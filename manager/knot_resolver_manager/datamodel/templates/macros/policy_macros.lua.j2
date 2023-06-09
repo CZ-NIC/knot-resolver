@@ -37,14 +37,19 @@ policy.slice_randomize_psl()
 
 {% macro policy_flags(flags) -%}
 policy.FLAGS({
-{%- if flags is string -%}
-'{{ flags.upper().replace("-", "_")|string }}'
-{%- else -%}
-{%- for flag in flags|list -%}
-'{{ flag.upper().replace("-", "_") }}',
-{%- endfor -%}
-{%- endif -%}
+{{- flags -}}
 })
+{%- endmacro %}
+
+
+{# Tags assign #}
+
+{% macro policy_tags_assign(tags) -%}
+policy.TAGS_ASSIGN({{ string_table(tags) }})
+{%- endmacro %}
+
+{% macro policy_get_tagset(tags) -%}
+policy.get_tagset({{ string_table(tags) }})
 {%- endmacro %}
 
 
@@ -253,7 +258,11 @@ policy.TLS_FORWARD({{ tls_servers_table(servers) }})
 
 {# Other #}
 
-{% macro policy_todname(names) -%}
+{% macro policy_todname(name) -%}
+todname('{{ name.punycode()|string }}')
+{%- endmacro %}
+
+{% macro policy_todnames(names) -%}
 policy.todnames({
 {%- if names is string -%}
 '{{ names.punycode()|string }}'

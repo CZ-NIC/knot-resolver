@@ -1,5 +1,9 @@
 {% if not cfg.lua.script_only %}
 
+-- FFI library
+ffi = require('ffi')
+local C = ffi.C
+
 -- hostname
 hostname('{{ cfg.hostname }}')
 
@@ -12,6 +16,9 @@ nsid.name('{{ cfg.nsid }}_' .. worker.id)
 -- LOGGING section ----------------------------------
 {% include "logging.lua.j2" %}
 
+-- MONITORING section -------------------------------
+{% include "monitoring.lua.j2" %}
+
 -- WEBMGMT section ----------------------------------
 {% include "webmgmt.lua.j2" %}
 
@@ -21,26 +28,23 @@ nsid.name('{{ cfg.nsid }}_' .. worker.id)
 -- NETWORK section ----------------------------------
 {% include "network.lua.j2" %}
 
--- STATIC-HINTS section -----------------------------
-{% include "static_hints.lua.j2" %}
-
 -- VIEWS section ------------------------------------
 {% include "views.lua.j2" %}
 
+-- LOCAL-DATA section -------------------------------
+{% include "local_data.lua.j2" %}
+
 -- SLICES section -----------------------------------
-{% include "slices.lua.j2" %}
+{# {% include "slices.lua.j2" %} #}
 
 -- POLICY section -----------------------------------
-{% include "policy.lua.j2" %}
+{# {% include "policy.lua.j2" %} #}
 
 -- RPZ section --------------------------------------
-{% include "rpz.lua.j2" %}
+{# {% include "rpz.lua.j2" %} #}
 
--- STUB-ZONES section -------------------------------
-{% include "stub_zones.lua.j2" %}
-
--- FORWARD-ZONES section ----------------------------
-{% include "forward_zones.lua.j2" %}
+-- FORWARD section ----------------------------------
+{% include "forward.lua.j2" %}
 
 -- CACHE section ------------------------------------
 {% include "cache.lua.j2" %}
@@ -64,6 +68,3 @@ nsid.name('{{ cfg.nsid }}_' .. worker.id)
 {% if cfg.lua.script %}
 {{ cfg.lua.script }}
 {% endif %}
-
--- manager's monitoring configuration
-{% include "monitoring.lua.j2" %}

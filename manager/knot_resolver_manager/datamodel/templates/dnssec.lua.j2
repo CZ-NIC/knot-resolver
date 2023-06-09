@@ -1,3 +1,5 @@
+{% from 'macros/common_macros.lua.j2' import boolean %}
+
 {% if not cfg.dnssec %}
 -- disable dnssec
 trust_anchors.remove('.')
@@ -51,6 +53,6 @@ trust_anchors.set_insecure({
 {% if cfg.dnssec.trust_anchors_files %}
 -- dnssec.trust-anchors-files
 {% for taf in cfg.dnssec.trust_anchors_files %}
-trust_anchors.add_file('{{ taf.file }}',  readonly = {{ 'true' if taf.read_only else 'false' }})
+trust_anchors.add_file('{{ taf.file }}',  readonly = {{ boolean(taf.read_only) }})
 {% endfor %}
 {% endif %}

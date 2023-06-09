@@ -16,16 +16,24 @@ def test_policy_add():
     assert tmpl.render(rule=rule, postrule=True) == f"policy.add({rule},true)"
 
 
-def test_policy_flags():
-    flags: List[PolicyFlagEnum] = ["no-cache", "no-edns"]
-    tmpl_str = """{% from 'macros/policy_macros.lua.j2' import policy_flags %}
-{{ policy_flags(flags) }}"""
+def test_policy_tags_assign():
+    tags: List[str] = ["t01", "t02", "t03"]
+    tmpl_str = """{% from 'macros/policy_macros.lua.j2' import policy_tags_assign %}
+{{ policy_tags_assign(tags) }}"""
 
     tmpl = template_from_str(tmpl_str)
-    assert tmpl.render(flags=flags[1]) == f"policy.FLAGS({{'{flags[1].upper().replace('-', '_')}'}})"
-    assert (
-        tmpl.render(flags=flags) == f"policy.FLAGS({{{str(flags).upper().replace('-', '_').replace(' ', '')[1:-1]},}})"
-    )
+    assert tmpl.render(tags=tags[1]) == f"policy.TAGS_ASSIGN('{tags[1]}')"
+    assert tmpl.render(tags=tags) == "policy.TAGS_ASSIGN({" + ",".join([f"'{x}'" for x in tags]) + ",})"
+
+
+def test_policy_get_tagset():
+    tags: List[str] = ["t01", "t02", "t03"]
+    tmpl_str = """{% from 'macros/policy_macros.lua.j2' import policy_get_tagset %}
+{{ policy_get_tagset(tags) }}"""
+
+    tmpl = template_from_str(tmpl_str)
+    assert tmpl.render(tags=tags[1]) == f"policy.get_tagset('{tags[1]}')"
+    assert tmpl.render(tags=tags) == "policy.get_tagset({" + ",".join([f"'{x}'" for x in tags]) + ",})"
 
 
 # Filters

@@ -1,10 +1,9 @@
 from typing import List, Optional, Union
 
+from knot_resolver_manager.datamodel.forward_schema import ForwardServerSchema
 from knot_resolver_manager.datamodel.network_schema import AddressRenumberingSchema
 from knot_resolver_manager.datamodel.types import (
     DNSRecordTypeEnum,
-    DomainName,
-    File,
     IPAddressOptionalPort,
     PolicyActionEnum,
     PolicyFlagEnum,
@@ -43,23 +42,6 @@ class AnswerSchema(ConfigSchema):
     rdata: str
     ttl: TimeUnit = TimeUnit("1s")
     nodata: bool = False
-
-
-class ForwardServerSchema(ConfigSchema):
-    """
-    Configuration of Forward server.
-
-    ---
-    address: IP address of Forward server.
-    pin_sha256: Hash of accepted CA certificate.
-    hostname: Hostname of the Forward server.
-    ca_file: Path to CA certificate file.
-    """
-
-    address: IPAddressOptionalPort
-    pin_sha256: Optional[Union[str, List[str]]] = None
-    hostname: Optional[DomainName] = None
-    ca_file: Optional[File] = None
 
 
 def _validate_policy_action(policy_action: Union["ActionSchema", "PolicySchema"]) -> None:

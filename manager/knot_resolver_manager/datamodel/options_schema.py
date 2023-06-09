@@ -28,7 +28,7 @@ class OptionsSchema(ConfigSchema):
 
         ---
         glue_checking: Glue records scrictness checking level.
-        qname_minimisation: Send minimum amount of information in recursive queries to enhance privacy.
+        minimize: Send minimum amount of information in recursive queries to enhance privacy.
         query_loopback: Permits queries to loopback addresses.
         reorder_rrset: Controls whether resource records within a RRSet are reordered each time it is served from the cache.
         query_case_randomization: Randomize Query Character Case.
@@ -42,7 +42,7 @@ class OptionsSchema(ConfigSchema):
         """
 
         glue_checking: GlueCheckingEnum = "normal"
-        qname_minimisation: bool = True
+        minimize: bool = True
         query_loopback: bool = False
         reorder_rrset: bool = True
         query_case_randomization: bool = True
@@ -57,7 +57,7 @@ class OptionsSchema(ConfigSchema):
     _LAYER = Raw
 
     glue_checking: GlueCheckingEnum
-    qname_minimisation: bool
+    minimize: bool
     query_loopback: bool
     reorder_rrset: bool
     query_case_randomization: bool

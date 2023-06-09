@@ -1,5 +1,23 @@
 from knot_resolver_manager.datamodel.config_schema import template_from_str
-from knot_resolver_manager.datamodel.forward_zone_schema import ForwardServerSchema
+from knot_resolver_manager.datamodel.forward_schema import ForwardServerSchema
+
+
+def test_boolean():
+    tmpl_str = """{% from 'macros/common_macros.lua.j2' import boolean %}
+{{ boolean(x) }}"""
+
+    tmpl = template_from_str(tmpl_str)
+    assert tmpl.render(x=True) == "true"
+    assert tmpl.render(x=False) == "false"
+
+
+def test_boolean_neg():
+    tmpl_str = """{% from 'macros/common_macros.lua.j2' import boolean %}
+{{ boolean(x,true) }}"""
+
+    tmpl = template_from_str(tmpl_str)
+    assert tmpl.render(x=True) == "false"
+    assert tmpl.render(x=False) == "true"
 
 
 def test_string_table():
@@ -50,9 +68,9 @@ def test_servers_table():
 def test_tls_servers_table():
     d = ForwardServerSchema(
         # the ca-file is a dummy, because it's existence is checked
-        {"address": "2001:DB8::d0c", "hostname": "res.example.com", "ca-file": "/etc/passwd"}
+        {"address": ["2001:DB8::d0c"], "hostname": "res.example.com", "ca-file": "/etc/passwd"}
     )
-    t = [d, ForwardServerSchema({"address": "192.0.2.1", "pin-sha256": "YQ=="})]
+    t = [d, ForwardServerSchema({"address": ["192.0.2.1"], "pin-sha256": "YQ=="})]
     tmpl_str = """{% from 'macros/common_macros.lua.j2' import tls_servers_table %}
 {{ tls_servers_table(x) }}"""
 
@@ -60,5 +78,5 @@ def test_tls_servers_table():
     assert tmpl.render(x=[d.address, t[1].address]) == f"{{'{d.address}','{t[1].address}',}}"
     assert (
         tmpl.render(x=t)
-        == f"{{{{'{d.address}',hostname='{d.hostname}',ca_file='{d.ca_file}',}},{{'{t[1].address}',pin_sha256='{t[1].pin_sha256}',}},}}"
+        == f"{{{{'{d.address}',hostname='{d.hostname}',ca_file='{d.ca_file}',}},{{'{t[1].address}',pin_sha256={{'{t[1].pin_sha256}',}}}},}}"
     )

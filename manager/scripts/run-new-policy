@@ -1,0 +1,29 @@
+#!/bin/bash
+
+# ensure consistent behaviour
+src_dir="$(dirname "$(realpath "$0")")"
+source $src_dir/_env.sh
+
+build_kresd_new_policy
+
+echo
+echo Building Knot Resolver Manager native extensions
+echo ------------------------------------------------
+poetry build
+# copy native modules from build directory to source directory
+shopt -s globstar
+shopt -s nullglob
+for d in build/lib*; do
+    for f in "$d/"**/*.so; do
+        cp -v "$f" ${f#"$d/"}
+    done
+done
+shopt -u globstar
+shopt -u nullglob
+
+
+echo
+echo Knot Manager API is accessible on http://localhost:5000
+echo -------------------------------------------------------
+
+python3 -m knot_resolver_manager -c etc/knot-resolver/config.policy.dev.yml $@

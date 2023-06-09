@@ -56,13 +56,14 @@ def test_size_unit_invalid(val: Any):
         SizeUnit(val)
 
 
-@pytest.mark.parametrize("val", ["1d", "24h", "1440m", "86400s", "86400000ms"])
+@pytest.mark.parametrize("val", ["1d", "24h", "1440m", "86400s", "86400000ms", "86400000000us"])
 def test_time_unit_valid(val: str):
     o = TimeUnit(val)
-    assert int(o) == 86400000
+    assert int(o) == 86400000000
     assert str(o) == val
     assert o.seconds() == 86400
     assert o.millis() == 86400000
+    assert o.micros() == 86400000000
 
 
 @pytest.mark.parametrize("val", ["-1", "-24h", "1440mm", 6575, -1440])

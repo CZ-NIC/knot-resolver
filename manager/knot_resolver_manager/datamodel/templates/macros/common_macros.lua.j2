@@ -1,3 +1,15 @@
+{% macro quotes(string) -%}
+'{{ string }}'
+{%- endmacro %}
+
+{% macro boolean(val, negation=false) -%}
+{%- if negation -%}
+{{ 'false' if val else 'true' }}
+{%- else-%}
+{{ 'true' if val else 'false' }}
+{%- endif -%}
+{%- endmacro %}
+
 {# Return string or table of strings #}
 {% macro string_table(table) -%}
 {%- if table is string -%}

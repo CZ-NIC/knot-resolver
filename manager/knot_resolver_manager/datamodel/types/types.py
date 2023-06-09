@@ -24,6 +24,11 @@ class Int0_65535(IntRangeBase):
     _max: int = 65_535
 
 
+class Percent(IntRangeBase):
+    _min: int = 0
+    _max: int = 100
+
+
 class PortNumber(IntRangeBase):
     _min: int = 1
     _max: int = 65_535
@@ -42,14 +47,20 @@ class SizeUnit(UnitBase):
     def bytes(self) -> int:
         return self._value
 
+    def mbytes(self) -> int:
+        return self._value // 1024**2
+
 
 class TimeUnit(UnitBase):
-    _units = {"ms": 1, "s": 1000, "m": 60 * 1000, "h": 3600 * 1000, "d": 24 * 3600 * 1000}
+    _units = {"us": 1, "ms": 10**3, "s": 10**6, "m": 60 * 10**6, "h": 3600 * 10**6, "d": 24 * 3600 * 10**6}
 
     def seconds(self) -> int:
-        return self._value // 1000
+        return self._value // 1000**2
 
     def millis(self) -> int:
+        return self._value // 1000
+
+    def micros(self) -> int:
         return self._value
 
 

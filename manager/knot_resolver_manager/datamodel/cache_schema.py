@@ -1,6 +1,8 @@
-from typing import List, Optional
+from typing import List, Optional, Union
 
-from knot_resolver_manager.datamodel.types import Dir, DomainName, File, SizeUnit, TimeUnit
+from typing_extensions import Literal
+
+from knot_resolver_manager.datamodel.types import Dir, DomainName, File, IntNonNegative, Percent, SizeUnit, TimeUnit
 from knot_resolver_manager.utils.modeling import ConfigSchema
 
 
@@ -25,23 +27,50 @@ class PrefillSchema(ConfigSchema):
             raise ValueError("cache prefilling is not yet supported for non-root zones")
 
 
+class GarbageCollectorSchema(ConfigSchema):
+    """
+    Configuration options of the cache garbage collector (kres-cache-gc).
+
+    ---
+    interval: Time interval how often the garbage collector will be run.
+    threshold: Cache usage in percent that triggers the garbage collector.
+    release: Percent of used cache to be freed by the garbage collector.
+    temp_keys_space: Maximum amount of temporary memory for copied keys (0 = unlimited).
+    rw_deletes: Maximum number of deleted records per read-write transaction (0 = unlimited).
+    rw_reads: Maximum number of readed records per read-write transaction (0 = unlimited).
+    rw_duration: Maximum duration of read-write transaction (0 = unlimited).
+    rw_delay: Wait time between two read-write transactions.
+    dry_run: Run the garbage collector in dry-run mode.
+    """
+
+    interval: TimeUnit = TimeUnit("1s")
+    threshold: Percent = Percent(80)
+    release: Percent = Percent(10)
+    temp_keys_space: SizeUnit = SizeUnit(0)
+    rw_deletes: IntNonNegative = IntNonNegative(100)
+    rw_reads: IntNonNegative = IntNonNegative(200)
+    rw_duration: TimeUnit = TimeUnit(0)
+    rw_delay: TimeUnit = TimeUnit(0)
+    dry_run: bool = False
+
+
 class CacheSchema(ConfigSchema):
     """
     DNS resolver cache configuration.
 
     ---
-    garbage_collector: Automatically use garbage collector to periodically clear cache.
     storage: Cache storage of the DNS resolver.
     size_max: Maximum size of the cache.
+    garbage_collector: Use the garbage collector (kres-cache-gc) to periodically clear cache.
     ttl_min: Minimum time-to-live for the cache entries.
     ttl_max: Maximum time-to-live for the cache entries.
     ns_timeout: Time interval for which a nameserver address will be ignored after determining that it does not return (useful) answers.
     prefill: Prefill the cache periodically by importing zone data obtained over HTTP.
     """
 
-    garbage_collector: bool = True
     storage: Dir = Dir("/var/cache/knot-resolver")
     size_max: SizeUnit = SizeUnit("100M")
+    garbage_collector: Union[GarbageCollectorSchema, Literal[False]] = GarbageCollectorSchema()
     ttl_min: TimeUnit = TimeUnit("5s")
     ttl_max: TimeUnit = TimeUnit("6d")
     ns_timeout: TimeUnit = TimeUnit("1000ms")

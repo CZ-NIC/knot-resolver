@@ -20,13 +20,13 @@ class StubZoneSchema(ConfigSchema):
     Configuration of Stub Zone.
 
     ---
-    name: Domain name of the zone.
+    subtree: Domain name of the zone.
     servers: IP address of Stub server.
     views: Use this Stub Zone only for clients defined by views.
     options: Configuration flags for Stub Zone.
     """
 
-    name: DomainName
+    subtree: DomainName
     servers: Union[List[IPAddressOptionalPort], List[StubServerSchema]]
     views: Optional[List[str]] = None
     options: Optional[List[PolicyFlagEnum]] = None

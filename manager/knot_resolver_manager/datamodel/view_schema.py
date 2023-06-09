@@ -1,7 +1,22 @@
 from typing import List, Optional
 
-from knot_resolver_manager.datamodel.types import IPNetwork, PolicyFlagEnum
+from typing_extensions import Literal
+
+from knot_resolver_manager.datamodel.types import IDPattern, IPNetwork
 from knot_resolver_manager.utils.modeling import ConfigSchema
+
+
+class ViewOptionsSchema(ConfigSchema):
+    """
+    Configuration options for clients identified by the view.
+
+    ---
+    minimize: Send minimum amount of information in recursive queries to enhance privacy.
+    dns64: Enable/disable DNS64.
+    """
+
+    minimize: bool = True
+    dns64: bool = True
 
 
 class ViewSchema(ConfigSchema):
@@ -10,14 +25,16 @@ class ViewSchema(ConfigSchema):
 
     ---
     subnets: Identifies the client based on his subnet.
-    tsig: Identifies the client based on a TSIG key name (for testing purposes, TSIG signature is not verified!).
-    options: Configuration flags for clients identified by the view.
+    tags: Tags to link with other policy rules.
+    answer: Direct approach how to handle request from clients identified by the view.
+    options: Configuration options for clients identified by the view.
     """
 
-    subnets: Optional[List[IPNetwork]] = None
-    tsig: Optional[List[str]] = None
-    options: Optional[List[PolicyFlagEnum]] = None
+    subnets: List[IPNetwork]
+    tags: Optional[List[IDPattern]] = None
+    answer: Optional[Literal["allow", "refused", "noanswer"]] = None
+    options: ViewOptionsSchema = ViewOptionsSchema()
 
     def _validate(self) -> None:
-        if self.tsig is None and self.subnets is None:
-            raise ValueError("'subnets' or 'rsig' must be configured")
+        if bool(self.tags) == bool(self.answer):
+            raise ValueError("only one of 'tags' and 'answer' options must be configured")

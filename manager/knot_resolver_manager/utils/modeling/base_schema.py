@@ -7,15 +7,18 @@ import yaml
 
 from knot_resolver_manager.utils.functional import all_matches
 
+from .base_generic_type_wrapper import BaseGenericTypeWrapper
 from .base_value_type import BaseValueType
 from .exceptions import AggregateDataValidationError, DataDescriptionError, DataValidationError
 from .renaming import Renamed, renamed
 from .types import (
     get_generic_type_argument,
     get_generic_type_arguments,
+    get_generic_type_wrapper_argument,
     get_optional_inner_type,
     is_dict,
     is_enum,
+    is_generic_type_wrapper,
     is_internal_field_name,
     is_list,
     is_literal,
@@ -54,6 +57,7 @@ class Serializable(ABC):
             or is_literal(typ)
             or is_dict(typ)
             or is_list(typ)
+            or is_generic_type_wrapper(typ)
             or (inspect.isclass(typ) and issubclass(typ, Serializable))
             or (inspect.isclass(typ) and issubclass(typ, BaseValueType))
             or (inspect.isclass(typ) and issubclass(typ, BaseSchema))
@@ -66,8 +70,11 @@ class Serializable(ABC):
         if isinstance(obj, Serializable):
             return obj.to_dict()
 
-        elif isinstance(obj, BaseValueType):
-            return obj.serialize()
+        elif isinstance(obj, (BaseValueType, BaseGenericTypeWrapper)):
+            o = obj.serialize()
+            # if Serializable.is_serializable(o):
+            return Serializable.serialize(o)
+            # return o
 
         elif isinstance(obj, list):
             res: List[Any] = [Serializable.serialize(i) for i in cast(List[Any], obj)]
@@ -170,6 +177,10 @@ def _describe_type(typ: Type[Any]) -> Dict[Any, Any]:
 
     elif inspect.isclass(typ) and issubclass(typ, BaseValueType):
         return typ.json_schema()
+
+    elif is_generic_type_wrapper(typ):
+        wrapped = get_generic_type_wrapper_argument(typ)
+        return _describe_type(wrapped)
 
     elif is_none_type(typ):
         return {"type": "null"}
@@ -279,11 +290,15 @@ class ObjectMapper:
         inner_type = get_generic_type_argument(tp)
         errs: List[DataValidationError] = []
         res: List[Any] = []
-        for i, val in enumerate(obj):
-            try:
+
+        try:
+            for i, val in enumerate(obj):
                 res.append(self.map_object(inner_type, val, object_path=f"{object_path}[{i}]"))
-            except DataValidationError as e:
-                errs.append(e)
+        except DataValidationError as e:
+            errs.append(e)
+        except TypeError as e:
+            errs.append(DataValidationError(str(e), object_path))
+
         if len(errs) == 1:
             raise errs[0]
         elif len(errs) > 1:
@@ -464,6 +479,12 @@ class ObjectMapper:
         # BaseValueType subclasses
         elif inspect.isclass(tp) and issubclass(tp, BaseValueType):
             return self.create_value_type_object(tp, obj, object_path)
+
+        # BaseGenericTypeWrapper subclasses
+        elif is_generic_type_wrapper(tp):
+            inner_type = get_generic_type_wrapper_argument(tp)
+            obj_valid = self.map_object(inner_type, obj, object_path)
+            return tp(obj_valid, object_path=object_path)  # type: ignore
 
         # nested BaseSchema subclasses
         elif inspect.isclass(tp) and issubclass(tp, BaseSchema):

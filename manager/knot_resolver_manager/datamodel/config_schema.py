@@ -11,7 +11,8 @@ from knot_resolver_manager.constants import MAX_WORKERS
 from knot_resolver_manager.datamodel.cache_schema import CacheSchema
 from knot_resolver_manager.datamodel.dns64_schema import Dns64Schema
 from knot_resolver_manager.datamodel.dnssec_schema import DnssecSchema
-from knot_resolver_manager.datamodel.forward_zone_schema import ForwardZoneSchema
+from knot_resolver_manager.datamodel.forward_schema import ForwardSchema
+from knot_resolver_manager.datamodel.local_data_schema import LocalDataSchema
 from knot_resolver_manager.datamodel.logging_schema import LoggingSchema
 from knot_resolver_manager.datamodel.lua_schema import LuaSchema
 from knot_resolver_manager.datamodel.management_schema import ManagementSchema
@@ -19,10 +20,7 @@ from knot_resolver_manager.datamodel.monitoring_schema import MonitoringSchema
 from knot_resolver_manager.datamodel.network_schema import NetworkSchema
 from knot_resolver_manager.datamodel.options_schema import OptionsSchema
 from knot_resolver_manager.datamodel.policy_schema import PolicySchema
-from knot_resolver_manager.datamodel.rpz_schema import RPZSchema
 from knot_resolver_manager.datamodel.slice_schema import SliceSchema
-from knot_resolver_manager.datamodel.static_hints_schema import StaticHintsSchema
-from knot_resolver_manager.datamodel.stub_zone_schema import StubZoneSchema
 from knot_resolver_manager.datamodel.types import IntPositive
 from knot_resolver_manager.datamodel.types.files import UncheckedPath
 from knot_resolver_manager.datamodel.view_schema import ViewSchema
@@ -73,9 +71,9 @@ def _cpu_count() -> Optional[int]:
         return cpus
 
 
-def _default_max_worker_count() -> Optional[int]:
+def _default_max_worker_count() -> int:
     c = _cpu_count()
-    if c is not None:
+    if c:
         return c * 10
     return MAX_WORKERS
 
@@ -96,13 +94,11 @@ class KresConfig(ConfigSchema):
         webmgmt: Configuration of legacy web management endpoint.
         options: Fine-tuning global parameters of DNS resolver operation.
         network: Network connections and protocols configuration.
-        static_hints: Static hints for forward records (A/AAAA) and reverse records (PTR)
         views: List of views and its configuration.
+        local_data: Local data for forward records (A/AAAA) and reverse records (PTR).
         slices: Split the entire DNS namespace into distinct slices.
         policy: List of policy rules and its configuration.
-        rpz: List of Response Policy Zones and its configuration.
-        stub_zones: List of Stub Zones and its configuration.
-        forward_zones: List of Forward Zones and its configuration.
+        forward: List of Forward Zones and its configuration.
         cache: DNS resolver cache configuration.
         dnssec: Disable DNSSEC, enable with defaults or set new configuration.
         dns64: Disable DNS64 (RFC 6147), enable with defaults or set new configuration.
@@ -121,13 +117,11 @@ class KresConfig(ConfigSchema):
         webmgmt: Optional[WebmgmtSchema] = None
         options: OptionsSchema = OptionsSchema()
         network: NetworkSchema = NetworkSchema()
-        static_hints: StaticHintsSchema = StaticHintsSchema()
-        views: Optional[Dict[str, ViewSchema]] = None
+        views: Optional[List[ViewSchema]] = None
+        local_data: LocalDataSchema = LocalDataSchema()
         slices: Optional[List[SliceSchema]] = None
         policy: Optional[List[PolicySchema]] = None
-        rpz: Optional[List[RPZSchema]] = None
-        stub_zones: Optional[List[StubZoneSchema]] = None
-        forward_zones: Optional[List[ForwardZoneSchema]] = None
+        forward: Optional[List[ForwardSchema]] = None
         cache: CacheSchema = CacheSchema()
         dnssec: Union[bool, DnssecSchema] = True
         dns64: Union[bool, Dns64Schema] = False
@@ -146,13 +140,11 @@ class KresConfig(ConfigSchema):
     webmgmt: Optional[WebmgmtSchema]
     options: OptionsSchema
     network: NetworkSchema
-    static_hints: StaticHintsSchema
-    views: Optional[Dict[str, ViewSchema]]
+    views: Optional[List[ViewSchema]]
+    local_data: LocalDataSchema
     slices: Optional[List[SliceSchema]]
     policy: Optional[List[PolicySchema]]
-    rpz: Optional[List[RPZSchema]]
-    stub_zones: Optional[List[StubZoneSchema]]
-    forward_zones: Optional[List[ForwardZoneSchema]]
+    forward: Optional[List[ForwardSchema]]
     cache: CacheSchema
     dnssec: Union[Literal[False], DnssecSchema]
     dns64: Union[Literal[False], Dns64Schema]

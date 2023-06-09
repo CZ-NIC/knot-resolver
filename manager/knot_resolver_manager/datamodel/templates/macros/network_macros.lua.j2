@@ -44,20 +44,12 @@ net.{{ interface.if_name }},
 
 {% macro network_listen(listen) -%}
 {%- if listen.unix_socket -%}
-    {%- if listen.unix_socket is iterable-%}
-        {% for path in listen.unix_socket -%}
-            {{ net_listen_unix_socket(path, listen.kind, listen.freebind) }}
-        {% endfor -%}
-    {%- else -%}
-        {{ net_listen_unix_socket(listen.unix_socket, listen.kind, listen.freebind) }}
-    {%- endif -%}
+{% for path in listen.unix_socket %}
+{{ net_listen_unix_socket(path, listen.kind, listen.freebind) }}
+{% endfor %}
 {%- elif listen.interface -%}
-    {%- if listen.interface is iterable-%}
-        {% for interface in listen.interface -%}
-            {{ net_listen_interface(interface, listen.kind, listen.freebind, listen.port) }}
-        {% endfor -%}
-    {%- else -%}
-        {{ net_listen_interface(listen.interface, listen.kind, listen.freebind, listen.port) }}
-    {%- endif -%}
+{% for interface in listen.interface %}
+{{ net_listen_interface(interface, listen.kind, listen.freebind, listen.port) }}
+{% endfor %}
 {%- endif -%}
 {%- endmacro %}

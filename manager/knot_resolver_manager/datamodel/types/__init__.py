@@ -1,7 +1,9 @@
 from .enums import DNSRecordTypeEnum, PolicyActionEnum, PolicyFlagEnum
 from .files import AbsoluteDir, Dir, File, FilePath
+from .generic_types import ListOrItem
 from .types import (
     DomainName,
+    IDPattern,
     Int0_512,
     Int0_65535,
     InterfaceName,
@@ -16,6 +18,7 @@ from .types import (
     IPv4Address,
     IPv6Address,
     IPv6Network96,
+    Percent,
     PortNumber,
     SizeUnit,
     TimeUnit,
@@ -26,6 +29,7 @@ __all__ = [
     "PolicyFlagEnum",
     "DNSRecordTypeEnum",
     "DomainName",
+    "IDPattern",
     "Int0_512",
     "Int0_65535",
     "InterfaceName",
@@ -40,6 +44,8 @@ __all__ = [
     "IPv4Address",
     "IPv6Address",
     "IPv6Network96",
+    "ListOrItem",
+    "Percent",
     "PortNumber",
     "SizeUnit",
     "TimeUnit",

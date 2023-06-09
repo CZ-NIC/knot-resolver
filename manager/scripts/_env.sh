@@ -50,3 +50,36 @@ function build_kresd {
 	export PATH="$(realpath manager/.install_kresd)/sbin:$PATH"
 	popd
 }
+
+function build_kresd_new_policy {
+	echo
+	echo Building Knot Resolver
+	echo ----------------------
+	echo -e "${blue}In case of an compilation error, run this command to try to fix it:${reset}"
+	echo -e "\t${blue}rm -r $(realpath .install_kresd) $(realpath .build_kresd)${reset}"
+	echo
+
+
+	pushd ..
+	rm -rf manager/.install_kresd manager/.build_kresd
+	mkdir -p manager/.build_kresd manager/.install_kresd
+
+	if [ -d "kres-new-policy" ]
+	then
+	echo updating repository...
+	cd kres-new-policy
+	git pull
+	else
+	echo cloning repository...
+	git clone -b new-policy https://gitlab.nic.cz/knot/knot-resolver.git kres-new-policy
+	cd kres-new-policy
+	git submodule update --init --recursive
+	fi
+
+	meson setup ../manager/.build_kresd --prefix=$(realpath ../manager/.install_kresd) --default-library=static --buildtype=debug
+	ninja -C ../manager/.build_kresd
+	ninja install -C ../manager/.build_kresd
+	cd ..
+	export PATH="$(realpath manager/.install_kresd)/sbin:$PATH"
+	popd
+}
