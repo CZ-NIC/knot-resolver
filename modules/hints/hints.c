@@ -152,7 +152,11 @@ static int query(kr_layer_t *ctx, knot_pkt_t *pkt)
 	}
 	/* FIXME: putting directly into packet breaks ordering in case the hint
 	 * is applied after a CNAME jump. */
-	if (knot_dname_in_bailiwick(qry->sname, (const uint8_t *)"\4arpa\0") >= 0) {
+	const bool is_rev =
+		knot_dname_in_bailiwick(qry->sname, (const uint8_t *)"\4arpa\0") > 0 &&
+		(knot_dname_in_bailiwick(qry->sname, (const uint8_t *)"\7in-addr\4arpa\0") > 0
+		 || knot_dname_in_bailiwick(qry->sname, (const uint8_t *)"\3ip6\4arpa\0") > 0);
+	if (is_rev) {
 		if (satisfy_reverse(data, pkt, qry) != 0)
 			return ctx->state;
 	} else {
