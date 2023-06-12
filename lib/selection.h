@@ -131,6 +131,12 @@ struct kr_server_selection {
  */
 KR_EXPORT
 void kr_server_selection_init(struct kr_query *qry);
+/**
+ * @brief Ensure server selection state suitable for processing "reply from cache".
+ *
+ * In particular, qry->server_selection.error() calls shouldn't crash.
+ */
+void kr_server_selection_cached(struct kr_query *qry);
 
 /**
  * @brief Add forwarding target to request.

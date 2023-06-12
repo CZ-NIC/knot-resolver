@@ -3,9 +3,9 @@ local condition = require('cqueues.condition')
 
 -- setup resolver
 modules = { 'hints', 'dns64' }
-hints['dns64.example'] = '192.168.1.1'
 hints.use_nodata(true) -- Respond NODATA to AAAA query
 hints.ttl(60)
+hints['dns64.example'] = '192.168.1.1'
 dns64.config('fe80::21b:77ff:0:0')
 
 -- helper to wait for query resolution

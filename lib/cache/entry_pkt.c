@@ -125,12 +125,9 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 }
 
 
-int answer_from_pkt(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
+int answer_from_pkt(struct kr_query *qry, knot_pkt_t *pkt, uint16_t type,
 		const struct entry_h *eh, const void *eh_bound, uint32_t new_ttl)
 {
-	struct kr_request *req = ctx->req;
-	struct kr_query *qry = req->current_query;
-
 	const uint16_t msgid = knot_wire_get_id(pkt->wire);
 
 	/* Ensure the wire buffer is large enough.  Strategy: fit and at least double. */
@@ -139,8 +136,8 @@ int answer_from_pkt(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
 	if (pkt_len > pkt->max_size) {
 		pkt->max_size = MIN(KNOT_WIRE_MAX_PKTSIZE,
 				    MAX(pkt->max_size * 2, pkt_len));
-		mm_free(&ctx->req->pool, pkt->wire); /* no-op, but... */
-		pkt->wire = mm_alloc(&ctx->req->pool, pkt->max_size);
+		mm_free(&qry->request->pool, pkt->wire); /* no-op, but... */
+		pkt->wire = mm_alloc(&qry->request->pool, pkt->max_size);
 		pkt->compr.wire = pkt->wire;
 		/* TODO: ^^ nicer way how to replace knot_pkt_t::wire ? */
 	}

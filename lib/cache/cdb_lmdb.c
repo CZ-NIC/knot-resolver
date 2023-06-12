@@ -17,6 +17,10 @@
 #include "lib/cache/cdb_api.h"
 #include "lib/utils.h"
 
+/// A hacky way allowing usual usage of kr_log_error(MDB, ...)
+/// while differentiating between cache and rules in the produced logs.
+#define LOG_GRP_MDB     (env->is_cache ? LOG_GRP_CACHE     : LOG_GRP_RULES)
+#define LOG_GRP_MDB_TAG (env->is_cache ? LOG_GRP_CACHE_TAG : LOG_GRP_RULES_TAG)
 
 /* Defines */
 #define LMDB_DIR_MODE   0770
@@ -41,6 +45,8 @@ struct lmdb_env
 		MDB_txn *ro, *rw;
 		MDB_cursor *ro_curs;
 	} txn;
+
+	bool is_cache; /**< cache vs. rules; from struct kr_cdb_opts::is_cache */
 
 	/* Cached part of struct stat for data.mdb. */
 	dev_t st_dev;
@@ -70,10 +76,11 @@ static inline kr_cdb_pt env2db(struct lmdb_env *env)
 	return (kr_cdb_pt)env;
 }
 
-static int cdb_commit(kr_cdb_pt db, struct kr_cdb_stats *stats);
+static int cdb_commit(kr_cdb_pt db, struct kr_cdb_stats *stats, bool accept);
+static void txn_abort(struct lmdb_env *env);
 
 /** @brief Convert LMDB error code. */
-static int lmdb_error(int error)
+static int lmdb_error(struct lmdb_env *env, int error)
 {
 	switch (error) {
 	case MDB_SUCCESS:
@@ -83,9 +90,12 @@ static int lmdb_error(int error)
 	case ENOSPC:
 	case MDB_MAP_FULL:
 	case MDB_TXN_FULL:
+		// For now, ENOSPC is a hard error for rules; easiest to log here.
+		if (!env->is_cache)
+			kr_log_error(MDB, "LMDB error: %s\n", mdb_strerror(error));
 		return kr_error(ENOSPC);
 	default:
-		kr_log_error(CACHE, "LMDB error: %s\n", mdb_strerror(error));
+		kr_log_error(MDB, "LMDB error: %s\n", mdb_strerror(error));
 		return kr_error(error);
 	}
 }
@@ -104,17 +114,17 @@ static inline MDB_val val_knot2mdb(knot_db_val_t v)
  * It's much lighter than reopen_env(). */
 static int refresh_mapsize(struct lmdb_env *env)
 {
-	int ret = cdb_commit(env2db(env), NULL);
-	if (!ret) ret = lmdb_error(mdb_env_set_mapsize(env->env, 0));
+	int ret = cdb_commit(env2db(env), NULL, true);
+	if (!ret) ret = lmdb_error(env, mdb_env_set_mapsize(env->env, 0));
 	if (ret) return ret;
 
 	MDB_envinfo info;
-	ret = lmdb_error(mdb_env_info(env->env, &info));
+	ret = lmdb_error(env, mdb_env_info(env->env, &info));
 	if (ret) return ret;
 
 	env->mapsize = info.me_mapsize;
 	if (env->mapsize != env->st_size) {
-		kr_log_info(CACHE, "suspicious size of cache file '%s'"
+		kr_log_info(MDB, "suspicious size of file '%s'"
 				": file size %zu != LMDB map size %zu\n",
 				env->mdb_data_path, (size_t)env->st_size, env->mapsize);
 	}
@@ -126,10 +136,10 @@ static void clear_stale_readers(struct lmdb_env *env)
 	int cleared;
 	int ret = mdb_reader_check(env->env, &cleared);
 	if (ret != MDB_SUCCESS) {
-		kr_log_error(CACHE, "failed to clear stale reader locks: "
+		kr_log_error(MDB, "failed to clear stale reader locks: "
 				"LMDB error %d %s\n", ret, mdb_strerror(ret));
 	} else if (cleared != 0) {
-		kr_log_info(CACHE, "cleared %d stale reader locks\n", cleared);
+		kr_log_info(MDB, "cleared %d stale reader locks\n", cleared);
 	}
 }
 
@@ -158,7 +168,7 @@ retry:
 	}
 
 	if (unlikely(ret == MDB_MAP_RESIZED)) {
-		kr_log_info(CACHE, "detected size increased by another process\n");
+		kr_log_info(MDB, "detected size increased by another process\n");
 		ret = refresh_mapsize(env);
 		if (ret == 0)
 			goto retry;
@@ -194,7 +204,7 @@ static int txn_get(struct lmdb_env *env, MDB_txn **txn, bool rdonly)
 			*txn = env->txn.rw;
 			kr_assert(*txn);
 		}
-		return lmdb_error(ret);
+		return lmdb_error(env, ret);
 	}
 
 	/* Get an active RO txn and return it. */
@@ -205,7 +215,7 @@ static int txn_get(struct lmdb_env *env, MDB_txn **txn, bool rdonly)
 		ret = txn_get_noresize(env, FLAG_RENEW, &env->txn.ro);
 	}
 	if (ret != MDB_SUCCESS) {
-		return lmdb_error(ret);
+		return lmdb_error(env, ret);
 	}
 	env->txn.ro_active = true;
 	*txn = env->txn.ro;
@@ -213,13 +223,18 @@ static int txn_get(struct lmdb_env *env, MDB_txn **txn, bool rdonly)
 	return kr_ok();
 }
 
-static int cdb_commit(kr_cdb_pt db, struct kr_cdb_stats *stats)
+static int cdb_commit(kr_cdb_pt db, struct kr_cdb_stats *stats, bool accept)
 {
 	struct lmdb_env *env = db2env(db);
+	if (!accept) {
+		txn_abort(env);
+		return kr_ok();
+	}
+
 	int ret = kr_ok();
 	if (env->txn.rw) {
 		if (stats) stats->commit++;
-		ret = lmdb_error(mdb_txn_commit(env->txn.rw));
+		ret = lmdb_error(env, mdb_txn_commit(env->txn.rw));
 		env->txn.rw = NULL; /* the transaction got freed even in case of errors */
 	} else if (env->txn.ro && env->txn.ro_active) {
 		mdb_txn_reset(env->txn.ro);
@@ -236,9 +251,11 @@ static int txn_curs_get(struct lmdb_env *env, MDB_cursor **curs, struct kr_cdb_s
 		return kr_error(EINVAL);
 	if (env->txn.ro_curs_active)
 		goto success;
-	/* Only in a read-only txn; TODO: it's a bit messy/coupled */
+	/* Only in a read-only txn; TODO: it's a bit messy/coupled
+	 * At least for rules we don't do the auto-commit feature. */
 	if (env->txn.rw) {
-		int ret = cdb_commit(env2db(env), stats);
+		if (!env->is_cache) return kr_error(EINPROGRESS);
+		int ret = cdb_commit(env2db(env), stats, true);
 		if (ret) return ret;
 	}
 	MDB_txn *txn = NULL;
@@ -250,7 +267,7 @@ static int txn_curs_get(struct lmdb_env *env, MDB_cursor **curs, struct kr_cdb_s
 	} else {
 		ret = mdb_cursor_open(txn, env->dbi, &env->txn.ro_curs);
 	}
-	if (ret) return lmdb_error(ret);
+	if (ret) return lmdb_error(env, ret);
 	env->txn.ro_curs_active = true;
 success:
 	kr_assert(env->txn.ro_curs_active && env->txn.ro && env->txn.ro_active
@@ -294,7 +311,7 @@ static void cdb_close_env(struct lmdb_env *env, struct kr_cdb_stats *stats)
 
 	/* Get rid of any transactions. */
 	txn_free_ro(env);
-	cdb_commit(env2db(env), stats);
+	cdb_commit(env2db(env), stats, env->is_cache);
 
 	mdb_env_sync(env->env, 1);
 	stats->close++;
@@ -313,7 +330,7 @@ static int cdb_open_env(struct lmdb_env *env, const char *path, const size_t map
 
 	stats->open++;
 	ret = mdb_env_create(&env->env);
-	if (ret != MDB_SUCCESS) return lmdb_error(ret);
+	if (ret != MDB_SUCCESS) return lmdb_error(env, ret);
 
 	env->mdb_data_path = kr_absolutize_path(path, "data.mdb");
 	if (!env->mdb_data_path) {
@@ -336,9 +353,11 @@ static int cdb_open_env(struct lmdb_env *env, const char *path, const size_t map
 		if (ret != MDB_SUCCESS) goto error_mdb;
 	}
 
-	/* Cache doesn't require durability, we can be
-	 * loose with the requirements as a tradeoff for speed. */
-	const unsigned flags = MDB_WRITEMAP | MDB_MAPASYNC | MDB_NOTLS;
+	const unsigned flags = env->is_cache
+		/* Cache doesn't require durability, we can be
+		 * loose with the requirements as a tradeoff for speed. */
+		? MDB_WRITEMAP | MDB_NOTLS | MDB_MAPASYNC
+		: MDB_WRITEMAP | MDB_NOTLS;
 	ret = mdb_env_open(env->env, path, flags, LMDB_FILE_MODE);
 	if (ret != MDB_SUCCESS) goto error_mdb;
 
@@ -367,14 +386,19 @@ static int cdb_open_env(struct lmdb_env *env, const char *path, const size_t map
 	ret = mdb_txn_begin(env->env, NULL, 0, &txn);
 	if (ret != MDB_SUCCESS) goto error_mdb;
 
-	ret = mdb_dbi_open(txn, NULL, 0, &env->dbi);
+
+	//FIXME: perhaps we want MDB_DUPSORT in future,
+	//  but for that we'd have to avoid MDB_RESERVE.
+	//  (including a proper assertion, instead of sometimes-crash inside lmdb)
+	const unsigned dbi_flags = 0; //is_cache ? 0 : MDB_DUPSORT;
+	ret = mdb_dbi_open(txn, NULL, dbi_flags, &env->dbi);
 	if (ret != MDB_SUCCESS) {
 		mdb_txn_abort(txn);
 		goto error_mdb;
 	}
 
 #if !defined(__MACOSX__) && !(defined(__APPLE__) && defined(__MACH__))
-	if (size_requested) {
+	if (size_requested && env->is_cache) { // prealloc makes no sense for rules
 		ret = posix_fallocate(fd, 0, MAX(env->mapsize, env->st_size));
 	} else {
 		ret = 0;
@@ -383,7 +407,7 @@ static int cdb_open_env(struct lmdb_env *env, const char *path, const size_t map
 		/* POSIX says this can happen when the feature isn't supported by the FS.
 		 * We haven't seen this happen on Linux+glibc but it was reported on
 		 * Linux+musl and FreeBSD. */
-		kr_log_info(CACHE, "space pre-allocation failed and ignored; "
+		kr_log_info(MDB, "space pre-allocation failed and ignored; "
 				"your (file)system probably doesn't support it.\n");
 	} else if (ret != 0) {
 		mdb_txn_abort(txn);
@@ -403,7 +427,7 @@ static int cdb_open_env(struct lmdb_env *env, const char *path, const size_t map
 	return kr_ok();
 
 error_mdb:
-	ret = lmdb_error(ret);
+	ret = lmdb_error(env, ret);
 error_sys:
 	free_const(env->mdb_data_path);
 	stats->close++;
@@ -424,6 +448,8 @@ static int cdb_init(kr_cdb_pt *db, struct kr_cdb_stats *stats,
 	if (!env) {
 		return kr_error(ENOMEM);
 	}
+	env->is_cache = opts->is_cache;
+
 	int ret = cdb_open_env(env, opts->path, opts->maxsize, stats);
 	if (ret != 0) {
 		free(env);
@@ -457,7 +483,7 @@ static int cdb_count(kr_cdb_pt db, struct kr_cdb_stats *stats)
 		return stat.ms_entries;
 	} else {
 		txn_abort(env);
-		return lmdb_error(ret);
+		return lmdb_error(env, ret);
 	}
 }
 
@@ -467,7 +493,7 @@ static int reopen_env(struct lmdb_env *env, struct kr_cdb_stats *stats, const si
 	const char *path;
 	int ret = mdb_env_get_path(env->env, &path);
 	if (ret != MDB_SUCCESS) {
-		return lmdb_error(ret);
+		return lmdb_error(env, ret);
 	}
 	auto_free char *path_copy = strdup(path);
 	cdb_close_env(env, stats);
@@ -485,7 +511,7 @@ static int cdb_check_health(kr_cdb_pt db, struct kr_cdb_stats *stats)
 	}
 
 	if (st.st_dev != env->st_dev || st.st_ino != env->st_ino) {
-		kr_log_debug(CACHE, "cache file has been replaced, reopening\n");
+		kr_log_debug(MDB, "LMDB file has been replaced, reopening\n");
 		int ret = reopen_env(env, stats, 0); // we accept mapsize from the new file
 		return ret == 0 ? 1 : ret;
 	}
@@ -494,7 +520,7 @@ static int cdb_check_health(kr_cdb_pt db, struct kr_cdb_stats *stats)
 	 * contrary to methods based on mdb_env_info(). */
 	if (st.st_size == env->st_size)
 		return kr_ok();
-	kr_log_info(CACHE, "detected size change (by another instance?) of file '%s'"
+	kr_log_info(MDB, "detected size change (by another instance?) of file '%s'"
 			": file size %zu -> file size %zu\n",
 			env->mdb_data_path, (size_t)env->st_size, (size_t)st.st_size);
 	env->st_size = st.st_size; // avoid retrying in cycle even if we fail
@@ -549,15 +575,15 @@ static int cdb_clear(kr_cdb_pt db, struct kr_cdb_stats *stats)
 		MDB_txn *txn = NULL;
 		int ret = txn_get(env, &txn, false);
 		if (ret == kr_ok()) {
-			ret = lmdb_error(mdb_drop(txn, env->dbi, 0));
-			if (ret == kr_ok()) {
-				ret = cdb_commit(db, stats);
+			ret = lmdb_error(env, mdb_drop(txn, env->dbi, 0));
+			if (ret == kr_ok() && env->is_cache) {
+				ret = cdb_commit(db, stats, true);
 			}
 			if (ret == kr_ok()) {
 				return ret;
 			}
 		}
-		kr_log_info(CACHE, "clearing error, falling back\n");
+		kr_log_info(MDB, "clearing error, falling back\n");
 	}
 	/* Fallback: we'll remove the database files and reopen.
 	 * Other instances can continue to use the removed lmdb,
@@ -565,12 +591,12 @@ static int cdb_clear(kr_cdb_pt db, struct kr_cdb_stats *stats)
 
 	/* We are about to switch to a different file, so end all txns, to be sure. */
 	txn_free_ro(env);
-	(void) cdb_commit(db, stats);
+	(void) cdb_commit(db, stats, env->is_cache);
 
 	const char *path = NULL;
 	int ret = mdb_env_get_path(env->env, &path);
 	if (ret != MDB_SUCCESS) {
-		return lmdb_error(ret);
+		return lmdb_error(env, ret);
 	}
 	auto_free char *mdb_lockfile = kr_strcatdup(2, path, "/lock.mdb");
 	auto_free char *lockfile = kr_strcatdup(2, path, "/krcachelock");
@@ -581,7 +607,7 @@ static int cdb_clear(kr_cdb_pt db, struct kr_cdb_stats *stats)
 	/* Find if we get a lock on lockfile. */
 	const int lockfile_fd = lockfile_get(lockfile);
 	if (lockfile_fd < 0) {
-		kr_log_error(CACHE, "clearing failed to get ./krcachelock (%s); retry later\n",
+		kr_log_error(MDB, "clearing failed to get ./krcachelock (%s); retry later\n",
 				kr_strerror(lockfile_fd));
 		/* As we're out of space (almost certainly - mdb_drop didn't work),
 		 * we will retry on the next failing write operation. */
@@ -597,7 +623,7 @@ static int cdb_clear(kr_cdb_pt db, struct kr_cdb_stats *stats)
 			ret = kr_ok();
 		// else pass some other error
 	} else {
-		kr_log_debug(CACHE, "clear: identical files, unlinking\n");
+		kr_log_debug(MDB, "clear: identical files, unlinking\n");
 		// coverity[toctou]
 		unlink(env->mdb_data_path);
 		unlink(mdb_lockfile);
@@ -607,7 +633,7 @@ static int cdb_clear(kr_cdb_pt db, struct kr_cdb_stats *stats)
 	/* Environment updated, release lockfile. */
 	int lrerr = lockfile_release(lockfile_fd);
 	if (lrerr) {
-		kr_log_error(CACHE, "failed to release ./krcachelock: %s\n",
+		kr_log_error(MDB, "failed to release ./krcachelock: %s\n",
 				kr_strerror(lrerr));
 	}
 	return ret;
@@ -635,7 +661,7 @@ static int cdb_readv(kr_cdb_pt db, struct kr_cdb_stats *stats,
 			} else {
 				txn_abort(env);
 			}
-			ret = lmdb_error(ret);
+			ret = lmdb_error(env, ret);
 			if (ret == kr_error(ENOSPC)) {
 				/* we're likely to be forced to cache clear anyway */
 				ret = kr_error(ENOENT);
@@ -661,7 +687,7 @@ static int cdb_write(struct lmdb_env *env, MDB_txn **txn, const knot_db_val_t *k
 	/* We don't try to recover from MDB_TXN_FULL. */
 	if (ret != MDB_SUCCESS) {
 		txn_abort(env);
-		return lmdb_error(ret);
+		return lmdb_error(env, ret);
 	}
 
 	/* Update the result. */
@@ -705,7 +731,7 @@ static int cdb_remove(kr_cdb_pt db, struct kr_cdb_stats *stats,
 		MDB_val _key = val_knot2mdb(keys[i]);
 		MDB_val val = { 0, NULL };
 		stats->remove++;
-		ret = lmdb_error(mdb_del(txn, env->dbi, &_key, &val));
+		ret = lmdb_error(env, mdb_del(txn, env->dbi, &_key, &val));
 		if (ret == kr_ok())
 			deleted++;
 		else if (ret == KNOT_ENOENT) {
@@ -735,7 +761,7 @@ static int cdb_match(kr_cdb_pt db, struct kr_cdb_stats *stats,
 	ret = mdb_cursor_open(txn, env->dbi, &cur);
 	if (ret != 0) {
 		txn_abort(env);
-		return lmdb_error(ret);
+		return lmdb_error(env, ret);
 	}
 
 	MDB_val cur_key = val_knot2mdb(*key);
@@ -747,7 +773,7 @@ static int cdb_match(kr_cdb_pt db, struct kr_cdb_stats *stats,
 		if (ret != MDB_NOTFOUND) {
 			txn_abort(env);
 		}
-		return lmdb_error(ret);
+		return lmdb_error(env, ret);
 	}
 
 	int results = 0;
@@ -771,7 +797,7 @@ static int cdb_match(kr_cdb_pt db, struct kr_cdb_stats *stats,
 	mdb_cursor_close(cur);
 	if (ret != MDB_SUCCESS && ret != MDB_NOTFOUND) {
 		txn_abort(env);
-		return lmdb_error(ret);
+		return lmdb_error(env, ret);
 	} else if (results == 0) {
 		stats->match_miss++;
 	}
@@ -818,7 +844,34 @@ failure:
 	} else {
 		txn_abort(env);
 	}
-	return lmdb_error(ret);
+	return lmdb_error(env, ret);
+}
+
+static int cdb_read_less(kr_cdb_pt db, struct kr_cdb_stats *stats,
+		knot_db_val_t *key, knot_db_val_t *val)
+{
+	if (kr_fails_assert(db && key && key->data && val))
+		return kr_error(EINVAL);
+	struct lmdb_env *env = db2env(db);
+	MDB_cursor *curs = NULL;
+	int ret = txn_curs_get(env, &curs, stats);
+	if (ret) return ret;
+
+	MDB_val key2_m = val_knot2mdb(*key);
+	MDB_val val2_m = { 0, NULL };
+	stats->read_less++;
+	ret = mdb_cursor_get(curs, &key2_m, &val2_m, MDB_PREV);
+	if (!ret) {
+		/* finalize the output */
+		*key = val_mdb2knot(key2_m);
+		*val = val_mdb2knot(val2_m);
+		return 1;
+	} else if (ret == MDB_NOTFOUND) {
+		// stats->read_less++; // seems a pointless stat
+	} else {
+		txn_abort(env);
+	}
+	return lmdb_error(env, ret);
 }
 
 static double cdb_usage_percent(kr_cdb_pt db)
@@ -858,11 +911,9 @@ const struct kr_cdb_api *kr_cdb_lmdb(void)
 		cdb_init, cdb_deinit, cdb_count, cdb_clear, cdb_commit,
 		cdb_readv, cdb_writev, cdb_remove,
 		cdb_match,
-		cdb_read_leq,
-		cdb_usage_percent,
-		cdb_get_maxsize,
+		cdb_read_leq, cdb_read_less,
+		cdb_usage_percent, cdb_get_maxsize,
 		cdb_check_health,
 	};
-
 	return &api;
 }

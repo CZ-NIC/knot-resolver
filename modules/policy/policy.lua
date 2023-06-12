@@ -5,8 +5,6 @@ local ffi = require('ffi')
 local LOG_GRP_POLICY_TAG = ffi.string(ffi.C.kr_log_grp2name(ffi.C.LOG_GRP_POLICY))
 local LOG_GRP_REQDBG_TAG = ffi.string(ffi.C.kr_log_grp2name(ffi.C.LOG_GRP_REQDBG))
 
-local todname = kres.str2dname -- not available during module load otherwise
-
 -- Counter of unique rules
 local nextid = 0
 local function getruleid()
@@ -71,7 +69,8 @@ end
 -- policy functions are defined below
 local policy = {}
 
-function policy.PASS(state, _)
+function policy.PASS(state, req)
+	policy.FLAGS('PASSTHRU_LEGACY')(state, req)
 	return state
 end
 
@@ -267,91 +266,6 @@ function policy.ANSWER(rtable, nodata)
 		end
 		return kres.DONE
 	end
-end
-
-local dname_localhost = todname('localhost.')
-
--- Rule for localhost. zone; see RFC6303, sec. 3
-local function localhost(_, req)
-	local qry = req:current()
-	local answer = req:ensure_answer()
-	if answer == nil then return nil end
-	ffi.C.kr_pkt_make_auth_header(answer)
-
-	local is_exact = ffi.C.knot_dname_is_equal(qry.sname, dname_localhost)
-
-	answer:rcode(kres.rcode.NOERROR)
-	answer:begin(kres.section.ANSWER)
-	if qry.stype == kres.type.AAAA then
-		answer:put(qry.sname, 900, answer:qclass(), kres.type.AAAA,
-			'\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\1')
-	elseif qry.stype == kres.type.A then
-		answer:put(qry.sname, 900, answer:qclass(), kres.type.A, '\127\0\0\1')
-	elseif is_exact and qry.stype == kres.type.SOA then
-		mkauth_soa(answer, dname_localhost)
-	elseif is_exact and qry.stype == kres.type.NS then
-		answer:put(dname_localhost, 900, answer:qclass(), kres.type.NS, dname_localhost)
-	else
-		answer:begin(kres.section.AUTHORITY)
-		mkauth_soa(answer, dname_localhost)
-	end
-	return kres.DONE
-end
-
-local dname_rev4_localhost = todname('1.0.0.127.in-addr.arpa');
-local dname_rev4_localhost_apex = todname('127.in-addr.arpa');
-
--- Rule for reverse localhost.
--- Answer with locally served minimal 127.in-addr.arpa domain, only having
--- a PTR record in 1.0.0.127.in-addr.arpa, and with 1.0...0.ip6.arpa. zone.
--- TODO: much of this would better be left to the hints module (or coordinated).
-local function localhost_reversed(_, req)
-	local qry = req:current()
-	local answer = req:ensure_answer()
-	if answer == nil then return nil end
-
-	-- classify qry.sname:
-	local is_exact   -- exact dname for localhost
-	local is_apex    -- apex of a locally-served localhost zone
-	local is_nonterm -- empty non-terminal name
-	if ffi.C.knot_dname_in_bailiwick(qry.sname, todname('ip6.arpa.')) > 0 then
-		-- exact ::1 query (relying on the calling rule)
-		is_exact = true
-		is_apex = true
-	else
-		-- within 127.in-addr.arpa.
-		local labels = ffi.C.knot_dname_labels(qry.sname, nil)
-		if labels == 3 then
-			is_exact = false
-			is_apex = true
-		elseif labels == 4+2 and ffi.C.knot_dname_is_equal(
-					qry.sname, dname_rev4_localhost) then
-			is_exact = true
-		else
-			is_exact = false
-			is_apex = false
-			is_nonterm = ffi.C.knot_dname_in_bailiwick(dname_rev4_localhost, qry.sname) > 0
-		end
-	end
-
-	ffi.C.kr_pkt_make_auth_header(answer)
-	answer:rcode(kres.rcode.NOERROR)
-	answer:begin(kres.section.ANSWER)
-	if is_exact and qry.stype == kres.type.PTR then
-		answer:put(qry.sname, 900, answer:qclass(), kres.type.PTR, dname_localhost)
-	elseif is_apex and qry.stype == kres.type.SOA then
-		mkauth_soa(answer, dname_rev4_localhost_apex, dname_localhost)
-	elseif is_apex and qry.stype == kres.type.NS then
-		answer:put(dname_rev4_localhost_apex, 900, answer:qclass(), kres.type.NS,
-			dname_localhost)
-	else
-		if not is_nonterm then
-			answer:rcode(kres.rcode.NXDOMAIN)
-		end
-		answer:begin(kres.section.AUTHORITY)
-		mkauth_soa(answer, dname_rev4_localhost_apex, dname_localhost)
-	end
-	return kres.DONE
 end
 
 -- All requests
@@ -916,171 +830,87 @@ function policy.todnames(names)
 	return names
 end
 
--- RFC1918 Private, local, broadcast, test and special zones
--- Considerations: RFC6761, sec 6.1.
--- https://www.iana.org/assignments/locally-served-dns-zones
-local private_zones = {
-	-- RFC6303
-	'10.in-addr.arpa.',
-	'16.172.in-addr.arpa.',
-	'17.172.in-addr.arpa.',
-	'18.172.in-addr.arpa.',
-	'19.172.in-addr.arpa.',
-	'20.172.in-addr.arpa.',
-	'21.172.in-addr.arpa.',
-	'22.172.in-addr.arpa.',
-	'23.172.in-addr.arpa.',
-	'24.172.in-addr.arpa.',
-	'25.172.in-addr.arpa.',
-	'26.172.in-addr.arpa.',
-	'27.172.in-addr.arpa.',
-	'28.172.in-addr.arpa.',
-	'29.172.in-addr.arpa.',
-	'30.172.in-addr.arpa.',
-	'31.172.in-addr.arpa.',
-	'168.192.in-addr.arpa.',
-	'0.in-addr.arpa.',
-	'254.169.in-addr.arpa.',
-	'2.0.192.in-addr.arpa.',
-	'100.51.198.in-addr.arpa.',
-	'113.0.203.in-addr.arpa.',
-	'255.255.255.255.in-addr.arpa.',
-	-- RFC7793
-	'64.100.in-addr.arpa.',
-	'65.100.in-addr.arpa.',
-	'66.100.in-addr.arpa.',
-	'67.100.in-addr.arpa.',
-	'68.100.in-addr.arpa.',
-	'69.100.in-addr.arpa.',
-	'70.100.in-addr.arpa.',
-	'71.100.in-addr.arpa.',
-	'72.100.in-addr.arpa.',
-	'73.100.in-addr.arpa.',
-	'74.100.in-addr.arpa.',
-	'75.100.in-addr.arpa.',
-	'76.100.in-addr.arpa.',
-	'77.100.in-addr.arpa.',
-	'78.100.in-addr.arpa.',
-	'79.100.in-addr.arpa.',
-	'80.100.in-addr.arpa.',
-	'81.100.in-addr.arpa.',
-	'82.100.in-addr.arpa.',
-	'83.100.in-addr.arpa.',
-	'84.100.in-addr.arpa.',
-	'85.100.in-addr.arpa.',
-	'86.100.in-addr.arpa.',
-	'87.100.in-addr.arpa.',
-	'88.100.in-addr.arpa.',
-	'89.100.in-addr.arpa.',
-	'90.100.in-addr.arpa.',
-	'91.100.in-addr.arpa.',
-	'92.100.in-addr.arpa.',
-	'93.100.in-addr.arpa.',
-	'94.100.in-addr.arpa.',
-	'95.100.in-addr.arpa.',
-	'96.100.in-addr.arpa.',
-	'97.100.in-addr.arpa.',
-	'98.100.in-addr.arpa.',
-	'99.100.in-addr.arpa.',
-	'100.100.in-addr.arpa.',
-	'101.100.in-addr.arpa.',
-	'102.100.in-addr.arpa.',
-	'103.100.in-addr.arpa.',
-	'104.100.in-addr.arpa.',
-	'105.100.in-addr.arpa.',
-	'106.100.in-addr.arpa.',
-	'107.100.in-addr.arpa.',
-	'108.100.in-addr.arpa.',
-	'109.100.in-addr.arpa.',
-	'110.100.in-addr.arpa.',
-	'111.100.in-addr.arpa.',
-	'112.100.in-addr.arpa.',
-	'113.100.in-addr.arpa.',
-	'114.100.in-addr.arpa.',
-	'115.100.in-addr.arpa.',
-	'116.100.in-addr.arpa.',
-	'117.100.in-addr.arpa.',
-	'118.100.in-addr.arpa.',
-	'119.100.in-addr.arpa.',
-	'120.100.in-addr.arpa.',
-	'121.100.in-addr.arpa.',
-	'122.100.in-addr.arpa.',
-	'123.100.in-addr.arpa.',
-	'124.100.in-addr.arpa.',
-	'125.100.in-addr.arpa.',
-	'126.100.in-addr.arpa.',
-	'127.100.in-addr.arpa.',
-
-	-- RFC6303
-	-- localhost_reversed handles ::1
-	'0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.ip6.arpa.',
-	'd.f.ip6.arpa.',
-	'8.e.f.ip6.arpa.',
-	'9.e.f.ip6.arpa.',
-	'a.e.f.ip6.arpa.',
-	'b.e.f.ip6.arpa.',
-	'8.b.d.0.1.0.0.2.ip6.arpa.',
-	-- RFC8375
-	'home.arpa.',
-}
-policy.todnames(private_zones)
-
 -- @var Default rules
 policy.rules = {}
 policy.postrules = {}
-policy.special_names = {
-	-- XXX: beware of special_names_optim() when modifying these filters
-	{
-		cb=policy.suffix_common(policy.DENY_MSG(
-			'Blocking is mandated by standards, see references on '
-			.. 'https://www.iana.org/assignments/'
-			.. 'locally-served-dns-zones/locally-served-dns-zones.xhtml',
-			kres.extended_error.NOTSUP),
-			private_zones, todname('arpa.')),
-		count=0
-	},
-	{
-		cb=policy.suffix(policy.DENY_MSG(
-			'Blocking is mandated by standards, see references on '
-			.. 'https://www.iana.org/assignments/'
-			.. 'special-use-domain-names/special-use-domain-names.xhtml',
-			kres.extended_error.NOTSUP),
-			{
-				todname('test.'),
-				todname('onion.'),
-				todname('invalid.'),
-				todname('local.'), -- RFC 8375.4
-			}),
-		count=0
-	},
-	{
-		cb=policy.suffix(localhost, {dname_localhost}),
-		count=0
-	},
-	{
-		cb=policy.suffix_common(localhost_reversed, {
-			todname('127.in-addr.arpa.'),
-			todname('1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.ip6.arpa.')},
-			todname('arpa.')),
-		count=0
-	},
-}
 
--- Return boolean; false = no special name may apply, true = some might apply.
--- The point is to *efficiently* filter almost all QNAMEs that do not apply.
-local function special_names_optim(req, sname)
-	local qname_size = req.qsource.packet.qname_size
-	if qname_size < 9 then return true end -- don't want to special-case bad array access
-	local root = sname + qname_size - 1
-	return
-		-- .a???. or .t???.
-		(root[-5] == 4 and (root[-4] == 97 or root[-4] == 116))
-		-- .on???. or .in?????. or lo???. or *ost.
-		or (root[-6] == 5 and root[-5] == 111 and root[-4] == 110)
-		or (root[-8] == 7 and root[-7] == 105 and root[-6] == 110)
-		or (root[-6] == 5 and root[-5] == 108 and root[-4] == 111)
-		or (root[-3] == 111 and root[-2] == 115 and root[-1] == 116)
+-- This certainly isn't perfect, but it allows lua config like:
+-- kr_view_insert_action('127.0.0.0/24', policy.TAGS_ASSIGN({'t01', 't02'}))
+local kr_rule_tags_t = ffi.typeof('kr_rule_tags_t[1]')
+function policy.get_tagset(names)
+	local result = ffi.new(kr_rule_tags_t, 0)
+	for _, name in pairs(names) do
+		if ffi.C.kr_rule_tag_add(name, result) ~= 0 then
+			error('converting tagset failed')
+		end
+	end
+	return result[0] -- it's atomic value fortunately
 end
+function policy.tags_assign_bitmap(bitmap)
+	return function (_, req)
+		req.rule_tags = bitmap
+	end
+end
+function policy.TAGS_ASSIGN(names)
+	local bitmap = policy.get_tagset(names)
+	return 'policy.tags_assign_bitmap(' .. tostring(bitmap) .. ')'
+end
+
+--[[ Insert a forwarding rule, i.e. override upstream for one DNS subtree.
+
+Throws lua exceptions when detecting something fishy.
+
+\param subtree plain string
+\param options
+  .auth targets are authoritative (false by default = resolver)
+  .dnssec if overridden to false, don't validate DNSSEC locally
+    - for resolvers we still do *not* send CD=1 upstream,
+      i.e. we trust their DNSSEC validation.
+    - for auths this inserts a negative trust anchor
+      Beware that setting .set_insecure() *later* would override that.
+\param targets same format as policy.TLS_FORWARD() except that `tls = true`
+               can be specified for each address (defaults to false)
+--]]
+function policy.rule_forward_add(subtree, options, targets)
+	local targets_2 = {}
+	for _, target in ipairs(targets) do
+		local port_default = 53
+		if target.tls or false then
+			port_default = 853
+			-- lots of code; easiest to just call it this way; checks and throws
+			-- The extra .tls field gets ignored.
+			policy.TLS_FORWARD({target})
+		end
+
+		-- this also throws on failure
+		local sock = addr2sock(target[1], port_default)
+		if options.auth then
+			local port = ffi.C.kr_inaddr_port(sock)
+			assert(not options.tls and port == port_default)
+		end
+		table.insert(targets_2, sock)
+	end
+	local targets_3 = ffi.new('const struct sockaddr * [?]', #targets_2 + 1, targets_2)
+	targets_3[#targets_2] = nil
+
+	local subtree_dname = todname(subtree)
+	assert(ffi.C.kr_rule_forward(subtree_dname,
+			{
+				is_nods = options.dnssec == false,
+				is_auth = options.auth,
+			},
+			targets_3
+		) == 0)
+
+	-- Probably the best way to turn off DNSSEC validation for auth is negative TA.
+	if options.auth and options.dnssec == false then
+		local ntas = kres.context().negative_anchors
+		assert(ffi.C.kr_ta_add(ntas, subtree_dname, kres.type.DS, 0, nil, 0) == 0)
+	end
+end
+
+
+local view_action_buf = ffi.new('knot_db_val_t[1]')
 
 -- Top-down policy list walk until we hit a match
 -- the caller is responsible for reordering policy list
@@ -1091,10 +921,14 @@ policy.layer = {
 	begin = function(state, req)
 		-- Don't act on "finished" cases.
 		if bit.band(state, bit.bor(kres.FAIL, kres.DONE)) ~= 0 then return state end
+
+		if ffi.C.kr_view_select_action(req, view_action_buf) == 0 then
+			local act_str = ffi.string(view_action_buf[0].data, view_action_buf[0].len)
+			return loadstring('return '..act_str)()(state, req)
+		end
+
 		local qry = req:initial() -- same as :current() but more descriptive
 		return policy.evaluate(policy.rules, req, qry, state)
-			or (special_names_optim(req, qry.sname)
-					and policy.evaluate(policy.special_names, req, qry, state))
 			or state
 	end,
 	finish = function(state, req)

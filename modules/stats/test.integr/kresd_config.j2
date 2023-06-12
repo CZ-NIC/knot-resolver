@@ -52,6 +52,7 @@ function reply_result(state, req)
 	local result = check_stats(got)
 	return result(state, req)
 end
+policy.add(policy.all(policy.FLAGS('PASSTHRU_LEGACY'))) -- the test isn't written with this in mind
 policy.add(policy.pattern(reply_result, 'stats.test.'))
 policy.add(policy.all(FWD_TARGET)) -- avoid iteration
 

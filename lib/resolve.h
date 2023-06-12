@@ -16,6 +16,7 @@
 #include "lib/rplan.h"
 #include "lib/module.h"
 #include "lib/cache/api.h"
+#include "lib/rules/api.h"
 
 /**
  * @file resolve.h
@@ -270,6 +271,7 @@ struct kr_request {
 	unsigned int count_no_nsaddr;
 	unsigned int count_fail_row;
 	alloc_wire_f alloc_wire_cb; /**< CB to allocate answer wire (can be NULL). */
+	kr_rule_tags_t rule_tags; /**< TagSet applying to this request. */
 	struct kr_extended_error extended_error;  /**< EDE info; don't modify directly, use kr_request_set_extended_error() */
 };
 
@@ -328,9 +330,12 @@ int kr_resolve_consume(struct kr_request *request, struct kr_transport **transpo
 /**
  * Produce either next additional query or finish.
  *
- * If the CONSUME is returned then dst, type and packet will be filled with
+ * If the CONSUME is returned then *transport and *packet will be filled with
  * appropriate values and caller is responsible to send them and receive answer.
  * If it returns any other state, then content of the variables is undefined.
+ *
+ * Implemented in its own file ./resolve-produce.c
+ * FIXME: more issues in this doc-comment
  *
  * @param  request request state (in PRODUCE state)
  * @param  dst     [out] possible address of the next nameserver
@@ -348,8 +353,7 @@ int kr_resolve_produce(struct kr_request *request, struct kr_transport **transpo
  *
  * @param  request request state (in PRODUCE state)
  * @param  src     address from which the query is going to be sent
- * @param  dst     address of the name server
- * @param  type    used socket type (SOCK_STREAM, SOCK_DGRAM)
+ * @param  transport  destination server's address and other properties
  * @param  packet  [in,out] query packet to be finalised
  * @return         kr_ok() or error code
  */

@@ -79,6 +79,7 @@ enum kr_log_group {
 	LOG_GRP_DEVEL,
 	LOG_GRP_RENUMBER,
 	LOG_GRP_EDE,
+	LOG_GRP_RULES,
 	/* ^^ Add new log groups above ^^. */
 	LOG_GRP_REQDBG, /* Must be first non-displayed entry in enum! */
 };
@@ -131,6 +132,7 @@ enum kr_log_group {
 #define LOG_GRP_DEVEL_TAG		"devel"		/**< ``devel``: for development purposes */
 #define LOG_GRP_RENUMBER_TAG		"renum"		/**< ``renum``: operation related to renumber */
 #define LOG_GRP_EDE_TAG			"exterr"	/**< ``exterr``: extended error module */
+#define LOG_GRP_RULES_TAG		"rules"		/**< ``rules``: new policy rules (their processing) */
 #define LOG_GRP_REQDBG_TAG		"reqdbg"	/**< ``reqdbg``: debug logs enabled by policy actions */
 ///@}
 
@@ -230,8 +232,8 @@ struct kr_query;
  * @param  grp GROUP_NAME (without the LOG_GRP_ prefix)
  * @param  fmt printf-like format string
  */
-#define kr_log_req(req, qry_id, indent, grp, fmt, ...) \
-       kr_log_req1(req, qry_id, indent, LOG_GRP_ ## grp, LOG_GRP_ ## grp ## _TAG, fmt, ## __VA_ARGS__)
+#define kr_log_req(req, qry_uid, indent, grp, fmt, ...) \
+       kr_log_req1(req, qry_uid, indent, LOG_GRP_ ## grp, LOG_GRP_ ## grp ## _TAG, fmt, ## __VA_ARGS__)
 KR_EXPORT KR_PRINTF(6)
 void kr_log_req1(const struct kr_request * const req, uint32_t qry_uid,
 		const unsigned int indent, enum kr_log_group group, const char *tag, const char *fmt, ...);

@@ -69,12 +69,13 @@ struct kr_cdb_api {};
 struct lru {};
 "
 
-${CDEFS} ${LIBKRES} types <<-EOF
+${CDEFS} libknot types <<-EOF
 	knot_section_t
 	knot_rrinfo_t
 	knot_dname_t
 	knot_rdata_t
 	knot_rdataset_t
+	knot_db_val_t
 EOF
 
 # The generator doesn't work well with typedefs of functions.
@@ -125,6 +126,10 @@ ${CDEFS} ${LIBKRES} types <<-EOF
 	kr_qarray_t
 	struct kr_rplan
 	struct kr_request_qsource_flags
+	kr_rule_tags_t
+	struct kr_rule_zonefile_config
+	struct kr_rule_fwd_flags
+	typedef kr_rule_fwd_flags_t
 	struct kr_extended_error
 	struct kr_request
 	enum kr_rank
@@ -141,6 +146,7 @@ ${CDEFS} ${LIBKRES} types <<-EOF
 	struct kr_server_selection
 	kr_log_level_t
 	enum kr_log_group
+	struct kr_query_data_src
 EOF
 
 # static variables; these lines might not be simple to generate
@@ -282,6 +288,15 @@ ${CDEFS} ${LIBKRES} functions <<-EOF
 	kr_cache_commit
 	# FIXME: perhaps rename this exported symbol
 	packet_ttl
+# New policy
+	kr_rules_init
+	kr_view_insert_action
+	kr_view_select_action
+	kr_rule_tag_add
+	kr_rule_local_data_emptyzone
+	kr_rule_local_data_nxdomain
+	kr_rule_zonefile
+	kr_rule_forward
 EOF
 
 
