@@ -128,7 +128,7 @@ class IDPattern(PatternBase):
     Alphanumerical ID for identifying systemd slice.
     """
 
-    _re = re.compile(r"[a-zA-Z0-9]+")
+    _re = re.compile(r"^(?!-)[a-z0-9-]*[a-z0-9]+$")
 
 
 class InterfacePort(StrBase):
