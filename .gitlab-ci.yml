@@ -631,12 +631,17 @@ pkg:alma-9:
   <<: *pkg_test
   image: $CI_REGISTRY/packaging/apkg/full/alma-9
 
-pkg:opensuse-15.4:
-  <<: *pkg_test
-  <<: *enable_repo_build
-  image: $CI_REGISTRY/packaging/apkg/full/opensuse-15.4
-  allow_failure: true  # SUSE is always special
+# RHEL 8 derivatives would need more work due to *default* python being old
+#pkg:rocky-8:
+#  <<: *pkg_test
+#  image: $CI_REGISTRY/packaging/apkg/full/rocky-8
 
+# Leap 15.4 would need more work due to *default* python being old
+#pkg:opensuse-15.4:
+#  <<: *pkg_test
+#  <<: *enable_repo_build
+#  image: $CI_REGISTRY/packaging/apkg/full/opensuse-15.4
+#  allow_failure: true  # SUSE is always special
 # }}}
   allow_failure: true
 
