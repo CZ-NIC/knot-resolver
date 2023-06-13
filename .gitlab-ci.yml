@@ -643,7 +643,6 @@ pkg:alma-9:
 #  image: $CI_REGISTRY/packaging/apkg/full/opensuse-15.4
 #  allow_failure: true  # SUSE is always special
 # }}}
-  allow_failure: true
 
 pages:
   image: $CI_REGISTRY/packaging/apkg/lxc/fedora-36
