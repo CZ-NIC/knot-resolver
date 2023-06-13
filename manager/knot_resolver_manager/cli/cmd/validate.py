@@ -1,9 +1,11 @@
 import argparse
 import sys
+from pathlib import Path
 from typing import List, Tuple, Type
 
 from knot_resolver_manager.cli.command import Command, CommandArgs, CompWords, register_command
 from knot_resolver_manager.datamodel import KresConfig
+from knot_resolver_manager.datamodel.globals import Context, set_global_validation_context
 from knot_resolver_manager.utils.modeling import try_to_parse
 from knot_resolver_manager.utils.modeling.exceptions import DataParsingError, DataValidationError
 
@@ -41,6 +43,7 @@ class ValidateCommand(Command):
             data = input("Type configuration to validate: ")
 
         try:
+            set_global_validation_context(Context(resolve_directory=Path(self.input_file).parent))
             KresConfig(try_to_parse(data))
         except (DataParsingError, DataValidationError) as e:
             print(e)
