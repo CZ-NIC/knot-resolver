@@ -128,18 +128,6 @@ option(
 )
 
 option(
-  'client',
-  type: 'combo',
-  choices: [
-    'auto',
-    'enabled',
-    'disabled',
-  ],
-  value: 'auto',
-  description: 'build kresc client binary',
-)
-
-option(
   'utils',
   type: 'combo',
   choices: [
