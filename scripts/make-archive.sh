@@ -11,11 +11,14 @@ cd "$(dirname ${0})/.."
 
 if ! git describe --tags --exact-match; then
     # devel version
-    GIT_HASH=$(git rev-parse --short HEAD )
-    TIMESTAMP=$(date -u +'%s' 2>/dev/null)
+    VERSION_TAG=$(git tag --merged HEAD --sort=-taggerdate | head -1)
+    VERSION=${VERSION_TAG#v}
+    GIT_HASH=$(git rev-parse --short=6 HEAD)
+    N_COMMITS=$(git rev-list $VERSION_TAG.. --count)
+    FULL_VERSION="$VERSION.dev$N_COMMITS+$GIT_HASH"
 
     # modify and commit meson.build
-    sed -i "s/^\(\s*version\s*:\s*'\)\([^']\+\)\('.*\)/\1\2.$TIMESTAMP.$GIT_HASH\3/" meson.build
+    sed -i "s/^\(\s*version\s*:\s*'\)\([^']\+\)\('.*\)/\1$FULL_VERSION\3/" meson.build
 
     : changed version in meson.build, changes must be committed to git
     git add meson.build
