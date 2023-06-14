@@ -12,7 +12,7 @@ from knot_resolver_manager.utils.modeling.exceptions import DataValidationError
     [
         {"type": "empty", "roots": ["sub2.example.org"]},
         {"type": "empty", "roots-url": "https://example.org/blocklist.txt", "refresh": "1d"},
-        {"type": "nxdomain", "roots-file": "/path/to/file.txt"},
+        {"type": "nxdomain", "roots-file": "/etc/hosts"},  # must be an existing file or validation will fail
         {"type": "redirect", "roots": ["sub4.example.org"], "addresses": ["127.0.0.1", "::1"]},
     ],
 )

@@ -2,8 +2,8 @@ from typing import Dict, List, Optional
 
 from typing_extensions import Literal
 
-from knot_resolver_manager.datamodel.types import DomainName, IDPattern, IPAddress, TimeUnit
-from knot_resolver_manager.datamodel.types.files import FilePath, UncheckedPath
+from knot_resolver_manager.datamodel.types import DomainName, IDPattern, IPAddress, ListOrItem, TimeUnit
+from knot_resolver_manager.datamodel.types.files import FilePath
 from knot_resolver_manager.utils.modeling import ConfigSchema
 
 
@@ -29,7 +29,7 @@ class SubtreeSchema(ConfigSchema):
     nodata: bool = True
     addresses: Optional[List[IPAddress]] = None
     roots: Optional[List[DomainName]] = None
-    roots_file: Optional[UncheckedPath] = None
+    roots_file: Optional[FilePath] = None
     roots_url: Optional[str] = None
     refresh: Optional[TimeUnit] = None
 
@@ -63,6 +63,8 @@ class LocalDataSchema(ConfigSchema):
     ---
     ttl: Default TTL value used for added local data/records.
     nodata: Use NODATA synthesis. NODATA will be synthesised for matching name, but mismatching type(e.g. AAAA query when only A exists).
+    root_fallback_addresses: Direct replace of root hints.
+    root_fallback_addresses_files: Direct replace of root hints from a zonefile.
     addresses: Direct addition of hostname and IP addresses pairs.
     addresses_files: Direct addition of hostname and IP addresses pairs from files in '/etc/hosts' like format.
     records: Direct addition of records in DNS zone file format.
@@ -72,8 +74,10 @@ class LocalDataSchema(ConfigSchema):
 
     ttl: Optional[TimeUnit] = None
     nodata: bool = True
-    addresses: Optional[Dict[DomainName, List[IPAddress]]] = None
-    addresses_files: Optional[List[UncheckedPath]] = None
+    root_fallback_addresses: Optional[Dict[DomainName, ListOrItem[IPAddress]]] = None
+    root_fallback_addresses_files: Optional[ListOrItem[FilePath]] = None
+    addresses: Optional[Dict[DomainName, IPAddress]] = None
+    addresses_files: Optional[ListOrItem[FilePath]] = None
     records: Optional[str] = None
     subtrees: Optional[List[SubtreeSchema]] = None
     rpz: Optional[List[RPZSchema]] = None
