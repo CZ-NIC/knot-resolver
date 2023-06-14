@@ -12,3 +12,44 @@ logging:
 network:
   listen:
     - interface: 127.0.0.1@5353
+views:
+  - subnets: [127.0.0.0/24]
+    tags: [t01, t02, t03]
+    options:
+      dns64: false
+  - subnets: [0.0.0.0/0, "::/0"]
+    answer: refused
+  - subnets: [10.0.10.0/24]
+    answer: allow
+local-data:
+  ttl: 60m
+  nodata: false
+  records: |
+    example.net. TXT "foo bar"
+     A 192.168.2.3
+     A 192.168.2.4
+    local.example.org AAAA ::1
+  subtrees:
+    - type: empty
+      tags: [ t2 ]
+      roots: [ example1.org ]
+    - type: nxdomain
+      roots: [ sub4.example.org ]
+  rpz:
+    - file: runtime/blocklist.rpz
+      tags: [t01, t02]
+forward:
+  - subtree: '.'
+    options:
+      dnssec: true
+      authoritative: false
+    servers:
+      - address: [2001:148f:fffe::1, 185.43.135.1]
+        transport: tls
+        hostname: odvr.nic.cz
+      - address: [ 192.0.2.1, 192.0.2.2 ]
+        pin-sha256: ['YQ==', 'Wg==']
+  - subtree: 1.168.192.in-addr.arpa
+    options:
+      dnssec: false
+    servers: [ 192.0.2.1@5353 ]
