@@ -15,15 +15,6 @@ Summary:        Caching full DNS Resolver
 License:        GPL-3.0-or-later
 URL:            https://www.knot-resolver.cz/
 Source0:        knot-resolver-%{version}.tar.xz
-
-# LuaJIT only on these arches
-%if 0%{?rhel} == 7
-# RHEL 7 does not have aarch64 LuaJIT
-ExclusiveArch:	%{ix86} x86_64
-%else
-ExclusiveArch:	%{arm} aarch64 %{ix86} x86_64
-%endif
-
 %if 0%{GPG_CHECK}
 Source1:        knot-resolver-%{version}.tar.xz.asc
 # PGP keys used to sign upstream releases
@@ -33,6 +24,20 @@ Source1:        knot-resolver-%{version}.tar.xz.asc
 Source100:      kresd-keyblock.asc
 BuildRequires:  gnupg2
 %endif
+
+%description
+The Knot Resolver is a DNSSEC-enabled caching full resolver implementation
+written in C and LuaJIT, including both a resolver library and a daemon.
+Modular architecture of the library keeps the core tiny and efficient, and
+provides a state-machine like API for extensions.
+
+
+%package core
+Summary:        Caching full DNS Resolver - core binaries
+Conflicts:      knot-resolver < 6
+
+# LuaJIT only on these arches
+ExclusiveArch:	%{arm} aarch64 %{ix86} x86_64
 
 BuildRequires:  gcc
 BuildRequires:  gcc-c++
@@ -90,7 +95,7 @@ BuildRequires:  lmdb-devel
 Requires(pre):  shadow
 %endif
 
-%description
+%description core
 The Knot Resolver is a DNSSEC-enabled caching full resolver implementation
 written in C and LuaJIT, including both a resolver library and a daemon.
 Modular architecture of the library keeps the core tiny and efficient, and
@@ -102,7 +107,7 @@ $ systemctl start kresd@1.service
 
 %package devel
 Summary:        Development headers for Knot Resolver
-Requires:       %{name}%{?_isa} = %{version}-%{release}
+Requires:       %{name}-core%{?_isa} = %{version}-%{release}
 
 %description devel
 The package contains development headers for Knot Resolver.
@@ -110,7 +115,7 @@ The package contains development headers for Knot Resolver.
 %if "x%{?suse_version}" == "x"
 %package module-dnstap
 Summary:        dnstap module for Knot Resolver
-Requires:       %{name} = %{version}-%{release}
+Requires:       %{name}-core = %{version}-%{release}
 
 %description module-dnstap
 dnstap module for Knot Resolver supports logging DNS responses to a unix socket
@@ -121,7 +126,7 @@ need effectively log all DNS traffic.
 %if "x%{?suse_version}" == "x"
 %package module-http
 Summary:        HTTP module for Knot Resolver
-Requires:       %{name} = %{version}-%{release}
+Requires:       %{name}-core = %{version}-%{release}
 %if 0%{?fedora} || 0%{?rhel} > 7
 Requires:       lua5.1-http
 Requires:       lua5.1-mmdb
@@ -137,9 +142,10 @@ queries. It can also serve DNS-over-HTTPS, but it is deprecated in favor of
 native C implementation, which doesn't require this package.
 %endif
 
-%package -n python3-knot-resolver-manager
+%package -n knot-resolver-manager
 Summary:        Configuration tool for Knot Resolver
-Requires:       %{name} = %{version}-%{release}
+Provides:       knot-resolver6 = %{version}-%{release}
+Requires:       %{name}-core = %{version}-%{release}
 %if 0%{?rhel} == 8
 Requires:       python3
 Requires:       python3-pyyaml
@@ -157,7 +163,7 @@ Requires:		python3-prometheus_client
 Requires:		supervisor
 %endif
 
-%description -n python3-knot-resolver-manager
+%description -n knot-resolver-manager
 Knot Resolver Manager is a configuration tool for Knot Resolver. The Manager
 hides the complexity of running several independent resolver processes while
 ensuring zero-downtime reconfiguration with YAML/JSON declarative
@@ -236,7 +242,7 @@ install -m 644 -D shell-completion/client.fish %{buildroot}%{_datarootdir}/fish/
 
 popd
 
-%pre
+%pre core
 getent group knot-resolver >/dev/null || groupadd -r knot-resolver
 getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysconfdir}/knot-resolver -s /sbin/nologin -c "Knot Resolver" knot-resolver
 
@@ -265,8 +271,7 @@ if [ -f %{_unitdir}/kresd.socket ] ; then
 fi
 %endif
 
-
-%post
+%post core
 # upgrade-4-to-5
 %if "x%{?rhel}" == "x"
 export UPG_DIR=%{_sharedstatedir}/knot-resolver/.upgrade-4-to-5
@@ -292,16 +297,17 @@ fi
 /sbin/ldconfig
 %endif
 
-%preun
+%preun core
 %systemd_preun kres-cache-gc.service kresd.target
 
-%postun
+%postun core
 %systemd_postun_with_restart 'kresd@*.service' kres-cache-gc.service
 %if "x%{?fedora}" == "x"
 /sbin/ldconfig
 %endif
 
-%files
+
+%files core
 %dir %{_pkgdocdir}
 %license %{_pkgdocdir}/COPYING
 %doc %{_pkgdocdir}/AUTHORS
@@ -381,7 +387,7 @@ fi
 %{_libdir}/knot-resolver/kres_modules/prometheus.lua
 %endif
 
-%files -n python3-knot-resolver-manager
+%files -n knot-resolver-manager
 %{python3_sitearch}/knot_resolver_manager*
 %{_sysconfdir}/knot-resolver/config.yml
 %{_unitdir}/knot-resolver.service
