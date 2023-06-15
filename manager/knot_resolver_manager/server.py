@@ -405,9 +405,6 @@ async def _deny_working_directory_changes(config_old: KresConfig, config_new: Kr
 def _set_working_directory(config_raw: Dict[str, Any]) -> None:
     rundir = get_rundir_without_validation(config_raw)
 
-    if not rundir.to_path().exists():
-        raise KresManagerException(f"`rundir` directory ({rundir}) does not exist!")
-
     logger.info("changing working directory to rundir at '%s'", rundir.to_path().absolute())
     os.chdir(rundir.to_path())
 
@@ -481,7 +478,7 @@ async def start_server(config: Path = DEFAULT_MANAGER_CONFIG_FILE) -> int:
 
         # before processing any configuration, set validation context
         #  - resolve_root = root against which all relative paths will be resolved
-        set_global_validation_context(Context(resolve_directory=config.parent))
+        set_global_validation_context(Context(config.parent))
 
         # Preprocess config - load from file or in general take it to the last step before validation.
         config_raw = await _load_raw_config(config)

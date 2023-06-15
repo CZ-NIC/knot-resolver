@@ -4,6 +4,7 @@ from typing_extensions import Literal
 
 from knot_resolver_manager.datamodel.types import Dir, DomainName, File, IntNonNegative, Percent, SizeUnit, TimeUnit
 from knot_resolver_manager.utils.modeling import ConfigSchema
+from knot_resolver_manager.utils.modeling.base_schema import lazy_default
 
 
 class PrefillSchema(ConfigSchema):
@@ -68,7 +69,7 @@ class CacheSchema(ConfigSchema):
     prefill: Prefill the cache periodically by importing zone data obtained over HTTP.
     """
 
-    storage: Dir = Dir("/var/cache/knot-resolver")
+    storage: Dir = lazy_default(Dir, "/var/cache/knot-resolver")
     size_max: SizeUnit = SizeUnit("100M")
     garbage_collector: Union[GarbageCollectorSchema, Literal[False]] = GarbageCollectorSchema()
     ttl_min: TimeUnit = TimeUnit("5s")

@@ -21,8 +21,7 @@ from knot_resolver_manager.datamodel.network_schema import NetworkSchema
 from knot_resolver_manager.datamodel.options_schema import OptionsSchema
 from knot_resolver_manager.datamodel.policy_schema import PolicySchema
 from knot_resolver_manager.datamodel.slice_schema import SliceSchema
-from knot_resolver_manager.datamodel.types import IntPositive
-from knot_resolver_manager.datamodel.types.files import UncheckedPath
+from knot_resolver_manager.datamodel.types import Dir, IntPositive
 from knot_resolver_manager.datamodel.view_schema import ViewSchema
 from knot_resolver_manager.datamodel.webmgmt_schema import WebmgmtSchema
 from knot_resolver_manager.utils.modeling import ConfigSchema
@@ -110,7 +109,7 @@ class KresConfig(ConfigSchema):
         version: int = 1
         nsid: Optional[str] = None
         hostname: Optional[str] = None
-        rundir: UncheckedPath = UncheckedPath("/var/run/knot-resolver")
+        rundir: Dir = lazy_default(Dir, "/var/run/knot-resolver")
         workers: Union[Literal["auto"], IntPositive] = IntPositive(1)
         max_workers: IntPositive = IntPositive(_default_max_worker_count())
         management: ManagementSchema = lazy_default(ManagementSchema, {"unix-socket": "./manager.sock"})
@@ -122,7 +121,7 @@ class KresConfig(ConfigSchema):
         slices: Optional[List[SliceSchema]] = None
         policy: Optional[List[PolicySchema]] = None
         forward: Optional[List[ForwardSchema]] = None
-        cache: CacheSchema = CacheSchema()
+        cache: CacheSchema = lazy_default(CacheSchema, {})
         dnssec: Union[bool, DnssecSchema] = True
         dns64: Union[bool, Dns64Schema] = False
         logging: LoggingSchema = LoggingSchema()
@@ -133,7 +132,7 @@ class KresConfig(ConfigSchema):
 
     nsid: Optional[str]
     hostname: str
-    rundir: UncheckedPath
+    rundir: Dir
     workers: IntPositive
     max_workers: IntPositive
     management: ManagementSchema
@@ -197,7 +196,7 @@ class KresConfig(ConfigSchema):
         return _MAIN_TEMPLATE.render(cfg=self, cwd=os.getcwd())  # pyright: reportUnknownMemberType=false
 
 
-def get_rundir_without_validation(data: Dict[str, Any]) -> UncheckedPath:
+def get_rundir_without_validation(data: Dict[str, Any]) -> Dir:
     """
     Without fully parsing, try to get a rundir from a raw config data. When it fails,
     attempts a full validation to produce a good error message.
@@ -211,4 +210,4 @@ def get_rundir_without_validation(data: Dict[str, Any]) -> UncheckedPath:
         _ = KresConfig(data)  # this should throw a descriptive error
         assert False
 
-    return UncheckedPath(rundir, object_path="/rundir")
+    return Dir(rundir, object_path="/rundir")
