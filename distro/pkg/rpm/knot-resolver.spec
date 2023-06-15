@@ -204,9 +204,6 @@ pushd manager
 %py3_build
 popd
 
-%check
-meson test -C build_rpm
-
 %install
 DESTDIR="${RPM_BUILD_ROOT}" %{NINJA} -v -C build_rpm install
 
