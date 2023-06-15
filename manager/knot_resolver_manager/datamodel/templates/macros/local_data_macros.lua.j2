@@ -20,14 +20,14 @@ hints.root_file('{{ file }}')
 
 {% macro local_data_addresses(pairs) -%}
 {% for name, address in pairs.items() %}
-hints['{{ name }}'] = '{{ address }}'
+assert(hints.set('{{ name }} {{ address }}').result == true)
 {% endfor %}
 {%- endmacro %}
 
 
 {% macro local_data_addresses_files(files) -%}
 {% for file in files %}
-hints.add_hosts('{{ file }}')
+assert(hints.add_hosts('{{ file }}').result == true)
 {% endfor %}
 {%- endmacro %}
 
