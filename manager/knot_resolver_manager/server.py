@@ -480,7 +480,7 @@ async def start_server(config: Path = DEFAULT_MANAGER_CONFIG_FILE) -> int:
         config = config.absolute()
 
         # before processing any configuration, set validation context
-        #  - resolve_directory = root against which all relative paths will be resolved
+        #  - resolve_root = root against which all relative paths will be resolved
         set_global_validation_context(Context(resolve_directory=config.parent))
 
         # Preprocess config - load from file or in general take it to the last step before validation.
