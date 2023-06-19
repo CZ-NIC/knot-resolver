@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Any, Dict, Tuple, Type, TypeVar
 
-from knot_resolver_manager.datamodel.globals import get_global_validation_context
+from knot_resolver_manager.datamodel.globals import get_resolve_root, get_strict_validation
 from knot_resolver_manager.utils.modeling.base_value_type import BaseValueType
 
 
@@ -19,6 +19,7 @@ class UncheckedPath(BaseValueType):
         super().__init__(source_value, object_path=object_path)
         self._object_path: str = object_path
         self._parents: Tuple[UncheckedPath, ...] = parents
+        self.strict_validation: bool = get_strict_validation()
 
         if isinstance(source_value, str):
             # we do not load global validation context if the path is absolute
@@ -26,7 +27,7 @@ class UncheckedPath(BaseValueType):
             if source_value.startswith("/"):
                 resolve_root = Path("/")
             else:
-                resolve_root = get_global_validation_context().resolve_directory
+                resolve_root = get_resolve_root()
 
             self._raw_value: str = source_value
             if self._parents:
@@ -84,7 +85,7 @@ class Dir(UncheckedPath):
         self, source_value: Any, parents: Tuple["UncheckedPath", ...] = tuple(), object_path: str = "/"
     ) -> None:
         super().__init__(source_value, parents=parents, object_path=object_path)
-        if not self._value.is_dir():
+        if self.strict_validation and not self._value.is_dir():
             raise ValueError(f"path '{self._value}' does not point to an existing directory")
 
 
@@ -99,7 +100,7 @@ class AbsoluteDir(Dir):
         self, source_value: Any, parents: Tuple["UncheckedPath", ...] = tuple(), object_path: str = "/"
     ) -> None:
         super().__init__(source_value, parents=parents, object_path=object_path)
-        if not self._value.is_absolute():
+        if self.strict_validation and not self._value.is_absolute():
             raise ValueError("path not absolute")
 
 
@@ -113,9 +114,9 @@ class File(UncheckedPath):
         self, source_value: Any, parents: Tuple["UncheckedPath", ...] = tuple(), object_path: str = "/"
     ) -> None:
         super().__init__(source_value, parents=parents, object_path=object_path)
-        if not self._value.exists():
+        if self.strict_validation and not self._value.exists():
             raise ValueError("file does not exist")
-        if not self._value.is_file():
+        if self.strict_validation and not self._value.is_file():
             raise ValueError("path is not a file")
 
 
@@ -131,7 +132,7 @@ class FilePath(UncheckedPath):
     ) -> None:
         super().__init__(source_value, parents=parents, object_path=object_path)
         p = self._value.parent
-        if not p.exists() or not p.is_dir():
+        if self.strict_validation and not p.exists() or not p.is_dir():
             raise ValueError(f"path '{self._value}' does not point inside an existing directory")
-        if self._value.is_dir():
+        if self.strict_validation and self._value.is_dir():
             raise ValueError("path points to a directory when we expected a file")

@@ -22,13 +22,15 @@ from typing import Optional
 
 
 class Context:
-    resolve_directory: Path
+    resolve_root: Optional[Path]
+    strict_validation: bool
 
-    def __init__(self, resolve_directory: Path) -> None:
-        self.resolve_directory = resolve_directory
+    def __init__(self, resolve_root: Optional[Path], strict_validation: bool = True) -> None:
+        self.resolve_root = resolve_root
+        self.strict_validation = strict_validation
 
 
-_global_context: Optional[Context] = None
+_global_context: Context = Context(None)
 
 
 def set_global_validation_context(context: Context) -> None:
@@ -38,13 +40,18 @@ def set_global_validation_context(context: Context) -> None:
 
 def reset_global_validation_context() -> None:
     global _global_context
-    _global_context = None
+    _global_context = Context(None)
 
 
-def get_global_validation_context() -> Context:
-    if _global_context is None:
+def get_resolve_root() -> Path:
+    if _global_context.resolve_root is None:
         raise RuntimeError(
-            "Global validation context is not set! Before validation, you have to call `set_global_validation_context()` function!"
+            "Global validation context 'resolve_root' is not set!"
+            " Before validation, you have to set it using `set_global_validation_context()` function!"
         )
 
-    return _global_context
+    return _global_context.resolve_root
+
+
+def get_strict_validation() -> bool:
+    return _global_context.strict_validation

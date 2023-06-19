@@ -5,7 +5,11 @@ from typing import List, Optional, Tuple, Type
 
 from knot_resolver_manager.cli.command import Command, CommandArgs, CompWords, register_command
 from knot_resolver_manager.datamodel import KresConfig
-from knot_resolver_manager.datamodel.globals import Context, set_global_validation_context
+from knot_resolver_manager.datamodel.globals import (
+    Context,
+    reset_global_validation_context,
+    set_global_validation_context,
+)
 from knot_resolver_manager.utils.modeling import try_to_parse
 from knot_resolver_manager.utils.modeling.exceptions import DataParsingError, DataValidationError
 
@@ -16,12 +20,20 @@ class ConvertCommand(Command):
         super().__init__(namespace)
         self.input_file: str = namespace.input_file
         self.output_file: Optional[str] = namespace.output_file
+        self.strict: bool = namespace.strict
 
     @staticmethod
     def register_args_subparser(
         subparser: "argparse._SubParsersAction[argparse.ArgumentParser]",
     ) -> Tuple[argparse.ArgumentParser, "Type[Command]"]:
         convert = subparser.add_parser("convert", help="Converts JSON or YAML configuration to Lua script.")
+        convert.set_defaults(strict=True)
+        convert.add_argument(
+            "--no-strict",
+            help="Ignore strict rules during validation, e.g. path/file existence.",
+            action="store_false",
+            dest="strict",
+        )
         convert.add_argument(
             "input_file",
             type=str,
@@ -48,8 +60,9 @@ class ConvertCommand(Command):
 
         try:
             parsed = try_to_parse(data)
-            set_global_validation_context(Context(resolve_directory=Path(self.input_file).parent))
+            set_global_validation_context(Context(Path(Path(self.input_file).parent), self.strict))
             lua = KresConfig(parsed).render_lua()
+            reset_global_validation_context()
         except (DataParsingError, DataValidationError) as e:
             print(e)
             sys.exit(1)

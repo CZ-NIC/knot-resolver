@@ -2,8 +2,7 @@ from typing import Dict, List, Optional
 
 from typing_extensions import Literal
 
-from knot_resolver_manager.datamodel.types import DomainName, IDPattern, IPAddress, ListOrItem, TimeUnit
-from knot_resolver_manager.datamodel.types.files import FilePath
+from knot_resolver_manager.datamodel.types import DomainName, File, IDPattern, IPAddress, ListOrItem, TimeUnit
 from knot_resolver_manager.utils.modeling import ConfigSchema
 
 
@@ -29,7 +28,7 @@ class SubtreeSchema(ConfigSchema):
     nodata: bool = True
     addresses: Optional[List[IPAddress]] = None
     roots: Optional[List[DomainName]] = None
-    roots_file: Optional[FilePath] = None
+    roots_file: Optional[File] = None
     roots_url: Optional[str] = None
     refresh: Optional[TimeUnit] = None
 
@@ -52,7 +51,7 @@ class RPZSchema(ConfigSchema):
     tags: Tags to link with other policy rules.
     """
 
-    file: FilePath
+    file: File
     tags: Optional[List[IDPattern]] = None
 
 
@@ -75,9 +74,9 @@ class LocalDataSchema(ConfigSchema):
     ttl: Optional[TimeUnit] = None
     nodata: bool = True
     root_fallback_addresses: Optional[Dict[DomainName, ListOrItem[IPAddress]]] = None
-    root_fallback_addresses_files: Optional[ListOrItem[FilePath]] = None
+    root_fallback_addresses_files: Optional[ListOrItem[File]] = None
     addresses: Optional[Dict[DomainName, IPAddress]] = None
-    addresses_files: Optional[ListOrItem[FilePath]] = None
+    addresses_files: Optional[ListOrItem[File]] = None
     records: Optional[str] = None
     subtrees: Optional[List[SubtreeSchema]] = None
     rpz: Optional[List[RPZSchema]] = None
