@@ -205,9 +205,5 @@ def get_rundir_without_validation(data: Dict[str, Any]) -> Dir:
     """
 
     if "rundir" in data:
-        rundir = data["rundir"]
-    else:
-        _ = KresConfig(data)  # this should throw a descriptive error
-        assert False
-
-    return Dir(rundir, object_path="/rundir")
+        return Dir(data["rundir"], object_path="/rundir")
+    return KresConfig(data).rundir  # this should throw a descriptive error
