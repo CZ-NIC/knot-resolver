@@ -45,23 +45,23 @@ class SizeUnit(UnitBase):
     _units = {"B": 1, "K": 1024, "M": 1024**2, "G": 1024**3}
 
     def bytes(self) -> int:
-        return self._value
+        return self._base_value
 
     def mbytes(self) -> int:
-        return self._value // 1024**2
+        return self._base_value // 1024**2
 
 
 class TimeUnit(UnitBase):
     _units = {"us": 1, "ms": 10**3, "s": 10**6, "m": 60 * 10**6, "h": 3600 * 10**6, "d": 24 * 3600 * 10**6}
 
     def seconds(self) -> int:
-        return self._value // 1000**2
+        return self._base_value // 1000**2
 
     def millis(self) -> int:
-        return self._value // 1000
+        return self._base_value // 1000
 
     def micros(self) -> int:
-        return self._value
+        return self._base_value
 
 
 class DomainName(StrBase):
@@ -81,28 +81,20 @@ class DomainName(StrBase):
     )
 
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
-        super().__init__(source_value)
-        if isinstance(source_value, str):
-            try:
-                punycode = source_value.encode("idna").decode("utf-8") if source_value != "." else "."
-            except ValueError:
-                raise ValueError(
-                    f"conversion of '{source_value}' to IDN punycode representation failed",
-                    object_path,
-                )
+        super().__init__(source_value, object_path)
+        try:
+            punycode = self._value.encode("idna").decode("utf-8") if self._value != "." else "."
+        except ValueError:
+            raise ValueError(
+                f"conversion of '{self._value}' to IDN punycode representation failed",
+                object_path,
+            )
 
-            if type(self)._re.match(punycode):
-                self._value = source_value
-                self._punycode = punycode
-            else:
-                raise ValueError(
-                    f"'{source_value}' represented in punycode '{punycode}' does not match '{self._re.pattern}' pattern",
-                    object_path,
-                )
+        if type(self)._re.match(punycode):
+            self._punycode = punycode
         else:
             raise ValueError(
-                "Unexpected value for '<domain-name>'."
-                f" Expected string, got '{source_value}' with type '{type(source_value)}'",
+                f"'{source_value}' represented in punycode '{punycode}' does not match '{self._re.pattern}' pattern",
                 object_path,
             )
 
@@ -120,6 +112,10 @@ class DomainName(StrBase):
 
 
 class InterfaceName(PatternBase):
+    """
+    Network interface name.
+    """
+
     _re = re.compile(r"^[a-zA-Z0-9]+(?:[-_][a-zA-Z0-9]+)*$")
 
 
@@ -145,27 +141,22 @@ class InterfacePort(StrBase):
     port: PortNumber
 
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
-        super().__init__(source_value)
-        if isinstance(source_value, str):
-            parts = source_value.split("@")
-            if len(parts) == 2:
+        super().__init__(source_value, object_path)
+
+        parts = self._value.split("@")
+        if len(parts) == 2:
+            try:
+                self.addr = ipaddress.ip_address(parts[0])
+            except ValueError as e1:
                 try:
-                    self.addr = ipaddress.ip_address(parts[0])
-                except ValueError as e1:
-                    try:
-                        self.if_name = InterfaceName(parts[0])
-                    except ValueError as e2:
-                        raise ValueError(f"expected IP address or interface name, got '{parts[0]}'.") from e1 and e2
-                self.port = PortNumber.from_str(parts[1], object_path)
-            else:
-                raise ValueError(f"expected '<ip-address|interface-name>@<port>', got '{source_value}'.")
-            self._value = source_value
+                    self.if_name = InterfaceName(parts[0])
+                except ValueError as e2:
+                    raise ValueError(
+                        f"expected IP address or interface name, got '{parts[0]}'.", object_path
+                    ) from e1 and e2
+            self.port = PortNumber.from_str(parts[1], object_path)
         else:
-            raise ValueError(
-                "Unexpected value for '<ip-address|interface-name>@<port>'."
-                f" Expected string, got '{source_value}' with type '{type(source_value)}'",
-                object_path,
-            )
+            raise ValueError(f"expected '<ip-address|interface-name>@<port>', got '{source_value}'.", object_path)
 
 
 class InterfaceOptionalPort(StrBase):
@@ -174,28 +165,23 @@ class InterfaceOptionalPort(StrBase):
     port: Optional[PortNumber] = None
 
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
-        super().__init__(source_value)
-        if isinstance(source_value, str):
-            parts = source_value.split("@")
-            if 0 < len(parts) < 3:
+        super().__init__(source_value, object_path)
+
+        parts = self._value.split("@")
+        if 0 < len(parts) < 3:
+            try:
+                self.addr = ipaddress.ip_address(parts[0])
+            except ValueError as e1:
                 try:
-                    self.addr = ipaddress.ip_address(parts[0])
-                except ValueError as e1:
-                    try:
-                        self.if_name = InterfaceName(parts[0])
-                    except ValueError as e2:
-                        raise ValueError(f"expected IP address or interface name, got '{parts[0]}'.") from e1 and e2
-                if len(parts) == 2:
-                    self.port = PortNumber.from_str(parts[1], object_path)
-            else:
-                raise ValueError(f"expected '<ip-address|interface-name>[@<port>]', got '{parts}'.")
-            self._value = source_value
+                    self.if_name = InterfaceName(parts[0])
+                except ValueError as e2:
+                    raise ValueError(
+                        f"expected IP address or interface name, got '{parts[0]}'.", object_path
+                    ) from e1 and e2
+            if len(parts) == 2:
+                self.port = PortNumber.from_str(parts[1], object_path)
         else:
-            raise ValueError(
-                "Unexpected value for '<ip-address|interface-name>[@<port>]'."
-                f" Expected string, got '{source_value}' with type '{type(source_value)}'",
-                object_path,
-            )
+            raise ValueError(f"expected '<ip-address|interface-name>[@<port>]', got '{parts}'.", object_path)
 
 
 class IPAddressPort(StrBase):
@@ -203,23 +189,17 @@ class IPAddressPort(StrBase):
     port: PortNumber
 
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
-        super().__init__(source_value)
-        if isinstance(source_value, str):
-            parts = source_value.split("@")
-            if len(parts) == 2:
-                self.port = PortNumber.from_str(parts[1], object_path)
-                try:
-                    self.addr = ipaddress.ip_address(parts[0])
-                except ValueError as e:
-                    raise ValueError(f"failed to parse IP address '{parts[0]}'.") from e
-            else:
-                raise ValueError(f"expected '<ip-address>@<port>', got '{source_value}'.")
-            self._value = source_value
+        super().__init__(source_value, object_path)
+
+        parts = self._value.split("@")
+        if len(parts) == 2:
+            self.port = PortNumber.from_str(parts[1], object_path)
+            try:
+                self.addr = ipaddress.ip_address(parts[0])
+            except ValueError as e:
+                raise ValueError(f"failed to parse IP address '{parts[0]}'.", object_path) from e
         else:
-            raise ValueError(
-                "Unexpected value for '<ip-address>@<port>'."
-                f" Expected string, got '{source_value}' with type '{type(source_value)}'"
-            )
+            raise ValueError(f"expected '<ip-address>@<port>', got '{source_value}'.", object_path)
 
 
 class IPAddressOptionalPort(StrBase):
@@ -228,24 +208,16 @@ class IPAddressOptionalPort(StrBase):
 
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
         super().__init__(source_value)
-        if isinstance(source_value, str):
-            parts = source_value.split("@")
-            if 0 < len(parts) < 3:
-                try:
-                    self.addr = ipaddress.ip_address(parts[0])
-                except ValueError as e:
-                    raise ValueError(f"failed to parse IP address '{parts[0]}'.") from e
-                if len(parts) == 2:
-                    self.port = PortNumber.from_str(parts[1], object_path)
-            else:
-                raise ValueError(f"expected '<ip-address>[@<port>]', got '{parts}'.")
-            self._value = source_value
+        parts = source_value.split("@")
+        if 0 < len(parts) < 3:
+            try:
+                self.addr = ipaddress.ip_address(parts[0])
+            except ValueError as e:
+                raise ValueError(f"failed to parse IP address '{parts[0]}'.", object_path) from e
+            if len(parts) == 2:
+                self.port = PortNumber.from_str(parts[1], object_path)
         else:
-            raise ValueError(
-                "Unexpected value for a '<ip-address>[@<port>]'."
-                f" Expected string, got '{source_value}' with type '{type(source_value)}'",
-                object_path,
-            )
+            raise ValueError(f"expected '<ip-address>[@<port>]', got '{parts}'.", object_path)
 
 
 class IPv4Address(BaseValueType):
@@ -273,6 +245,9 @@ class IPv4Address(BaseValueType):
 
     def __int__(self) -> int:
         raise ValueError("Can't convert IPv4 address to an integer")
+
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}("{self._value}")'
 
     def __eq__(self, o: object) -> bool:
         """
@@ -316,6 +291,9 @@ class IPv6Address(BaseValueType):
     def __int__(self) -> int:
         raise ValueError("Can't convert IPv6 address to an integer")
 
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}("{self._value}")'
+
     def __eq__(self, o: object) -> bool:
         """
         Two instances of IPv6Address are equal when they represent same IPv6 address as string.
@@ -351,14 +329,17 @@ class IPNetwork(BaseValueType):
                 f" Expected string, got '{source_value}' with type '{type(source_value)}'"
             )
 
-    def to_std(self) -> Union[ipaddress.IPv4Network, ipaddress.IPv6Network]:
-        return self._value
+    def __int__(self) -> int:
+        raise ValueError("Can't convert network prefix to an integer")
 
     def __str__(self) -> str:
         return self._value.with_prefixlen
 
-    def __int__(self) -> int:
-        raise ValueError("Can't convert network prefix to an integer")
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}("{self._value}")'
+
+    def to_std(self) -> Union[ipaddress.IPv4Network, ipaddress.IPv6Network]:
+        return self._value
 
     def serialize(self) -> Any:
         return self._value.with_prefixlen
@@ -394,6 +375,9 @@ class IPv6Network(BaseValueType):
 
     def __int__(self) -> int:
         raise ValueError("Can't convert network prefix to an integer")
+
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}("{self._value}")'
 
     def __eq__(self, o: object) -> bool:
         return isinstance(o, IPv6Network) and o._value == self._value

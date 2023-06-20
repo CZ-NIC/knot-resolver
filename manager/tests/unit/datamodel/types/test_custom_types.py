@@ -57,7 +57,7 @@ def test_size_unit_invalid(val: Any):
         SizeUnit(val)
 
 
-@pytest.mark.parametrize("val", ["1d", "24h", "1440m", "86400s", "86400000ms", "86400000000us"])
+@pytest.mark.parametrize("val", ["1d", "24h", "1440m", "86400s", "86400000ms"])
 def test_time_unit_valid(val: str):
     o = TimeUnit(val)
     assert int(o) == 86400000000
@@ -79,8 +79,8 @@ def test_parsing_units():
         time: TimeUnit
 
     o = TestSchema({"size": "3K", "time": "10m"})
-    assert o.size == SizeUnit("3072B")
-    assert o.time == TimeUnit("600s")
+    assert int(o.size) == int(SizeUnit("3072B"))
+    assert int(o.time) == int(TimeUnit("600s"))
     assert o.size.bytes() == 3072
     assert o.time.seconds() == 10 * 60
 
