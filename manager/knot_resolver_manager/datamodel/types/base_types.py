@@ -87,6 +87,40 @@ class StrBase(BaseValueType):
         return {"type": "string"}
 
 
+class StringLengthBase(StrBase):
+    """
+    Base class to work with string value length.
+    Just inherit the class and set the values for '_min_bytes' and '_max_bytes'.
+
+    class String32B(StringLengthBase):
+        _min_bytes: int = 32
+    """
+
+    _min_bytes: int = 1
+    _max_bytes: int
+
+    def __init__(self, source_value: Any, object_path: str = "/") -> None:
+        super().__init__(source_value, object_path)
+        value_bytes = len(self._value.encode("utf-8"))
+        if hasattr(self, "_min_bytes") and (value_bytes < self._min_bytes):
+            raise ValueError(
+                f"the string value {source_value} is shorter than the minimum {self._min_bytes} bytes.", object_path
+            )
+        if hasattr(self, "_max_bytes") and (value_bytes > self._max_bytes):
+            raise ValueError(
+                f"the string value {source_value} is longer than the maximum {self._max_bytes} bytes.", object_path
+            )
+
+    @classmethod
+    def json_schema(cls: Type["StringLengthBase"]) -> Dict[Any, Any]:
+        typ: Dict[str, Any] = {"type": "string"}
+        if hasattr(cls, "_min_bytes"):
+            typ["minLength"] = cls._min_bytes
+        if hasattr(cls, "_max_bytes"):
+            typ["maxLength"] = cls._max_bytes
+        return typ
+
+
 class IntRangeBase(IntBase):
     """
     Base class to work with integer value in range.
