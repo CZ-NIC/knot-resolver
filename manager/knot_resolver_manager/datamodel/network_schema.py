@@ -3,6 +3,7 @@ from typing import List, Optional, Union
 from typing_extensions import Literal
 
 from knot_resolver_manager.datamodel.types import (
+    EscapedStr,
     File,
     FilePath,
     Int0_512,
@@ -62,7 +63,7 @@ class TLSSchema(ConfigSchema):
 
     cert_file: Optional[File] = None
     key_file: Optional[File] = None
-    sticket_secret: Optional[str] = None
+    sticket_secret: Optional[EscapedStr] = None
     sticket_secret_file: Optional[File] = None
     auto_discovery: bool = False
     padding: Union[bool, Int0_512] = True

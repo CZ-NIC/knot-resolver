@@ -2,7 +2,16 @@ from typing import List, Optional, Union
 
 from typing_extensions import Literal
 
-from knot_resolver_manager.datamodel.types import Dir, DomainName, File, IntNonNegative, Percent, SizeUnit, TimeUnit
+from knot_resolver_manager.datamodel.types import (
+    Dir,
+    DomainName,
+    EscapedStr,
+    File,
+    IntNonNegative,
+    Percent,
+    SizeUnit,
+    TimeUnit,
+)
 from knot_resolver_manager.utils.modeling import ConfigSchema
 from knot_resolver_manager.utils.modeling.base_schema import lazy_default
 
@@ -19,7 +28,7 @@ class PrefillSchema(ConfigSchema):
     """
 
     origin: DomainName
-    url: str
+    url: EscapedStr
     refresh_interval: TimeUnit = TimeUnit("1d")
     ca_file: Optional[File] = None
 
