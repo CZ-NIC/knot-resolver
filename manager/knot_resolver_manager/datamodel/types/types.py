@@ -2,7 +2,13 @@ import ipaddress
 import re
 from typing import Any, Dict, Optional, Type, Union
 
-from knot_resolver_manager.datamodel.types.base_types import IntRangeBase, PatternBase, StrBase, UnitBase
+from knot_resolver_manager.datamodel.types.base_types import (
+    IntRangeBase,
+    PatternBase,
+    StrBase,
+    StringLengthBase,
+    UnitBase,
+)
 from knot_resolver_manager.utils.modeling import BaseValueType
 
 
@@ -92,6 +98,14 @@ class EscapedStr(StrBase):
             elif not c.isalnum():
                 s[i] = repr(c)[1:-1]
         self._value = "".join(s)
+
+
+class EscapedStr32B(EscapedStr, StringLengthBase):
+    """
+    Same as 'EscapedStr', but minimal length is 32 bytes.
+    """
+
+    _min_bytes: int = 32
 
 
 class DomainName(StrBase):

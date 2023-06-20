@@ -4,6 +4,7 @@ from .generic_types import ListOrItem
 from .types import (
     DomainName,
     EscapedStr,
+    EscapedStr32B,
     IDPattern,
     Int0_512,
     Int0_65535,
@@ -33,6 +34,7 @@ __all__ = [
     "DNSRecordTypeEnum",
     "DomainName",
     "EscapedStr",
+    "EscapedStr32B",
     "IDPattern",
     "Int0_512",
     "Int0_65535",
