@@ -3,6 +3,7 @@ from .files import AbsoluteDir, Dir, File, FilePath
 from .generic_types import ListOrItem
 from .types import (
     DomainName,
+    EscapedStr,
     IDPattern,
     Int0_512,
     Int0_65535,
@@ -31,6 +32,7 @@ __all__ = [
     "PolicyFlagEnum",
     "DNSRecordTypeEnum",
     "DomainName",
+    "EscapedStr",
     "IDPattern",
     "Int0_512",
     "Int0_65535",

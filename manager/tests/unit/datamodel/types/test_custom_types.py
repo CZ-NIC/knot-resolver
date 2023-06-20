@@ -9,6 +9,7 @@ from pytest import raises
 from knot_resolver_manager.datamodel.types import (
     Dir,
     DomainName,
+    EscapedStr,
     InterfaceName,
     InterfaceOptionalPort,
     InterfacePort,
@@ -115,6 +116,34 @@ def test_pin_sha256_valid(val: str):
 def test_pin_sha256_invalid(val: str):
     with raises(ValueError):
         PinSha256(val)
+
+
+@pytest.mark.parametrize(
+    "val,exp",
+    [
+        ("", r""),
+        (2000, "2000"),
+        ("string", r"string"),
+        ("\t\n\v", r"\t\n\v"),
+        ("\a\b\f\n\r\t\v\\", r"\a\b\f\n\r\t\v\\"),
+        # fmt: off
+        ("''", r"\'\'"),
+        ('""', r'\"\"'),
+        ("\'\'", r"\'\'"),
+        ('\"\"', r'\"\"'),
+        ('\\"\\"', r'\\\"\\\"'),
+        ("\\'\\'", r"\\\'\\\'"),
+        # fmt: on
+    ],
+)
+def test_escaped_str_valid(val: Any, exp: str):
+    assert str(EscapedStr(val)) == exp
+
+
+@pytest.mark.parametrize("val", [1.1, False])
+def test_escaped_str_invalid(val: Any):
+    with raises(ValueError):
+        EscapedStr(val)
 
 
 @pytest.mark.parametrize(

@@ -64,6 +64,36 @@ class TimeUnit(UnitBase):
         return self._base_value
 
 
+class EscapedStr(StrBase):
+    """
+    A string where escape sequences are ignored and quotes are escaped.
+    """
+
+    def __init__(self, source_value: Any, object_path: str = "/") -> None:
+        super().__init__(source_value, object_path)
+
+        escape = {
+            "'": r"\'",
+            '"': r"\"",
+            "\a": r"\a",
+            "\n": r"\n",
+            "\r": r"\r",
+            "\t": r"\t",
+            "\b": r"\b",
+            "\f": r"\f",
+            "\v": r"\v",
+            "\0": r"\0",
+        }
+
+        s = list(self._value)
+        for i, c in enumerate(self._value):
+            if c in escape:
+                s[i] = escape[c]
+            elif not c.isalnum():
+                s[i] = repr(c)[1:-1]
+        self._value = "".join(s)
+
+
 class DomainName(StrBase):
     """
     Fully or partially qualified domain name.
