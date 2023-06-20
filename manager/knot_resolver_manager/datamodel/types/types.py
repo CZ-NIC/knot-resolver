@@ -131,6 +131,14 @@ class IDPattern(PatternBase):
     _re = re.compile(r"^(?!-)[a-z0-9-]*[a-z0-9]+$")
 
 
+class PinSha256(PatternBase):
+    """
+    A string that stores base64 encoded sha256.
+    """
+
+    _re = re.compile(r"^[A-Za-z\d+/]{86}==$")
+
+
 class InterfacePort(StrBase):
     addr: Union[None, ipaddress.IPv4Address, ipaddress.IPv6Address] = None
     if_name: Optional[InterfaceName] = None

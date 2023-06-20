@@ -70,7 +70,15 @@ def test_tls_servers_table():
         # the ca-file is a dummy, because it's existence is checked
         {"address": ["2001:DB8::d0c"], "hostname": "res.example.com", "ca-file": "/etc/passwd"}
     )
-    t = [d, ForwardServerSchema({"address": ["192.0.2.1"], "pin-sha256": "YQ=="})]
+    t = [
+        d,
+        ForwardServerSchema(
+            {
+                "address": "192.0.2.1",
+                "pin-sha256": "OTJmODU3ZDMyOWMwOWNlNTU4Y2M0YWNjMjI5NWE2NWJlMzY4MzRmMzY3NGU3NDAwNTI1YjMxZTMxYTgzMzQwMQ==",
+            }
+        ),
+    ]
     tmpl_str = """{% from 'macros/common_macros.lua.j2' import tls_servers_table %}
 {{ tls_servers_table(x) }}"""
 
