@@ -504,6 +504,9 @@ static int protolayer_manager_submit(
 		struct protolayer_payload payload, const struct comm_info *comm,
 		protolayer_finished_cb cb, void *baton)
 {
+	if (manager->session->closing)
+		return kr_error(ECANCELED);
+
 	struct protolayer_iter_ctx *ctx = malloc(manager->cb_ctx_size);
 	kr_require(ctx);
 
