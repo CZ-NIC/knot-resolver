@@ -244,13 +244,6 @@ getent group knot-resolver >/dev/null || groupadd -r knot-resolver
 getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysconfdir}/knot-resolver -s /sbin/nologin -c "Knot Resolver" knot-resolver
 
 %post core
-# 5.0.1 fix to force restart of kres-cache-gc.service, which was missing in systemd_postun_with_restart
-# TODO: remove once most users upgrade to 5.0.1+
-systemctl daemon-reload >/dev/null 2>&1 || :
-if [ $1 -ge 2 ] ; then
-        systemctl try-restart kres-cache-gc.service >/dev/null 2>&1 || :
-fi
-
 # systemd_post macro is not needed for anything (calls systemctl preset)
 %tmpfiles_create %{_tmpfilesdir}/knot-resolver.conf
 %if "x%{?fedora}" == "x"
