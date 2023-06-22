@@ -51,15 +51,6 @@ centos-7:pkgbuild:
     - yum install -y rpm-build python3-pip epel-release
     - *apkgbuild
 
-debian-9:pkgbuild:
-  <<: *pkgbuild
-  image: $CI_REGISTRY/labs/lxc-gitlab-runner/debian-9
-  variables:
-    OBS_REPO: knot-resolver-build
-    DISTROTEST_REPO: Debian_9.0
-  script:
-    - *debpkgbuild
-
 debian-10:pkgbuild:
   <<: *pkgbuild
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/debian-10
@@ -168,17 +159,6 @@ centos-7:pkgtest:
     - yum install -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module | grep -v debug | grep -v devel)
     - systemctl start kresd@1
     - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
-
-debian-9:pkgtest:
-  <<: *pkgtest
-  needs:
-    - debian-9:pkgbuild
-  image: $CI_REGISTRY/labs/lxc-gitlab-runner/debian-9
-  variables:
-    OBS_REPO: knot-resolver-build
-    DISTROTEST_REPO: Debian_9.0
-  script:
-    - *debpkgtest
 
 debian-10:pkgtest:
   <<: *pkgtest

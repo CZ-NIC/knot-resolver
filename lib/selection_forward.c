@@ -15,7 +15,7 @@ static_assert(FORWARDING_TIMEOUT >= KR_NS_TIMEOUT_MIN_DEAD_TIMEOUT,
 		"Bad combination of NS selection limits.");
 
 struct forward_local_state {
-	kr_sockaddr_array_t *targets;
+	const kr_sockaddr_array_t *targets; /// data owned by kr_request
 	struct address_state *addr_states;
 	/** Index of last choice in the targets array, used for error reporting. */
 	size_t last_choice_index;
@@ -66,7 +66,7 @@ void forward_choose_transport(struct kr_query *qry,
 
 		update_address_state(addr_state, address, addr_len, qry);
 
-		if (addr_state->generation == -1) {
+		if (addr_state->generation == -1 || addr_state->broken) {
 			continue;
 		}
 		addr_state->choice_array_index = i;

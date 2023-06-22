@@ -1,0 +1,22 @@
+[Unit]
+Description=Knot Resolver Manager
+Documentation=man:knot-resolver.systemd(7)
+Wants=network-online.target
+After=network-online.target
+Before=nss-lookup.target
+Wants=nss-lookup.target
+
+[Service]
+Type=notify
+TimeoutStartSec=10s
+ExecStart=@bin_dir@/knot-resolver --config=@etc_dir@/config.yml
+ExecReload=@bin_dir@/kresctl --socket @run_dir@/manager.sock reload
+KillSignal=SIGINT
+WorkingDirectory=@systemd_work_dir@
+User=@user@
+Group=@group@
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_SETPCAP
+AmbientCapabilities=CAP_NET_BIND_SERVICE CAP_SETPCAP
+
+[Install]
+WantedBy=multi-user.target

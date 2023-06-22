@@ -26,6 +26,7 @@
 #include "lib/generic/trie.h"
 #include "lib/resolve.h"
 #include "lib/rplan.h"
+#include "lib/rules/api.h"
 #include "lib/utils.h"
 
 #include "lib/cache/impl.h"
@@ -34,8 +35,6 @@
  *	- Reconsider when RRSIGs are put in and retrieved from the cache.
  *	  Currently it's always done, which _might_ be spurious, depending
  *	  on how kresd will use the returned result.
- *	  There's also the "problem" that kresd ATM does _not_ ask upstream
- *	  with DO bit in some cases.
  */
 
 
@@ -126,8 +125,7 @@ int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct k
 		 * LMDB only restricts our env without changing the in-file maxsize.
 		 * That is worked around by reopening (found no other reliable way). */
 		cache->api->close(cache->db, &cache->stats);
-		struct kr_cdb_opts opts2;
-		memcpy(&opts2, opts, sizeof(opts2));
+		struct kr_cdb_opts opts2 = *opts;
 		opts2.maxsize = 0;
 		ret = cache->api->open(&cache->db, &cache->stats, &opts2, mm);
 	}
@@ -177,7 +175,7 @@ int kr_cache_commit(struct kr_cache *cache)
 		return kr_error(EINVAL);
 	}
 	if (cache->api->commit) {
-		return cache_op(cache, commit);
+		return cache_op(cache, commit, true);
 	}
 	return kr_ok();
 }
@@ -317,6 +315,19 @@ int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
 	struct kr_request *req = ctx->req;
 	struct kr_query *qry = req->current_query;
+
+	/* TODO: review when to run this?  We want to process rules here
+	 * even when some of the cache exit-conditions happen.  NO_CACHE in particular. */
+	if (!req->options.PASSTHRU_LEGACY && !qry->flags.CACHE_TRIED) {
+		int ret = kr_rule_local_data_answer(qry, pkt);
+		if (ret < 0)
+			ctx->state = KR_STATE_FAIL;
+		if (ret != 0) {
+			qry->flags.CACHE_TRIED = true;
+			return ctx->state;
+		}
+	}
+
 	/* We first check various exit-conditions and then call the _real function. */
 
 	if (!kr_cache_is_open(&req->ctx->cache)
@@ -328,6 +339,7 @@ int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	}
 	/* ATM cache only peeks for qry->sname and that would be useless
 	 * to repeat on every iteration, so disable it from now on.
+	 * Note that xNAME causes a followup kr_query, so cache will get re-tried.
 	 * LATER(optim.): assist with more precise QNAME minimization. */
 	qry->flags.CACHE_TRIED = true;
 

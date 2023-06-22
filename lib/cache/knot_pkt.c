@@ -11,8 +11,8 @@
 
 int pkt_renew(knot_pkt_t *pkt, const knot_dname_t *name, uint16_t type)
 {
-	/* Update packet question if needed. */
-	if (!knot_dname_is_equal(knot_pkt_qname(pkt), name)
+	/* Clear the packet if needed. */
+	if (pkt->rrset_count != 0 || !knot_dname_is_equal(knot_pkt_qname(pkt), name)
 	    || knot_pkt_qtype(pkt) != type || knot_pkt_qclass(pkt) != KNOT_CLASS_IN) {
 		int ret = kr_pkt_recycle(pkt);
 		if (ret) return kr_error(ret);
@@ -55,7 +55,7 @@ static int pkt_alloc_space(knot_pkt_t *pkt, int count)
 	return kr_ok();
 }
 
-int pkt_append(knot_pkt_t *pkt, const struct answer_rrset *rrset, uint8_t rank)
+int pkt_append(knot_pkt_t *pkt, const struct answer_rrset *rrset)
 {
 	/* allocate space, to be sure */
 	int rrset_cnt = (rrset->set.rr->rrs.count > 0) + (rrset->sig_rds.count > 0);
@@ -69,7 +69,7 @@ int pkt_append(knot_pkt_t *pkt, const struct answer_rrset *rrset, uint8_t rank)
 		/* allocate rank */
 		uint8_t *rr_rank = mm_alloc(&pkt->mm, sizeof(*rr_rank));
 		if (!rr_rank) return kr_error(ENOMEM);
-		*rr_rank = (i == 0) ? rank : (KR_RANK_OMIT | KR_RANK_AUTH);
+		*rr_rank = (i == 0) ? rrset->set.rank : (KR_RANK_OMIT | KR_RANK_AUTH);
 			/* rank for RRSIGs isn't really useful: ^^ */
 		if (i == 0) {
 			pkt->rr[pkt->rrset_count] = *rrset->set.rr;

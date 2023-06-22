@@ -18,6 +18,8 @@
 #include "lib/defines.h"
 #include "lib/dnssec.h"
 #include "lib/log.h"
+#include "lib/resolve.h"
+#include "lib/rules/api.h"
 
 #include <arpa/inet.h>
 #include <getopt.h>
@@ -68,6 +70,12 @@ KR_EXPORT const char *malloc_conf = "narenas:1";
 #ifndef TCP_BACKLOG_DEFAULT
 #define TCP_BACKLOG_DEFAULT 128
 #endif
+
+/** I don't know why linker is dropping this _zonefile function otherwise. TODO: revisit. */
+KR_EXPORT void kr_misc_unused(void)
+{
+	kr_rule_zonefile(NULL);
+}
 
 struct args the_args_value;  /** Static allocation for the_args singleton. */
 
@@ -609,6 +617,14 @@ int main(int argc, char **argv)
 		lua_settop(the_engine->L, 0);
 	}
 
+	ret = kr_rules_init_ensure();
+	if (ret) {
+		kr_log_error(RULES, "failed to initialize policy rule engine: %s\n",
+				kr_strerror(ret));
+		ret = EXIT_FAILURE;
+		goto cleanup;
+	}
+
 	drop_capabilities();
 
 	if (engine_start() != 0) {
@@ -621,6 +637,9 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
+	/* Starting everything succeeded, so commit rule DB changes. */
+	kr_rules_commit(true);
+
 	/* Run the event loop */
 	ret = run_worker(loop, fork_id == 0, the_args);
 
@@ -631,6 +650,8 @@ cleanup:/* Cleanup. */
 	worker_deinit();
 	engine_deinit();
 	network_deinit();
+	kr_rules_commit(false);
+	kr_rules_deinit();
 	if (loop != NULL) {
 		uv_loop_close(loop);
 	}

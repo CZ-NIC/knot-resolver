@@ -37,7 +37,9 @@ local function test_basic_actions()
 	daf.add('qname = deny. deny')
 	daf.add('qname = drop. drop')
 
-	check_answer('daf pass action', 'pass.', kres.type.A, kres.rcode.NOERROR)
+	-- This one won't work anymore, as PASS(THRU) now also skips hints.
+	--check_answer('daf pass action', 'pass.', kres.type.A, kres.rcode.NOERROR)
+
 	check_answer('daf deny action', 'deny.', kres.type.A, kres.rcode.NXDOMAIN)
 	check_answer('daf drop action', 'drop.', kres.type.A, kres.rcode.SERVFAIL)
 end

@@ -1,0 +1,102 @@
+{% from 'macros/common_macros.lua.j2' import boolean %}
+{% from 'macros/network_macros.lua.j2' import network_listen, http_config %}
+
+-- network.do-ipv4/6
+net.ipv4 = {{ boolean(cfg.network.do_ipv4) }}
+net.ipv6 = {{ boolean(cfg.network.do_ipv6) }}
+
+{% if cfg.network.out_interface_v4 %}
+-- network.out-interface-v4
+net.outgoing_v4('{{ cfg.network.out_interface_v4 }}')
+{% endif %}
+
+{% if cfg.network.out_interface_v6 %}
+-- network.out-interface-v6
+net.outgoing_v6('{{ cfg.network.out_interface_v6 }}')
+{% endif %}
+
+-- network.tcp-pipeline
+net.tcp_pipeline({{ cfg.network.tcp_pipeline }})
+
+-- network.edns-keep-alive
+{% if cfg.network.edns_tcp_keepalive %}
+modules.load('edns_keepalive')
+{% else %}
+modules.unload('edns_keepalive')
+{% endif %}
+
+-- network.edns-buffer-size
+net.bufsize(
+    {{ cfg.network.edns_buffer_size.upstream.bytes() }},
+    {{ cfg.network.edns_buffer_size.downstream.bytes() }}
+)
+
+{% if cfg.network.tls.cert_file and cfg.network.tls.key_file %}
+-- network.tls
+net.tls('{{ cfg.network.tls.cert_file  }}', '{{ cfg.network.tls.key_file }}')
+{% endif %}
+
+{% if cfg.network.tls.sticket_secret %}
+-- network.tls.sticket-secret
+net.tls_sticket_secret('{{ cfg.network.tls.sticket_secret }}')
+{% endif %}
+
+{% if cfg.network.tls.sticket_secret_file %}
+-- network.tls.sticket-secret-file
+net.tls_sticket_secret_file('{{ cfg.network.tls.sticket_secret_file }}')
+{% endif %}
+
+{% if cfg.network.tls.auto_discovery %}
+-- network.tls.auto-discovery
+modules.load('experimental_dot_auth')
+{% else %}
+-- modules.unload('experimental_dot_auth')
+{% endif %}
+
+-- network.tls.padding
+net.tls_padding(
+{%- if cfg.network.tls.padding == true -%}
+true
+{%- elif cfg.network.tls.padding == false -%}
+false
+{%- else -%}
+{{ cfg.network.tls.padding }}
+{%- endif -%}
+)
+
+{% if cfg.network.address_renumbering %}
+-- network.address-renumbering
+modules.load('renumber')
+renumber.config = {
+{% for item in cfg.network.address_renumbering %}
+    {'{{ item.source }}', '{{ item.destination }}'},
+{% endfor %}
+}
+{% endif %}
+
+{%- set vars = {'doh_legacy': False} -%}
+{% for listen in cfg.network.listen if listen.kind == "doh-legacy" -%}
+{%- if vars.update({'doh_legacy': True}) -%}{%- endif -%}
+{%- endfor %}
+
+{% if vars.doh_legacy %}
+-- doh_legacy http config
+modules.load('http')
+{{ http_config(cfg.network.tls,"doh_legacy") }}
+{% endif %}
+
+{% if cfg.network.proxy_protocol %}
+-- network.proxy-protocol
+net.proxy_allowed({
+{% for item in cfg.network.proxy_protocol.allow %}
+'{{ item }}',
+{% endfor %}
+})
+{% else %}
+net.proxy_allowed({})
+{% endif %}
+
+-- network.listen
+{% for listen in cfg.network.listen %}
+{{ network_listen(listen) }}
+{% endfor %}

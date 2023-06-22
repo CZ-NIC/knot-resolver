@@ -105,7 +105,10 @@ KR_EXPORT
 int kr_cache_clear(struct kr_cache *cache);
 
 
-/* ** This interface is temporary. ** */
+/* ** This interface is temporary. **
+ * _peek_exact() doesn't look e.g. at signed wildcards
+ * or at local data defined in rules
+ * */
 
 struct kr_cache_p {
 	uint32_t time;	/**< The time of inception. */

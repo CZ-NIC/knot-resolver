@@ -932,6 +932,7 @@ static int begin(kr_layer_t *ctx)
 	return reset(ctx);
 }
 
+/* LATER: make calls of this function more organized; spaghetti is though here. */
 int kr_make_query(struct kr_query *query, knot_pkt_t *pkt)
 {
 	/* Minimize QNAME (if possible). */
@@ -977,6 +978,7 @@ static int prepare_query(kr_layer_t *ctx, knot_pkt_t *pkt)
 		return KR_STATE_FAIL;
 	}
 
+	// TODO: this logging (and rplan's) is confusing, especially around `uid` values
 	WITH_VERBOSE(query) {
 		KR_DNAME_GET_STR(name_str, query->sname);
 		KR_RRTYPE_GET_STR(type_str, query->stype);
@@ -1026,6 +1028,21 @@ static void bound_ttls(ranked_rr_array_t *array, uint32_t qry_uid,
 	}
 }
 
+static void ede_passthru(const knot_pkt_t *pkt, struct kr_request *req)
+{
+	const uint8_t *ede_raw = pkt->edns_opts ?
+			pkt->edns_opts->ptr[KNOT_EDNS_OPTION_EDE] : NULL;
+	if (!ede_raw) return;
+	kr_require(ede_raw[0] * 256 + ede_raw[1] == KNOT_EDNS_OPTION_EDE);
+	uint16_t ede_len = ede_raw[2] * 256 + ede_raw[3];
+	if (ede_len < 2) return;
+	uint16_t ede_code = ede_raw[4] * 256 + ede_raw[5];
+	if (ede_code >= KNOT_EDNS_EDE_INDETERMINATE // long range of DNSSEC codes
+			&& ede_code <= KNOT_EDNS_EDE_NSEC_MISS) {
+		kr_request_set_extended_error(req, ede_code, "V5T7: forwarded EDE code");
+	}
+}
+
 /** Resolve input query or continue resolution with followups.
  *
  *  This roughly corresponds to RFC1034, 5.3.3 4a-d.
@@ -1068,7 +1085,7 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 		VERBOSE_MSG("<= malformed response (parsed %d)\n", (int)pkt->parsed);
 		query->server_selection.error(query, req->upstream.transport, KR_SELECTION_MALFORMED);
 		return KR_STATE_FAIL;
-	} else if (!is_paired_to_query(pkt, query)) {
+	} else if (!query->flags.CACHED && !is_paired_to_query(pkt, query)) {
 		WITH_VERBOSE(query) {
 			const char *ns_str =
 				req->upstream.transport ? kr_straddr(&req->upstream.transport->address.ip) : "(internal)";
@@ -1129,6 +1146,10 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 		}
 		ret = KR_STATE_FAIL;
 		selection_error = KR_SELECTION_SERVFAIL;
+		if (query->flags.FORWARD) {
+			/* additionally pass some of the EDE codes through */
+			ede_passthru(pkt, req);
+		}
 		break;
 	case KNOT_RCODE_FORMERR:
 		ret = KR_STATE_FAIL;

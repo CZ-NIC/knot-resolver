@@ -7,6 +7,7 @@
 #include "lib/cache/cdb_api.h"
 #include "lib/defines.h"
 
+/** Get API implementation for LMDB. */
 KR_EXPORT KR_CONST
 const struct kr_cdb_api *kr_cdb_lmdb(void);
 

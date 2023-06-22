@@ -173,7 +173,7 @@ int put_rtt_state(const uint8_t *ip, size_t len, struct rtt_state state,
 				.data = &state };
 
 	int ret = cache->api->write(db, stats, &key, &value, 1);
-	cache->api->commit(db, stats);
+	cache->api->commit(db, stats, true);
 
 	free(key.data);
 	return ret;
@@ -686,6 +686,13 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 		break;
 	case KR_SELECTION_REFUSED:
 	case KR_SELECTION_SERVFAIL:
+		if (qry->flags.FORWARD || qry->flags.STUB) {
+			/* The NS might not be broken, but this state is just for this query
+			 * and it doesn't make sense to retry on the same NS immediately. */
+			addr_state->broken = true;
+			break;
+		}
+		/* For authoritative servers we try some fallback workarounds. */
 		if (qry->flags.NO_MINIMIZE && qry->flags.NO_0X20 && qry->flags.TCP) {
 			addr_state->broken = true;
 		} else if (qry->flags.NO_MINIMIZE) {
@@ -764,6 +771,15 @@ void kr_server_selection_init(struct kr_query *qry)
 		iter_local_state_alloc(
 			mempool, &qry->server_selection.local_state->private);
 	}
+}
+void kr_server_selection_cached(struct kr_query *qry)
+{
+	qry->server_selection = (struct kr_server_selection){
+		.initialized = false,
+		// we reuse iter_error, as it's no-op if (!initialized)
+		.error = iter_error,
+		// everything else is NULL
+	};
 }
 
 int kr_forward_add_target(struct kr_request *req, const struct sockaddr *sock)

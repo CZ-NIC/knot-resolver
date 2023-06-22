@@ -4,6 +4,7 @@ KRESD_CMD=$1
 MESON_BUILD_ROOT=$(pwd)
 mkdir -p tests/dnstap
 export GOPATH=$MESON_BUILD_ROOT/tests/dnstap
+echo "$GOPATH"
 cd "$(dirname $0)"
 DNSTAP_TEST=dnstap-test
 
@@ -11,15 +12,17 @@ if [ -z "$GITLAB_CI" ]; then
 	type -P go >/dev/null || exit 77
 	echo "Building the dnstap test and its dependencies..."
 	# some packages may be missing on the system right now
-	go get github.com/{FiloSottile/gvt,cloudflare/dns,dnstap/golang-dnstap,golang/protobuf/proto}
+	go get .
 else
 	# In CI we've prebuilt dependencies into the default GOPATH.
 	# We're in a scratch container, so we just add the dnstap test inside.
 	export GOPATH=/root/go
 fi
-DTAP=$GOPATH/src/$DNSTAP_TEST
+DTAP_DIR="$GOPATH/src"
+DTAP="$DTAP_DIR/$DNSTAP_TEST"
+mkdir -p "$DTAP_DIR"
 rm -f $DTAP && ln -s $(realpath ..)/$DNSTAP_TEST $DTAP
-go install $DNSTAP_TEST
+go install .
 
 
 CONFIG=$(realpath ./config)

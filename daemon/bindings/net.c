@@ -717,7 +717,7 @@ static int net_tls_client(lua_State *L)
 	/* check that only allowed keys are present */
 	{
 		const char *bad_key = lua_table_checkindices(L, (const char *[])
-			{ "1", "hostname", "ca_file", "pin_sha256", "insecure", NULL });
+			{ "1", "hostname", "ca_file", "pin_sha256", "insecure", "tls", NULL });
 		if (bad_key)
 			lua_error_p(L, "found unexpected key '%s'", bad_key);
 	}

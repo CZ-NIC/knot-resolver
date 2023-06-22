@@ -30,6 +30,10 @@ typedef struct {
 	uint32_t size;
 	knot_rdata_t *rdata;
 } knot_rdataset_t;
+typedef struct knot_db_val {
+	void *data;
+	size_t len;
+} knot_db_val_t;
 
 typedef struct knot_mm {
 	void *ctx, *alloc, *free;
@@ -135,6 +139,7 @@ struct kr_qflags {
 	_Bool NO_NS_FOUND : 1;
 	_Bool PKT_IS_SANE : 1;
 	_Bool DNS64_DISABLE : 1;
+	_Bool PASSTHRU_LEGACY : 1;
 };
 typedef struct ranked_rr_array_entry {
 	uint32_t qry_uid;
@@ -194,6 +199,23 @@ struct kr_request_qsource_flags {
 	_Bool http : 1;
 	_Bool xdp : 1;
 };
+typedef unsigned long kr_rule_tags_t;
+struct kr_rule_zonefile_config {
+	const char *filename;
+	const char *input_str;
+	size_t input_len;
+	_Bool is_rpz;
+	_Bool nodata;
+	kr_rule_tags_t tags;
+	const char *origin;
+	uint32_t ttl;
+};
+struct kr_rule_fwd_flags {
+	_Bool is_auth : 1;
+	_Bool is_tcp : 1;
+	_Bool is_nods : 1;
+};
+typedef struct kr_rule_fwd_flags kr_rule_fwd_flags_t;
 struct kr_extended_error {
 	int32_t info_code;
 	const char *extra_text;
@@ -240,6 +262,7 @@ struct kr_request {
 	unsigned int count_no_nsaddr;
 	unsigned int count_fail_row;
 	alloc_wire_f alloc_wire_cb;
+	kr_rule_tags_t rule_tags;
 	struct kr_extended_error extended_error;
 };
 enum kr_rank {KR_RANK_INITIAL, KR_RANK_OMIT, KR_RANK_TRY, KR_RANK_INDET = 4, KR_RANK_BOGUS, KR_RANK_MISMATCH, KR_RANK_MISSING, KR_RANK_INSECURE, KR_RANK_AUTH = 16, KR_RANK_SECURE = 32};
@@ -260,6 +283,7 @@ struct kr_cdb_stats {
 	uint64_t match_miss;
 	uint64_t read_leq;
 	uint64_t read_leq_miss;
+	uint64_t read_less;
 	double usage_percent;
 };
 typedef struct uv_timer_s uv_timer_t;
@@ -315,7 +339,14 @@ struct kr_server_selection {
 	struct local_state *local_state;
 };
 typedef int kr_log_level_t;
-enum kr_log_group {LOG_GRP_UNKNOWN = -1, LOG_GRP_SYSTEM = 1, LOG_GRP_CACHE, LOG_GRP_IO, LOG_GRP_NETWORK, LOG_GRP_TA, LOG_GRP_TLS, LOG_GRP_GNUTLS, LOG_GRP_TLSCLIENT, LOG_GRP_XDP, LOG_GRP_DOH, LOG_GRP_DNSSEC, LOG_GRP_HINT, LOG_GRP_PLAN, LOG_GRP_ITERATOR, LOG_GRP_VALIDATOR, LOG_GRP_RESOLVER, LOG_GRP_SELECTION, LOG_GRP_ZCUT, LOG_GRP_COOKIES, LOG_GRP_STATISTICS, LOG_GRP_REBIND, LOG_GRP_WORKER, LOG_GRP_POLICY, LOG_GRP_TASENTINEL, LOG_GRP_TASIGNALING, LOG_GRP_TAUPDATE, LOG_GRP_DAF, LOG_GRP_DETECTTIMEJUMP, LOG_GRP_DETECTTIMESKEW, LOG_GRP_GRAPHITE, LOG_GRP_PREFILL, LOG_GRP_PRIMING, LOG_GRP_SRVSTALE, LOG_GRP_WATCHDOG, LOG_GRP_NSID, LOG_GRP_DNSTAP, LOG_GRP_TESTS, LOG_GRP_DOTAUTH, LOG_GRP_HTTP, LOG_GRP_CONTROL, LOG_GRP_MODULE, LOG_GRP_DEVEL, LOG_GRP_RENUMBER, LOG_GRP_EDE, LOG_GRP_PROTOLAYER, LOG_GRP_REQDBG};
+enum kr_log_group {LOG_GRP_UNKNOWN = -1, LOG_GRP_SYSTEM = 1, LOG_GRP_CACHE, LOG_GRP_IO, LOG_GRP_NETWORK, LOG_GRP_TA, LOG_GRP_TLS, LOG_GRP_GNUTLS, LOG_GRP_TLSCLIENT, LOG_GRP_XDP, LOG_GRP_DOH, LOG_GRP_DNSSEC, LOG_GRP_HINT, LOG_GRP_PLAN, LOG_GRP_ITERATOR, LOG_GRP_VALIDATOR, LOG_GRP_RESOLVER, LOG_GRP_SELECTION, LOG_GRP_ZCUT, LOG_GRP_COOKIES, LOG_GRP_STATISTICS, LOG_GRP_REBIND, LOG_GRP_WORKER, LOG_GRP_POLICY, LOG_GRP_TASENTINEL, LOG_GRP_TASIGNALING, LOG_GRP_TAUPDATE, LOG_GRP_DAF, LOG_GRP_DETECTTIMEJUMP, LOG_GRP_DETECTTIMESKEW, LOG_GRP_GRAPHITE, LOG_GRP_PREFILL, LOG_GRP_PRIMING, LOG_GRP_SRVSTALE, LOG_GRP_WATCHDOG, LOG_GRP_NSID, LOG_GRP_DNSTAP, LOG_GRP_TESTS, LOG_GRP_DOTAUTH, LOG_GRP_HTTP, LOG_GRP_CONTROL, LOG_GRP_MODULE, LOG_GRP_DEVEL, LOG_GRP_RENUMBER, LOG_GRP_EDE, LOG_GRP_RULES, LOG_GRP_PROTOLAYER, LOG_GRP_REQDBG};
+struct kr_query_data_src {
+	_Bool initialized;
+	_Bool all_set;
+	uint8_t rule_depth;
+	kr_rule_fwd_flags_t flags;
+	knot_db_val_t targets_ptr;
+};
 
 kr_layer_t kr_layer_t_static;
 _Bool kr_dbg_assertion_abort;
@@ -342,6 +373,7 @@ struct kr_query {
 	struct timeval timestamp;
 	struct kr_zonecut zone_cut;
 	struct kr_layer_pickle *deferred;
+	struct kr_query_data_src data_src;
 	int8_t cname_depth;
 	struct kr_query *cname_parent;
 	struct kr_request *request;
@@ -458,6 +490,14 @@ int kr_cache_remove(struct kr_cache *, const knot_dname_t *, uint16_t);
 int kr_cache_remove_subtree(struct kr_cache *, const knot_dname_t *, _Bool, int);
 int kr_cache_commit(struct kr_cache *);
 uint32_t packet_ttl(const knot_pkt_t *);
+int kr_rules_init(const char *, size_t);
+int kr_view_insert_action(const char *, const char *);
+int kr_view_select_action(const struct kr_request *, knot_db_val_t *);
+int kr_rule_tag_add(const char *, kr_rule_tags_t *);
+int kr_rule_local_data_emptyzone(const knot_dname_t *, kr_rule_tags_t);
+int kr_rule_local_data_nxdomain(const knot_dname_t *, kr_rule_tags_t);
+int kr_rule_zonefile(const struct kr_rule_zonefile_config *);
+int kr_rule_forward(const knot_dname_t *, kr_rule_fwd_flags_t, const struct sockaddr **);
 typedef struct {
 	int sock_type;
 	_Bool tls;

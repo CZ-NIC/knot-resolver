@@ -1,0 +1,180 @@
+[tool.poetry]
+name = "knot-resolver-manager"
+version = "0.1.0"
+description = "A central management tool for multiple instances of Knot Resolver"
+authors = [
+    "Václav Šraier <vaclav.sraier@nic.cz>",
+    "Aleš Mrázek <ales.mrazek@nic.cz>"
+]
+
+# See currently open issue about building C extensions here:
+# https://github.com/python-poetry/poetry/issues/2740
+[tool.poetry.build]
+script = "build.py"
+generate-setup-file = true
+
+[tool.poetry.dependencies]
+python = "^3.7"
+aiohttp = "*"
+jinja2 = "*"
+pyyaml = "*"
+supervisor = "*"
+typing-extensions = "*"
+prometheus-client = "*"
+
+[tool.poetry.group.dev.dependencies]
+poetry = "^1.4.2"
+pyparsing = "^3.0.9"
+poethepoet = "^0.18.1"
+debugpy = "^1.6.7"
+
+[tool.poetry.group.test.dependencies]
+pytest = "^7.3.1"
+pytest-cov = "^4.0.0"
+pytest-asyncio = "^0.21.0"
+tox = "^4.5.1"
+tox-pyenv = "^1.1.0"
+
+[tool.poetry.group.lint.dependencies]
+black = "^23.3.0"
+isort = "^4.3.21"
+toml = "^0.10.2"
+mypy = "^1.3.0"
+types-pyyaml = "^6.0.12.10"
+pylint = "^2.13.9"
+flake8 = {version = "*", python = "^3.8.1"}
+
+[tool.poetry.group.docs.dependencies]
+sphinx = "^5.3.0"
+
+[tool.poetry.scripts]
+kresctl = 'knot_resolver_manager.cli.main:main'
+knot-resolver = 'knot_resolver_manager.__main__:run'
+
+[tool.poe.tasks]
+run = { cmd = "scripts/run", help = "Run the manager" }
+run-debug = { cmd = "scripts/run-debug", help = "Run the manager under debugger" }
+docs = { cmd = "scripts/docs", help = "Create HTML documentation" }
+test = { shell = "env PYTHONPATH=. pytest --junitxml=unit.junit.xml --cov=knot_resolver_manager --show-capture=all tests/unit/", help = "Run tests" }
+check = { cmd = "scripts/codecheck", help = "Run static code analysis" }
+format = { shell = "black knot_resolver_manager/ tests/ scripts/ build.py; isort -rc .", help = "Run code formatter" }
+fixdeps = { shell = "poetry install; npm install; npm update", help = "Install/update dependencies according to configuration files"}
+commit = { shell = "scripts/commit", help = "Invoke every single check before commiting" }
+container = { cmd = "scripts/container.py", help = "Manage containers" }
+kresctl = { script = "knot_resolver_manager.cli.main:main", help="run kresctl" }
+clean = """
+  rm -rf .coverage
+         .mypy_cache
+         .pytest_cache
+         ./**/__pycache__
+         dist
+         .tox
+"""
+gen-setuppy = { shell = "python scripts/create_setup.py > setup.py", help = "Generate setup.py file for backwards compatibility" }
+tox = { cmd = "tox", help = "Run tests in tox" }
+integration = {cmd = "python tests/integration/runner.py", help = "Run integration tests" }
+configure-vscode = {cmd = "scripts/configure-vscode", help = "Create VSCode configuration for debugging, virtual envs etc" }
+man = {cmd = "scripts/man", help = "Display manpage from sources" }
+
+[tool.black]
+line-length = 120
+target_version = ['py311']
+include = '\.py$'
+exclude = "setup.py"    # Poetry generates it and we want to keep it unchanged
+
+[tool.isort]
+line_length=120                # corresponds to -w  flag
+profile = "black"
+multi_line_output=3            # corresponds to -m  flag
+include_trailing_comma=true    # corresponds to -tc flag
+skip_glob = '^((?!py$).)*$'    # isort all Python files
+float_to_top=true
+skip = "setup.py"   # Poetry generates it and we want to keep it unchanged
+
+[tool.tox]
+legacy_tox_ini = """
+[tox]
+isolated_build = True
+envlist = py37, py38, py39, py10, py11
+
+[tox:.package]
+# note tox will use the same python version as under what tox is installed to package
+# so unless this is python 3 you can require a given python version for the packaging
+# environment via the basepython key
+basepython = python3
+
+[testenv]
+deps = poetry
+commands =
+    poetry install -v
+    ./poe test
+"""
+
+[tool.pylint."MESSAGES CONTROL"]
+disable= [
+    "broad-except",
+    "fixme",
+    "global-statement",
+    "invalid-name",
+    "line-too-long",  # checked by flake8
+    "missing-docstring",
+    "no-else-return",
+    "no-self-use",
+    "raise-missing-from",
+    "too-few-public-methods",
+    "unused-import",  # checked by flake8,
+    "bad-continuation", # conflicts with black
+    "consider-using-in", # pyright can't see through in expressions,
+    "too-many-return-statements", # would prevent us from using recursive tree traversals
+    "logging-fstring-interpolation", # see https://github.com/PyCQA/pylint/issues/1788
+    "no-else-raise", # not helpful for readability, when we want explicit branches
+    "raising-bad-type", # handled by type checker
+    "too-many-arguments",  # sure, but how can we change the signatures to take less arguments? artificially create objects with arguments? That's stupid...
+    "no-member",  # checked by pyright
+    "import-error", # checked by pyright (and pylint does not do it properly)
+    "unsupported-delete-operation", # checked by pyright
+    "unsubscriptable-object", # checked by pyright
+    "unsupported-membership-test", # checked by pyright
+    "invalid-overridden-method",  # hopefully checked by type checkers
+]
+
+[tool.pylint.SIMILARITIES]
+min-similarity-lines = "6"
+ignore-comments = "yes"
+ignore-docstrings = "yes"
+ignore-imports = "yes"
+
+[tool.pylint.DESIGN]
+max-parents = "10"
+
+[tool.pyright]
+include = [
+    "knot_resolver_manager",
+    "tests"
+]
+exclude = []
+typeCheckingMode = "strict"
+
+[tool.mypy]
+python_version = "3.7"
+# strict = true
+disallow_any_generics = true
+disallow_subclassing_any = true
+disallow_untyped_calls = false
+disallow_untyped_decorators = true
+pretty = true
+show_error_codes = true
+allow_redefinition = true
+disallow_untyped_defs = false
+strict_equality = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+implicit_reexport = false
+no_implicit_optional = true
+
+[build-system]
+requires = [
+    "poetry-core>=1.0.0",
+    "setuptools>=67.8.0"
+]
+build-backend = "poetry.core.masonry.api"

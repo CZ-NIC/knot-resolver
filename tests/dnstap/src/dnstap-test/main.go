@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"github.com/cloudflare/dns"
 	dnstap "github.com/dnstap/golang-dnstap"
-	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 	"io"
 	"io/ioutil"
 	"log"

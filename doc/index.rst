@@ -4,54 +4,70 @@
 Knot Resolver
 #############
 
-Knot Resolver is a minimalistic implementation of a caching validating DNS resolver.
-Modular architecture keeps the core tiny and efficient,
-and it provides a state-machine like API for extensions.
+Welcome to Knot Resolver's documentation!
+Knot Resolver is an opensource implementation of a caching validating DNS resolver.
+Modular architecture keeps the core tiny and efficient, and it also provides a state-machine like API for extensions.
+
+If you are a new user, please start with chapter for :ref:`getting started <gettingstarted>`.
 
 .. toctree::
-   :caption: Quick Start
-   :name: quickstart
+   :caption: Getting Started
+   :name: gettingstarted-chapter
    :maxdepth: 1
 
-   quickstart-install
-   quickstart-startup
-   quickstart-config
-
-.. _configuration-chapter:
+   gettingstarted-install
+   gettingstarted-startup
+   gettingstarted-config
 
 .. toctree::
    :caption: Configuration
-   :name: users
+   :name: configuration-chapter
    :maxdepth: 3
 
    config-overview
-   config-network
-   config-performance
-   config-policy
-   config-logging-monitoring
-   config-dnssec
-   config-experimental
-   config-no-systemd
-
-.. _operation-chapter:
+   config-schema
+   usecase-network-interfaces
+   config-lua
 
 .. toctree::
-   :caption: Operation
+   :caption: Deployment
+   :name: deployment-chapter
    :maxdepth: 1
 
+   deployment-systemd
+   deployment-manual
+   deployment-docker
+   deployment-advanced
+
+.. toctree::
+   :caption: Management
+   :name: management-chapter
+   :maxdepth: 1
+
+   manager-api
+   manager-client
+
+.. toctree::
+   :caption: For operators
+   :name: operators-chapter
+   :maxdepth: 1
+
+   upgrading-to-6
    upgrading
    NEWS
 
+
 .. toctree::
-   :caption: Developers
-   :name: developers
+   :caption: For developers
+   :name: developers-chapter
    :maxdepth: 2
 
+   architecture
    build
-   modules-http-custom-services
    lib
    modules_api
    worker_api
+   modules-http-custom-services
 
 
 Indices and tables

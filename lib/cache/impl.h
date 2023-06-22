@@ -274,7 +274,7 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
  * This assumes the TTL is OK and entry_h_consistent, but it may still return error.
  * On success it handles all the rest, incl. qry->flags.
  */
-int answer_from_pkt(kr_layer_t *ctx, knot_pkt_t *pkt, uint16_t type,
+int answer_from_pkt(struct kr_query *qry, knot_pkt_t *pkt, uint16_t type,
 		const struct entry_h *eh, const void *eh_bound, uint32_t new_ttl);
 
 
@@ -328,6 +328,11 @@ static inline int rdataset_dematerialized_size(const uint8_t *data, uint16_t *rd
 /** Serialize an rdataset.  It may be NULL as short-hand for empty. */
 void rdataset_dematerialize(const knot_rdataset_t *rds, uint8_t * restrict data);
 
+/** Materialize a knot_rdataset_t from cache.
+ * Return the number of bytes consumed or an error code. */
+int rdataset_materialize(knot_rdataset_t * restrict rds, const uint8_t * const data,
+				const uint8_t *data_bound, knot_mm_t *pool);
+
 
 /** Partially constructed answer when gathering RRsets from cache. */
 struct answer {
@@ -362,7 +367,7 @@ int entry2answer(struct answer *ans, int id,
 /** Prepare answer packet to be filled by RRs (without RR data in wire). */
 int pkt_renew(knot_pkt_t *pkt, const knot_dname_t *name, uint16_t type);
 
-/** Append RRset + its RRSIGs into the current section (*shallow* copy), with given rank.
+/** Append RRset + its RRSIGs into the current section (*shallow* copy).
  *
  * \note it works with empty set as well (skipped)
  * \note pkt->wire is not updated in any way
@@ -370,7 +375,7 @@ int pkt_renew(knot_pkt_t *pkt, const knot_dname_t *name, uint16_t type);
  * \note Whole RRsets are put into the pseudo-packet;
  *       normal parsed packets would only contain single-RR sets.
  */
-int pkt_append(knot_pkt_t *pkt, const struct answer_rrset *rrset, uint8_t rank);
+int pkt_append(knot_pkt_t *pkt, const struct answer_rrset *rrset);
 
 
 

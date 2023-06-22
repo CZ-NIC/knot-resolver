@@ -186,8 +186,9 @@ static int cache_open(lua_State *L)
 
 	/* Reopen cache */
 	struct kr_cdb_opts opts = {
-		(conf && strlen(conf)) ? conf : ".",
-		cache_size
+		.is_cache = true,
+		.path = (conf && strlen(conf)) ? conf : ".",
+		.maxsize = cache_size,
 	};
 	int ret = kr_cache_open(&the_resolver->cache, api, &opts, &the_engine->pool);
 	if (ret != 0) {

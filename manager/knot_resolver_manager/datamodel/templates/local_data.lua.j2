@@ -1,0 +1,51 @@
+{% from 'macros/local_data_macros.lua.j2' import local_data_subtree_root, local_data_records, local_data_root_fallback_addresses, local_data_root_fallback_addresses_files, local_data_addresses, local_data_addresses_files %}
+
+
+modules = { 'hints > iterate' }
+
+{# root-fallback-addresses #}
+{% if cfg.local_data.root_fallback_addresses -%}
+{{ local_data_root_fallback_addresses(cfg.local_data.root_fallback_addresses) }}
+{%- endif %}
+
+{# root-fallback-addresses-files #}
+{% if cfg.local_data.root_fallback_addresses_files -%}
+{{ local_data_root_fallback_addresses_files(cfg.local_data.root_fallback_addresses_files) }}
+{%- endif %}
+
+{# addresses #}
+{% if cfg.local_data.addresses -%}
+{{ local_data_addresses(cfg.local_data.addresses) }}
+{%- endif %}
+
+{# addresses-files #}
+{% if cfg.local_data.addresses_files -%}
+{{ local_data_addresses_files(cfg.local_data.addresses_files) }}
+{%- endif %}
+
+{# records #}
+{% if cfg.local_data.records -%}
+{{ local_data_records(cfg.local_data.records, false, cfg.local_data.ttl, cfg.local_data.nodata) }}
+{%- endif %}
+
+{# subtrees #}
+{% if cfg.local_data.subtrees -%}
+{% for subtree in cfg.local_data.subtrees %}
+{% if subtree.roots -%}
+{% for root in subtree.roots %}
+{{ local_data_subtree_root(subtree.type, root, subtree.tags) }}
+{% endfor %}
+{%- elif subtree.roots_file -%}
+{# TODO: not implemented yet #}
+{%- elif subtree.roots_url -%}
+{# TODO: not implemented yet #}
+{%- endif %}
+{% endfor %}
+{%- endif %}
+
+{# rpz #}
+{% if cfg.local_data.rpz -%}
+{% for rpz in cfg.local_data.rpz %}
+{{ local_data_records(rpz.file, true, cfg.local_data.ttl, cfg.local_data.nodata, rpz.tags) }}
+{% endfor %}
+{%- endif %}

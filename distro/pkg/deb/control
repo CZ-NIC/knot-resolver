@@ -4,6 +4,7 @@ Priority: optional
 Maintainer: Knot Resolver <knot-resolver@labs.nic.cz>
 Build-Depends:
  debhelper (>= 9~),
+ dh-python,
  libcmocka-dev (>= 1.0.0),
  libedit-dev,
  libfstrm-dev,
@@ -20,12 +21,10 @@ Build-Depends:
  luajit,
  pkg-config,
  meson (>= 0.49),
- doxygen,
  protobuf-c-compiler,
- python3-breathe,
- python3-sphinx,
- python3-sphinx-rtd-theme,
- texinfo,
+ python3-all,
+ python3-dev,
+ python3-setuptools,
  libssl-dev,
 Homepage: https://www.knot-resolver.cz/
 
@@ -122,19 +121,16 @@ Description: HTTP module for Knot Resolver
  This package contains HTTP/2 module for local visualization of the
  resolver cache and queries.
 
-Package: knot-resolver-doc
+Package: python3-knot-resolver-manager
 Architecture: all
-Section: doc
+Provides: knot-resolver-manager
 Depends:
- libjs-jquery,
- libjs-underscore,
+ knot-resolver (= ${binary:Version}),
  ${misc:Depends},
-Description: Documentation for Knot Resolver
- The Knot Resolver is a caching full resolver implementation
- written in C and LuaJIT, including both a resolver library and a
- daemon. Modular architecture of the library keeps the core tiny and
- efficient, and provides a state-machine like API for
- extensions. There are three built-in modules - iterator, cache,
- validator, and many external.
- .
- This package contains Knot Resolver Documentation.
+ ${python3:Depends},
+Section: python
+Description: Configuration tool for Knot Resolver
+ Knot Resolver Manager is a configuration tool for Knot Resolver. The Manager
+ hides the complexity of running several independent resolver processes while
+ ensuring zero-downtime reconfiguration with YAML/JSON declarative
+ configuration and an optional HTTP API for dynamic changes.

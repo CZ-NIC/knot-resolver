@@ -1,0 +1,13 @@
+network:
+  listen:
+    - interface: 127.0.0.1@5353
+server:
+  id: integration-test
+  workers: 1
+  rundir: tests/integration/run
+  management:
+    interface: 127.0.0.1@5001
+cache:
+  storage: cache
+logging:
+  level: debug

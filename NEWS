@@ -1,5 +1,19 @@
-Knot Resolver 5.6.1 (2023-0m-dd)
+Knot Resolver 6.0.0 (2023-mm-dd)
 ================================
+
+Improvements
+------------
+- Knot Resolver v6 alpha starts
+- 6.0.x versions are dedicated to alpha cycle
+
+
+Knot Resolver 5.7.0 (2023-0m-dd)
+================================
+
+Improvements
+------------
+- forwarding mode: tweak dealing with failures from forwarders,
+  in particular prefer sending CD=0 upstream (!1392)
 
 Bugfixes
 --------
