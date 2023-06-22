@@ -333,7 +333,6 @@ fi
 %{_sbindir}/kresc
 %{_sbindir}/kres-cache-gc
 %{_libdir}/libkres.so.*
-%dir %{_libdir}/knot-resolver
 %{_libdir}/knot-resolver/*.so
 %{_libdir}/knot-resolver/*.lua
 %dir %{_libdir}/knot-resolver/kres_modules
