@@ -43,13 +43,13 @@ RUN apt-get install -y /pkg/*/*.deb && \
 	rm -rf /var/lib/apt/lists/* && \
 	mkdir /config
 
-COPY manager/etc/knot-resolver/config.yml /config/config.yml
+COPY manager/etc/knot-resolver/config.docker.yml /config/config.yml
 
 LABEL cz.knot-resolver.vendor="CZ.NIC"
 LABEL maintainer="knot-resolver-users@lists.nic.cz"
 
-# Export DNS over UDP & TCP, DNS-over-HTTPS, DNS-over-TLS, web interface
-EXPOSE 53/UDP 53/TCP 443/TCP 853/TCP 8453/TCP
+# Export plain DNS, DoT, DoH and management interface
+EXPOSE 53/UDP 53/TCP 443/TCP 853/TCP 5000/TCP
 
-ENTRYPOINT ["/usr/bin/python3", "-m", "knot_resolver_manager"]
+ENTRYPOINT ["/usr/bin/knot-resolver"]
 CMD ["-c", "/config/config.yml"]
