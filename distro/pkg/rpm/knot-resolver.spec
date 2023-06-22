@@ -243,44 +243,7 @@ popd
 getent group knot-resolver >/dev/null || groupadd -r knot-resolver
 getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysconfdir}/knot-resolver -s /sbin/nologin -c "Knot Resolver" knot-resolver
 
-%if "x%{?rhel}" == "x"
-# upgrade-4-to-5
-if [ -f %{_unitdir}/kresd.socket ] ; then
-	export UPG_DIR=%{_sharedstatedir}/knot-resolver/.upgrade-4-to-5
-	mkdir -p ${UPG_DIR}
-	touch ${UPG_DIR}/.unfinished
-
-	for sock in kresd.socket kresd-tls.socket kresd-webmgmt.socket kresd-doh.socket ; do
-		if systemctl is-enabled ${sock} 2>/dev/null | grep -qv masked ; then
-			systemctl show ${sock} -p Listen > ${UPG_DIR}/${sock}
-			case "$(systemctl show ${sock} -p BindIPv6Only)" in
-			*ipv6-only)
-				touch ${UPG_DIR}/${sock}.v6only
-				;;
-			*default)
-				if cat /proc/sys/net/ipv6/bindv6only | grep -q 1 ; then
-					touch ${UPG_DIR}/${sock}.v6only
-				fi
-				;;
-			esac
-		fi
-	done
-fi
-%endif
-
 %post core
-# upgrade-4-to-5
-%if "x%{?rhel}" == "x"
-export UPG_DIR=%{_sharedstatedir}/knot-resolver/.upgrade-4-to-5
-if [ -f ${UPG_DIR}/.unfinished ] ; then
-	rm -f ${UPG_DIR}/.unfinished
-	kresd -c %{_libdir}/knot-resolver/upgrade-4-to-5.lua &>/dev/null
-	echo -e "\n   !!! WARNING !!!"
-	echo -e "Knot Resolver configuration file requires manual upgrade.\n"
-	cat ${UPG_DIR}/kresd.conf.net 2>/dev/null
-fi
-%endif
-
 # 5.0.1 fix to force restart of kres-cache-gc.service, which was missing in systemd_postun_with_restart
 # TODO: remove once most users upgrade to 5.0.1+
 systemctl daemon-reload >/dev/null 2>&1 || :
