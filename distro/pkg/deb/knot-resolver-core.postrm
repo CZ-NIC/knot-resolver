@@ -3,7 +3,7 @@
 set -e
 
 if [ "$1" = "remove" ]; then
-    systemctl stop system-kresd.slice || true
+    deb-systemd-invoke stop system-kresd.slice || true
 fi
 
 #DEBHELPER#
