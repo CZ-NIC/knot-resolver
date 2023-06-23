@@ -90,8 +90,8 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 		.comm_addr = comm_addr,
 		.src_addr = comm_addr
 	};
-	session2_unwrap(s, protolayer_wire_buf(&s->layers->wire_buf), &in_comm,
-			udp_on_unwrapped, NULL);
+	session2_unwrap(s, protolayer_wire_buf(&s->layers->wire_buf, false),
+			&in_comm, udp_on_unwrapped, NULL);
 }
 
 static int family_to_freebind_option(sa_family_t sa_family, int *level, int *name)
@@ -189,7 +189,8 @@ static enum protolayer_iter_cb_result pl_udp_unwrap(
 			}
 		}
 
-		ctx->payload = protolayer_buffer(data + trimmed, data_len - trimmed);
+		ctx->payload = protolayer_buffer(
+				data + trimmed, data_len - trimmed, false);
 	}
 
 	return protolayer_continue(ctx);
@@ -271,7 +272,7 @@ static enum protolayer_iter_cb_result pl_tcp_unwrap(
 
 		memcpy(wire_buf_free_space(&tcp->wire_buf), buf, len);
 		wire_buf_consume(&tcp->wire_buf, ctx->payload.buffer.len);
-		ctx->payload = protolayer_wire_buf(&tcp->wire_buf);
+		ctx->payload = protolayer_wire_buf(&tcp->wire_buf, false);
 	}
 
 	if (kr_fails_assert(ctx->payload.type == PROTOLAYER_PAYLOAD_WIRE_BUF)) {
@@ -523,7 +524,8 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 		return;
 	}
 
-	session2_unwrap(s, protolayer_wire_buf(&s->layers->wire_buf), NULL, NULL, NULL);
+	session2_unwrap(s, protolayer_wire_buf(&s->layers->wire_buf, false),
+			NULL, NULL, NULL);
 }
 
 static void _tcp_accept(uv_stream_t *master, int status, enum protolayer_grp grp)
@@ -936,7 +938,9 @@ static void xdp_rx(uv_poll_t* handle, int status, int events)
 		memcpy(comm.eth_from, msg->eth_from, sizeof(comm.eth_from));
 		memcpy(comm.eth_to, msg->eth_to, sizeof(comm.eth_to));
 		session2_unwrap(xhd->session,
-				protolayer_buffer(msg->payload.iov_base, msg->payload.iov_len),
+				protolayer_buffer(
+					msg->payload.iov_base,
+					msg->payload.iov_len, false),
 				&comm, NULL, NULL);
 		if (ret)
 			kr_log_debug(XDP, "worker_submit() == %d: %s\n", ret, kr_strerror(ret));

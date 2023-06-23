@@ -390,7 +390,7 @@ static ssize_t send_callback(nghttp2_session *h2, const uint8_t *data, size_t le
 
 	kr_log_debug(DOH, "[%p] send_callback: %p\n", (void *)h2, (void *)send_ctx->data);
 	session2_wrap_after(http->h.session, PROTOLAYER_PROTOCOL_HTTP,
-			protolayer_buffer(send_ctx->data, length), NULL,
+			protolayer_buffer(send_ctx->data, length, false), NULL,
 			callback_finished_free_baton, send_ctx);
 
 	return length;
@@ -506,7 +506,7 @@ static int send_data_callback(nghttp2_session *h2, nghttp2_frame *frame, const u
 
 	kr_assert(cur == iovcnt);
 	int ret = session2_wrap_after(http->h.session, PROTOLAYER_PROTOCOL_HTTP,
-			protolayer_iovec(dest_iov, cur),
+			protolayer_iovec(dest_iov, cur, false),
 			NULL, callback_finished_free_baton, sdctx);
 
 	if (ret < 0)
@@ -733,7 +733,7 @@ static int submit_to_wirebuffer(struct pl_http_sess_data *ctx)
 
 	ret = 0;
 	session2_unwrap_after(ctx->h.session, PROTOLAYER_PROTOCOL_HTTP,
-			protolayer_wire_buf(wb), NULL, NULL, NULL);
+			protolayer_wire_buf(wb, false), NULL, NULL, NULL);
 cleanup:
 	http_cleanup_stream(ctx);
 	return ret;

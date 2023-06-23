@@ -385,7 +385,15 @@ const char *protolayer_payload_name(enum protolayer_payload_type p);
  * is ever (de-)allocated by the protolayer manager! */
 struct protolayer_payload {
 	enum protolayer_payload_type type;
-	unsigned int ttl; /**< time-to-live hint (e.g. for HTTP Cache-Control) */
+
+	/** Time-to-live hint (e.g. for HTTP Cache-Control) */
+	unsigned int ttl;
+
+	/** If `true`, the payload's memory may be freed early as kresd does not
+	 * completely control its lifetime. When going asynchronous, it needs to
+	 * be copied. */
+	bool short_lived;
+
 	union {
 		/** Only valid if `type` is `_BUFFER`. */
 		struct {
@@ -426,6 +434,7 @@ struct protolayer_iter_ctx {
 	struct protolayer_manager *manager;
 	int status;
 	enum protolayer_iter_action action;
+	void *async_buffer;
 
 	/** Contains a sequence of variably-sized CPU-aligned layer-specific
 	 * structs. See `struct protolayer_manager::data`. */
@@ -444,10 +453,12 @@ size_t protolayer_payload_copy(void *dest,
                                size_t max_len);
 
 /** Convenience function to get a buffer-type payload. */
-static inline struct protolayer_payload protolayer_buffer(void *buf, size_t len)
+static inline struct protolayer_payload protolayer_buffer(void *buf, size_t len,
+                                                          bool short_lived)
 {
 	return (struct protolayer_payload){
 		.type = PROTOLAYER_PAYLOAD_BUFFER,
+		.short_lived = short_lived,
 		.buffer = {
 			.buf = buf,
 			.len = len
@@ -457,10 +468,11 @@ static inline struct protolayer_payload protolayer_buffer(void *buf, size_t len)
 
 /** Convenience function to get an iovec-type payload. */
 static inline struct protolayer_payload protolayer_iovec(
-		struct iovec *iov, int iovcnt)
+		struct iovec *iov, int iovcnt, bool short_lived)
 {
 	return (struct protolayer_payload){
 		.type = PROTOLAYER_PAYLOAD_IOVEC,
+		.short_lived = short_lived,
 		.iovec = {
 			.iov = iov,
 			.cnt = iovcnt
@@ -469,10 +481,12 @@ static inline struct protolayer_payload protolayer_iovec(
 }
 
 /** Convenience function to get a wire-buf-type payload. */
-static inline struct protolayer_payload protolayer_wire_buf(struct wire_buf *wire_buf)
+static inline struct protolayer_payload protolayer_wire_buf(
+		struct wire_buf *wire_buf, bool short_lived)
 {
 	return (struct protolayer_payload){
 		.type = PROTOLAYER_PAYLOAD_WIRE_BUF,
+		.short_lived = short_lived,
 		.wire_buf = wire_buf
 	};
 }
