@@ -11,11 +11,14 @@ cd "$(dirname ${0})/.."
 
 if ! git describe --tags --exact-match; then
     # devel version
-    GIT_HASH=$(git rev-parse --short HEAD )
-    TIMESTAMP=$(date -u +'%s' 2>/dev/null)
+    VERSION_TAG=$(git tag --merged HEAD --sort=-taggerdate | head -1)
+    VERSION=${VERSION_TAG#v}
+    GIT_HASH=$(git rev-parse --short=6 HEAD)
+    N_COMMITS=$(git rev-list $VERSION_TAG.. --count)
+    FULL_VERSION="$VERSION.dev$N_COMMITS+$GIT_HASH"
 
     # modify and commit meson.build
-    sed -i "s/^\(\s*version\s*:\s*'\)\([^']\+\)\('.*\)/\1\2.$TIMESTAMP.$GIT_HASH\3/" meson.build
+    sed -i "s/^\(\s*version\s*:\s*'\)\([^']\+\)\('.*\)/\1$FULL_VERSION\3/" meson.build
 
     : changed version in meson.build, changes must be committed to git
     git add meson.build
@@ -33,6 +36,14 @@ rm -rf build_dist ||:
 meson build_dist
 ninja -C build_dist dist
 
-# print path to generated tarball
-set +o xtrace
-find "${PWD}/build_dist/meson-dist/" -name "knot-resolver-*.tar.xz"
+# copy tarball to apkg path
+DIST_ARCHIVE=$(find "build_dist/meson-dist/" -name "knot-resolver-*.tar.xz")
+APKG_ARCHIVE="pkg/archives/dev/$(basename $DIST_ARCHIVE)"
+mkdir -p pkg/archives/dev
+cp "$DIST_ARCHIVE" "$APKG_ARCHIVE"
+
+# remove build directory
+rm -rf build_dist ||:
+
+# print path to generated tarball as expected by apkg
+echo "$APKG_ARCHIVE"
