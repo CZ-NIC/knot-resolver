@@ -99,6 +99,22 @@ class EscapedStr(StrBase):
                 s[i] = repr(c)[1:-1]
         self._value = "".join(s)
 
+    def multiline(self) -> str:
+        """
+        Lua multiline string is enclosed in double square brackets '[[ ]]'.
+        This method makes sure that double square brackets are escaped.
+        """
+
+        replace = {
+            "[[": r"\[\[",
+            "]]": r"\]\]",
+        }
+
+        ml = self._orig_value
+        for s, r in replace.items():
+            ml = ml.replace(s, r)
+        return ml
+
 
 class EscapedStr32B(EscapedStr, StringLengthBase):
     """

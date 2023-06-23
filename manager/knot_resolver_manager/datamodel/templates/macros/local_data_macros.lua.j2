@@ -46,7 +46,8 @@ assert(hints.add_hosts('{{ file }}').result == true)
 {{ id }}.filename = '{{ input_str }}'
 {% else %}
 {{ id }}.input_str = [[
-{{ input_str }}]]
+{{ input_str.multiline() }}
+]]
 {% endif %}
 assert(C.kr_rule_zonefile({{ id }})==0)
 {%- endmacro %}

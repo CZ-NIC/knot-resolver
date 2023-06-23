@@ -9,6 +9,34 @@ from knot_resolver_manager.utils.modeling import ConfigSchema
 str_template = Template("'{{ string }}'")
 
 
+str_multiline_template = Template(
+    """[[
+{{ string.multiline() }}
+]]"""
+)
+
+
+@pytest.mark.parametrize(
+    "val,exp",
+    [
+        ("\a\b\f\n\r\t\v\\", "\a\b\f\n\r\t\v\\"),
+        ("[[ test ]]", r"\[\[ test \]\]"),
+        ("[ [ test ] ]", r"[ [ test ] ]"),
+    ],
+)
+def test_escaped_str_multiline(val: Any, exp: str):
+    class TestSchema(ConfigSchema):
+        pattern: EscapedStr
+
+    d = TestSchema({"pattern": val})
+    assert (
+        str_multiline_template.render(string=d.pattern)
+        == f"""[[
+{exp}
+]]"""
+    )
+
+
 @pytest.mark.parametrize(
     "val,exp",
     [
