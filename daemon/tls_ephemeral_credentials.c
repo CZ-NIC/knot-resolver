@@ -51,7 +51,7 @@ static void _lock_unlock(lock_t *lock, const char *fname)
 	}
 }
 
-static gnutls_x509_privkey_t get_ephemeral_privkey ()
+static gnutls_x509_privkey_t get_ephemeral_privkey (void)
 {
 	gnutls_x509_privkey_t privkey = NULL;
 	int err;
@@ -189,7 +189,8 @@ bad:
 	return NULL;
 }
 
-struct tls_credentials * tls_get_ephemeral_credentials(struct engine *engine)
+/*! Generate new ephemeral TLS credentials. */
+struct tls_credentials * tls_get_ephemeral_credentials(void)
 {
 	struct tls_credentials *creds = NULL;
 	gnutls_x509_privkey_t privkey = NULL;
@@ -208,7 +209,7 @@ struct tls_credentials * tls_get_ephemeral_credentials(struct engine *engine)
 	}
 
 	creds->valid_until = now + EPHEMERAL_CERT_EXPIRATION_SECONDS;
-	creds->ephemeral_servicename = strdup(engine_get_hostname(engine));
+	creds->ephemeral_servicename = strdup(engine_get_hostname());
 	if (creds->ephemeral_servicename == NULL) {
 		kr_log_error(TLS, "could not get server's hostname, using '" INVALID_HOSTNAME "' instead\n");
 		if ((creds->ephemeral_servicename = strdup(INVALID_HOSTNAME)) == NULL) {

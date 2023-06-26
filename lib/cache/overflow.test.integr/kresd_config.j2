@@ -34,6 +34,8 @@ policy.add(policy.all(policy.DEBUG_ALWAYS))
 
 cache.open(1*MB)
 
+net.bufsize(4096)
+
 {% endraw %}
 
 {% if DO_IP6 == "true" %}

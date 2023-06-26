@@ -11,42 +11,28 @@
 
 /** Query resolution task (opaque). */
 struct qr_task;
-/** Worker state (opaque). */
+/** Worker state. */
 struct worker_ctx;
 /** Transport session (opaque). */
-struct session;
-/** Zone import context (opaque). */
-struct zone_import_ctx;
+struct session2;
 /** Data about the communication (defined in io.h). */
-struct io_comm_data;
+struct comm_info;
 
 /** Pointer to the singleton worker.  NULL if not initialized. */
 KR_EXPORT extern struct worker_ctx *the_worker;
 
 /** Create and initialize the worker.
  * \return error code (ENOMEM) */
-int worker_init(struct engine *engine, int worker_count);
+int worker_init(void);
 
 /** Destroy the worker (free memory). */
 void worker_deinit(void);
 
 /**
- * Process an incoming packet (query from a client or answer from upstream).
- *
- * @param session     session the packet came from, or NULL (not from network)
- * @param comm        IO communication data (see `struct io_comm_data` docs)
- * @param eth_*       MAC addresses or NULL (they're useful for XDP)
- * @param pkt         the packet, or NULL (an error from the transport layer)
- * @return 0 or an error code
- */
-int worker_submit(struct session *session, struct io_comm_data *comm,
-                  const uint8_t *eth_from, const uint8_t *eth_to, knot_pkt_t *pkt);
-
-/**
  * End current DNS/TCP session, this disassociates pending tasks from this session
  * which may be freely closed afterwards.
  */
-int worker_end_tcp(struct session *session);
+int worker_end_tcp(struct session2 *session);
 
 KR_EXPORT knot_pkt_t *worker_resolve_mk_pkt_dname(knot_dname_t *qname, uint16_t qtype, uint16_t qclass,
 				   const struct kr_qflags *options);
@@ -93,25 +79,12 @@ void worker_task_unref(struct qr_task *task);
 
 void worker_task_timeout_inc(struct qr_task *task);
 
-int worker_add_tcp_connected(struct worker_ctx *worker,
-			     const struct sockaddr *addr,
-			     struct session *session);
-int worker_del_tcp_connected(struct worker_ctx *worker,
-			     const struct sockaddr *addr);
-int worker_del_tcp_waiting(struct worker_ctx *worker,
-			   const struct sockaddr* addr);
-struct session* worker_find_tcp_waiting(struct worker_ctx *worker,
-					       const struct sockaddr* addr);
-struct session* worker_find_tcp_connected(struct worker_ctx *worker,
-					       const struct sockaddr* addr);
 knot_pkt_t *worker_task_get_pktbuf(const struct qr_task *task);
-
-struct request_ctx *worker_task_get_request(struct qr_task *task);
 
 struct kr_transport *worker_task_get_transport(struct qr_task *task);
 
 /** Note: source session is NULL in case the request hasn't come over network. */
-KR_EXPORT struct session *worker_request_get_source_session(const struct kr_request *req);
+KR_EXPORT struct session2 *worker_request_get_source_session(const struct kr_request *req);
 
 uint16_t worker_task_pkt_get_msgid(struct qr_task *task);
 void worker_task_pkt_set_msgid(struct qr_task *task, uint16_t msgid);
@@ -120,7 +93,7 @@ void worker_task_subreq_finalize(struct qr_task *task);
 bool worker_task_finished(struct qr_task *task);
 
 /** To be called after sending a DNS message.  It mainly deals with cleanups. */
-int qr_task_on_send(struct qr_task *task, const uv_handle_t *handle, int status);
+int qr_task_on_send(struct qr_task *task, struct session2 *s, int status);
 
 /** Various worker statistics.  Sync with wrk_stats() */
 struct worker_stats {
@@ -162,7 +135,6 @@ typedef array_t(const char *) doh_headerlist_t;
 
 /** \details Worker state is meant to persist during the whole life of daemon. */
 struct worker_ctx {
-	struct engine *engine;
 	uv_loop_t *loop;
 	int count;  /** unreliable, does not count systemd instance, do not use */
 	int vars_table_ref;
@@ -171,8 +143,6 @@ struct worker_ctx {
 	/** Addresses to bind for outgoing connections or AF_UNSPEC. */
 	struct sockaddr_in out_addr4;
 	struct sockaddr_in6 out_addr6;
-
-	uint8_t wire_buf[RECVMMSG_BATCH * KNOT_WIRE_MAX_PKTSIZE];
 
 	struct worker_stats stats;
 

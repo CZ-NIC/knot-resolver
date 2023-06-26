@@ -14,7 +14,7 @@ kresd_src = files([
   'main.c',
   'network.c',
   'proxyv2.c',
-  'session.c',
+  'session2.c',
   'tls.c',
   'tls_ephemeral_credentials.c',
   'tls_session_ticket-srv.c',
@@ -22,6 +22,7 @@ kresd_src = files([
   'worker.c',
   'zimport.c',
 ])
+
 if nghttp2.found()
   kresd_src += files(['http.c'])
 endif

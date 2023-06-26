@@ -2,9 +2,10 @@
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include "daemon/proxyv2.h"
-
+#include "daemon/network.h"
 #include "lib/generic/trie.h"
+
+#include "daemon/proxyv2.h"
 
 const char PROXY2_SIGNATURE[12] = {
 	0x0D, 0x0A, 0x0D, 0x0A, 0x00, 0x0D, 0x0A, 0x51, 0x55, 0x49, 0x54, 0x0A
@@ -128,25 +129,25 @@ static inline void next_tlv(struct proxy2_tlv **tlv)
 }
 
 
-bool proxy_allowed(const struct network *net, const struct sockaddr *saddr)
+bool proxy_allowed(const struct sockaddr *saddr)
 {
 	union kr_in_addr addr;
 	trie_t *trie;
 	size_t addr_size;
 	switch (saddr->sa_family) {
 	case AF_INET:
-		if (net->proxy_all4)
+		if (the_network->proxy_all4)
 			return true;
 
-		trie = net->proxy_addrs4;
+		trie = the_network->proxy_addrs4;
 		addr_size = sizeof(addr.ip4);
 		addr.ip4 = ((struct sockaddr_in *) saddr)->sin_addr;
 		break;
 	case AF_INET6:
-		if (net->proxy_all6)
+		if (the_network->proxy_all6)
 			return true;
 
-		trie = net->proxy_addrs6;
+		trie = the_network->proxy_addrs6;
 		addr_size = sizeof(addr.ip6);
 		addr.ip6 = ((struct sockaddr_in6 *) saddr)->sin6_addr;
 		break;
@@ -166,7 +167,7 @@ bool proxy_allowed(const struct network *net, const struct sockaddr *saddr)
 	return kr_bitcmp((char *) &addr, (char *) &found->addr, found->netmask) == 0;
 }
 
-ssize_t proxy_process_header(struct proxy_result *out, struct session *s,
+ssize_t proxy_process_header(struct proxy_result *out,
 		const void *buf, const ssize_t nread)
 {
 	if (!buf)
@@ -286,5 +287,5 @@ ssize_t proxy_process_header(struct proxy_result *out, struct session *s,
 	}
 
 fill_wirebuf:
-	return session_wirebuf_trim(s, hdr_len);
+	return hdr_len;
 }
