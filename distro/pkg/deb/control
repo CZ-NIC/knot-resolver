@@ -29,7 +29,7 @@ Build-Depends:
 Homepage: https://www.knot-resolver.cz/
 
 Package: knot-resolver-manager
-Architecture: all
+Architecture: any
 Provides:
  knot-resolver6,
 Depends:
