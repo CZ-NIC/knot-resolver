@@ -25,7 +25,6 @@ If you are a new user, please start with chapter for :ref:`getting started <gett
    :maxdepth: 3
 
    config-overview
-   config-schema
    usecase-network-interfaces
    config-policy-new
    config-lua
