@@ -362,34 +362,24 @@ class IPNetwork(BaseValueType):
         }
 
 
-class IPv6Network96(BaseValueType):
+class IPv6Network(BaseValueType):
     _value: ipaddress.IPv6Network
 
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
-        super().__init__(source_value, object_path=object_path)
+        super().__init__(source_value)
         if isinstance(source_value, str):
             try:
                 self._value: ipaddress.IPv6Network = ipaddress.IPv6Network(source_value)
             except ValueError as e:
-                raise ValueError("failed to parse IPv6 /96 network.") from e
-
-            if self._value.prefixlen == 128:
-                raise ValueError(
-                    "Expected IPv6 network address with /96 prefix length."
-                    " Submitted address has been interpreted as /128."
-                    " Maybe, you forgot to add /96 after the base address?"
-                )
-
-            if self._value.prefixlen != 96:
-                raise ValueError(
-                    "expected IPv6 network address with /96 prefix length."
-                    f" Got prefix lenght of {self._value.prefixlen}"
-                )
+                raise ValueError("failed to parse IPv6 network.") from e
         else:
             raise ValueError(
-                "Unexpected value for a network subnet."
+                "Unexpected value for a IPv6 network subnet."
                 f" Expected string, got '{source_value}' with type '{type(source_value)}'"
             )
+
+    def to_std(self) -> ipaddress.IPv6Network:
+        return self._value
 
     def __str__(self) -> str:
         return self._value.with_prefixlen
@@ -398,14 +388,29 @@ class IPv6Network96(BaseValueType):
         raise ValueError("Can't convert network prefix to an integer")
 
     def __eq__(self, o: object) -> bool:
-        return isinstance(o, IPv6Network96) and o._value == self._value
+        return isinstance(o, IPv6Network) and o._value == self._value
 
     def serialize(self) -> Any:
         return self._value.with_prefixlen
 
-    def to_std(self) -> ipaddress.IPv6Network:
-        return self._value
-
     @classmethod
-    def json_schema(cls: Type["IPv6Network96"]) -> Dict[Any, Any]:
-        return {"type": "string"}
+    def json_schema(cls: Type["IPv6Network"]) -> Dict[Any, Any]:
+        return {
+            "type": "string",
+        }
+
+
+class IPv6Network96(IPv6Network):
+    def __init__(self, source_value: Any, object_path: str = "/") -> None:
+        super().__init__(source_value, object_path=object_path)
+        if self._value.prefixlen == 128:
+            raise ValueError(
+                "Expected IPv6 network address with /96 prefix length."
+                " Submitted address has been interpreted as /128."
+                " Maybe, you forgot to add /96 after the base address?"
+            )
+
+        if self._value.prefixlen != 96:
+            raise ValueError(
+                "expected IPv6 network address with /96 prefix length." f" Got prefix lenght of {self._value.prefixlen}"
+            )
