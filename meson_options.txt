@@ -35,8 +35,8 @@ option(
     'enabled',
     'disabled',
   ],
-  value: 'auto',
-  description: 'creates kresd.conf in config directory',
+  value: 'disabled',
+  description: 'creates kresd.conf in config directory (legacy for version before 6)',
 )
 
 option(

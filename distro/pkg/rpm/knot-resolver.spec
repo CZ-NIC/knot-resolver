@@ -188,7 +188,6 @@ CFLAGS="%{optflags}" LDFLAGS="%{?__global_ldflags}" meson build_rpm \
     -Dmanaged_ta=enabled \
     -Dkeyfile_default="%{_sharedstatedir}/knot-resolver/root.keys" \
     -Dinstall_root_keys=enabled \
-    -Dinstall_kresd_conf=enabled \
     -Dmalloc=jemalloc \
     --buildtype=plain \
     --prefix="%{_prefix}" \
@@ -266,7 +265,6 @@ getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysc
 %doc %{_pkgdocdir}/NEWS
 %doc %{_pkgdocdir}/examples
 %dir %{_sysconfdir}/knot-resolver
-%config(noreplace) %{_sysconfdir}/knot-resolver/kresd.conf
 %config(noreplace) %{_sysconfdir}/knot-resolver/root.hints
 %{_sysconfdir}/knot-resolver/icann-ca.pem
 %attr(750,knot-resolver,knot-resolver) %dir %{_sharedstatedir}/knot-resolver
