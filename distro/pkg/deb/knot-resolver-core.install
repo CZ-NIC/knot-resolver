@@ -1,6 +1,3 @@
-usr/lib/systemd/system/kresd@.service lib/systemd/system/
-usr/lib/systemd/system/kres-cache-gc.service lib/systemd/system/
-usr/lib/systemd/system/kresd.target lib/systemd/system/
 usr/lib/*.so.*
 usr/lib/tmpfiles.d/knot-resolver.conf
 usr/lib/knot-resolver/*.so
