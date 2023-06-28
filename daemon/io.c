@@ -682,7 +682,7 @@ struct io_stream_data {
  *
  * For parameters see http://docs.libuv.org/en/v1.x/stream.html#c.uv_read_cb
  *
- * - This is just basic read-eval-print; libedit is supported through kresc;
+ * - This is just basic read-eval-print; use rather kresctl with shell completion
  */
 void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 {

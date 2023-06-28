@@ -29,7 +29,6 @@
 /autom4te.cache/*
 /bench/bench_lru
 /build*
-/client/kresc
 /compile
 /compile_commands.json
 /config.guess

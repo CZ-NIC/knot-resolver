@@ -275,7 +275,6 @@ Recommended build options for packagers:
 * ``-Ddoc=enabled`` for offline documentation (see :ref:`build-html-doc`)
 * ``-Dinstall_kresd_conf=enabled`` to install default config file
 * ``-Dmanager=enabled`` to force build of the manager and its features
-* ``-Dclient=enabled`` to force build of kresc
 * ``-Dunit_tests=enabled`` to force build of unit tests
 
 Systemd

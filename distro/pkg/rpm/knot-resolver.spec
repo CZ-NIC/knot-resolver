@@ -181,7 +181,6 @@ gpg2 --verify %{SOURCE1} %{SOURCE0}
 %build
 CFLAGS="%{optflags}" LDFLAGS="%{?__global_ldflags}" meson build_rpm \
     -Dsystemd_files=enabled \
-    -Dclient=enabled \
 %if "x%{?suse_version}" == "x"
     -Ddnstap=enabled \
 %endif
@@ -283,7 +282,6 @@ getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysc
 %ghost %{_localstatedir}/cache/%{name}
 %attr(750,knot-resolver,knot-resolver) %dir %{_libdir}/%{name}
 %{_sbindir}/kresd
-%{_sbindir}/kresc
 %{_sbindir}/kres-cache-gc
 %{_libdir}/libkres.so.*
 %{_libdir}/knot-resolver/*.so
