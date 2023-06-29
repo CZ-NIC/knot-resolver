@@ -64,7 +64,7 @@ Less verbose logging for DNSSEC validation errors can be enabled by using :ref:`
 
 .. py:function:: log_groups([table])
 
-  :param: table of string(s) representing :ref:`log groups <config_log_groups>`
+  :param: table of string(s) representing log groups
   :return: table of string with currently set log groups
 
   Use to turn-on debug logging for the selected groups regardless of the global
@@ -76,6 +76,10 @@ Less verbose logging for DNSSEC validation errors can be enabled by using :ref:`
      log_groups({'io', 'tls'}  -- turn on debug logging for io and tls groups
      log_groups()              -- list active log groups
      log_groups({})            -- remove all log groups
+
+.. py:function:: log_avail_groups()
+
+   Lists all available log groups with their brief descriptions.
 
 Various statistics for monitoring purposes are available in :ref:`mod-stats` module, including export to central systems like Graphite, Metronome, InfluxDB, or Prometheus format.
 

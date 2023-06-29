@@ -4,3 +4,4 @@ breathe
 jsonschema2md
 json-schema-for-humans
 sphinx_mdinclude
+sphinx_rtd_theme

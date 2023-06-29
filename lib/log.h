@@ -31,123 +31,88 @@ void kr_log_target_set(kr_log_target_t target);
 
 /* Groups */
 
+#define LOG_GRP_MAP(XX, XX_VAL) \
+	XX_VAL(SYSTEM,     "system", 1, "catch-all log for generic messages") /* Must be second */ \
+	\
+	/* vv  Add new log groups below - keep sorted  vv */ \
+	XX(CACHE,          "cache",     "record cache operations") \
+	XX(CONTROL,        "contrl",    "TTY control sockets") \
+	XX(COOKIES,        "cookie",    "DNS cookies") \
+	XX(DAF,            "daf",       "DNS Application Firewall module") \
+	XX(DETECTTIMEJUMP, "timejm",    "time jump detection") \
+	XX(DETECTTIMESKEW, "timesk",    "time skew detection") \
+	XX(DEVEL,          "devel",     "development purposes") \
+	XX(DNSSEC,         "dnssec",    "DNSSEC") \
+	XX(DNSTAP,         "dnstap",    "DNSTAP (traffic collection)") \
+	XX(DOH,            "doh",       "DNS-over-HTTPS") \
+	XX(DOTAUTH,        "dotaut",    "DNS-over-TLS towards authoritative servers") \
+	XX(EDE,            "exterr",    "extended error module") \
+	XX(GNUTLS,         "gnutls",    "low-level logs from GnuTLS") \
+	XX(GRAPHITE,       "graphi",    "Graphite protocol module") \
+	XX(HINT,           "hint",      "static hints") \
+	XX(HTTP,           "http",      "legacy DNS-over-HTTPS module") \
+	XX(IO,             "io",        "resolver input/output") \
+	XX(ITERATOR,       "iterat",    "iterator layer") \
+	XX(MODULE,         "module",    "for user-defined modules") \
+	XX(NETWORK,        "net",       "network configuration and operation") \
+	XX(NSID,           "nsid",      "name server identifier module") \
+	XX(PLAN,           "plan",      "resolution planning") \
+	XX(POLICY,         "policy",    "policy module") \
+	XX(PREFILL,        "prefil",    "cache prefilling module") \
+	XX(PRIMING,        "primin",    "priming queries module") \
+	XX(PROTOLAYER,     "prlayr",    "protocol layer system") \
+	XX(REBIND,         "rebind",    "rebinding attack protection module") \
+	XX(RENUMBER,       "renum",     "IP address renumbering module") \
+	XX(RESOLVER,       "resolv",    "name resolution") \
+	XX(RULES,          "rules",     "rules module") \
+	XX(SELECTION,      "select",    "server selection") \
+	XX(SRVSTALE,       "srvstl",    "serve-stale module") \
+	XX(STATISTICS,     "statis",    "statistics module") \
+	XX(TA,             "ta",        "trust anchors") \
+	XX(TASENTINEL,     "tasent",    "trust anchor sentinel module") \
+	XX(TASIGNALING,    "tasign",    "trust anchor knowledge signaling module") \
+	XX(TAUPDATE,       "taupd",     "trust anchor updater module") \
+	XX(TESTS,          "tests",     "resolver testing") \
+	XX(TLS,            "tls",       "TLS server") \
+	XX(TLSCLIENT,      "tls_cl",    "TLS client") \
+	XX(VALIDATOR,      "valdtr",    "validate layer") \
+	XX(WATCHDOG,       "wtchdg",    "systemd watchdog integration module") \
+	XX(WORKER,         "worker",    "task management") \
+	XX(XDP,            "xdp",       "XDP") \
+	XX(ZCUT,           "zoncut",    "zone cuts") \
+	/* ^^  Add new log groups above - keep sorted  ^^ */ \
+	\
+	XX(REQDBG,         "reqdbg",    "request debugging") /* Must be first non-displayed entry in enum! */
+
 /* Don't forget add *_TAG below, log_group_names[] item (log.c) and generate
  * new kres-gen.lua */
 enum kr_log_group {
 	LOG_GRP_UNKNOWN = -1,
-	LOG_GRP_SYSTEM = 1,  /* Must be first in enum. */
-	LOG_GRP_CACHE,
-	LOG_GRP_IO,
-	LOG_GRP_NETWORK,
-	LOG_GRP_TA,
-	LOG_GRP_TLS,
-	LOG_GRP_GNUTLS,
-	LOG_GRP_TLSCLIENT,
-	LOG_GRP_XDP,
-	LOG_GRP_DOH,
-	LOG_GRP_DNSSEC,
-	LOG_GRP_HINT,
-	LOG_GRP_PLAN,
-	LOG_GRP_ITERATOR,
-	LOG_GRP_VALIDATOR,
-	LOG_GRP_RESOLVER,
-	LOG_GRP_SELECTION,
-	LOG_GRP_ZCUT,
-	LOG_GRP_COOKIES,
-	LOG_GRP_STATISTICS,
-	LOG_GRP_REBIND,
-	LOG_GRP_WORKER,
-	LOG_GRP_POLICY,
-	LOG_GRP_TASENTINEL,
-	LOG_GRP_TASIGNALING,
-	LOG_GRP_TAUPDATE,
-	LOG_GRP_DAF,
-	LOG_GRP_DETECTTIMEJUMP,
-	LOG_GRP_DETECTTIMESKEW,
-	LOG_GRP_GRAPHITE,
-	LOG_GRP_PREFILL,
-	LOG_GRP_PRIMING,
-	LOG_GRP_SRVSTALE,
-	LOG_GRP_WATCHDOG,
-	LOG_GRP_NSID,
-	LOG_GRP_DNSTAP,
-	LOG_GRP_TESTS,
-	LOG_GRP_DOTAUTH,
-	LOG_GRP_HTTP,
-	LOG_GRP_CONTROL,
-	LOG_GRP_MODULE,
-	LOG_GRP_DEVEL,
-	LOG_GRP_RENUMBER,
-	LOG_GRP_EDE,
-	LOG_GRP_RULES,
-	LOG_GRP_PROTOLAYER,
-	/* ^^ Add new log groups above ^^. */
-	LOG_GRP_REQDBG, /* Must be first non-displayed entry in enum! */
+
+#define XX(grp, str, desc) LOG_GRP_ ## grp,
+#define XX_VAL(grp, str, val, desc) LOG_GRP_ ## grp = (val),
+	LOG_GRP_MAP(XX, XX_VAL)
+#undef XX_VAL
+#undef XX
+
+	LOG_GRP_COUNT
 };
 
-/**
- * @name Group names
- */
-///@{
-#define LOG_GRP_SYSTEM_TAG		"system"	/**< ``system``: catch-all log for generic messages*/
-#define LOG_GRP_CACHE_TAG		"cache"		/**< ``cache``: operations related to cache */
-#define LOG_GRP_IO_TAG			"io"		/**< ``io``: input/output operations */
-#define LOG_GRP_NETWORK_TAG		"net"		/**< ``net``: network configuration and operation */
-#define LOG_GRP_TA_TAG			"ta"		/**< ``ta``: basic log for trust anchors (TA) */
-#define LOG_GRP_TASENTINEL_TAG		"tasent"	/**< ``tasent``: TA sentinel */
-#define LOG_GRP_TASIGNALING_TAG		"tasign"	/**< ``tasign``: TA signal query */
-#define LOG_GRP_TAUPDATE_TAG		"taupd"		/**< ``taupd``: TA update */
-#define LOG_GRP_TLS_TAG			"tls"		/**< ``tls``: TLS encryption layer */
-#define LOG_GRP_GNUTLS_TAG		"gnutls"	/**< ``gnutls``: low-level logs from GnuTLS */
-#define LOG_GRP_TLSCLIENT_TAG		"tls_cl"	/**< ``tls_cl``: TLS client messages (used for TLS forwarding) */
-#define LOG_GRP_XDP_TAG			"xdp"		/**< ``xdp``: operations related to XDP */
-#define LOG_GRP_DOH_TAG			"doh"		/**< ``doh``: DNS-over-HTTPS logger (doh2 implementation) */
-#define LOG_GRP_DNSSEC_TAG		"dnssec"	/**< ``dnssec``: operations related to DNSSEC */
-#define LOG_GRP_HINT_TAG		"hint"		/**< ``hint``: operations related to static hints */
-#define LOG_GRP_PLAN_TAG		"plan"		/**< ``plan``: operations related to resolution plan */
-#define LOG_GRP_ITERATOR_TAG		"iterat"	/**< ``iterat``: operations related to iterate layer */
-#define LOG_GRP_VALIDATOR_TAG		"valdtr"	/**< ``valdtr``: operations related to validate layer */
-#define LOG_GRP_RESOLVER_TAG		"resolv"	/**< ``resolv``: operations related to resolving */
-#define LOG_GRP_SELECTION_TAG		"select"	/**< ``select``: operations related to server selection */
-#define LOG_GRP_ZCUT_TAG		"zoncut"	/**< ``zonecut``: operations related to zone cut */
-#define LOG_GRP_COOKIES_TAG		"cookie"	/**< ``cookie``: operations related to cookies */
-#define LOG_GRP_STATISTICS_TAG		"statis"	/**< ``statis``: operations related to statistics */
-#define LOG_GRP_REBIND_TAG		"rebind"	/**< ``rebind``: operations related to rebinding */
-#define LOG_GRP_WORKER_TAG		"worker"	/**< ``worker``: operations related to worker layer */
-#define LOG_GRP_POLICY_TAG		"policy"	/**< ``policy``: operations related to policy */
-#define LOG_GRP_DAF_TAG			"daf"		/**< ``daf``: operations related to DAF module */
-#define LOG_GRP_DETECTTIMEJUMP_TAG	"timejm"	/**< ``timejm``: operations related to time jump */
-#define LOG_GRP_DETECTTIMESKEW_TAG	"timesk"	/**< ``timesk``: operations related to time skew */
-#define LOG_GRP_GRAPHITE_TAG		"graphi"	/**< ``graphi``: operations related to graphite */
-#define LOG_GRP_PREFILL_TAG		"prefil"	/**< ``prefil``: operations related to prefill */
-#define LOG_GRP_PRIMING_TAG		"primin"	/**< ``primin``: operations related to priming */
-#define LOG_GRP_SRVSTALE_TAG		"srvstl"	/**< ``srvstl``: operations related to serve stale */
-#define LOG_GRP_WATCHDOG_TAG		"wtchdg"	/**< ``wtchdg``: operations related to watchdog */
-#define LOG_GRP_NSID_TAG		"nsid"		/**< ``nsid``: operations related to NSID */
-#define LOG_GRP_DNSTAP_TAG		"dnstap"	/**< ``dnstap``: operations related to dnstap */
-#define LOG_GRP_TESTS_TAG		"tests"		/**< ``tests``: operations related to tests  */
-#define LOG_GRP_DOTAUTH_TAG		"dotaut"	/**< ``dotaut``: DNS-over-TLS against authoritative servers */
-#define LOG_GRP_HTTP_TAG		"http"		/**< ``http``: http module, its web interface and legacy DNS-over-HTTPS */
-#define LOG_GRP_CONTROL_TAG		"contrl"	/**< ``contrl``: TTY control sockets*/
-#define LOG_GRP_MODULE_TAG		"module"	/**< ``module``: suitable for user-defined modules */
-#define LOG_GRP_DEVEL_TAG		"devel"		/**< ``devel``: for development purposes */
-#define LOG_GRP_RENUMBER_TAG		"renum"		/**< ``renum``: operation related to renumber */
-#define LOG_GRP_EDE_TAG			"exterr"	/**< ``exterr``: extended error module */
-#define LOG_GRP_RULES_TAG		"rules"		/**< ``rules``: new policy rules (their processing) */
-#define LOG_GRP_PROTOLAYER_TAG		"prlayr"	/**< ``prlayr``: protocol layer system (session2) */
-#define LOG_GRP_REQDBG_TAG		"reqdbg"	/**< ``reqdbg``: debug logs enabled by policy actions */
-///@}
+KR_EXPORT
+extern const char *const kr_log_grp_names[];
 
 KR_EXPORT
 bool kr_log_group_is_set(enum kr_log_group group);
 KR_EXPORT
 void kr_log_group_add(enum kr_log_group group);
 KR_EXPORT
-void kr_log_group_reset();
+void kr_log_group_reset(void);
 KR_EXPORT
 const char *kr_log_grp2name(enum kr_log_group group);
 KR_EXPORT
 enum kr_log_group kr_log_name2grp(const char *name);
+KR_EXPORT
+void kr_log_list_grps(void);
 
 
 /* Levels */
@@ -178,40 +143,37 @@ kr_log_level_t kr_log_name2level(const char *name);
  */
 /// @{
 
-/** Debugging message.  Can be very verbose.
- * The level is most often used through VERBOSE_MSG. */
-#define kr_log_debug(grp, fmt, ...) \
-	kr_log_fmt(LOG_GRP_ ## grp, LOG_DEBUG, SD_JOURNAL_METADATA, \
-			"[%-6s] " fmt, LOG_GRP_ ## grp ## _TAG, ## __VA_ARGS__)
-
-#define kr_log_info(grp, fmt, ...) \
-	kr_log_fmt(LOG_GRP_ ## grp, LOG_INFO, SD_JOURNAL_METADATA, \
-			"[%-6s] " fmt, LOG_GRP_ ## grp ## _TAG, ## __VA_ARGS__)
-
-#define kr_log_notice(grp, fmt, ...) \
-	kr_log_fmt(LOG_GRP_ ## grp, LOG_NOTICE, SD_JOURNAL_METADATA, \
-			"[%-6s] " fmt, LOG_GRP_ ## grp ## _TAG, ## __VA_ARGS__)
+#define kr_log_on_level(grp, level, fmt, ...) \
+	kr_log_fmt(LOG_GRP_ ## grp, (level), SD_JOURNAL_METADATA, \
+			"[%-6s] " fmt, kr_log_grp_names[LOG_GRP_ ## grp], ## __VA_ARGS__)
 
 /** Levels less severe than ``notice`` are not logged by default. */
 #define LOG_DEFAULT_LEVEL	LOG_NOTICE
 
+/** Debugging message.  Can be very verbose.
+ * The level is most often used through VERBOSE_MSG. */
+#define kr_log_debug(grp, fmt, ...) \
+	kr_log_on_level(grp, LOG_DEBUG, fmt, ## __VA_ARGS__)
+
+#define kr_log_info(grp, fmt, ...) \
+	kr_log_on_level(grp, LOG_INFO, fmt, ## __VA_ARGS__)
+
+#define kr_log_notice(grp, fmt, ...) \
+	kr_log_on_level(grp, LOG_NOTICE, fmt, ## __VA_ARGS__)
+
 #define kr_log_warning(grp, fmt, ...) \
-	kr_log_fmt(LOG_GRP_ ## grp, LOG_WARNING, SD_JOURNAL_METADATA, \
-			"[%-6s] " fmt, LOG_GRP_ ## grp ## _TAG, ## __VA_ARGS__)
+	kr_log_on_level(grp, LOG_WARNING, fmt, ## __VA_ARGS__)
 
 /** Significant error.  The process continues, except for configuration errors during startup. */
 #define kr_log_error(grp, fmt, ...) \
-	kr_log_fmt(LOG_GRP_ ## grp, LOG_ERR, SD_JOURNAL_METADATA, \
-			"[%-6s] " fmt, LOG_GRP_ ## grp ## _TAG, ## __VA_ARGS__)
+	kr_log_on_level(grp, LOG_ERR, fmt, ## __VA_ARGS__)
 
 /** Critical condition.  The process dies.  Bad configuration should not cause this. */
 #define kr_log_crit(grp, fmt, ...) \
-	kr_log_fmt(LOG_GRP_ ## grp, LOG_CRIT, SD_JOURNAL_METADATA, \
-			"[%-6s] " fmt, LOG_GRP_ ## grp ## _TAG, ## __VA_ARGS__)
+	kr_log_on_level(grp, LOG_CRIT, fmt, ## __VA_ARGS__)
 
 #define kr_log_deprecate(grp, fmt, ...) \
-	kr_log_fmt(LOG_GRP_ ## grp, LOG_WARNING, SD_JOURNAL_METADATA, \
-			"[%-6s] deprecation WARNING: " fmt, LOG_GRP_ ## grp ## _TAG, ## __VA_ARGS__)
+	kr_log_on_level(grp, LOG_WARNING, "deprecation WARNING: " fmt, ## __VA_ARGS__)
 
 /**
  * Logging function for user modules. Uses group LOG_GRP_MODULE and ``info`` level.
@@ -235,7 +197,7 @@ struct kr_query;
  * @param  fmt printf-like format string
  */
 #define kr_log_req(req, qry_uid, indent, grp, fmt, ...) \
-       kr_log_req1(req, qry_uid, indent, LOG_GRP_ ## grp, LOG_GRP_ ## grp ## _TAG, fmt, ## __VA_ARGS__)
+       kr_log_req1(req, qry_uid, indent, LOG_GRP_ ## grp, kr_log_grp_names[LOG_GRP_ ## grp], fmt, ## __VA_ARGS__)
 KR_EXPORT KR_PRINTF(6)
 void kr_log_req1(const struct kr_request * const req, uint32_t qry_uid,
 		const unsigned int indent, enum kr_log_group group, const char *tag, const char *fmt, ...);
@@ -247,7 +209,8 @@ void kr_log_req1(const struct kr_request * const req, uint32_t qry_uid,
  * @param  grp GROUP_NAME (without the LOG_GRP_ prefix)
  * @param  fmt printf-like format string
  */
-#define kr_log_q(qry, grp, fmt, ...) kr_log_q1(qry, LOG_GRP_ ## grp, LOG_GRP_ ## grp ## _TAG, fmt, ## __VA_ARGS__)
+#define kr_log_q(qry, grp, fmt, ...) \
+	kr_log_q1(qry, LOG_GRP_ ## grp, kr_log_grp_names[LOG_GRP_ ## grp], fmt, ## __VA_ARGS__)
 KR_EXPORT KR_PRINTF(4)
 void kr_log_q1(const struct kr_query *qry, enum kr_log_group group, const char *tag, const char *fmt, ...);
 

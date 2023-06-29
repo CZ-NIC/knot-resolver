@@ -7,6 +7,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <gnutls/gnutls.h>
+#include <limits.h>
 #include "contrib/ucw/mempool.h"
 #include "lib/log.h"
 #include "lib/resolve.h"
@@ -25,65 +26,15 @@ kr_log_target_t kr_log_target = LOG_TARGET_DEFAULT;
 
 /** Set of log-groups that are on debug level.  It's a bitmap over 1 << enum kr_log_group. */
 static uint64_t kr_log_groups = 0;
+static_assert(LOG_GRP_COUNT <= CHAR_BIT * sizeof(kr_log_groups), "Too many log groups.");
 
-typedef struct {
-	const char		*g_name;
-	enum kr_log_group	g_val;
-} log_group_names_t;
-
-#define GRP_NAME_ITEM(grp) { grp ## _TAG, grp }
-
-const log_group_names_t log_group_names[] = {
-	GRP_NAME_ITEM(LOG_GRP_SYSTEM),
-	GRP_NAME_ITEM(LOG_GRP_CACHE),
-	GRP_NAME_ITEM(LOG_GRP_IO),
-	GRP_NAME_ITEM(LOG_GRP_NETWORK),
-	GRP_NAME_ITEM(LOG_GRP_TA),
-	GRP_NAME_ITEM(LOG_GRP_TLS),
-	GRP_NAME_ITEM(LOG_GRP_GNUTLS),
-	GRP_NAME_ITEM(LOG_GRP_TLSCLIENT),
-	GRP_NAME_ITEM(LOG_GRP_XDP),
-	GRP_NAME_ITEM(LOG_GRP_DOH),
-	GRP_NAME_ITEM(LOG_GRP_DNSSEC),
-	GRP_NAME_ITEM(LOG_GRP_HINT),
-	GRP_NAME_ITEM(LOG_GRP_PLAN),
-	GRP_NAME_ITEM(LOG_GRP_ITERATOR),
-	GRP_NAME_ITEM(LOG_GRP_VALIDATOR),
-	GRP_NAME_ITEM(LOG_GRP_RESOLVER),
-	GRP_NAME_ITEM(LOG_GRP_SELECTION),
-	GRP_NAME_ITEM(LOG_GRP_ZCUT),
-	GRP_NAME_ITEM(LOG_GRP_COOKIES),
-	GRP_NAME_ITEM(LOG_GRP_STATISTICS),
-	GRP_NAME_ITEM(LOG_GRP_REBIND),
-	GRP_NAME_ITEM(LOG_GRP_WORKER),
-	GRP_NAME_ITEM(LOG_GRP_POLICY),
-	GRP_NAME_ITEM(LOG_GRP_TASENTINEL),
-	GRP_NAME_ITEM(LOG_GRP_TASIGNALING),
-	GRP_NAME_ITEM(LOG_GRP_TAUPDATE),
-	GRP_NAME_ITEM(LOG_GRP_DAF),
-	GRP_NAME_ITEM(LOG_GRP_DETECTTIMEJUMP),
-	GRP_NAME_ITEM(LOG_GRP_DETECTTIMESKEW),
-	GRP_NAME_ITEM(LOG_GRP_GRAPHITE),
-	GRP_NAME_ITEM(LOG_GRP_PREFILL),
-	GRP_NAME_ITEM(LOG_GRP_PRIMING),
-	GRP_NAME_ITEM(LOG_GRP_SRVSTALE),
-	GRP_NAME_ITEM(LOG_GRP_WATCHDOG),
-	GRP_NAME_ITEM(LOG_GRP_NSID),
-	GRP_NAME_ITEM(LOG_GRP_DNSTAP),
-	GRP_NAME_ITEM(LOG_GRP_TESTS),
-	GRP_NAME_ITEM(LOG_GRP_DOTAUTH),
-	GRP_NAME_ITEM(LOG_GRP_HTTP),
-	GRP_NAME_ITEM(LOG_GRP_CONTROL),
-	GRP_NAME_ITEM(LOG_GRP_MODULE),
-	GRP_NAME_ITEM(LOG_GRP_DEVEL),
-	GRP_NAME_ITEM(LOG_GRP_RENUMBER),
-	GRP_NAME_ITEM(LOG_GRP_EDE),
-	GRP_NAME_ITEM(LOG_GRP_RULES),
-	GRP_NAME_ITEM(LOG_GRP_PROTOLAYER),
-	GRP_NAME_ITEM(LOG_GRP_REQDBG),
-	{ NULL, LOG_GRP_UNKNOWN },
+const char *const kr_log_grp_names[LOG_GRP_COUNT] = {
+#define XX(grp, name, desc) [LOG_GRP_ ## grp] = (name),
+#define XX_VAL(grp, name, val, desc) XX(grp, name, desc)
+	LOG_GRP_MAP(XX, XX_VAL)
+#undef XX_VAL
+#undef XX
 };
-static_assert(LOG_GRP_REQDBG <= 8 * sizeof(kr_log_groups), "Too many log groups.");
 
 bool kr_log_group_is_set(enum kr_log_group group)
 {
@@ -180,13 +131,17 @@ kr_log_level_t kr_log_name2level(const char *name)
 
 const char *kr_log_grp2name(enum kr_log_group group)
 {
-	for (int i = 0; log_group_names[i].g_name; ++i)
-	{
-		if (log_group_names[i].g_val == group)
-			return log_group_names[i].g_name;
-	}
+	switch (group) {
+#define XX(grp, str, desc) case LOG_GRP_ ## grp: \
+		return (str);
+#define XX_VAL(grp, str, val, desc) XX(grp, str, desc)
+	LOG_GRP_MAP(XX, XX_VAL)
+#undef XX_VAL
+#undef XX
 
-	return NULL;
+	default:
+		return NULL;
+	}
 }
 
 enum kr_log_group kr_log_name2grp(const char *name)
@@ -194,18 +149,29 @@ enum kr_log_group kr_log_name2grp(const char *name)
 	if (kr_fails_assert(name))
 		return LOG_GRP_UNKNOWN;
 
-	for (int i = 0; log_group_names[i].g_name; ++i)
-	{
-		if (strcmp(log_group_names[i].g_name, name) == 0)
-			return log_group_names[i].g_val;
+#define XX(grp, str, desc) if ((str) && strcmp((str), name) == 0) { \
+		return LOG_GRP_ ## grp; \
 	}
+#define XX_VAL(grp, str, val, desc) XX(grp, str, desc)
+	LOG_GRP_MAP(XX, XX_VAL)
+#undef XX_VAL
+#undef XX
 
 	return LOG_GRP_UNKNOWN;
 }
 
+void kr_log_list_grps(void)
+{
+#define XX(grp, str, desc) if ((str)) \
+	printf(" %6s: %s\n", (const char *)(str), (desc));
+#define XX_VAL(grp, str, val, desc) XX(grp, str, desc)
+	LOG_GRP_MAP(XX, XX_VAL)
+#undef XX_VAL
+#undef XX
+}
 
 
-static void kr_gnutls_log_level_set()
+static void kr_gnutls_log_level_set(void)
 {
 	/* gnutls logs messages related to our TLS and also libdnssec,
 	 * and the logging is set up in a global way only */
@@ -240,7 +206,7 @@ void kr_log_group_add(enum kr_log_group group)
 		kr_gnutls_log_level_set();
 }
 
-void kr_log_group_reset()
+void kr_log_group_reset(void)
 {
 	bool had_gnutls = kr_log_group_is_set(LOG_GRP_GNUTLS);
 	kr_log_groups = 0;

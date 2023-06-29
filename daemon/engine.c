@@ -240,6 +240,12 @@ bad_call:
 	lua_error_p(L, "takes a table of string groups as parameter or nothing");
 }
 
+static int l_log_avail_groups(lua_State *L)
+{
+	kr_log_list_grps();
+	return 0;
+}
+
 char *engine_get_hostname(void) {
 	static char hostname_str[KNOT_DNAME_MAXLEN];
 
@@ -486,6 +492,8 @@ static int init_state(void)
 	lua_setglobal(the_engine->L, "log_target");
 	lua_pushcfunction(the_engine->L, l_log_groups);
 	lua_setglobal(the_engine->L, "log_groups");
+	lua_pushcfunction(the_engine->L, l_log_avail_groups);
+	lua_setglobal(the_engine->L, "log_avail_groups");
 	lua_pushcfunction(the_engine->L, l_setuser);
 	lua_setglobal(the_engine->L, "user");
 	lua_pushcfunction(the_engine->L, l_hint_root_file);
