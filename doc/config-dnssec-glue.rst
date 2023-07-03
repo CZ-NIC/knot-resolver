@@ -1,11 +1,10 @@
 .. SPDX-License-Identifier: GPL-3.0-or-later
 
-.. function:: mode(['strict' | 'normal' | 'permissive'])
+.. option:: options/glue-checking: normal|strict|permissive
 
-   :param: New checking level specified as string (*optional*).
-   :return: Current checking level.
+   :default: normal
 
-   Get or change resolver strictness checking level.
+   The resolver strictness checking level.
 
    By default, resolver runs in *normal* mode. There are possibly many small adjustments
    hidden behind the mode settings, but the main idea is that in *permissive* mode, the resolver
