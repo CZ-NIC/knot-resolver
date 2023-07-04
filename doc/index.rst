@@ -27,6 +27,7 @@ If you are a new user, please start with chapter for :ref:`getting started <gett
    config-overview
    usecase-network-interfaces
    config-policy-new
+   config-dnssec
    config-lua
 
 .. toctree::
