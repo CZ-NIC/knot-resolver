@@ -27,6 +27,7 @@ If you are a new user, please start with chapter for :ref:`getting started <gett
    config-overview
    usecase-network-interfaces
    config-policy-new
+   config-logging-monitoring
    config-dnssec
    config-lua
 
@@ -63,6 +64,7 @@ If you are a new user, please start with chapter for :ref:`getting started <gett
    :name: developers-chapter
    :maxdepth: 2
 
+   manager-dev
    architecture
    build
    lib
