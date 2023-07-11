@@ -101,10 +101,6 @@ written in C and LuaJIT, including both a resolver library and a daemon.
 Modular architecture of the library keeps the core tiny and efficient, and
 provides a state-machine like API for extensions.
 
-The package is pre-configured as local caching resolver.
-To start using it, start a single kresd instance:
-$ systemctl start kresd@1.service
-
 %package devel
 Summary:        Development headers for Knot Resolver
 Requires:       %{name}-core%{?_isa} = %{version}-%{release}
@@ -188,7 +184,6 @@ CFLAGS="%{optflags}" LDFLAGS="%{?__global_ldflags}" meson build_rpm \
     -Dmanaged_ta=enabled \
     -Dkeyfile_default="%{_sharedstatedir}/knot-resolver/root.keys" \
     -Dinstall_root_keys=enabled \
-    -Dinstall_kresd_conf=enabled \
     -Dmalloc=jemalloc \
     --buildtype=plain \
     --prefix="%{_prefix}" \
@@ -206,9 +201,9 @@ popd
 %install
 DESTDIR="${RPM_BUILD_ROOT}" %{NINJA} -v -C build_rpm install
 
-# add kresd.target to multi-user.target.wants to support enabling kresd services
+# add knot-resolver.service to multi-user.target.wants to support enabling kresd services
 install -m 0755 -d %{buildroot}%{_unitdir}/multi-user.target.wants
-ln -s ../kresd.target %{buildroot}%{_unitdir}/multi-user.target.wants/kresd.target
+ln -s ../knot-resolver.service %{buildroot}%{_unitdir}/multi-user.target.wants/knot-resolver.service
 
 # remove modules with missing dependencies
 rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/etcd.lua
@@ -249,11 +244,11 @@ getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysc
 /sbin/ldconfig
 %endif
 
-%preun core
-%systemd_preun kres-cache-gc.service kresd.target
+%preun manager
+%systemd_preun knot-resolver.service
 
-%postun core
-%systemd_postun_with_restart 'kresd@*.service' kres-cache-gc.service
+%postun manager
+%systemd_postun_with_restart knot-resolver.service
 %if "x%{?fedora}" == "x"
 /sbin/ldconfig
 %endif
@@ -266,17 +261,12 @@ getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysc
 %doc %{_pkgdocdir}/NEWS
 %doc %{_pkgdocdir}/examples
 %dir %{_sysconfdir}/knot-resolver
-%config(noreplace) %{_sysconfdir}/knot-resolver/kresd.conf
 %config(noreplace) %{_sysconfdir}/knot-resolver/root.hints
 %{_sysconfdir}/knot-resolver/icann-ca.pem
 %attr(750,knot-resolver,knot-resolver) %dir %{_sharedstatedir}/knot-resolver
 %attr(640,knot-resolver,knot-resolver) %{_sharedstatedir}/knot-resolver/root.keys
-%{_unitdir}/kresd@.service
-%{_unitdir}/kres-cache-gc.service
-%{_unitdir}/kresd.target
 %dir %{_unitdir}/multi-user.target.wants
-%{_unitdir}/multi-user.target.wants/kresd.target
-%{_mandir}/man7/kresd.systemd.7.gz
+%{_unitdir}/multi-user.target.wants/knot-resolver.service
 %{_tmpfilesdir}/knot-resolver.conf
 %ghost /run/%{name}
 %ghost %{_localstatedir}/cache/%{name}

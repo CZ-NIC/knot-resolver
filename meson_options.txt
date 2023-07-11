@@ -35,8 +35,8 @@ option(
     'enabled',
     'disabled',
   ],
-  value: 'auto',
-  description: 'creates kresd.conf in config directory',
+  value: 'disabled',
+  description: 'creates kresd.conf in config directory (legacy for version before 6)',
 )
 
 option(
@@ -101,6 +101,16 @@ option(
   description: 'installs systemd-related files',
 )
 
+option(
+  'systemd_legacy_units',
+  type: 'combo',
+  choices: [
+    'disabled',
+    'enabled',
+  ],
+  value: 'disabled',
+  description: 'installs legacy systemd units for running without manager, like with versions before 6',
+)
 
 # Component options
 option(

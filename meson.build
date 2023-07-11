@@ -114,6 +114,7 @@ xdp = meson.get_compiler('c').has_header('libknot/xdp/xdp.h')
 
 ### Systemd
 systemd_files = get_option('systemd_files')
+systemd_legacy_units = get_option('systemd_legacy_units')
 libsystemd = dependency('libsystemd', required: systemd_files == 'enabled')
 
 ### Allocator
@@ -231,9 +232,7 @@ subdir('etc')
 
 
 # Systemd unit files
-if systemd_files != 'disabled'
-  subdir('systemd')
-endif
+subdir('systemd')
 
 
 # Additional files
