@@ -27,7 +27,7 @@ struct args {
 
 struct tls_proxy_ctx;
 
-struct tls_proxy_ctx *tls_proxy_allocate();
+struct tls_proxy_ctx *tls_proxy_allocate(void);
 void tls_proxy_free(struct tls_proxy_ctx *proxy);
 int tls_proxy_init(struct tls_proxy_ctx *proxy, const struct args *a);
 int tls_proxy_start_listen(struct tls_proxy_ctx *proxy);

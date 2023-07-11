@@ -918,7 +918,7 @@ int tls_process_from_client(struct peer *client, const uint8_t *buf, ssize_t nre
 	return submitted;
 }
 
-struct tls_proxy_ctx *tls_proxy_allocate()
+struct tls_proxy_ctx *tls_proxy_allocate(void)
 {
 	return malloc(sizeof(struct tls_proxy_ctx));
 }

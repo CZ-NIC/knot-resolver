@@ -19,6 +19,8 @@ Bugfixes
 --------
 - fix unusual timestamp format in debug dumps of records (!1386)
 - adjust linker options; it should help less common platforms (!1384)
+- hints module: fix names inside home.arpa. (!1406)
+- EDNS padding (RFC 8467) compatibility with knot-dns 3.3 libs (!1422)
 
 
 Knot Resolver 5.6.0 (2023-01-26)

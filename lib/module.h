@@ -22,7 +22,7 @@ struct kr_prop;
  * @param module module name (e.g. policy)
  */
 #define KR_MODULE_EXPORT(module) \
-    KR_EXPORT uint32_t module ## _api() { return KR_MODULE_API; }
+    KR_EXPORT uint32_t module ## _api(void) { return KR_MODULE_API; }
 #define KR_MODULE_API ((uint32_t) 0x20210125)
 
 typedef uint32_t (module_api_cb)(void);

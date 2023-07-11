@@ -69,6 +69,7 @@ static int keylog_file_fd = -1;
 
 #pragma GCC diagnostic ignored "-Wpedantic"
 #pragma GCC diagnostic ignored "-Wunused-result"
+#pragma GCC diagnostic ignored "-Wstrict-prototypes"
 
 static inline void put_hex(char *buffer, int pos, char c)
 {

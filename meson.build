@@ -133,12 +133,21 @@ message('---------------------------')
 ## Compiler args
 add_project_arguments(
   '-D_GNU_SOURCE',
+
+  # Various warnings.  Let's use any warning that doesn't "cause problems".
+  '-Wall',
   '-Wformat',
   '-Wformat-security',
   '-Wtype-limits',
   '-Wshadow',
   '-Werror=implicit-function-declaration', # Probably messed up includes; implicit functions are evil!
   '-Werror=attributes',  # Missing cleanup attribute could lead to memory leaks.
+  '-Wstrict-prototypes', # `void foo();` is basically always a mistake, in our code at least.
+  '-Wold-style-definition',
+  '-Wignored-qualifiers',
+  '-Woverride-init',
+  '-Wuninitialized',
+
   '-fvisibility=hidden',
   '-DHAVE_ASPRINTF=' + have_asprintf.to_int().to_string(),
 
@@ -260,6 +269,7 @@ if clangtidy.found()
     command: [
       clangtidy,
       '-quiet',
+      '-extra-arg=-Wno-unknown-warning-option', # version in CI is weird in this
       '-p', meson.build_root(),
     ] + c_src_lint
   )

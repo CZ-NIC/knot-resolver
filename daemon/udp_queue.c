@@ -42,7 +42,7 @@ typedef struct {
 	} items[UDP_QUEUE_LEN];
 } udp_queue_t;
 
-static udp_queue_t * udp_queue_create()
+static udp_queue_t * udp_queue_create(void)
 {
 	udp_queue_t *q = calloc(1, sizeof(*q));
 	kr_require(q != NULL);
@@ -59,7 +59,7 @@ static udp_queue_t * udp_queue_create()
 }
 
 /** Global state for udp_queue_*.  Note: we never free the pointed-to memory. */
-struct {
+struct state {
 	/** Singleton map: fd -> udp_queue_t, as a simple array of pointers. */
 	udp_queue_t **udp_queues;
 	int udp_queues_len;
@@ -68,7 +68,8 @@ struct {
 	array_t(int) waiting_fds;
 
 	uv_check_t check_handle;
-} static state = {0};
+};
+static struct state state = {0};
 
 /** Empty the given queue.  The queue is assumed to exist (but may be empty). */
 static void udp_queue_send(int fd)
