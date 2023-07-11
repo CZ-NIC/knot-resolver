@@ -5,9 +5,8 @@
 Cache
 =====
 
-Cache in Knot Resolver is stored on disk and also shared between
-:ref:`systemd-multiple-instances` so resolver doesn't lose the cached data on
-restart or crash.
+Cache in Knot Resolver is shared between :ref:`multiple workers <config-multiple-workers>`
+and stored in a file, so resolver doesn't lose the cached data on restart or crash.
 
 To improve performance even further the resolver implements so-called aggressive caching
 for DNSSEC-validated data (:rfc:`8198`), which improves performance and also protects
@@ -99,12 +98,12 @@ config file as well.
 Configuration reference
 -----------------------
 
-
 .. option:: cache/storage: <dir>
+
    :default: /var/cache/knot-resolver
 
-
 .. option:: cache/size-max: <size B|K|M|G>
+
    :default: 100M
 
 .. note:: Use ``B, K, M, G`` bytes units prefixes.
@@ -118,14 +117,14 @@ Note that the maximum size cannot be lowered, only increased due to how cache is
       storage: /var/cache/knot-resolver
       size-max: 400M
 
-
 .. option:: cache/ttl-max: <time ms|s|m|h|d>
-   :default: 1d (1 day)
+
+   :default: 1d
 
    Higher TTL bound applied to all received records.
 
-
 .. option:: cache/ttl-min: <time ms|s|m|h|d>
+
    :default: 5s
 
    Lower TTL bound applied to all received records.
@@ -139,10 +138,10 @@ Note that the maximum size cannot be lowered, only increased due to how cache is
       ttl-max: 2d
       ttl-min: 20s
 
-
 .. option:: cache/ns-timeout: <time ms|s|m|h|d>
+
    :default: 1000ms
 
    Time interval for which a nameserver address will be ignored after determining that it doesn't return (useful) answers.
-   The intention is to avoid waiting if there's little hope; instead, kresd can immediately SERVFAIL or immediately use stale records (with :ref:`serve_stale <mod-serve_stale>` module).
+   The intention is to avoid waiting if there's little hope; instead, kresd can immediately SERVFAIL or immediately use stale records (with :ref:`serve-stale <config-serve-stale>`).
 

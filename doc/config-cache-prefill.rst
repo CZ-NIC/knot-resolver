@@ -9,8 +9,8 @@ This provides ability to periodically prefill the DNS cache by importing root zo
 
 Intended users of this module are big resolver operators which will benefit from decreased latencies and smaller amount of traffic towards DNS root servers.
 
-
 .. option:: cache/prefill: <list>
+
    .. option:: origin: <zone name>
 
       Name of the zone, only root zone import is supported at the moment.
@@ -20,6 +20,7 @@ Intended users of this module are big resolver operators which will benefit from
       URL of a file in :rfc:`1035` zone file format.
 
    .. option:: refresh-interval: <time ms|s|m|h|d>
+
       :default: 1d
 
       Time between zone data refresh attempts.
