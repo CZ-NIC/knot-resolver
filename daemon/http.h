@@ -3,4 +3,4 @@
  */
 
 /** Initializes the protocol layers managed by http. */
-void http_protolayers_init();
+void http_protolayers_init(void);
