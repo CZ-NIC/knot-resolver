@@ -44,10 +44,6 @@ static char * bool2jsonstr(bool val)
 	return result;
 }
 
-		knot_dname_in_bailiwick(qry->sname, (const uint8_t *)"\4arpa\0") > 0 &&
-		(knot_dname_in_bailiwick(qry->sname, (const uint8_t *)"\7in-addr\4arpa\0") > 0
-		 || knot_dname_in_bailiwick(qry->sname, (const uint8_t *)"\3ip6\4arpa\0") > 0);
-	if (is_rev) {
 static int parse_addr_str(union kr_sockaddr *sa, const char *addr)
 {
 	int family = strchr(addr, ':') ? AF_INET6 : AF_INET;
