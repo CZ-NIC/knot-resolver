@@ -848,6 +848,7 @@ int kr_view_insert_action(const char *subnet, const char *action)
 	{ // Write ruleset-specific prefix of the key.
 		const size_t rsp_len = strlen(RULESET_DEFAULT);
 		key.data -= rsp_len;
+		key.len  += rsp_len;
 		memcpy(key.data, RULESET_DEFAULT, rsp_len);
 	}
 
