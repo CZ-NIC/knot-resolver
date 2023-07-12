@@ -92,6 +92,7 @@ BuildRequires:  openssl-devel
 %if 0%{?suse_version}
 %define NINJA ninja
 BuildRequires:  lmdb-devel
+BuildRequires:  python3-setuptools
 Requires(pre):  shadow
 %endif
 
