@@ -31,6 +31,7 @@ If you are a new user, please start with chapter for :ref:`getting started <gett
    config-logging-monitoring
    config-dnssec
    config-lua
+   config-experimental
 
 .. toctree::
    :caption: Deployment
