@@ -1,6 +1,6 @@
 .. SPDX-License-Identifier: GPL-3.0-or-later
 
-.. _network-configuration:
+.. _config-network:
 
 ************************
 Networking and protocols
@@ -40,20 +40,20 @@ Server (communication with clients)
 .. toctree::
    :maxdepth: 2
 
-   daemon-bindings-net_server
-   daemon-bindings-net_tlssrv
-   modules-http
+   config-network-server
+   config-network-server-tls
+   .. config-network-http
 
 Client (retrieving answers from servers)
 ========================================
 
-Following chapters describe basic configuration of how resolver retrieves data from other *(upstream)* servers. Data processing is also affected by configured policies, see chapter :ref:`policies` for more advanced usage.
+Following chapters describe basic configuration of how resolver retrieves data from other *(upstream)* servers. Data processing is also affected by configured policies, see chapter :ref:`config-policy-new` for more advanced usage.
 
 .. toctree::
    :maxdepth: 2
 
-   daemon-bindings-net_client
-   config-network-forwarding
+   config-network-client
+   config-forward
 
 DNS protocol tweaks
 ===================
@@ -61,4 +61,4 @@ DNS protocol tweaks
 .. toctree::
    :maxdepth: 2
 
-   daemon-bindings-net_dns_tweaks
+   config-network-dns-tweaks

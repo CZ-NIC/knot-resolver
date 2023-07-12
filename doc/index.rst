@@ -25,9 +25,9 @@ If you are a new user, please start with chapter for :ref:`getting started <gett
    :maxdepth: 3
 
    config-overview
-   usecase-network-interfaces
-   config-policy-new
+   config-network
    config-performance
+   config-policy-new
    config-logging-monitoring
    config-dnssec
    config-lua
