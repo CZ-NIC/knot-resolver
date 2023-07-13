@@ -36,6 +36,12 @@ Cache
 .. doxygenfile:: cache/impl.h
    :project: libkres
 
+Rules
+-----
+
+.. doxygenfile:: rules/api.h
+   :project: libkres
+
 .. _lib_api_nameservers:
 
 Nameservers

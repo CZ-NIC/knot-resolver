@@ -10,6 +10,7 @@ struct knot_pkt;
 struct sockaddr;
 #include <libknot/db/db.h>
 
+/// Storage for a tag-set.  It's a bitmap, so 64 tags are supported now.
 typedef uint64_t kr_rule_tags_t;
 #define KR_RULE_TAGS_ALL ((kr_rule_tags_t)0)
 /// Tags "capacity", i.e. numbered from 0 to _CAP - 1.
