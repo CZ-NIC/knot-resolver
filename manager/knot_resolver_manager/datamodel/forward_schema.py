@@ -2,7 +2,7 @@ from typing import List, Optional, Union
 
 from typing_extensions import Literal
 
-from knot_resolver_manager.datamodel.types import DomainName, File, IPAddressOptionalPort, ListOrItem
+from knot_resolver_manager.datamodel.types import DomainName, File, IPAddressOptionalPort, ListOrItem, PinSha256
 from knot_resolver_manager.utils.modeling import ConfigSchema
 
 
@@ -20,7 +20,7 @@ class ForwardServerSchema(ConfigSchema):
 
     address: ListOrItem[IPAddressOptionalPort]
     transport: Optional[Literal["tls"]] = None
-    pin_sha256: Optional[ListOrItem[str]] = None
+    pin_sha256: Optional[ListOrItem[PinSha256]] = None
     hostname: Optional[DomainName] = None
     ca_file: Optional[File] = None
 

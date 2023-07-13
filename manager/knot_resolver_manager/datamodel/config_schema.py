@@ -19,9 +19,7 @@ from knot_resolver_manager.datamodel.management_schema import ManagementSchema
 from knot_resolver_manager.datamodel.monitoring_schema import MonitoringSchema
 from knot_resolver_manager.datamodel.network_schema import NetworkSchema
 from knot_resolver_manager.datamodel.options_schema import OptionsSchema
-from knot_resolver_manager.datamodel.policy_schema import PolicySchema
-from knot_resolver_manager.datamodel.slice_schema import SliceSchema
-from knot_resolver_manager.datamodel.types import Dir, IntPositive
+from knot_resolver_manager.datamodel.types import Dir, EscapedStr, IntPositive
 from knot_resolver_manager.datamodel.view_schema import ViewSchema
 from knot_resolver_manager.datamodel.webmgmt_schema import WebmgmtSchema
 from knot_resolver_manager.utils.modeling import ConfigSchema
@@ -95,8 +93,6 @@ class KresConfig(ConfigSchema):
         network: Network connections and protocols configuration.
         views: List of views and its configuration.
         local_data: Local data for forward records (A/AAAA) and reverse records (PTR).
-        slices: Split the entire DNS namespace into distinct slices.
-        policy: List of policy rules and its configuration.
         forward: List of Forward Zones and its configuration.
         cache: DNS resolver cache configuration.
         dnssec: Disable DNSSEC, enable with defaults or set new configuration.
@@ -107,8 +103,8 @@ class KresConfig(ConfigSchema):
         """
 
         version: int = 1
-        nsid: Optional[str] = None
-        hostname: Optional[str] = None
+        nsid: Optional[EscapedStr] = None
+        hostname: Optional[EscapedStr] = None
         rundir: Dir = lazy_default(Dir, "/var/run/knot-resolver")
         workers: Union[Literal["auto"], IntPositive] = IntPositive(1)
         max_workers: IntPositive = IntPositive(_default_max_worker_count())
@@ -118,8 +114,6 @@ class KresConfig(ConfigSchema):
         network: NetworkSchema = NetworkSchema()
         views: Optional[List[ViewSchema]] = None
         local_data: LocalDataSchema = LocalDataSchema()
-        slices: Optional[List[SliceSchema]] = None
-        policy: Optional[List[PolicySchema]] = None
         forward: Optional[List[ForwardSchema]] = None
         cache: CacheSchema = lazy_default(CacheSchema, {})
         dnssec: Union[bool, DnssecSchema] = True
@@ -130,8 +124,8 @@ class KresConfig(ConfigSchema):
 
     _LAYER = Raw
 
-    nsid: Optional[str]
-    hostname: str
+    nsid: Optional[EscapedStr]
+    hostname: EscapedStr
     rundir: Dir
     workers: IntPositive
     max_workers: IntPositive
@@ -141,8 +135,6 @@ class KresConfig(ConfigSchema):
     network: NetworkSchema
     views: Optional[List[ViewSchema]]
     local_data: LocalDataSchema
-    slices: Optional[List[SliceSchema]]
-    policy: Optional[List[PolicySchema]]
     forward: Optional[List[ForwardSchema]]
     cache: CacheSchema
     dnssec: Union[Literal[False], DnssecSchema]

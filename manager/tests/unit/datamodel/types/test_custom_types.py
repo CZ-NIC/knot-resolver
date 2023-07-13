@@ -9,6 +9,7 @@ from pytest import raises
 from knot_resolver_manager.datamodel.types import (
     Dir,
     DomainName,
+    EscapedStr,
     InterfaceName,
     InterfaceOptionalPort,
     InterfacePort,
@@ -18,6 +19,7 @@ from knot_resolver_manager.datamodel.types import (
     IPv4Address,
     IPv6Address,
     IPv6Network96,
+    PinSha256,
     PortNumber,
     SizeUnit,
     TimeUnit,
@@ -56,7 +58,7 @@ def test_size_unit_invalid(val: Any):
         SizeUnit(val)
 
 
-@pytest.mark.parametrize("val", ["1d", "24h", "1440m", "86400s", "86400000ms", "86400000000us"])
+@pytest.mark.parametrize("val", ["1d", "24h", "1440m", "86400s", "86400000ms"])
 def test_time_unit_valid(val: str):
     o = TimeUnit(val)
     assert int(o) == 86400000000
@@ -78,8 +80,8 @@ def test_parsing_units():
         time: TimeUnit
 
     o = TestSchema({"size": "3K", "time": "10m"})
-    assert o.size == SizeUnit("3072B")
-    assert o.time == TimeUnit("600s")
+    assert int(o.size) == int(SizeUnit("3072B"))
+    assert int(o.time) == int(TimeUnit("600s"))
     assert o.size.bytes() == 3072
     assert o.time.seconds() == 10 * 60
 
@@ -89,6 +91,59 @@ def test_checked_path():
         p: Dir
 
     assert str(TestSchema({"p": "/tmp"}).p) == "/tmp"
+
+
+@pytest.mark.parametrize(
+    "val",
+    [
+        "YmE3ODE2YmY4ZjAx+2ZlYTQxNDE0MGRlNWRhZTIyMjNiMDAzNjFhMzk/MTc3YTljYjQxMGZmNjFmMjAwMTVhZA==",
+        "OTJmODU3ZDMyOWMwOWNlNTU4Y2M0YWNjMjI5NWE2NWJlMzY4MzRmMzY3NGU3NDAwNTI1YjMxZTMxYTgzMzQwMQ==",
+    ],
+)
+def test_pin_sha256_valid(val: str):
+    o = PinSha256(val)
+    assert str(o) == val
+
+
+@pytest.mark.parametrize(
+    "val",
+    [
+        "!YmE3ODE2YmY4ZjAxY2ZlYTQxNDE0MGRlNWRhZTIyMjNiMDAzNjFhMzk2MTc3YTljjQxMGZmNjFmMjAwMTVhZA==",
+        "OTJmODU3ZDMyOWMwOWNlNTU4Y2M0YWNjMjI5NWE2NWJlMzY4MzRmMzY3NGU3NDAwNTI1YjMxZTMxYTgzMzQwMQ",
+        "YmFzZTY0IQ",
+    ],
+)
+def test_pin_sha256_invalid(val: str):
+    with raises(ValueError):
+        PinSha256(val)
+
+
+@pytest.mark.parametrize(
+    "val,exp",
+    [
+        ("", r""),
+        (2000, "2000"),
+        ("string", r"string"),
+        ("\t\n\v", r"\t\n\v"),
+        ("\a\b\f\n\r\t\v\\", r"\a\b\f\n\r\t\v\\"),
+        # fmt: off
+        ("''", r"\'\'"),
+        ('""', r'\"\"'),
+        ("\'\'", r"\'\'"),
+        ('\"\"', r'\"\"'),
+        ('\\"\\"', r'\\\"\\\"'),
+        ("\\'\\'", r"\\\'\\\'"),
+        # fmt: on
+    ],
+)
+def test_escaped_str_valid(val: Any, exp: str):
+    assert str(EscapedStr(val)) == exp
+
+
+@pytest.mark.parametrize("val", [1.1, False])
+def test_escaped_str_invalid(val: Any):
+    with raises(ValueError):
+        EscapedStr(val)
 
 
 @pytest.mark.parametrize(

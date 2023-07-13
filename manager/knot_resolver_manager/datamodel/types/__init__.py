@@ -3,6 +3,8 @@ from .files import AbsoluteDir, Dir, File, FilePath
 from .generic_types import ListOrItem
 from .types import (
     DomainName,
+    EscapedStr,
+    EscapedStr32B,
     IDPattern,
     Int0_512,
     Int0_65535,
@@ -20,6 +22,7 @@ from .types import (
     IPv6Network,
     IPv6Network96,
     Percent,
+    PinSha256,
     PortNumber,
     SizeUnit,
     TimeUnit,
@@ -30,6 +33,8 @@ __all__ = [
     "PolicyFlagEnum",
     "DNSRecordTypeEnum",
     "DomainName",
+    "EscapedStr",
+    "EscapedStr32B",
     "IDPattern",
     "Int0_512",
     "Int0_65535",
@@ -48,6 +53,7 @@ __all__ = [
     "IPv6Network96",
     "ListOrItem",
     "Percent",
+    "PinSha256",
     "PortNumber",
     "SizeUnit",
     "TimeUnit",

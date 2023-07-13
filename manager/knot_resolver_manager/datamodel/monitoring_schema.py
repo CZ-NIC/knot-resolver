@@ -2,14 +2,14 @@ from typing import Union
 
 from typing_extensions import Literal
 
-from knot_resolver_manager.datamodel.types import DomainName, IPAddress, PortNumber, TimeUnit
+from knot_resolver_manager.datamodel.types import DomainName, EscapedStr, IPAddress, PortNumber, TimeUnit
 from knot_resolver_manager.utils.modeling import ConfigSchema
 
 
 class GraphiteSchema(ConfigSchema):
     host: Union[IPAddress, DomainName]
     port: PortNumber = PortNumber(2003)
-    prefix: str = ""
+    prefix: EscapedStr = EscapedStr("")
     interval: TimeUnit = TimeUnit("5s")
     tcp: bool = False
 

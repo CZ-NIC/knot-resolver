@@ -1,7 +1,49 @@
+import inspect
 import json
-from typing import Any, Dict, cast
+from typing import Any, Dict, Type, cast
 
 from knot_resolver_manager.datamodel import KresConfig
+from knot_resolver_manager.datamodel.lua_schema import LuaSchema
+from knot_resolver_manager.utils.modeling import BaseSchema
+from knot_resolver_manager.utils.modeling.types import (
+    get_generic_type_argument,
+    get_generic_type_arguments,
+    get_optional_inner_type,
+    is_dict,
+    is_list,
+    is_optional,
+    is_union,
+)
+
+
+def test_config_check_str_type():
+    # check that there is no 'str' type in datamodel schema (except for LuaSchema
+    def _check_str_type(cls: Type[Any], object_path: str = ""):
+        if cls == str:
+            raise TypeError(f"{object_path}: 'str' type not allowed")
+        elif is_optional(cls):
+            inner: Type[Any] = get_optional_inner_type(cls)
+            _check_str_type(inner, object_path)
+        elif is_union(cls):
+            variants = get_generic_type_arguments(cls)
+            for v in variants:
+                _check_str_type(v, object_path)
+        elif is_dict(cls):
+            key_type, val_type = get_generic_type_arguments(cls)
+            _check_str_type(key_type, object_path)
+            _check_str_type(val_type, object_path)
+        elif is_list(cls):
+            inner_type = get_generic_type_argument(cls)
+            _check_str_type(inner_type, object_path)
+
+        elif inspect.isclass(cls) and issubclass(cls, BaseSchema):
+            annot = cls.__dict__.get("__annotations__", {})
+            for name, python_type in annot.items():
+                # ignore lua section
+                if python_type != LuaSchema:
+                    _check_str_type(python_type, f"{object_path}/{name}")
+
+    _check_str_type(KresConfig)
 
 
 def test_config_defaults():

@@ -395,7 +395,7 @@ async def _configure_graphite_bridge(config: KresConfig) -> None:
         )
         _graphite_bridge = GraphiteBridge((str(config.monitoring.graphite.host), int(config.monitoring.graphite.port)))
         _graphite_bridge.start(  # type: ignore
-            interval=config.monitoring.graphite.interval.seconds(), prefix=config.monitoring.graphite.prefix
+            interval=config.monitoring.graphite.interval.seconds(), prefix=str(config.monitoring.graphite.prefix)
         )
 
 

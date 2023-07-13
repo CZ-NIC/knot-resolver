@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from knot_resolver_manager.datamodel.types import IntNonNegative, TimeUnit
+from knot_resolver_manager.datamodel.types import DomainName, EscapedStr, File, IntNonNegative, TimeUnit
 from knot_resolver_manager.utils.modeling import ConfigSchema
 
 
@@ -14,7 +14,7 @@ class TrustAnchorFileSchema(ConfigSchema):
 
     """
 
-    file: str
+    file: File
     read_only: bool = False
 
 
@@ -40,6 +40,6 @@ class DnssecSchema(ConfigSchema):
     keep_removed: IntNonNegative = IntNonNegative(0)
     refresh_time: Optional[TimeUnit] = None
     hold_down_time: TimeUnit = TimeUnit("30d")
-    trust_anchors: Optional[List[str]] = None
-    negative_trust_anchors: Optional[List[str]] = None
+    trust_anchors: Optional[List[EscapedStr]] = None
+    negative_trust_anchors: Optional[List[DomainName]] = None
     trust_anchors_files: Optional[List[TrustAnchorFileSchema]] = None

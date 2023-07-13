@@ -2,7 +2,16 @@ from typing import List, Optional, Union
 
 from typing_extensions import Literal
 
-from knot_resolver_manager.datamodel.types import Dir, DomainName, File, IntNonNegative, Percent, SizeUnit, TimeUnit
+from knot_resolver_manager.datamodel.types import (
+    Dir,
+    DomainName,
+    EscapedStr,
+    File,
+    IntNonNegative,
+    Percent,
+    SizeUnit,
+    TimeUnit,
+)
 from knot_resolver_manager.utils.modeling import ConfigSchema
 from knot_resolver_manager.utils.modeling.base_schema import lazy_default
 
@@ -19,7 +28,7 @@ class PrefillSchema(ConfigSchema):
     """
 
     origin: DomainName
-    url: str
+    url: EscapedStr
     refresh_interval: TimeUnit = TimeUnit("1d")
     ca_file: Optional[File] = None
 
@@ -47,11 +56,11 @@ class GarbageCollectorSchema(ConfigSchema):
     interval: TimeUnit = TimeUnit("1s")
     threshold: Percent = Percent(80)
     release: Percent = Percent(10)
-    temp_keys_space: SizeUnit = SizeUnit(0)
+    temp_keys_space: SizeUnit = SizeUnit("0M")
     rw_deletes: IntNonNegative = IntNonNegative(100)
     rw_reads: IntNonNegative = IntNonNegative(200)
-    rw_duration: TimeUnit = TimeUnit(0)
-    rw_delay: TimeUnit = TimeUnit(0)
+    rw_duration: TimeUnit = TimeUnit("0us")
+    rw_delay: TimeUnit = TimeUnit("0us")
     dry_run: bool = False
 
 

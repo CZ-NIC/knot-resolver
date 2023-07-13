@@ -1,5 +1,6 @@
 from typing import Optional
 
+from knot_resolver_manager.datamodel.types import File
 from knot_resolver_manager.utils.modeling import ConfigSchema
 
 
@@ -15,7 +16,7 @@ class LuaSchema(ConfigSchema):
 
     script_only: bool = False
     script: Optional[str] = None
-    script_file: Optional[str] = None
+    script_file: Optional[File] = None
 
     def _validate(self) -> None:
         if self.script and self.script_file:

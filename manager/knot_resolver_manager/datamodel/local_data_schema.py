@@ -2,7 +2,15 @@ from typing import Dict, List, Optional
 
 from typing_extensions import Literal
 
-from knot_resolver_manager.datamodel.types import DomainName, File, IDPattern, IPAddress, ListOrItem, TimeUnit
+from knot_resolver_manager.datamodel.types import (
+    DomainName,
+    EscapedStr,
+    File,
+    IDPattern,
+    IPAddress,
+    ListOrItem,
+    TimeUnit,
+)
 from knot_resolver_manager.utils.modeling import ConfigSchema
 
 
@@ -29,7 +37,7 @@ class SubtreeSchema(ConfigSchema):
     addresses: Optional[List[IPAddress]] = None
     roots: Optional[List[DomainName]] = None
     roots_file: Optional[File] = None
-    roots_url: Optional[str] = None
+    roots_url: Optional[EscapedStr] = None
     refresh: Optional[TimeUnit] = None
 
     def _validate(self) -> None:
@@ -77,6 +85,6 @@ class LocalDataSchema(ConfigSchema):
     root_fallback_addresses_files: Optional[ListOrItem[File]] = None
     addresses: Optional[Dict[DomainName, IPAddress]] = None
     addresses_files: Optional[ListOrItem[File]] = None
-    records: Optional[str] = None
+    records: Optional[EscapedStr] = None
     subtrees: Optional[List[SubtreeSchema]] = None
     rpz: Optional[List[RPZSchema]] = None
