@@ -1,4 +1,4 @@
-etc/knot-resolver/config.yml
+etc/knot-resolver/config.yaml
 usr/lib/systemd/system/knot-resolver.service
 usr/share/bash-completion/completions/kresctl
 usr/share/fish/completions/kresctl.fish

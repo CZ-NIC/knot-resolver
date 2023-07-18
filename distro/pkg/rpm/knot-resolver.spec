@@ -228,7 +228,7 @@ mv %{buildroot}/%{_datadir}/doc/%{name}/* %{buildroot}/%{_pkgdocdir}/
 # install knot-resolver-manager
 pushd manager
 %py3_install
-install -m 644 -D etc/knot-resolver/config.yml %{buildroot}%{_sysconfdir}/knot-resolver/config.yml
+install -m 644 -D etc/knot-resolver/config.yaml %{buildroot}%{_sysconfdir}/knot-resolver/config.yaml
 install -m 644 -D shell-completion/client.bash %{buildroot}%{_datarootdir}/bash-completion/completions/kresctl
 install -m 644 -D shell-completion/client.fish %{buildroot}%{_datarootdir}/fish/completions/kresctl.fish
 
@@ -330,7 +330,7 @@ getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysc
 
 %files -n knot-resolver-manager
 %{python3_sitearch}/knot_resolver_manager*
-%{_sysconfdir}/knot-resolver/config.yml
+%{_sysconfdir}/knot-resolver/config.yaml
 %{_unitdir}/knot-resolver.service
 %{_bindir}/kresctl
 %{_bindir}/knot-resolver

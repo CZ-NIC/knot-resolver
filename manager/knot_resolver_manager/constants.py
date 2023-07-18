@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from knot_resolver_manager.kresd_controller.interface import KresID
 
 STARTUP_LOG_LEVEL = logging.DEBUG
-DEFAULT_MANAGER_CONFIG_FILE = Path("/etc/knot-resolver/config.yml")
+DEFAULT_MANAGER_CONFIG_FILE = Path("/etc/knot-resolver/config.yaml")
 MANAGER_FIX_ATTEMPT_MAX_COUNTER = 2
 FIX_COUNTER_DECREASE_INTERVAL_SEC = 30 * 60
 PID_FILE_NAME = "manager.pid"
