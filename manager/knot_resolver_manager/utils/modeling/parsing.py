@@ -81,11 +81,12 @@ def parse_json(data: str) -> Any:
 
 
 def try_to_parse(data: str) -> Any:
-    """Attempt to parse the data as a YAML or JSON string."""
+    """Attempt to parse the data as a JSON or YAML string."""
+
     try:
-        return parse_yaml(data)
-    except yaml.YAMLError as ye:
+        return parse_json(data)
+    except json.JSONDecodeError as je:
         try:
-            return parse_json(data)
-        except json.JSONDecodeError as je:
-            raise DataParsingError(f"failed to parse data, YAML: {ye}, JSON: {je}")
+            return parse_yaml(data)
+        except yaml.YAMLError as ye:
+            raise DataParsingError(f"failed to parse data, JSON: {je}, YAML: {ye}")
