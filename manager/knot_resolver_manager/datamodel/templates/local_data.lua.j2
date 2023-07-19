@@ -1,7 +1,15 @@
 {% from 'macros/local_data_macros.lua.j2' import local_data_subtree_root, local_data_records, local_data_root_fallback_addresses, local_data_root_fallback_addresses_files, local_data_addresses, local_data_addresses_files %}
-
+{% from 'macros/common_macros.lua.j2' import boolean %}
 
 modules = { 'hints > iterate' }
+
+{# nodata #}
+hints.use_nodata({{ boolean(cfg.local_data.nodata) }})
+
+{# ttl #}
+{% if cfg.local_data.ttl -%}
+hints.ttl({{ cfg.local_data.ttl.seconds() }})
+{%- endif %}
 
 {# root-fallback-addresses #}
 {% if cfg.local_data.root_fallback_addresses -%}
