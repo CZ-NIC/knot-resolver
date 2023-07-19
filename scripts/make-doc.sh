@@ -8,13 +8,7 @@ pushd manager
 mkdir -p ../doc/_static/
 python3 -m knot_resolver_manager.cli schema > ../doc/_static/config.schema.json
 generate-schema-doc --config expand_buttons=true ../doc/_static/config.schema.json ../doc/_static/schema_doc.html
-
-# generate readable version of the JSON schema
-# we could replace jsonschema2md with the following at some point in the future:
-#generate-schema-doc --config template_name=md --config show_toc=false ../doc/_static/config.schema.json ../doc/_static/schema_doc.md
-jsonschema2md ../doc/_static/config.schema.json /dev/stdout | sed 's/^#/###/' > ../doc/config-schema-body.md
 popd
-
 
 pushd doc
 doxygen

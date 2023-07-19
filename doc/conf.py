@@ -18,7 +18,6 @@ extensions = [
     'sphinx.ext.viewcode',
     'sphinx_tabs.tabs',
     'breathe',
-    'sphinx_mdinclude',
 ]
 
 # Breathe configuration

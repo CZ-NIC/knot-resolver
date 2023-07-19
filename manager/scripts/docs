@@ -1,0 +1,10 @@
+#!/bin/bash
+
+# ensure consistent behaviour
+src_dir="$(dirname "$(realpath "$0")")"
+source $src_dir/_env.sh
+cd ..
+
+echo Building documentation for Knot Resolver
+meson build_doc -Ddoc=enabled
+ninja -C build_doc doc

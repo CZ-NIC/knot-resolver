@@ -1,6 +1,4 @@
 Sphinx>=3.0.0
 sphinx-tabs
 breathe
-jsonschema2md
 json-schema-for-humans
-sphinx_mdinclude
