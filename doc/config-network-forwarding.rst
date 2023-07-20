@@ -17,7 +17,7 @@ Forwarding implementation in Knot Resolver has following properties:
   * Answers from *upstream* servers are cached.
   * Answers from *upstream* servers are locally DNSSEC-validated, unless dnssec is disabled.
   * Resolver automatically selects which IP address from given set of IP addresses will be used (based on performance characteristics).
-  * Forwarding can use either unencrypted DNS protocol, or :ref:`config-policy-forwarding-tls`.
+  * :ref:`Forwarding <config-forward>` can use either encrypted or unencrypted DNS protocol.
 
 .. warning::
 
@@ -38,6 +38,6 @@ Simple examples for **unencrypted** forwarding:
      - subtree: example.com.
        servers: [192.0.2.1]
 
-To configure encrypted version please see chapter :ref:`config-policy-forwarding-tls`.
+To configure encrypted version please see chapter about :ref:`forwarding <config-forward>`.
 
-Forwarding is documented in depth together with rest of :ref:`config-policy`.
+Forwarding is documented in depth together with rest of :ref:`config-policy-new`.

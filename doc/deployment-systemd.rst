@@ -4,7 +4,7 @@ Systemd
 
 In the default installation, Knot Resolver contains systemd integration and starting it on such system usually involves only one command.
 
-.. code-block::
+.. code-block:: bash
 
     systemctl enable --now knot-resolver.service
 
@@ -13,6 +13,7 @@ If you don't have systemd service file for Knot Resolver already installed in yo
 
 
 .. literalinclude:: ../systemd/knot-resolver.service.in
+    :language: bash
 
 .. note::
 

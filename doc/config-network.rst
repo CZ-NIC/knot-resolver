@@ -42,7 +42,6 @@ Server (communication with clients)
 
    config-network-server
    config-network-server-tls
-   .. config-network-http
 
 Client (retrieving answers from servers)
 ========================================

@@ -21,7 +21,7 @@ policy, or automatically maintained by the resolver itself.
 In practice this means that you can forget about it and your favorite Linux
 distribution will take care of it for you.
 
-Following :option:`dnssec` section allow to modify DNSSEC configuration *if you really have to*:
+Following :option:`dnssec <dnssec: false|<options>>` section allow to modify DNSSEC configuration *if you really have to*:
 
 .. option:: dnssec: false|<options>
 
@@ -96,7 +96,7 @@ Following :option:`dnssec` section allow to modify DNSSEC configuration *if you 
 
       .. note::
 
-         Static keys are very error-prone and should not be used in production. Use :option:`dnssec/trust-anchors-files` instead.
+         Static keys are very error-prone and should not be used in production. Use :option:`trust-anchors-files <trust-anchors-files: <list>>` instead.
 
       .. code-block:: yaml
 

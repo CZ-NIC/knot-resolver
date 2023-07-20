@@ -1,8 +1,8 @@
 .. SPDX-License-Identifier: GPL-3.0-or-later
 
-.. _usage-without-systemd:
-
 .. include:: deployment-warning.rst
+
+.. _deployment-no-systemd:
 
 *****************************************
 Usage without systemd and without manager

@@ -30,7 +30,7 @@ and unlimited number of "used-defined kinds" can be added in configuration.
 Each network address and port combination can be configured to expose
 one kind of endpoint. This is done using the same mechanisms as
 network configuration for plain DNS and DNS-over-TLS,
-see chapter :ref:`network-configuration` for more details.
+see chapter :ref:`config-lua-network` for more details.
 
 .. warning:: Management endpoint (``webmgmt``) must not be directly exposed
              to untrusted parties. Use `reverse-proxy`_ like Apache_
@@ -47,7 +47,7 @@ Example configuration
 
 This section shows how to configure HTTP module itself. For information how
 to configure HTTP server's IP addresses and ports please see chapter
-:ref:`network-configuration`.
+:ref:`config-lua-network`.
 
 .. code-block:: lua
 

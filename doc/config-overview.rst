@@ -30,7 +30,7 @@ You can use :ref:`kresctl validate <manager-client>` to check your configuration
     Whenever a configuration is loaded and the validation fails, we attempt to log a detailed
     error message explaining what the problem was. For example, it could look like the following.
 
-    .. code-block::
+    .. code-block:: bash
 
         ERROR:knot_resolver_manager.server:multiple configuration errors detected:
                 [/management/interface] invalid port number 66000
