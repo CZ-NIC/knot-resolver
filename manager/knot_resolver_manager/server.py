@@ -37,7 +37,7 @@ from knot_resolver_manager.utils.async_utils import readfile
 from knot_resolver_manager.utils.etag import structural_etag
 from knot_resolver_manager.utils.functional import Result
 from knot_resolver_manager.utils.modeling.exceptions import DataParsingError, DataValidationError
-from knot_resolver_manager.utils.modeling.parsing import DataFormat, parse_yaml
+from knot_resolver_manager.utils.modeling.parsing import DataFormat, try_to_parse
 from knot_resolver_manager.utils.modeling.query import query
 from knot_resolver_manager.utils.modeling.types import NoneType
 from knot_resolver_manager.utils.systemd_notify import systemd_notify
@@ -118,7 +118,7 @@ class Server:
         else:
             try:
                 data = await readfile(self._config_path)
-                config = KresConfig(parse_yaml(data))
+                config = KresConfig(try_to_parse(data))
                 await self.config_store.update(config)
                 logger.info("Configuration file successfully reloaded")
             except FileNotFoundError:
@@ -364,7 +364,7 @@ async def _load_raw_config(config: Union[Path, Dict[str, Any]]) -> Dict[str, Any
             )
         else:
             logger.info("Loading initial configuration from %s", config)
-            config = parse_yaml(await readfile(config))
+            config = try_to_parse(await readfile(config))
 
     # validate the initial configuration
     assert isinstance(config, dict)
