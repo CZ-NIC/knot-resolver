@@ -35,7 +35,7 @@ open logs of all instances                  ``journalctl -u knot-resolver``     
 open log of a single kresd instances        ``journalctl -u knot-resolver _PID=xxx``                                                     ``journalctl -u kresd@1``
 updating config programatically             use HTTP API or ``kresctl`` command                                                          write a custom tool to generate new config and restart ``kresd``'s
 handling errors during config changes       HTTP API just reports error, resolver keeps running with previous config                     custom tools for every user
-validate new config                         ``kresctl validate path/to/new/config.yml`` (not fully bullet proof), then try to run it     run ``kresd`` with the config and see if it fails
-look at the Lua config                      ``kresctl convert path/to/new/config.yml``                                                   ``cat /path/to/config.conf``
+validate new config                         ``kresctl validate path/to/new/config.yaml`` (not fully bullet proof), then try to run it     run ``kresd`` with the config and see if it fails
+look at the Lua config                      ``kresctl convert path/to/new/config.yaml``                                                   ``cat /path/to/config.conf``
 gather metrics                              point Prometheus etc. at the single HTTP API                                                 collect metrics manually from all individual processes
 ==========================================  ===========================================================================================  ==================================================================

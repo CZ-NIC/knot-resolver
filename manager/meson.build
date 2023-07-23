@@ -31,7 +31,7 @@ if build_manager
 
     # YAML config configuration file
     install_data(
-        sources: 'etc/knot-resolver/config.yml',
+        sources: 'etc/knot-resolver/config.yaml',
         install_dir: etc_dir,
     )
 endif

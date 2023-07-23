@@ -6,7 +6,7 @@
 Configuration
 *************
 
-Easiest way to configure Knot Resolver is to put YAML configuration in ``/etc/knot-resolver/config.yml`` file.
+Easiest way to configure Knot Resolver is to put YAML configuration in ``/etc/knot-resolver/config.yaml`` file.
 
 You can start exploring the configuration by continuing in this chapter or look at the complete :ref:`configuration <configuration-chapter>` documentation.
 
@@ -24,7 +24,7 @@ Examples are also installed as documentation files, typically in ``/usr/share/do
 
     .. code-block::
 
-        $ kresctl validate /etc/knot-resolver/config.yml
+        $ kresctl validate /etc/knot-resolver/config.yaml
 
 If you update the configuration file while Knot Resolver is running, you can force the resolver to **reload** it by invoking a ``systemd`` reload command.
 

@@ -2,7 +2,7 @@
 Manual
 ******
 
-The Knot Resolver can be started with the command ``knot-resolver``. You can provide an optional argument ``--config path/to/config.yml`` to load a different than default configuration file.
+The Knot Resolver can be started with the command ``knot-resolver``. You can provide an optional argument ``--config path/to/config.yaml`` to load a different than default configuration file.
 
 The resolver does not have any external runtime dependencies and it should be able to run in most environments. It should be possible to wrap it with any container technology.
 

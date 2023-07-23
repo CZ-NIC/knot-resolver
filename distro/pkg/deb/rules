@@ -42,7 +42,7 @@ override_dh_auto_build:
 override_dh_auto_install:
 	DESTDIR="${PWD}/debian/tmp" ninja -v -C build_deb install
 	dh_auto_install --buildsystem=pybuild --sourcedirectory manager
-	install -m 644 -D manager/etc/knot-resolver/config.yml debian/tmp/etc/knot-resolver/config.yml
+	install -m 644 -D manager/etc/knot-resolver/config.yaml debian/tmp/etc/knot-resolver/config.yaml
 	install -m 644 -D manager/shell-completion/client.bash debian/tmp/usr/share/bash-completion/completions/kresctl
 	install -m 644 -D manager/shell-completion/client.fish debian/tmp/usr/share/fish/completions/kresctl.fish
 
