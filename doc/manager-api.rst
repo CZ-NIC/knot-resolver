@@ -14,7 +14,7 @@ You can use HTTP API to dynamically change configuration of already running Knot
 By default the API is configured as UNIX domain socket ``manager.sock`` located in the resolver's rundir (typically ``/run/knot-resolver/``).
 This socket is used by ``kresctl`` utility in default.
 
-The API setting can be changed only in ``/etc/knot-resolver/config.yml`` configuration file:
+The API setting can be changed only in ``/etc/knot-resolver/config.yaml`` configuration file:
 
 .. code-block:: yaml
 
