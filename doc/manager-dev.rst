@@ -10,7 +10,7 @@ In this guide, we will setup a development environment, discuss tooling and high
 Development environment
 =======================
 
-The Manager is written in Python 3 with the goal of supporting multiple versions of Python available in current Linux distributions. For example, at the time of writing, this means we support Python 3.6 and newer. These compatibility requirements also force us not to rely heavily on modern runtime libraries such as Pydantic.
+The Manager is written in Python 3 with the goal of supporting multiple versions of Python available in current Linux distributions. For example, at the time of writing, this means we support Python 3.7 and newer. These compatibility requirements also force us not to rely heavily on modern runtime libraries such as Pydantic.
 
 Tools
 -----
@@ -26,7 +26,7 @@ First run of the Manager from source
 
 1. clone `the Knot Resolver repository <https://gitlab.nic.cz/knot/knot-resolver>`_
 2. enter the directory ``manager/`` in the repository, all following tasks will be performed from within that directory
-3. run ``poetry env use $(which python3.6)`` to configure Poetry to use a different Python interpreter than the default
+3. run ``poetry env use $(which python3.7)`` to configure Poetry to use a different Python interpreter than the default
 4. run ``poetry install`` to install all dependencies into a newly created virtual environment
 5. run ``./poe run`` to run the Manager in dev mode (Ctrl+C to exit)
 

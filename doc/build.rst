@@ -95,7 +95,7 @@ All dependencies are also listed in `pyproject.toml <https://gitlab.nic.cz/knot/
 .. csv-table::
    :header: "Requirement", "Notes"
 
-   "python3_ >=3.6.8", "Python language interpreter"
+   "python3_ >=3.7", "Python language interpreter"
    "Jinja2_", "Template engine for Python"
    "PyYAML_", "YAML framework for Python"
    "aiohttp_", "HTTP Client/Server for Python."

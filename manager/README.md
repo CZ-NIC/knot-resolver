@@ -17,7 +17,6 @@ Be careful, that you need the latest version of Poetry. The setup was tested wit
 After installing the tools above, the actual fully-featured development environment can be setup using these commands:
 
 ```sh
-pyenv install 3.6.12
 pyenv install 3.7.9
 pyenv install 3.8.7
 pyenv install 3.9.1
