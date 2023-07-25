@@ -16,3 +16,4 @@ docs/_build/*
 .build_kresd/
 .install_kresd/
 build/
+knot_resolver_manager.egg-info/
