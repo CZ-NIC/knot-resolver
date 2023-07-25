@@ -20,7 +20,7 @@ class DataDescriptionError(DataModelingBaseException):
 class DataValidationError(DataModelingBaseException):
     def __init__(self, msg: str, tree_path: str, child_exceptions: "Iterable[DataValidationError]" = tuple()) -> None:
         super().__init__(msg)
-        self._tree_path = tree_path
+        self._tree_path = tree_path.replace("_", "-")
         self._child_exceptions = child_exceptions
 
     def where(self) -> str:
