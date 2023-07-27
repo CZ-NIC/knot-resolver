@@ -363,7 +363,7 @@ async def _load_raw_config(config: Union[Path, Dict[str, Any]]) -> Dict[str, Any
                 f"Manager is configured to load config file at {config} on startup, but the file does not exist."
             )
         else:
-            logger.info("Loading initial configuration from %s", config)
+            logger.info(f"Loading configuration from '{config}' file.")
             config = try_to_parse(await readfile(config))
 
     # validate the initial configuration
@@ -372,7 +372,6 @@ async def _load_raw_config(config: Union[Path, Dict[str, Any]]) -> Dict[str, Any
 
 
 async def _load_config(config: Dict[str, Any]) -> KresConfig:
-    logger.info("Validating initial configuration...")
     config_validated = KresConfig(config)
     return config_validated
 
@@ -409,7 +408,7 @@ async def _deny_working_directory_changes(config_old: KresConfig, config_new: Kr
 def _set_working_directory(config_raw: Dict[str, Any]) -> None:
     rundir = get_rundir_without_validation(config_raw)
 
-    logger.info("changing working directory to rundir at '%s'", rundir.to_path().absolute())
+    logger.debug(f"Changing working directory to '{rundir.to_path().absolute()}'.")
     os.chdir(rundir.to_path())
 
 
