@@ -20,18 +20,25 @@ class DataDescriptionError(DataModelingBaseException):
 class DataValidationError(DataModelingBaseException):
     def __init__(self, msg: str, tree_path: str, child_exceptions: "Iterable[DataValidationError]" = tuple()) -> None:
         super().__init__(msg)
-        self._tree_path = tree_path
+        self._tree_path = tree_path.replace("_", "-")
         self._child_exceptions = child_exceptions
 
     def where(self) -> str:
         return self._tree_path
 
     def msg(self):
-        return f"[{self.where()}] " + super().__str__()
+        return f"[{self.where()}] {super().__str__()}"
 
     def recursive_msg(self, indentation_level: int = 0) -> str:
+        msg_parts: List[str] = []
+
+        if indentation_level == 0:
+            indentation_level += 1
+            msg_parts.append("Configuration validation error detected:")
+
         INDENT = indentation_level * "\t"
-        msg_parts: List[str] = [f"{INDENT}{self.msg()}"]
+        msg_parts.append(f"{INDENT}{self.msg()}")
+
         for c in self._child_exceptions:
             msg_parts.append(c.recursive_msg(indentation_level + 1))
         return "\n".join(msg_parts)
@@ -49,7 +56,7 @@ class AggregateDataValidationError(DataValidationError):
         msg_parts: List[str] = []
         if indentation_level == 0:
             inc = 1
-            msg_parts.append("multiple configuration errors detected:")
+            msg_parts.append("Configuration validation errors detected:")
 
         for c in self._child_exceptions:
             msg_parts.append(c.recursive_msg(indentation_level + inc))

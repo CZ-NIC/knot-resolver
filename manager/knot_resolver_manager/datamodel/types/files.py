@@ -101,7 +101,7 @@ class AbsoluteDir(Dir):
     ) -> None:
         super().__init__(source_value, parents=parents, object_path=object_path)
         if self.strict_validation and not self._value.is_absolute():
-            raise ValueError("path not absolute")
+            raise ValueError(f"path '{self._value}' is not absolute")
 
 
 class File(UncheckedPath):
@@ -115,9 +115,9 @@ class File(UncheckedPath):
     ) -> None:
         super().__init__(source_value, parents=parents, object_path=object_path)
         if self.strict_validation and not self._value.exists():
-            raise ValueError("file does not exist")
+            raise ValueError(f"file '{self._value}' does not exist")
         if self.strict_validation and not self._value.is_file():
-            raise ValueError("path is not a file")
+            raise ValueError(f"path '{self._value}' is not a file")
 
 
 class FilePath(UncheckedPath):
@@ -135,4 +135,4 @@ class FilePath(UncheckedPath):
         if self.strict_validation and not p.exists() or not p.is_dir():
             raise ValueError(f"path '{self._value}' does not point inside an existing directory")
         if self.strict_validation and self._value.is_dir():
-            raise ValueError("path points to a directory when we expected a file")
+            raise ValueError(f"path '{self._value}' points to a directory when we expected a file")
