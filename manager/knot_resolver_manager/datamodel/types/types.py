@@ -60,6 +60,9 @@ class SizeUnit(UnitBase):
 class TimeUnit(UnitBase):
     _units = {"us": 1, "ms": 10**3, "s": 10**6, "m": 60 * 10**6, "h": 3600 * 10**6, "d": 24 * 3600 * 10**6}
 
+    def minutes(self) -> int:
+        return self._base_value // 1000**2 // 60
+
     def seconds(self) -> int:
         return self._base_value // 1000**2
 

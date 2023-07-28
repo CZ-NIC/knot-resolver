@@ -1,4 +1,4 @@
-from typing import List, Optional, Union
+from typing import Any, List, Optional, Union
 
 from typing_extensions import Literal
 
@@ -64,27 +64,59 @@ class GarbageCollectorSchema(ConfigSchema):
     dry_run: bool = False
 
 
-class CacheSchema(ConfigSchema):
+class PredictionSchema(ConfigSchema):
     """
-    DNS resolver cache configuration.
+    Helps keep the cache hot by prefetching expiring records and learning usage patterns and repetitive queries.
 
     ---
-    storage: Cache storage of the DNS resolver.
-    size_max: Maximum size of the cache.
-    garbage_collector: Use the garbage collector (kres-cache-gc) to periodically clear cache.
-    ttl_min: Minimum time-to-live for the cache entries.
-    ttl_max: Maximum time-to-live for the cache entries.
-    ns_timeout: Time interval for which a nameserver address will be ignored after determining that it does not return (useful) answers.
-    prefill: Prefill the cache periodically by importing zone data obtained over HTTP.
+    window: Sampling window length.
+    period: Number of windows that can be kept in memory.
     """
 
-    storage: Dir = lazy_default(Dir, "/var/cache/knot-resolver")
-    size_max: SizeUnit = SizeUnit("100M")
-    garbage_collector: Union[GarbageCollectorSchema, Literal[False]] = GarbageCollectorSchema()
-    ttl_min: TimeUnit = TimeUnit("5s")
-    ttl_max: TimeUnit = TimeUnit("6d")
-    ns_timeout: TimeUnit = TimeUnit("1000ms")
-    prefill: Optional[List[PrefillSchema]] = None
+    window: TimeUnit = TimeUnit("15m")
+    period: IntNonNegative = IntNonNegative(24)
+
+
+class CacheSchema(ConfigSchema):
+    class Raw(ConfigSchema):
+        """
+        DNS resolver cache configuration.
+
+        ---
+        storage: Cache storage of the DNS resolver.
+        size_max: Maximum size of the cache.
+        garbage_collector: Use the garbage collector (kres-cache-gc) to periodically clear cache.
+        ttl_min: Minimum time-to-live for the cache entries.
+        ttl_max: Maximum time-to-live for the cache entries.
+        ns_timeout: Time interval for which a nameserver address will be ignored after determining that it does not return (useful) answers.
+        prefill: Prefill the cache periodically by importing zone data obtained over HTTP.
+        prediction: Helps keep the cache hot by prefetching expiring records and learning usage patterns and repetitive queries.
+        """
+
+        storage: Dir = lazy_default(Dir, "/var/cache/knot-resolver")
+        size_max: SizeUnit = SizeUnit("100M")
+        garbage_collector: Union[GarbageCollectorSchema, Literal[False]] = GarbageCollectorSchema()
+        ttl_min: TimeUnit = TimeUnit("5s")
+        ttl_max: TimeUnit = TimeUnit("6d")
+        ns_timeout: TimeUnit = TimeUnit("1000ms")
+        prefill: Optional[List[PrefillSchema]] = None
+        prediction: Union[bool, PredictionSchema] = False
+
+    _LAYER = Raw
+
+    storage: Dir
+    size_max: SizeUnit
+    garbage_collector: Union[GarbageCollectorSchema, Literal[False]]
+    ttl_min: TimeUnit
+    ttl_max: TimeUnit
+    ns_timeout: TimeUnit
+    prefill: Optional[List[PrefillSchema]]
+    prediction: Union[Literal[False], PredictionSchema]
+
+    def _prediction(self, obj: Raw) -> Any:
+        if obj.prediction is True:
+            return PredictionSchema()
+        return obj.prediction
 
     def _validate(self):
         if self.ttl_min.seconds() >= self.ttl_max.seconds():
