@@ -123,11 +123,6 @@ void session_close(struct session *session)
 	}
 }
 
-bool session_was_useful(const struct session *session)
-{
-	return session->was_useful;
-}
-
 int session_start_read(struct session *session)
 {
 	return io_start_read(session->handle);
@@ -582,6 +577,24 @@ ssize_t session_wirebuf_trim(struct session *session, ssize_t len)
 	return len;
 }
 
+void session_tcp_penalize(struct session *s)
+{
+	if (s->was_useful || !s->sflags.outgoing)
+		return;
+	/* We want to penalize the IP address, if a task is asking a query.
+	 * It might not be the right task, but that doesn't matter so much
+	 * for attributing the useless session to the IP address. */
+	struct qr_task *t = session_tasklist_get_first(s);
+	struct kr_query *qry = NULL;
+	if (t) {
+		struct kr_request *req = worker_task_request(t);
+		qry = array_tail(req->rplan.pending);
+	}
+	if (qry) /* We reuse the error for connection, as it's quite similar. */
+		qry->server_selection.error(qry, worker_task_get_transport(t),
+						KR_SELECTION_TCP_CONNECT_FAILED);
+}
+
 knot_pkt_t *session_produce_packet(struct session *session, knot_mm_t *mm)
 {
 	session->sflags.wirebuf_error = false;
@@ -617,6 +630,7 @@ knot_pkt_t *session_produce_packet(struct session *session, knot_mm_t *mm)
 		msg_size = knot_wire_read_u16(msg_start);
 		if (msg_size >= session->wire_buf_size) {
 			session->sflags.wirebuf_error = true;
+			session_tcp_penalize(session);
 			return NULL;
 		}
 		if (msg_size + 2 > wirebuf_msg_data_size) {
@@ -624,6 +638,7 @@ knot_pkt_t *session_produce_packet(struct session *session, knot_mm_t *mm)
 		}
 		if (msg_size == 0) {
 			session->sflags.wirebuf_error = true;
+			session_tcp_penalize(session);
 			return NULL;
 		}
 		msg_start += 2;
@@ -631,6 +646,7 @@ knot_pkt_t *session_produce_packet(struct session *session, knot_mm_t *mm)
 		msg_size = wirebuf_msg_data_size;
 	} else {
 		session->sflags.wirebuf_error = true;
+		session_tcp_penalize(session);
 		return NULL;
 	}
 

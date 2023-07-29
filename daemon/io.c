@@ -337,33 +337,6 @@ void tcp_timeout_trigger(uv_timer_t *timer)
 	}
 }
 
-static void tcp_disconnect(struct session *s, int errcode)
-{
-	if (kr_log_is_debug(IO, NULL)) {
-		struct sockaddr *peer = session_get_peer(s);
-		char *peer_str = kr_straddr(peer);
-		kr_log_debug(IO, "=> connection to '%s' closed by peer (%s)\n",
-			       peer_str ? peer_str : "",
-			       uv_strerror(errcode));
-	}
-
-	if (!session_was_useful(s) && session_flags(s)->outgoing) {
-		/* We want to penalize the IP address, if a task is asking a query.
-		 * It might not be the right task, but that doesn't matter so much
-		 * for attributing the useless session to the IP address. */
-		struct qr_task *t = session_tasklist_get_first(s);
-		struct kr_query *qry = NULL;
-		if (t) {
-			struct kr_request *req = worker_task_request(t);
-			qry = array_tail(req->rplan.pending);
-		}
-		if (qry) /* We reuse the error for connection, as it's quite similar. */
-			qry->server_selection.error(qry, worker_task_get_transport(t),
-							KR_SELECTION_TCP_CONNECT_FAILED);
-	}
-	worker_end_tcp(s);
-}
-
 static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 {
 	struct session *s = handle->data;
@@ -381,7 +354,16 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 	}
 
 	if (nread < 0 || !buf->base) {
-		tcp_disconnect(s, nread);
+		if (kr_log_is_debug(IO, NULL)) {
+			struct sockaddr *peer = session_get_peer(s);
+			char *peer_str = kr_straddr(peer);
+			kr_log_debug(IO, "=> connection to '%s' closed by peer (%s)\n",
+				       peer_str ? peer_str : "",
+				       uv_strerror(nread));
+		}
+
+		session_tcp_penalize(s);
+		worker_end_tcp(s);
 		return;
 	}
 
