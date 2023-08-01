@@ -1154,6 +1154,25 @@ void session2_waitinglist_finalize(struct session2 *session, int status)
 	}
 }
 
+void session2_penalize(struct session2 *session)
+{
+	if (session->was_useful || !session->outgoing)
+		return;
+
+	/* We want to penalize the IP address, if a task is asking a query.
+	 * It might not be the right task, but that doesn't matter so much
+	 * for attributing the useless session to the IP address. */
+	struct qr_task *t = session2_tasklist_get_first(session);
+	struct kr_query *qry = NULL;
+	if (t) {
+		struct kr_request *req = worker_task_request(t);
+		qry = array_tail(req->rplan.pending);
+	}
+	if (qry) /* We reuse the error for connection, as it's quite similar. */
+		qry->server_selection.error(qry, worker_task_get_transport(t),
+						KR_SELECTION_TCP_CONNECT_FAILED);
+}
+
 int session2_unwrap(struct session2 *s, struct protolayer_payload payload,
                     const struct comm_info *comm, protolayer_finished_cb cb,
                     void *baton)

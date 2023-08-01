@@ -993,6 +993,11 @@ static inline bool session2_is_empty(const struct session2 *session)
 	       session2_waitinglist_is_empty(session);
 }
 
+/** Penalizes the server the specified `session` is connected to, if the session
+ * has not been useful (see `struct session2::was_useful`). Only applies to
+ * `outgoing` sessions, and the session should not be connection-less. */
+void session2_penalize(struct session2 *session);
+
 /** Sends the specified `payload` to be processed in the `_UNWRAP` direction by
  * the session's protocol layers.
  *

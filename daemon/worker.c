@@ -41,6 +41,8 @@
 #define MAX_PIPELINED 100
 #endif
 
+#define MAX_DGRAM_LEN UINT16_MAX
+
 #define VERBOSE_MSG(qry, ...) kr_log_q(qry, WORKER, __VA_ARGS__)
 
 /** Client request state. */
@@ -1757,6 +1759,12 @@ static enum protolayer_iter_cb_result pl_dns_dgram_unwrap(
 		int ret = kr_ok();
 		for (int i = 0; i < ctx->payload.iovec.cnt; i++) {
 			const struct iovec *iov = &ctx->payload.iovec.iov[i];
+			if (iov->iov_len > MAX_DGRAM_LEN) {
+				session2_penalize(session);
+				ret = kr_error(EFBIG);
+				break;
+			}
+
 			knot_pkt_t *pkt = produce_packet(
 					iov->iov_base, iov->iov_len);
 			if (!pkt) {
@@ -1772,6 +1780,10 @@ static enum protolayer_iter_cb_result pl_dns_dgram_unwrap(
 		mp_flush(the_worker->pkt_pool.ctx);
 		return protolayer_break(ctx, ret);
 	} else if (ctx->payload.type == PROTOLAYER_PAYLOAD_BUFFER) {
+		if (ctx->payload.buffer.len > MAX_DGRAM_LEN) {
+			session2_penalize(session);
+			return protolayer_break(ctx, kr_error(EFBIG));
+		}
 		knot_pkt_t *pkt = produce_packet(
 				ctx->payload.buffer.buf,
 				ctx->payload.buffer.len);
@@ -1782,9 +1794,15 @@ static enum protolayer_iter_cb_result pl_dns_dgram_unwrap(
 		mp_flush(the_worker->pkt_pool.ctx);
 		return protolayer_break(ctx, ret);
 	} else if (ctx->payload.type == PROTOLAYER_PAYLOAD_WIRE_BUF) {
+		const size_t msg_len = wire_buf_data_length(ctx->payload.wire_buf);
+		if (msg_len > MAX_DGRAM_LEN) {
+			session2_penalize(session);
+			return protolayer_break(ctx, kr_error(EFBIG));
+		}
+
 		knot_pkt_t *pkt = produce_packet(
 				wire_buf_data(ctx->payload.wire_buf),
-				wire_buf_data_length(ctx->payload.wire_buf));
+				msg_len);
 		if (!pkt)
 			return protolayer_break(ctx, KNOT_EMALF);
 
@@ -2079,10 +2097,12 @@ static knot_pkt_t *stream_produce_packet(struct session2 *session,
 	uint16_t msg_len = knot_wire_read_u16(wire_buf_data(wb));
 	if (msg_len == 0) {
 		*out_err = true;
+		session2_penalize(session);
 		return NULL;
 	}
 	if (msg_len >= wb->size) {
 		*out_err = true;
+		session2_penalize(session);
 		return NULL;
 	}
 	if (wire_buf_data_length(wb) < msg_len + sizeof(uint16_t)) {
