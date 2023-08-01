@@ -16,3 +16,12 @@ prefill.config({
 {% endfor %}
 })
 {% endif %}
+
+{% if cfg.cache.prediction %}
+-- cache.prediction
+modules.load('predict')
+predict.config({
+    window = {{ cfg.cache.prediction.window.minutes() }}
+    period = {{ cfg.cache.prediction.period }}
+})
+{% endif %}

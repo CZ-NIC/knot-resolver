@@ -1,7 +1,7 @@
-from knot_resolver_manager.datamodel.options_schema import OptionsSchema
+from knot_resolver_manager.datamodel.cache_schema import CacheSchema
 
 
 def test_prediction_true_defaults():
-    o = OptionsSchema({"prediction": True})
+    o = CacheSchema({"prediction": True})
     assert str(o.prediction.window) == "15m"
     assert int(o.prediction.period) == 24

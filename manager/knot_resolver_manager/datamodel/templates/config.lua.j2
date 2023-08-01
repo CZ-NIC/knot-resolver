@@ -10,7 +10,7 @@ hostname('{{ cfg.hostname }}')
 {% if cfg.nsid %}
 -- nsid
 modules.load('nsid')
-nsid.name('{{ cfg.nsid }}_' .. worker.id)
+nsid.name('{{ cfg.nsid }}' .. worker.id)
 {% endif %}
 
 -- LOGGING section ----------------------------------
