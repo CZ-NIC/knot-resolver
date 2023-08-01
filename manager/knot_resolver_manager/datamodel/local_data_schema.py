@@ -82,9 +82,9 @@ class LocalDataSchema(ConfigSchema):
     ttl: Optional[TimeUnit] = None
     nodata: bool = True
     root_fallback_addresses: Optional[Dict[DomainName, ListOrItem[IPAddress]]] = None
-    root_fallback_addresses_files: Optional[ListOrItem[File]] = None
+    root_fallback_addresses_files: Optional[List[File]] = None
     addresses: Optional[Dict[DomainName, IPAddress]] = None
-    addresses_files: Optional[ListOrItem[File]] = None
+    addresses_files: Optional[List[File]] = None
     records: Optional[EscapedStr] = None
     subtrees: Optional[List[SubtreeSchema]] = None
     rpz: Optional[List[RPZSchema]] = None
