@@ -5,7 +5,7 @@ from knot_resolver_manager.datamodel.types import IPAddressOptionalPort
 
 def test_policy_rule_forward_add():
     tmpl_str = """{% from 'macros/forward_macros.lua.j2' import policy_rule_forward_add %}
-{{ policy_rule_forward_add(rule) }}"""
+{{ policy_rule_forward_add(rule.subtree[0],rule.options,rule.servers) }}"""
 
     rule = ForwardSchema(
         {

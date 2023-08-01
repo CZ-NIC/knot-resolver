@@ -8,7 +8,7 @@ from knot_resolver_manager.utils.modeling import ConfigSchema
 
 class ForwardServerSchema(ConfigSchema):
     """
-    Forward server configuration options.
+    Forward server configuration.
 
     ---
     address: IP address(es) of a forward server.
@@ -31,7 +31,7 @@ class ForwardServerSchema(ConfigSchema):
 
 class ForwardOptionsSchema(ConfigSchema):
     """
-    Configuration options for forward subtree.
+    Subtree(s) forward options.
 
     ---
     authoritative: The forwarding target is an authoritative server.
@@ -47,11 +47,11 @@ class ForwardSchema(ConfigSchema):
     Configuration of forward subtree.
 
     ---
-    subtree: Subtree to forward.
-    servers: Forward server configuration.
-    options: Configuration options for forward subtree.
+    subtree: Subtree(s) to forward.
+    servers: Forward servers configuration.
+    options: Subtree(s) forward options.
     """
 
-    subtree: DomainName
+    subtree: ListOrItem[DomainName]
     servers: Union[List[IPAddressOptionalPort], List[ForwardServerSchema]]
     options: ForwardOptionsSchema = ForwardOptionsSchema()
