@@ -37,6 +37,6 @@ ca_file='{{ server.ca_file }}',
 }
 {%- endmacro %}
 
-{% macro policy_rule_forward_add(forward) -%}
-policy.rule_forward_add('{{ forward.subtree }}',{{ forward_options(forward.options) }},{{ forward_servers(forward.servers) }})
+{% macro policy_rule_forward_add(subtree,options,servers) -%}
+policy.rule_forward_add('{{ subtree }}',{{ forward_options(options) }},{{ forward_servers(servers) }})
 {%- endmacro %}

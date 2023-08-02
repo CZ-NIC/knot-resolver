@@ -2,6 +2,8 @@
 
 {% if cfg.forward %}
 {% for fwd in cfg.forward %}
-{{ policy_rule_forward_add(fwd) }}
+{% for subtree in fwd.subtree %}
+{{ policy_rule_forward_add(subtree,fwd.options,fwd.servers) }}
+{% endfor %}
 {% endfor %}
 {% endif %}
