@@ -19,9 +19,11 @@ hints.root_file('{{ file }}')
 
 
 {% macro local_data_addresses(pairs) -%}
-{% for name, address in pairs.items() %}
+{%- for name, addresses in pairs.items() -%}
+{% for address in addresses %}
 assert(hints.set('{{ name }} {{ address }}').result == true)
 {% endfor %}
+{%- endfor -%}
 {%- endmacro %}
 
 
