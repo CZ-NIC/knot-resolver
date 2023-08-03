@@ -638,6 +638,8 @@ static int closest_NS(struct kr_cache *cache, struct key *k, entry_list_t el,
 	}
 
 	int zlf_len = k->buf[0];
+	int k_zlabels = knot_dname_labels(k->zname, NULL);
+	const int min_zlabels = qry ? qry->data_src.rule_depth : 0;
 
 	// LATER(optim): if stype is NS, we check the same value again
 	bool exact_match = true;
@@ -702,6 +704,15 @@ static int closest_NS(struct kr_cache *cache, struct key *k, entry_list_t el,
 		zlf_len -= (k->zname[0] + 1);
 		k->zname += (k->zname[0] + 1);
 		k->buf[zlf_len + 1] = 0;
+
+		/* We most likely don't want aggressive answer if it comes from a zone
+		 * *closer* to the root than the current data-source rule.
+		 * A particular use case is grafting a subtree into a signed zone,
+		 * in a place where nothing existed and thus is covered by NSEC*. */
+		if (--k_zlabels < min_zlabels) {
+			memset(el, 0, sizeof(entry_list_t));
+			return kr_error(ENOENT);
+		}
 	} while (true);
 }
 
