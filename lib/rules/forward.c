@@ -97,6 +97,7 @@ int kr_rule_data_src_check(struct kr_query *qry, struct knot_pkt *pkt)
 			labels > qry->data_src.rule_depth;
 			--labels, apex = knot_wire_next_label(apex, NULL));
 		kr_zonecut_set(&qry->zone_cut, apex);
+		qry->zone_cut.avoid_resolving = true;
 		knot_db_val_t targets = qry->data_src.targets_ptr;
 		kr_assert(targets.len > 0);
 		while (targets.len > 0) {

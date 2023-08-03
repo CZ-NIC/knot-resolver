@@ -162,6 +162,9 @@ static int get_resolvable_names(struct iter_local_state *local_state,
 	if (qry->sname[0] == '\0' && qry->stype == KNOT_RRTYPE_DNSKEY) {
 		return 0;
 	}
+	if (qry->zone_cut.avoid_resolving) {
+		return 0;
+	}
 
 	unsigned count = 0;
 	trie_it_t *it;

@@ -179,6 +179,7 @@ struct kr_zonecut {
 	struct kr_zonecut *parent;
 	trie_t *nsset;
 	knot_mm_t *pool;
+	_Bool avoid_resolving;
 };
 typedef struct {
 	struct kr_query **at;
