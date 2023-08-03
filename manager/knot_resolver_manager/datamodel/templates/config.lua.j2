@@ -31,26 +31,17 @@ nsid.name('{{ cfg.nsid }}' .. worker.id)
 -- VIEWS section ------------------------------------
 {% include "views.lua.j2" %}
 
+-- DNSSEC section -----------------------------------
+{% include "dnssec.lua.j2" %}
+
 -- LOCAL-DATA section -------------------------------
 {% include "local_data.lua.j2" %}
-
--- SLICES section -----------------------------------
-{# {% include "slices.lua.j2" %} #}
-
--- POLICY section -----------------------------------
-{# {% include "policy.lua.j2" %} #}
-
--- RPZ section --------------------------------------
-{# {% include "rpz.lua.j2" %} #}
 
 -- FORWARD section ----------------------------------
 {% include "forward.lua.j2" %}
 
 -- CACHE section ------------------------------------
 {% include "cache.lua.j2" %}
-
--- DNSSEC section -----------------------------------
-{% include "dnssec.lua.j2" %}
 
 -- DNS64 section ------------------------------------
 {% include "dns64.lua.j2" %}
