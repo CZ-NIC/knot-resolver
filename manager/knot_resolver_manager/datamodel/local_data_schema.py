@@ -83,7 +83,7 @@ class LocalDataSchema(ConfigSchema):
     nodata: bool = True
     root_fallback_addresses: Optional[Dict[DomainName, ListOrItem[IPAddress]]] = None
     root_fallback_addresses_files: Optional[List[File]] = None
-    addresses: Optional[Dict[DomainName, IPAddress]] = None
+    addresses: Optional[Dict[DomainName, ListOrItem[IPAddress]]] = None
     addresses_files: Optional[List[File]] = None
     records: Optional[EscapedStr] = None
     subtrees: Optional[List[SubtreeSchema]] = None
