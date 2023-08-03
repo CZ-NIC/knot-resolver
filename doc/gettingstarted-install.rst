@@ -6,38 +6,42 @@
 Installation
 ************
 
-As a first step, configure your system to use upstream repositories which have
-the **latest version** of Knot Resolver. Follow the instructions below for your
-distribution.
+Some Linux distributions contain Knot Resolver in their official repositories,
+but their policies usually don't allow keeping it up to date.
+Therefore we recommend to use upstream repositories which have the **latest stable version** of Knot Resolver.
 
-.. note:: Please note that the packages available in distribution repositories of Debian and Ubuntu are outdated. Make sure to follow these steps to use our upstream repositories.
+Please, follow the instructions for your packaging system:
 
 .. tabs::
 
-    .. code-tab:: bash Debian/Ubuntu
+    .. tab:: Debian
 
-        $ wget https://secure.nic.cz/files/knot-resolver/knot-resolver-release.deb
-        $ sudo dpkg -i knot-resolver-release.deb
-        $ sudo apt update
-        $ sudo apt install -y knot-resolver
+        Please follow https://pkg.labs.nic.cz/doc/?project=knot-resolver
 
-    .. code-tab:: bash CentOS 7+
+    .. tab:: Ubuntu
 
-        $ sudo yum install -y epel-release
-        $ sudo yum install -y knot-resolver
+        .. code:: bash
 
-    .. code-tab:: bash Fedora
+            sudo apt install software-properties-common
+            sudo add-apt-repository ppa:cz.nic-labs/knot-resolver
+            sudo apt update
+            sudo apt install knot-resolver6
 
-        $ sudo dnf install -y knot-resolver
+        For details see
+        https://launchpad.net/~cz.nic-labs/+archive/ubuntu/knot-resolver
 
-    .. code-tab:: bash Arch Linux
+    .. tab:: .rpm
 
-        $ sudo pacman -S knot-resolver
+        Please follow https://copr.fedorainfracloud.org/coprs/g/cznic/knot-resolver/
 
-**openSUSE Leap/Tumbleweed**
+    .. tab:: Docker
 
-Add the `OBS <https://en.opensuse.org/Portal:Build_Service>`_ package repository `home:CZ-NIC:knot-resolver-latest <https://software.opensuse.org/download.html?project=home%3ACZ-NIC%3Aknot-resolver-latest&package=knot-resolver>`_ to your system.
+        .. code:: bash
 
-.. note::
+            sudo docker run -ti --net=host docker.io/cznic/knot-resolver:6
 
-    If for some reason you need to **install Knot Resolver from source**, check out :ref:`building from sources <build>` documentation for developers.
+        Hub page: https://hub.docker.com/r/cznic/knot-resolver
+
+
+
+If for some reason you need to install Knot Resolver **from source**, check out :ref:`building from sources <build>` documentation for developers.
