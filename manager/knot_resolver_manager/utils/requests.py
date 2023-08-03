@@ -38,11 +38,14 @@ def request(
         return Response(err.code, err.read().decode("utf8"))
     except URLError as err:
         if err.errno == 111 or isinstance(err.reason, ConnectionRefusedError):
-            print("Connection refused.")
-            print(f"\tURL: {url}")
-            print("Is the URL correct?")
-            print("\tUnix socket would start with http+unix:// and URL encoded path.")
-            print("\tInet sockets would start with http:// and domain or ip")
+            msg = f"""
+                Connection refused.
+                \tURL: {url}
+                Is the URL correct?
+                \tUnix socket would start with http+unix:// and URL encoded path.
+                \tInet sockets would start with http:// and domain or ip
+            """
+            print(msg, file=sys.stderr)
         else:
             print(f"{err}: url={url}", file=sys.stderr)
         sys.exit(1)

@@ -41,5 +41,5 @@ class MetricsCommand(Command):
             else:
                 print(response.body)
         else:
-            print(response)
+            print(response, file=sys.stderr)
             sys.exit(1)

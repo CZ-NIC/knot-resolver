@@ -64,7 +64,7 @@ class ConvertCommand(Command):
             lua = KresConfig(parsed).render_lua()
             reset_global_validation_context()
         except (DataParsingError, DataValidationError) as e:
-            print(e)
+            print(e, file=sys.stderr)
             sys.exit(1)
 
         if self.output_file:

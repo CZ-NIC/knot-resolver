@@ -244,7 +244,7 @@ class ConfigCommand(Command):
         response = request(method, url, json_dump(new_config) if new_config else None)
 
         if response.status != 200:
-            print(response)
+            print(response, file=sys.stderr)
             sys.exit(1)
 
         if self.operation == Operations.GET and self.file:

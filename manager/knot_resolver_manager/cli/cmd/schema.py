@@ -42,7 +42,7 @@ class SchemaCommand(Command):
         if self.live:
             response = request("GET", f"{args.socket}/schema")
             if response.status != 200:
-                print(response)
+                print(response, file=sys.stderr)
                 sys.exit(1)
             schema = response.body
         else:

@@ -24,7 +24,7 @@ class StopCommand(Command):
         response = request("POST", f"{args.socket}/stop")
 
         if response.status != 200:
-            print(response)
+            print(response, file=sys.stderr)
             sys.exit(1)
 
     @staticmethod
