@@ -26,7 +26,6 @@ from knot_resolver_manager.constants import DEFAULT_MANAGER_CONFIG_FILE, PID_FIL
 from knot_resolver_manager.datamodel.config_schema import KresConfig, get_rundir_without_validation
 from knot_resolver_manager.datamodel.globals import (
     Context,
-    reset_global_validation_context,
     set_global_validation_context,
 )
 from knot_resolver_manager.datamodel.management_schema import ManagementSchema
@@ -406,7 +405,10 @@ async def _deny_working_directory_changes(config_old: KresConfig, config_new: Kr
 
 
 def _set_working_directory(config_raw: Dict[str, Any]) -> None:
-    rundir = get_rundir_without_validation(config_raw)
+    try:
+        rundir = get_rundir_without_validation(config_raw)
+    except ValueError as e:
+        raise DataValidationError(str(e), "/rundir")
 
     logger.debug(f"Changing working directory to '{rundir.to_path().absolute()}'.")
     os.chdir(rundir.to_path())
@@ -482,21 +484,21 @@ async def start_server(config: Path = DEFAULT_MANAGER_CONFIG_FILE) -> int:
         # Preprocess config - load from file or in general take it to the last step before validation.
         config_raw = await _load_raw_config(config)
 
+        # before processing any configuration, set validation context
+        #  - resolve_root = root against which all relative paths will be resolved
+        set_global_validation_context(Context(config.parent, True))
+
         # We want to change cwd as soon as possible. Some parts of the codebase are using os.getcwd() to get the
         # working directory.
         #
         # If we fail to read rundir from unparsed config, the first config validation error comes from here
-        set_global_validation_context(Context(config.parent, False))  # Strict validation for Paths is off.
         _set_working_directory(config_raw)
-        reset_global_validation_context()
 
         # We don't want more than one manager in a single working directory. So we lock it with a PID file.
         # Warning - this does not prevent multiple managers with the same naming of kresd service.
         _lock_working_directory()
 
-        # before processing any configuration, set validation context
-        #  - resolve_root = root against which all relative paths will be resolved
-        set_global_validation_context(Context(config.parent))
+        # set_global_validation_context(Context(config.parent))
 
         # After the working directory is set, we can initialize proper config store with a newly parsed configuration.
         config_store = await _init_config_store(config_raw)

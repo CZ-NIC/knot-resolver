@@ -25,6 +25,8 @@ from knot_resolver_manager.datamodel.webmgmt_schema import WebmgmtSchema
 from knot_resolver_manager.utils.modeling import ConfigSchema
 from knot_resolver_manager.utils.modeling.base_schema import lazy_default
 
+_DEFAULT_RUNDIR = "/var/run/knot-resolver"
+
 logger = logging.getLogger(__name__)
 
 
@@ -105,7 +107,7 @@ class KresConfig(ConfigSchema):
         version: int = 1
         nsid: Optional[EscapedStr] = None
         hostname: Optional[EscapedStr] = None
-        rundir: Dir = lazy_default(Dir, "/var/run/knot-resolver")
+        rundir: Dir = lazy_default(Dir, _DEFAULT_RUNDIR)
         workers: Union[Literal["auto"], IntPositive] = IntPositive(1)
         max_workers: IntPositive = IntPositive(_default_max_worker_count())
         management: ManagementSchema = lazy_default(ManagementSchema, {"unix-socket": "./manager.sock"})
@@ -190,12 +192,10 @@ class KresConfig(ConfigSchema):
 
 def get_rundir_without_validation(data: Dict[str, Any]) -> Dir:
     """
-    Without fully parsing, try to get a rundir from a raw config data. When it fails,
-    attempts a full validation to produce a good error message.
+    Without fully parsing, try to get a rundir from a raw config data, otherwise use default.
+    Attempts a dir validation to produce a good error message.
 
     Used for initial manager startup.
     """
 
-    if "rundir" in data:
-        return Dir(data["rundir"], object_path="/rundir")
-    return KresConfig(data).rundir  # this should throw a descriptive error
+    return Dir(data["rundir"] if "rundir" in data else _DEFAULT_RUNDIR, object_path="/rundir")
