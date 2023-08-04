@@ -59,5 +59,5 @@ class ValidateCommand(Command):
             KresConfig(try_to_parse(data))
             reset_global_validation_context()
         except (DataParsingError, DataValidationError) as e:
-            print(e)
+            print(e, file=sys.stderr)
             sys.exit(1)
