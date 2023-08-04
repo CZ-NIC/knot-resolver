@@ -515,7 +515,12 @@ class ObjectMapper:
 
     def _assign_default(self, obj: Any, name: str, python_type: Any, object_path: str) -> None:
         cls = obj.__class__
-        default = self._create_default(getattr(cls, name, None))
+
+        try:
+            default = self._create_default(getattr(cls, name, None))
+        except ValueError as e:
+            raise DataValidationError(str(e), f"{object_path}/{name}")
+
         value = self.map_object(python_type, default, object_path=f"{object_path}/{name}")
         setattr(obj, name, value)
 
