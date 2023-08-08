@@ -418,7 +418,7 @@ int rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt)
 				ret = answer_zla_empty(ztype, qry, pkt, zla_lf, ttl);
 				if (ret == kr_error(EAGAIN))
 					goto shorten;
-				return ret;
+				return ret ? ret : RET_ANSWERED;
 			case VAL_ZLAT_REDIRECT:
 				ret = answer_zla_redirect(qry, pkt, ruleset_name, zla_lf, ttl);
 				return ret ? kr_error(ret) : RET_ANSWERED;
