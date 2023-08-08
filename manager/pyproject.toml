@@ -46,6 +46,10 @@ flake8 = {version = "*", python = "^3.8.1"}
 
 [tool.poetry.group.docs.dependencies]
 sphinx = "^5.3.0"
+sphinx-tabs = "^3.4.1"
+sphinx-rtd-theme = "^1.2.2"
+breathe = "^4.35.0"
+json-schema-for-humans = "^0.45.1"
 
 [tool.poetry.scripts]
 kresctl = 'knot_resolver_manager.cli.main:main'

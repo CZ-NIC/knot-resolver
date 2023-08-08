@@ -10,5 +10,4 @@ Features in this section may changed, replaced or dropped in any release.
 .. toctree::
    :maxdepth: 1
 
-   daemon-scripting
-   modules-experimental_dot_auth
+   config-experimental-dot-auth

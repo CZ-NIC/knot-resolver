@@ -134,7 +134,7 @@ process for liveliness by connecting to the UNIX socket.
 Lua scripts
 -----------
 
-As it was mentioned in section :ref:`config-syntax`, Resolver's configuration
+As it was mentioned in section :ref:`config-lua-syntax`, Resolver's configuration
 file contains program in Lua programming language. This allows you to write
 dynamic rules and helps you to avoid repetitive templating that is unavoidable
 with static configuration. For example parts of configuration can depend on

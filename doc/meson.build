@@ -57,11 +57,6 @@ if get_option('doc') == 'enabled'
     error('missing doc dependency: python python-sphinx-tabs')
   endif
 
-  jsonschema2md = find_program('jsonschema2md')
-  if not jsonschema2md.found()
-    error('missing doc dependency: python jsonschema2md')
-  endif
-
   jsonschemaforhumans = run_command(python, '-c', 'import json_schema_for_humans', check: false)
   if jsonschemaforhumans.returncode() != 0
     error('missing doc dependency: python json-schema-for-humans')

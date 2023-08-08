@@ -2,7 +2,7 @@
 System architecture
 *******************
 
-As mentioned in the :ref:`getting started section <gettingstarted-intro>`, Knot Resolver is split into several components, namely the manager, ``kresd`` and the garbage collector. In addition to these custom components, we also rely on `supervisord <http://supervisord.org/>`_.
+Knot Resolver is split into several components, namely the manager, ``kresd`` and the garbage collector. In addition to these custom components, we also rely on `supervisord <http://supervisord.org/>`_.
 
 .. image:: architecture-schema.svg
     :width: 100%

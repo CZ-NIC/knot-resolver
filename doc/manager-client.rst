@@ -160,6 +160,10 @@ Only one of these arguments can be selected during the execution of a single ``k
 
     Validates configuration in JSON or YAML format.
 
+    .. option:: --no-strict
+
+        Ignore strict rules during validation, e.g. path/file existence.
+
     .. option:: <input_file>
 
         File with configuration in YAML or JSON format.
@@ -172,6 +176,10 @@ Only one of these arguments can be selected during the execution of a single ``k
 .. option:: convert
 
     Converts JSON or YAML configuration to Lua script.
+
+    .. option:: --no-strict
+
+        Ignore strict rules during validation, e.g. path/file existence.
 
     .. option:: <input_file>
 

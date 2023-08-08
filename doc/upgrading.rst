@@ -268,13 +268,13 @@ Configuration file
      "``trust_anchors.keyfile_default = nil``", "``trust_anchors.remove('.')``"
 
 * Network for HTTP endpoints is now configured using same mechanism as for normal DNS endpoints,
-  please refer to chapter :ref:`network-configuration`. Migration table:
+  please refer to chapter :ref:`config-lua-network`. Migration table:
 
   .. csv-table::
      :header: "3.x configuration", "4.x configuration"
 
-     "``modules = { http = { host = '192.0.2.1', port = 443 }}``","see chapter :ref:`network-configuration`"
-     "``http.config({ host = '192.0.2.1', port = 443 })``","see chapter :ref:`network-configuration`"
+     "``modules = { http = { host = '192.0.2.1', port = 443 }}``","see chapter :ref:`config-lua-network`"
+     "``http.config({ host = '192.0.2.1', port = 443 })``","see chapter :ref:`config-lua-network`"
      "``modules = { http = { endpoints = ... }}``","see chapter :ref:`mod-http-custom-endpoint`"
      "``http.config({ endpoints = ... })``","see chapter :ref:`mod-http-custom-endpoint`"
 

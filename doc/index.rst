@@ -5,10 +5,10 @@ Knot Resolver
 #############
 
 Welcome to Knot Resolver's documentation!
-Knot Resolver is an opensource implementation of a caching validating DNS resolver.
+Knot Resolver is an open-source implementation of a caching validating DNS resolver.
 Modular architecture keeps the core tiny and efficient, and it also provides a state-machine like API for extensions.
 
-If you are a new user, please start with chapter for :ref:`getting started <gettingstarted>`.
+If you are a new user, please start with chapter for :ref:`getting started <gettingstarted-chapter>`.
 
 .. toctree::
    :caption: Getting Started
@@ -25,10 +25,13 @@ If you are a new user, please start with chapter for :ref:`getting started <gett
    :maxdepth: 3
 
    config-overview
-   config-schema
-   usecase-network-interfaces
+   config-network
+   config-performance
    config-policy-new
+   config-logging-monitoring
+   config-dnssec
    config-lua
+   config-experimental
 
 .. toctree::
    :caption: Deployment
@@ -63,6 +66,7 @@ If you are a new user, please start with chapter for :ref:`getting started <gett
    :name: developers-chapter
    :maxdepth: 2
 
+   manager-dev
    architecture
    build
    lib
