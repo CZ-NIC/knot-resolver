@@ -149,12 +149,11 @@ ${CDEFS} ${LIBKRES} types <<-EOF
 	struct kr_query_data_src
 EOF
 
-# static variables; these lines might not be simple to generate
-printf "
-kr_layer_t kr_layer_t_static;
-_Bool kr_dbg_assertion_abort;
-int kr_dbg_assertion_fork;
-"
+${CDEFS} ${LIBKRES} variables <<-EOF
+	kr_layer_t_static
+	kr_dbg_assertion_abort
+	kr_dbg_assertion_fork
+EOF
 
 printf "
 typedef int32_t (*kr_stale_cb)(int32_t ttl, const knot_dname_t *owner, uint16_t type,
