@@ -21,7 +21,7 @@ prefill.config({
 -- cache.prediction
 modules.load('predict')
 predict.config({
-    window = {{ cfg.cache.prediction.window.minutes() }}
-    period = {{ cfg.cache.prediction.period }}
+    window = {{ cfg.cache.prediction.window.minutes() }},
+    period = {{ cfg.cache.prediction.period }},
 })
 {% endif %}
