@@ -13,6 +13,7 @@ from knot_resolver_manager.datamodel.types import (
     InterfaceName,
     InterfaceOptionalPort,
     InterfacePort,
+    IPAddressEM,
     IPAddressOptionalPort,
     IPAddressPort,
     IPNetwork,
@@ -305,3 +306,14 @@ def test_ipv6_96_network_valid(val: str):
 def test_ipv6_96_network_invalid(val: Any):
     with raises(ValueError):
         IPv6Network96(val)
+
+
+@pytest.mark.parametrize("val", ["10.10.10.5!", "::1!"])
+def test_ip_address_em_valid(val: str):
+    assert str(IPAddressEM(val)) == val
+
+
+@pytest.mark.parametrize("val", ["10.10.10.5", "::1", "10.10.10.5!!", "::1!!"])
+def test_ip_address_em_invalid(val: Any):
+    with raises(ValueError):
+        IPAddressEM(val)
