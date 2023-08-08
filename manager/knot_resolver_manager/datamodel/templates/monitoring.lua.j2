@@ -2,7 +2,7 @@
 local ffi = require('ffi')
 local id = os.getenv('SYSTEMD_INSTANCE')
 if not id then
-	log_err(ffi.C.LOG_GRP_SYSTEM, 'environment variable $SYSTEMD_INSTANCE not set, which should not have been possible due to running under manager')
+	log_error(ffi.C.LOG_GRP_SYSTEM, 'environment variable $SYSTEMD_INSTANCE not set, which should not have been possible due to running under manager')
 else
 	-- Bind to control socket in CWD (= rundir in config)
     -- FIXME replace with relative path after fixing https://gitlab.nic.cz/knot/knot-resolver/-/issues/720
