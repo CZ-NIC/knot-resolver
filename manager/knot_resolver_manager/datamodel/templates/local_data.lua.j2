@@ -41,7 +41,7 @@ hints.ttl({{ cfg.local_data.ttl.seconds() }})
 {% for subtree in cfg.local_data.subtrees %}
 {% if subtree.roots -%}
 {% for root in subtree.roots %}
-{{ local_data_subtree_root(subtree.type, root, subtree.tags) }}
+{{ local_data_subtree_root(root, subtree.type, subtree.ttl or cfg.local_data.ttl, subtree.tags) }}
 {% endfor %}
 {%- elif subtree.roots_file -%}
 {# TODO: not implemented yet #}

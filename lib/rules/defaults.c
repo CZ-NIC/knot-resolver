@@ -136,18 +136,20 @@ int rules_defaults_insert(void)
 		knot_dname_t name_buf[KNOT_DNAME_MAXLEN];
 		const knot_dname_t *dname =
 			knot_dname_from_str(name_buf, names[i], sizeof(name_buf));
-		int ret = kr_rule_local_data_emptyzone(dname, KR_RULE_TAGS_ALL);
+		int ret = kr_rule_local_subtree(dname, KR_RULE_SUB_EMPTY,
+						RULE_TTL_DEFAULT, KR_RULE_TAGS_ALL);
 		CHECK_RET(ret);
 		/* The double conversion is perhaps a bit wasteful, but it should be rare. */
 		/* LATER: add extra info with explanation?  policy module had an ADDITIONAL
 		 * record with explanation, but perhaps extended errors are more suitable?
-		 * Differentiating the message - perhaps splitting VAL_ZLAT_EMPTY into a few?
+		 * Differentiating the message - perhaps splitting KR_RULE_SUB_EMPTY into a few?
 		 */
 	}
 
 	knot_dname_t localhost_dname[] = "\x09localhost\0";
 	{ // forward localhost
-		int ret = kr_rule_local_data_redirect(localhost_dname, KR_RULE_TAGS_ALL);
+		int ret = kr_rule_local_subtree(localhost_dname, KR_RULE_SUB_REDIRECT,
+						RULE_TTL_DEFAULT, KR_RULE_TAGS_ALL);
 		CHECK_RET(ret);
 
 		knot_rrset_t rr = {

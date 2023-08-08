@@ -104,11 +104,19 @@ It provides various input formats described in following subsections.
 
       .. option:: type: empty|nxdomain|redirect
 
-         Type of a subtree.
+         Type of this subtree:
+
+          - ``empty`` is an empty zone with just SOA and NS at the top
+          - ``nxdomain`` replies ``NXDOMAIN`` everywhere, though in some cases that looks slightly weird
+          - ``redirect`` answers with local-data records from the top of the zone, inside the whole virtual subtree
 
       .. option:: tags: <list of tags>
 
          Optional, tags to link with other policy rules, e.g. :ref:`views <config-views>`.
+
+      .. option:: ttl: <time s|m|h|d>
+
+         Optional, TTL of answers from this rule.  Uses ``/local-data/ttl`` if unspecified.
 
    .. future
       .. option:: addresses: <list of addresses>

@@ -84,13 +84,14 @@ static void cname_scan2rule(zs_scanner_t *s)
 		// Exact RPZ semantics would be hard here, it makes more sense
 		// to apply also to a subtree, and corresponding wildcard rule
 		// usually accompanies this rule anyway.
-		ret = insert_trivial_zone(VAL_ZLAT_NXDOMAIN, s->r_ttl, apex, c->tags);
+		ret = kr_rule_local_subtree(apex, KR_RULE_SUB_NXDOMAIN, s->r_ttl, c->tags);
 	} else if (knot_dname_is_wildcard(s->r_data) && s->r_data[2] == 0) {
 		// "CNAME *." -> NODATA
 		knot_dname_t *apex = s->r_owner;
 		if (knot_dname_is_wildcard(apex)) {
 			apex += 2;
-			ret = insert_trivial_zone(VAL_ZLAT_NODATA, s->r_ttl, apex, c->tags);
+			ret = kr_rule_local_subtree(apex, KR_RULE_SUB_NODATA,
+							s->r_ttl, c->tags);
 		} else { // using special kr_rule_ semantics of empty CNAME RRset
 			knot_rrset_t rrs;
 			knot_rrset_init(&rrs, apex, KNOT_RRTYPE_CNAME,

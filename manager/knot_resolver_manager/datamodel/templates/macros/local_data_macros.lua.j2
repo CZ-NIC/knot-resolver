@@ -54,25 +54,17 @@ assert(hints.add_hosts('{{ file }}').result == true)
 assert(C.kr_rule_zonefile({{ id }})==0)
 {%- endmacro %}
 
-{% macro local_data_emptyzone(dname, tags) -%}
-assert(C.kr_rule_local_data_emptyzone({{ dname }},{{ tags }})==0)
-{%- endmacro %}
-
-{% macro local_data_nxdomain(dname, tags) -%}
-assert(C.kr_rule_local_data_nxdomain({{ dname }},{{ tags }})==0)
-{%- endmacro %}
-
-{% macro local_data_subtree_root(type, root, tags) -%}
+{% macro local_data_subtree_root(root, type, ttl, tags) -%}
+{% if ttl %}
+{%- set get_ttl = ttl.seconds() -%}
+{%- else -%}
+{%- set get_ttl = 'C.KR_RULE_TTL_DEFAULT' -%}
+{% endif %}
 {%- if tags -%}
 {%- set get_tags = policy_get_tagset(tags) -%}
 {%- else -%}
 {%- set get_tags = '0' -%}
 {%- endif -%}
-{%- if type == 'empty' -%}
-{{ local_data_emptyzone(policy_todname(root), get_tags) }}
-{%- elif type == 'nxdomain' -%}
-{{ local_data_nxdomain(policy_todname(root), get_tags) }}
-{%- else -%}
-{# TODO: implement other possible types #}
-{%- endif -%}
+assert(C.kr_rule_local_subtree(todname('{{ root }}'),
+	C.KR_RULE_SUB_{{ type.upper() }}, {{ get_ttl }}, {{ get_tags }}) == 0)
 {%- endmacro %}

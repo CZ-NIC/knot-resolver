@@ -147,12 +147,16 @@ ${CDEFS} ${LIBKRES} types <<-EOF
 	kr_log_level_t
 	enum kr_log_group
 	struct kr_query_data_src
+	enum kr_rule_sub_t
 EOF
 
-${CDEFS} ${LIBKRES} variables <<-EOF
+${CDEFS} ${KRESD} variables <<-EOF
 	kr_layer_t_static
+EOF
+${CDEFS} ${LIBKRES} variables <<-EOF
 	kr_dbg_assertion_abort
 	kr_dbg_assertion_fork
+	KR_RULE_TTL_DEFAULT
 EOF
 
 printf "
@@ -292,8 +296,7 @@ ${CDEFS} ${LIBKRES} functions <<-EOF
 	kr_view_insert_action
 	kr_view_select_action
 	kr_rule_tag_add
-	kr_rule_local_data_emptyzone
-	kr_rule_local_data_nxdomain
+	kr_rule_local_subtree
 	kr_rule_zonefile
 	kr_rule_forward
 	kr_rule_local_address
