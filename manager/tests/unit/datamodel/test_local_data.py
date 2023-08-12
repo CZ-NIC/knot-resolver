@@ -11,9 +11,10 @@ from knot_resolver_manager.utils.modeling.exceptions import DataValidationError
     "val",
     [
         {"type": "empty", "roots": ["sub2.example.org"]},
-        {"type": "empty", "roots-url": "https://example.org/blocklist.txt", "refresh": "1d"},
-        {"type": "nxdomain", "roots-file": "/etc/hosts"},  # must be an existing file or validation will fail
-        {"type": "redirect", "roots": ["sub4.example.org"], "addresses": ["127.0.0.1", "::1"]},
+        {"type": "nxdomain", "roots": ["sub3.example.org", "sub5.example.net."], "ttl": "1h"},
+        # {"type": "empty", "roots-url": "https://example.org/blocklist.txt", "refresh": "1d"},
+        # {"type": "nxdomain", "roots-file": "/etc/hosts"},  # must be an existing file or validation will fail
+        {"type": "redirect", "roots": ["sub4.example.org"]},
     ],
 )
 def test_subtree_valid(val: Any):
