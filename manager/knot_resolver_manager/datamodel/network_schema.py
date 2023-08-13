@@ -10,6 +10,7 @@ from knot_resolver_manager.datamodel.types import (
     Int0_65535,
     InterfaceOptionalPort,
     IPAddress,
+    IPAddressEM,
     IPNetwork,
     IPv4Address,
     IPv6Address,
@@ -45,7 +46,7 @@ class AddressRenumberingSchema(ConfigSchema):
     """
 
     source: IPNetwork
-    destination: IPAddress
+    destination: Union[IPAddressEM, IPAddress]
 
 
 class TLSSchema(ConfigSchema):
