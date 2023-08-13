@@ -157,8 +157,8 @@ For serious deployments it is strongly recommended to configure your own TLS cer
 
       :default: true
 
-      EDNS(0) padding of answers to queries that arrive over TLS
-      transport.  If set to ``true`` (the default), it will use a sensible
+      EDNS(0) padding of answers of queries and answers sent over an encrypted
+      channel.  If set to ``true`` (the default), it will use a sensible
       default padding scheme, as implemented by libknot if available at
       compile time.  If set to a numeric value >= 2 it will pad the
       answers to nearest *padding* boundary, e.g. if set to ``64``, the

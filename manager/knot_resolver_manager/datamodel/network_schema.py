@@ -58,8 +58,8 @@ class TLSSchema(ConfigSchema):
     key_file: Path to certificate key file.
     sticket_secret: Secret for TLS session resumption via tickets. (RFC 5077).
     sticket_secret_file: Path to file with secret for TLS session resumption via tickets. (RFC 5077).
-    auto_discovery: Automatic discovery of authoritative servers supporting DNS-over-TLS.
-    padding: EDNS(0) padding of answers to queries that arrive over TLS transport.
+    auto_discovery: Experimental automatic discovery of authoritative servers supporting DNS-over-TLS.
+    padding: EDNS(0) padding of queries and answers sent over an encrypted channel.
     """
 
     cert_file: Optional[File] = None
