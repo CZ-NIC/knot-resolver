@@ -37,7 +37,7 @@ def is_obj_type(obj: Any, types: Union[type, Tuple[Any, ...], Tuple[type, ...]])
     # pylint: disable=unidiomatic-typecheck
     if isinstance(types, tuple):
         return type(obj) in types
-    return type(obj) == types
+    return type(obj) is types
 
 
 class Serializable(ABC):
