@@ -570,6 +570,53 @@ int kr_rule_local_data_del(const knot_rrset_t *rrs, kr_rule_tags_t tags)
 	knot_db_val_t key = local_data_key(rrs, key_data, RULESET_DEFAULT);
 	return ruledb_op(remove, &key, 1);
 }
+int kr_rule_local_data_merge(const knot_rrset_t *rrs, const kr_rule_tags_t tags)
+{
+	ENSURE_the_rules;
+	// Construct the DB key.
+	uint8_t key_data[KEY_MAXLEN];
+	knot_db_val_t key = local_data_key(rrs, key_data, RULESET_DEFAULT);
+	knot_db_val_t val;
+	// Transaction: we assume that we're in a RW transaction already,
+	// so that here we already "have a lock" on the last version.
+	int ret = ruledb_op(read, &key, &val, 1);
+	if (abs(ret) == abs(ENOENT))
+		goto fallback;
+	if (ret)
+		return kr_error(ret);
+	// check tags
+	kr_rule_tags_t tags_old;
+	if (deserialize_fails_assert(&val, &tags_old) || tags_old != tags)
+		goto fallback;
+	// merge TTLs
+	uint32_t ttl;
+	if (deserialize_fails_assert(&val, &ttl))
+		goto fallback;
+	if (ttl > rrs->ttl)
+		ttl = rrs->ttl;
+	knot_rrset_t rrs_new;
+	knot_rrset_init(&rrs_new, rrs->owner, rrs->type, rrs->rclass, ttl);
+	// merge the rdatasets
+	knot_mm_t *mm = mm_ctx_mempool2(MM_DEFAULT_BLKSIZE); // frag. optimization
+	if (!mm)
+		return kr_error(ENOMEM);
+	ret = rdataset_materialize(&rrs_new.rrs, val.data, val.data + val.len, mm);
+	if (kr_fails_assert(ret >= 0)) { // just invalid call or rubbish data
+		mm_ctx_delete(mm);
+		return ret;
+	}
+	ret = knot_rdataset_merge(&rrs_new.rrs, &rrs->rrs, mm);
+	if (ret) { // ENOMEM or hitting 64 KiB limit
+		mm_ctx_delete(mm);
+		return kr_error(ret);
+	}
+	// everything is ready to insert the merged RRset
+	ret = local_data_ins(key, &rrs_new, NULL, tags);
+	mm_ctx_delete(mm);
+	return ret;
+fallback:
+	return local_data_ins(key, rrs, NULL, tags);
+}
 
 /** Empty or NXDOMAIN or NODATA.  Returning kr_error(EAGAIN) means the rule didn't match. */
 static int answer_zla_empty(val_zla_type_t type, struct kr_query *qry, knot_pkt_t *pkt,

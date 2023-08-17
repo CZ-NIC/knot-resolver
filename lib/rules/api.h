@@ -70,6 +70,15 @@ int kr_view_select_action(const struct kr_request *req, knot_db_val_t *selected)
 KR_EXPORT
 int kr_rule_local_data_ins(const knot_rrset_t *rrs, const knot_rdataset_t *sig_rds,
 				kr_rule_tags_t tags);
+/** Merge RRs into a local data rule.
+ *
+ * - If tags don't match, overwrite the data and return kr_error(EEXIST).
+ * - RRSIGs get dropped, if any were attached.
+ * - We assume that this is called with a RW transaction open already,
+ *   which is always true in normal usage (long RW txn covering whole config).
+ */
+KR_EXPORT
+int kr_rule_local_data_merge(const knot_rrset_t *rrs, kr_rule_tags_t tags);
 
 /** Remove a local data rule.
  *

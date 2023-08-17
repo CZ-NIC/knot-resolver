@@ -142,11 +142,12 @@ static int add_pair(const struct hints_data *data, const char *name, const char 
 	} else {
 		ret = knot_rrset_add_rdata(&rrs, (const uint8_t *)&ia.ip4.sin_addr, 4, NULL);
 	}
-	if (!ret) ret = kr_rule_local_data_ins(&rrs, NULL, KR_RULE_TAGS_ALL);
+	if (!ret) ret = kr_rule_local_data_merge(&rrs, KR_RULE_TAGS_ALL);
 	if (!ret && data->use_nodata) {
 		rrs.type = KNOT_RRTYPE_CNAME;
 		rrs.rrs.count = 0;
 		rrs.rrs.size = 0;
+		// no point in the _merge() variant here
 		ret = kr_rule_local_data_ins(&rrs, NULL, KR_RULE_TAGS_ALL);
 	}
 
@@ -167,7 +168,9 @@ static int add_reverse_pair(const struct hints_data *data, const char *name, con
 		return kr_error(EINVAL);
 	int ret = knot_rrset_add_rdata(&rrs, ptr_name, knot_dname_size(ptr_name), NULL);
 	if (!ret) {
-		ret = kr_rule_local_data_ins(&rrs, NULL, KR_RULE_TAGS_ALL);
+		// We use _merge().  Using multiple PTR RRs is not recommended generally,
+		// but here it seems better than choosing any "arbitrarily".
+		ret = kr_rule_local_data_merge(&rrs, KR_RULE_TAGS_ALL);
 		knot_rdataset_clear(&rrs.rrs, NULL);
 	}
 	return ret;
@@ -481,15 +484,13 @@ int hints_init(struct kr_module *module)
 	module->layer = &layer;
 
 	static const struct kr_prop props[] = {
-	/* FIXME(decide): .set() and .del() used to work on individual RRs;
-	 * now they overwrite or delete whole RRsets.
-	 * Also, .get() doesn't work at all.
+	/* TODO(decide): .del() used to work on individual RRs;
+	 * now it deletes whole RRsets. Also, .get() doesn't work at all.
 	 *
-	 * It really depends what kind of config/API we'll be exposing to user.
-	 *  - Manipulating whole RRsets generally makes more sense to me.
-	 *    (But hints.set() currently can't even insert larger sets.)
-	 *  - We'll probably be deprecating access through these non-declarative
-	 *    commands (set, get, del) which are also usable dynamically.
+	 * We'll probably be deprecating access direct through these non-declarative
+	 * commands (set, get, del) which are also usable dynamically.
+	 *
+	 * For .set() and .add_hosts() see the RW transaction note at kr_rule_local_data_merge()
 	 */
 	    { &hint_set,    "set", "Set {name, address} hint.", },
 	    { &hint_del,    "del", "Delete one {name, address} hint or all addresses for the name.", },
