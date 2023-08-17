@@ -119,7 +119,8 @@ static int add_pair_root(struct kr_zonecut *hints, const char *name, const char 
 	return kr_zonecut_add(hints, key, kr_inaddr(&ia.ip), kr_inaddr_len(&ia.ip));
 }
 
-static int add_pair(const struct hints_data *data, const char *name, const char *addr)
+static int add_pair(const char *name, const char *addr,
+			bool use_nodata, uint32_t ttl, kr_rule_tags_t tags)
 {
 	/* Build key */
 	knot_dname_t key[KNOT_DNAME_MAXLEN];
@@ -135,34 +136,35 @@ static int add_pair(const struct hints_data *data, const char *name, const char 
 
 	uint16_t rrtype = ia.ip.sa_family == AF_INET6 ? KNOT_RRTYPE_AAAA : KNOT_RRTYPE_A;
 	knot_rrset_t rrs;
-	knot_rrset_init(&rrs, key, rrtype, KNOT_CLASS_IN, data->ttl);
+	knot_rrset_init(&rrs, key, rrtype, KNOT_CLASS_IN, ttl);
 	int ret;
 	if (ia.ip.sa_family == AF_INET6) {
 		ret = knot_rrset_add_rdata(&rrs, (const uint8_t *)&ia.ip6.sin6_addr, 16, NULL);
 	} else {
 		ret = knot_rrset_add_rdata(&rrs, (const uint8_t *)&ia.ip4.sin_addr, 4, NULL);
 	}
-	if (!ret) ret = kr_rule_local_data_merge(&rrs, KR_RULE_TAGS_ALL);
-	if (!ret && data->use_nodata) {
+	if (!ret) ret = kr_rule_local_data_merge(&rrs, tags);
+	if (!ret && use_nodata) {
 		rrs.type = KNOT_RRTYPE_CNAME;
 		rrs.rrs.count = 0;
 		rrs.rrs.size = 0;
 		// no point in the _merge() variant here
-		ret = kr_rule_local_data_ins(&rrs, NULL, KR_RULE_TAGS_ALL);
+		ret = kr_rule_local_data_ins(&rrs, NULL, tags);
 	}
 
 	knot_rdataset_clear(&rrs.rrs, NULL);
 	return ret;
 }
 
-static int add_reverse_pair(const struct hints_data *data, const char *name, const char *addr)
+static int add_reverse_pair(const char *name, const char *addr,
+			bool use_nodata, uint32_t ttl, kr_rule_tags_t tags)
 {
 	const knot_dname_t *key = addr2reverse(addr);
 	if (!key)
 		return kr_error(EINVAL);
 	knot_rrset_t rrs;
 	knot_rrset_init(&rrs, /*const-cast*/(knot_dname_t *)key,
-			KNOT_RRTYPE_PTR, KNOT_CLASS_IN, data->ttl);
+			KNOT_RRTYPE_PTR, KNOT_CLASS_IN, ttl);
 	knot_dname_t ptr_name[KNOT_DNAME_MAXLEN];
 	if (!knot_dname_from_str(ptr_name, name, sizeof(ptr_name)))
 		return kr_error(EINVAL);
@@ -170,7 +172,7 @@ static int add_reverse_pair(const struct hints_data *data, const char *name, con
 	if (!ret) {
 		// We use _merge().  Using multiple PTR RRs is not recommended generally,
 		// but here it seems better than choosing any "arbitrarily".
-		ret = kr_rule_local_data_merge(&rrs, KR_RULE_TAGS_ALL);
+		ret = kr_rule_local_data_merge(&rrs, tags);
 		knot_rdataset_clear(&rrs.rrs, NULL);
 	}
 	return ret;
@@ -179,8 +181,10 @@ static int add_reverse_pair(const struct hints_data *data, const char *name, con
 /** For a given name, remove either one address  ##or all of them (if == NULL).
  *
  * Also remove the corresponding reverse records.
+ * Bug: it removes the whole forward RRset.
  */
-static int del_pair(struct hints_data *data, const char *name, const char *addr)
+int kr_rule_local_address_del(const char *name, const char *addr,
+				bool use_nodata, kr_rule_tags_t tags)
 {
 	// Parse addr
 	if (!addr)
@@ -193,8 +197,8 @@ static int del_pair(struct hints_data *data, const char *name, const char *addr)
 	const knot_dname_t *reverse_key = addr2reverse(addr);
 	knot_rrset_t rrs;
 	knot_rrset_init(&rrs, /*const-cast*/(knot_dname_t *)reverse_key,
-			KNOT_RRTYPE_PTR, KNOT_CLASS_IN, data->ttl);
-	int ret = kr_rule_local_data_del(&rrs, KR_RULE_TAGS_ALL);
+			KNOT_RRTYPE_PTR, KNOT_CLASS_IN, 0);
+	int ret = kr_rule_local_data_del(&rrs, tags);
 	if (ret != 1)
 		VERBOSE_MSG(NULL, "del_pair PTR for %s; error: %s\n", addr, kr_strerror(ret));
 	if (ret != 1 && ret != kr_error(ENOENT)) // ignore ENOENT for PTR (duplicities)
@@ -206,15 +210,15 @@ static int del_pair(struct hints_data *data, const char *name, const char *addr)
 	if (!rrs.owner)
 		return kr_error(EINVAL);
 	rrs.type = ia.ip.sa_family == AF_INET6 ? KNOT_RRTYPE_AAAA : KNOT_RRTYPE_A;
-	ret = kr_rule_local_data_del(&rrs, KR_RULE_TAGS_ALL);
+	ret = kr_rule_local_data_del(&rrs, tags);
 	if (ret != 1)
 		VERBOSE_MSG(NULL, "del_pair for %s; error: %s\n", name, kr_strerror(ret));
 
 	// Remove the NODATA entry; again, not perfect matching,
 	//  but we don't care much about this dynamic hints API.
-	if (ret == 1 && data->use_nodata) {
+	if (ret == 1 && use_nodata) {
 		rrs.type = KNOT_RRTYPE_CNAME;
-		ret = kr_rule_local_data_del(&rrs, KR_RULE_TAGS_ALL);
+		ret = kr_rule_local_data_del(&rrs, tags);
 		if (ret != 1)
 			VERBOSE_MSG(NULL, "del_pair for NODATA %s; error: %s\n",
 					name, kr_strerror(ret));
@@ -222,7 +226,7 @@ static int del_pair(struct hints_data *data, const char *name, const char *addr)
 	return ret < 0 ? ret : kr_ok();
 }
 
-static int load_file(struct kr_module *module, const char *path)
+int kr_rule_local_hosts(const char *path, bool use_nodata, uint32_t ttl, kr_rule_tags_t tags)
 {
 	auto_fclose FILE *fp = fopen(path, "r");
 	if (fp == NULL) {
@@ -233,7 +237,6 @@ static int load_file(struct kr_module *module, const char *path)
 	}
 
 	/* Load file to map */
-	struct hints_data *data = module->data;
 	size_t line_len_unused = 0;
 	size_t count = 0;
 	size_t line_count = 0;
@@ -260,14 +263,14 @@ static int load_file(struct kr_module *module, const char *path)
 		}
 		const char *name_tok;
 		while ((name_tok = strtok_r(NULL, " \t\n", &saveptr)) != NULL) {
-			ret = add_pair(data, name_tok, addr);
+			ret = add_pair(name_tok, addr, use_nodata, ttl, tags);
 			if (ret)
 				goto error;
 			count += 1;
 		}
-		ret = add_pair(data, canonical_name, addr);
+		ret = add_pair(canonical_name, addr, use_nodata, ttl, tags);
 		if (!ret) // PTR only to the canonical name
-			ret = add_reverse_pair(data, canonical_name, addr);
+			ret = add_reverse_pair(canonical_name, addr, use_nodata, ttl, tags);
 		if (ret)
 			goto error;
 		count += 1;
@@ -285,10 +288,18 @@ static char* hint_add_hosts(void *env, struct kr_module *module, const char *arg
 {
 	if (!args)
 		args = "/etc/hosts";
-	int err = load_file(module, args);
+	const struct hints_data *data = module->data;
+	int err = kr_rule_local_hosts(args, data->use_nodata, data->ttl, KR_RULE_TAGS_ALL);
 	return bool2jsonstr(err == kr_ok());
 }
 
+int kr_rule_local_address(const char *name, const char *addr,
+				bool use_nodata, uint32_t ttl, kr_rule_tags_t tags)
+{
+	int ret = add_reverse_pair(name, addr, use_nodata, ttl, KR_RULE_TAGS_ALL);
+	if (ret) return ret;
+	return add_pair(name, addr, use_nodata, ttl, KR_RULE_TAGS_ALL);
+}
 /**
  * Set name => address hint.
  *
@@ -310,9 +321,8 @@ static char* hint_set(void *env, struct kr_module *module, const char *args)
 	if (addr) {
 		*addr = '\0';
 		++addr;
-		ret = add_reverse_pair(data, args_copy, addr);
-		if (!ret)
-			ret = add_pair(data, args_copy, addr);
+		ret = kr_rule_local_address(args_copy, addr,
+				data->use_nodata, data->ttl, KR_RULE_TAGS_ALL);
 	}
 
 	return bool2jsonstr(ret == 0);
@@ -333,7 +343,7 @@ static char* hint_del(void *env, struct kr_module *module, const char *args)
 		*addr = '\0';
 		++addr;
 	}
-	ret = del_pair(data, args_copy, addr);
+	ret = kr_rule_local_address_del(args_copy, addr, data->use_nodata, KR_RULE_TAGS_ALL);
 	if (ret)
 		VERBOSE_MSG(NULL, "hints.del(%s) error: %s\n", args, kr_strerror(ret));
 
@@ -537,7 +547,9 @@ int hints_config(struct kr_module *module, const char *conf)
 	}
 
 	if (conf && conf[0]) {
-		return load_file(module, conf);
+		const struct hints_data *data = module->data;
+		return kr_rule_local_hosts(conf,
+				data->use_nodata, data->ttl, KR_RULE_TAGS_ALL);
 	}
 	return kr_ok();
 }
