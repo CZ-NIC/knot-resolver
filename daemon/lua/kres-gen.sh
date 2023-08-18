@@ -297,6 +297,8 @@ ${CDEFS} ${LIBKRES} functions <<-EOF
 	kr_rule_local_data_nxdomain
 	kr_rule_zonefile
 	kr_rule_forward
+	kr_rule_local_address
+	kr_rule_local_hosts
 EOF
 
 

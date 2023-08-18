@@ -80,6 +80,32 @@ int kr_rule_local_data_ins(const knot_rrset_t *rrs, const knot_rdataset_t *sig_r
 KR_EXPORT
 int kr_rule_local_data_merge(const knot_rrset_t *rrs, kr_rule_tags_t tags);
 
+/** Add a name-address pair into rules.
+ *
+ * - both forward and reverse mapping is added
+ * - merging is used; see kr_rule_local_data_merge()
+ * - NODATA is optionally inserted
+ */
+KR_EXPORT
+int kr_rule_local_address(const char *name, const char *addr,
+				bool use_nodata, uint32_t ttl, kr_rule_tags_t tags);
+
+/** For a given name, remove one address  ##or all of them (if == NULL).
+ *
+ * Also remove the corresponding reverse record and (optionally) NODATA mark.
+ * Bug: it removes the whole forward RRset.
+ */
+KR_EXPORT
+int kr_rule_local_address_del(const char *name, const char *addr,
+				bool use_nodata, kr_rule_tags_t tags);
+
+/** Load name-address pairs into rules from a hosts-like file.
+ *
+ * Same as kr_rule_data_address() but from a file.
+ */
+KR_EXPORT
+int kr_rule_local_hosts(const char *path, bool use_nodata, uint32_t ttl, kr_rule_tags_t tags);
+
 /** Remove a local data rule.
  *
  * \return the number of deleted rules or error < 0
