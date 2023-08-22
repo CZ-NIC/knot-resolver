@@ -72,7 +72,7 @@ class KresID:
 
     def __eq__(self, o: object) -> bool:
         if isinstance(o, KresID):
-            return self._id == o._id
+            return self._type == o._type and self._id == o._id
         return False
 
     def __str__(self) -> str:
