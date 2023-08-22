@@ -223,6 +223,14 @@ class SupervisordSubprocess(Subprocess):
         fast = _create_fast_proxy(self._config)
         fast.startProcess(self.name)
 
+    @async_in_a_thread
+    def get_pid(self) -> int:
+        if self._pid is None:
+            supervisord = _create_supervisord_proxy(self._config)
+            info = supervisord.getProcessInfo(self.name)
+            self._pid = info["pid"]
+        return self._pid
+
     def get_used_config(self) -> KresConfig:
         return self._config
 

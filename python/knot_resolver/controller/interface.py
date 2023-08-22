@@ -109,6 +109,7 @@ class Subprocess(ABC):
         self._id = kresid
         self._config = config
         self._registered_worker: bool = False
+        self._pid: Optional[int] = None
 
         self._config_file: Optional[Path] = None
         if self.type is SubprocessType.KRESD:
@@ -187,6 +188,10 @@ class Subprocess(ABC):
 
     @abstractmethod
     async def _restart(self) -> None:
+        pass
+
+    @abstractmethod
+    async def get_pid(self) -> int:
         pass
 
     @abstractmethod
