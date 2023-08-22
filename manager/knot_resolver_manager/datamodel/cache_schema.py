@@ -97,7 +97,7 @@ class CacheSchema(ConfigSchema):
         size_max: SizeUnit = SizeUnit("100M")
         garbage_collector: Union[GarbageCollectorSchema, Literal[False]] = GarbageCollectorSchema()
         ttl_min: TimeUnit = TimeUnit("5s")
-        ttl_max: TimeUnit = TimeUnit("6d")
+        ttl_max: TimeUnit = TimeUnit("1d")
         ns_timeout: TimeUnit = TimeUnit("1000ms")
         prefill: Optional[List[PrefillSchema]] = None
         prediction: Union[bool, PredictionSchema] = False
