@@ -10,6 +10,14 @@ Improvements
 Knot Resolver 5.7.0 (2023-0m-dd)
 ================================
 
+Security
+--------
+- avoid excessive TCP reconnections in a few more cases (!NNNN)
+  Like before, the remote server had to behave nonsensically in order
+  to inflict this upon itself, but it might be abusable for DoS.
+
+  We thank Ivan Jedek from OryxLabs for reporting this.
+
 Improvements
 ------------
 - forwarding mode: tweak dealing with failures from forwarders,
