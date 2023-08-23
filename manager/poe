@@ -1,10 +1,14 @@
 #!/bin/bash
 
-script_dir="$(dirname "$(realpath "$BASH_SOURCE[0]")")"
+script_dir="$(dirname "$(readlink -f "$0")")"
 
-if poetry run python -c 'import sys; sys.exit(0 if sys.version_info >= (3, 8) else 1)'; then
+if poetry --directory "$script_dir" run python -c 'import sys; sys.exit(0 if sys.version_info >= (3, 8) else 1)'; then
     poetry --directory "$script_dir" run poe --root "$script_dir" $@
+elif [ "$PWD" == "$script_dir" ]; then
+    poetry run poe $@
 else
-    echo "Unsupported Python version - must be >=3.8" >&2
+    echo "Running script from non project root is not supported for current 'poethepoet' version." >&2
+    echo "poethepoet version - must be >=0.22.0" >&2
+    echo "Python version - must be >=3.8" >&2
     exit 1
 fi
