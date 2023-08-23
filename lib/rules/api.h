@@ -58,6 +58,7 @@ int kr_view_select_action(const struct kr_request *req, knot_db_val_t *selected)
 
 /** Default TTL for answers from local data rules.
  *
+ * This applies to rules defined by the user, not the default rules.
  * Some types of rules save space when using this default.
  * This definition exists mainly for usage from lua.
  */

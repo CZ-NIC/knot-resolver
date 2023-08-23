@@ -11,7 +11,12 @@
 
 struct kr_rules *the_rules = NULL;
 
-const uint32_t KR_RULE_TTL_DEFAULT = RULE_TTL_DEFAULT;
+/* The default TTL value is a compromise and probably of little practical impact.
+ * - answering from local rules should be quite cheap,
+ *   so very high values are not expected to bring any improvements
+ * - on the other hand, rules are not expected to change very dynamically
+ */
+const uint32_t KR_RULE_TTL_DEFAULT = 300;
 
 /* DB key-space summary
 
@@ -405,7 +410,7 @@ int rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt)
 				return RET_CONT_CACHE;
 			}
 			// The other types optionally specify TTL.
-			uint32_t ttl = RULE_TTL_DEFAULT;
+			uint32_t ttl = KR_RULE_TTL_DEFAULT;
 			if (val.len >= sizeof(ttl)) // allow omitting -> can't kr_assert
 				deserialize_fails_assert(&val, &ttl);
 			if (kr_fails_assert(val.len == 0)) {
@@ -793,7 +798,7 @@ int kr_rule_local_subtree(const knot_dname_t *apex, enum kr_rule_sub_t type,
 		.data = NULL,
 		.len = sizeof(tags) + sizeof(ztype),
 	};
-	const bool has_ttl = ttl != RULE_TTL_DEFAULT;
+	const bool has_ttl = ttl != KR_RULE_TTL_DEFAULT;
 	if (has_ttl)
 		val.len += sizeof(ttl);
 	int ret = ruledb_op(write, &key, &val, 1);

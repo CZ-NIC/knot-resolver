@@ -10,6 +10,10 @@
 	if ((ret) < 0) { kr_assert(false); return kr_error((ret)); } \
 } while (false)
 
+/** RFC-defined local zones should be quite static,
+ * so we use a higher TTL separate from KR_RULE_TTL_DEFAULT. */
+#define TTL ((uint32_t)3600)
+
 int rules_defaults_insert(void)
 {
 	static const char * names[] = {
@@ -137,7 +141,7 @@ int rules_defaults_insert(void)
 		const knot_dname_t *dname =
 			knot_dname_from_str(name_buf, names[i], sizeof(name_buf));
 		int ret = kr_rule_local_subtree(dname, KR_RULE_SUB_EMPTY,
-						RULE_TTL_DEFAULT, KR_RULE_TAGS_ALL);
+						TTL, KR_RULE_TAGS_ALL);
 		CHECK_RET(ret);
 		/* The double conversion is perhaps a bit wasteful, but it should be rare. */
 		/* LATER: add extra info with explanation?  policy module had an ADDITIONAL
@@ -149,12 +153,12 @@ int rules_defaults_insert(void)
 	knot_dname_t localhost_dname[] = "\x09localhost\0";
 	{ // forward localhost
 		int ret = kr_rule_local_subtree(localhost_dname, KR_RULE_SUB_REDIRECT,
-						RULE_TTL_DEFAULT, KR_RULE_TAGS_ALL);
+						TTL, KR_RULE_TAGS_ALL);
 		CHECK_RET(ret);
 
 		knot_rrset_t rr = {
 			.owner = localhost_dname,
-			.ttl = RULE_TTL_DEFAULT,
+			.ttl = TTL,
 			.rclass = KNOT_CLASS_IN,
 			.rrs = { 0 },
 			.additional = NULL,
@@ -183,7 +187,7 @@ int rules_defaults_insert(void)
 	{ // reverse localhost; LATER: the situation isn't ideal with NXDOMAIN + some exact matches
 		knot_rrset_t rr = {
 			.owner = localhost_dname,
-			.ttl = RULE_TTL_DEFAULT,
+			.ttl = TTL,
 			.type = KNOT_RRTYPE_PTR,
 			.rclass = KNOT_CLASS_IN,
 			.rrs = { 0 },

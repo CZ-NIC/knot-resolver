@@ -11,8 +11,6 @@
 #undef VERBOSE_MSG
 #define VERBOSE_MSG(qry, ...) kr_log_q((qry), RULES,  ## __VA_ARGS__)
 
-#define RULE_TTL_DEFAULT ((uint32_t)10800)
-
 /** Insert all the default rules. in ./defaults.c */
 int rules_defaults_insert(void);
 

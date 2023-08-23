@@ -215,7 +215,7 @@ int kr_rule_zonefile(const struct kr_rule_zonefile_config *c)
 	zs_scanner_t s_storage, *s = &s_storage;
 	/* zs_init(), zs_set_input_file(), zs_set_processing() returns -1 in case of error,
 	 * so don't print error code as it meaningless. */
-	uint32_t ttl = c->ttl ? c->ttl : RULE_TTL_DEFAULT; // 0 would be nonsense
+	uint32_t ttl = c->ttl ? c->ttl : KR_RULE_TTL_DEFAULT; // 0 would be nonsense
 	int ret = zs_init(s, NULL, KNOT_CLASS_IN, ttl);
 	if (ret) {
 		kr_log_error(RULES, "error initializing zone scanner instance, error: %i (%s)\n",

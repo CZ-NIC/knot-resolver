@@ -33,7 +33,6 @@ struct hints_data {
 	bool use_nodata; /**< See hint_use_nodata() description, exposed via lua. */
 	uint32_t ttl;    /**< TTL used for the hints, exposed via lua. */
 };
-static const uint32_t HINTS_TTL_DEFAULT = 5;
 
 /** Useful for returning from module properties. */
 static char * bool2jsonstr(bool val)
@@ -299,7 +298,7 @@ int hints_init(struct kr_module *module)
 	if (!data)
 		return kr_error(ENOMEM);
 	data->use_nodata = true;
-	data->ttl = HINTS_TTL_DEFAULT;
+	data->ttl = KR_RULE_TTL_DEFAULT;
 	module->data = data;
 
 	return kr_ok();
