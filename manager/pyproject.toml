@@ -69,6 +69,7 @@ fixdeps = { shell = "poetry install; npm install; npm update", help = "Install/u
 commit = { shell = "scripts/commit", help = "Invoke every single check before commiting" }
 container = { cmd = "scripts/container.py", help = "Manage containers" }
 kresctl = { script = "knot_resolver_manager.cli.main:main", cwd="${POE_PWD}", help="run kresctl" }
+kresctl-nocwd = { script = "knot_resolver_manager.cli.main:main", help="run kresctl" } # Python <3.8 and poethepoet <0.22.0 compatibility (see also `./poe`)
 clean = """
   rm -rf .coverage
          .mypy_cache
