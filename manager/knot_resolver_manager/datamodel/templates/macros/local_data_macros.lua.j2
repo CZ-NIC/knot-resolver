@@ -17,6 +17,13 @@ hints.root_file('{{ file }}')
 {% endfor %}
 {%- endmacro %}
 
+{%- macro local_data_ttl(ttl) -%}
+{%- if ttl -%}
+{{ ttl.seconds() }}
+{%- else -%}
+{{ 'C.KR_RULE_TTL_DEFAULT' }}
+{%- endif -%}
+{%- endmacro -%}
 
 {% macro local_data_addresses(pairs) -%}
 {%- for name, addresses in pairs.items() -%}
@@ -36,9 +43,7 @@ assert(hints.add_hosts('{{ file }}').result == true)
 
 {% macro local_data_records(input_str, is_rpz, ttl, nodata, tags=none, id='rrs') -%}
 {{ id }} = ffi.new('struct kr_rule_zonefile_config')
-{% if ttl %}
-{{ id }}.ttl = {{ ttl.seconds() }}
-{% endif %}
+{{ id }}.ttl = {{ local_data_ttl(ttl) }}
 {% if tags %}
 {{ id }}.tags = {{ policy_get_tagset(tags) }}
 {% endif %}
@@ -55,16 +60,11 @@ assert(C.kr_rule_zonefile({{ id }})==0)
 {%- endmacro %}
 
 {% macro local_data_subtree_root(root, type, ttl, tags) -%}
-{% if ttl %}
-{%- set get_ttl = ttl.seconds() -%}
-{%- else -%}
-{%- set get_ttl = 'C.KR_RULE_TTL_DEFAULT' -%}
-{% endif %}
 {%- if tags -%}
 {%- set get_tags = policy_get_tagset(tags) -%}
 {%- else -%}
 {%- set get_tags = '0' -%}
 {%- endif -%}
 assert(C.kr_rule_local_subtree(todname('{{ root }}'),
-	C.KR_RULE_SUB_{{ type.upper() }}, {{ get_ttl }}, {{ get_tags }}) == 0)
+	C.KR_RULE_SUB_{{ type.upper() }}, {{ local_data_ttl(ttl) }}, {{ get_tags }}) == 0)
 {%- endmacro %}
