@@ -1,6 +1,7 @@
 import argparse
 import importlib
 import os
+import sys
 
 from knot_resolver_manager.cli.command import install_commands_parsers
 from knot_resolver_manager.cli.kresctl import Kresctl
@@ -59,7 +60,21 @@ def main() -> None:
     parser = create_main_argument_parser()
     install_commands_parsers(parser)
 
-    namespace = parser.parse_args()
+    # TODO: This is broken with unpatched versions of poethepoet, because they drop the `--` pseudo-argument.
+    # Patch submitted at <https://github.com/nat-n/poethepoet/pull/163>.
+    try:
+        pa_index = sys.argv.index("--", 1)
+        argv_to_parse = sys.argv[1:pa_index]
+        argv_extra = sys.argv[(pa_index + 1) :]
+    except ValueError:
+        argv_to_parse = sys.argv[1:]
+        argv_extra = []
+
+    namespace = parser.parse_args(argv_to_parse)
+    if hasattr(namespace, "extra"):
+        raise TypeError("'extra' is already an attribute - this is disallowed for commands")
+    namespace.extra = argv_extra
+
     kresctl = Kresctl(namespace, parser)
     kresctl.execute()
 
