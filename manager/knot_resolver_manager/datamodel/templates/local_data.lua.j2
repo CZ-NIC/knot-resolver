@@ -3,14 +3,6 @@
 
 modules = { 'hints > iterate' }
 
-{# nodata #}
-hints.use_nodata({{ boolean(cfg.local_data.nodata) }})
-
-{# ttl #}
-{% if cfg.local_data.ttl -%}
-hints.ttl({{ cfg.local_data.ttl.seconds() }})
-{%- endif %}
-
 {# root-fallback-addresses #}
 {% if cfg.local_data.root_fallback_addresses -%}
 {{ local_data_root_fallback_addresses(cfg.local_data.root_fallback_addresses) }}
@@ -23,12 +15,12 @@ hints.ttl({{ cfg.local_data.ttl.seconds() }})
 
 {# addresses #}
 {% if cfg.local_data.addresses -%}
-{{ local_data_addresses(cfg.local_data.addresses) }}
+{{ local_data_addresses(cfg.local_data.addresses, cfg.local_data.nodata, cfg.local_data.ttl) }}
 {%- endif %}
 
 {# addresses-files #}
 {% if cfg.local_data.addresses_files -%}
-{{ local_data_addresses_files(cfg.local_data.addresses_files) }}
+{{ local_data_addresses_files(cfg.local_data.addresses_files, cfg.local_data.nodata, cfg.local_data.ttl) }}
 {%- endif %}
 
 {# records #}

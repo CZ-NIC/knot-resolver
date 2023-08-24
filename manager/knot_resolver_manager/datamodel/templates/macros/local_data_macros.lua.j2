@@ -25,18 +25,20 @@ hints.root_file('{{ file }}')
 {%- endif -%}
 {%- endmacro -%}
 
-{% macro local_data_addresses(pairs) -%}
+{% macro local_data_addresses(pairs, nodata, ttl, tags) -%}
 {%- for name, addresses in pairs.items() -%}
 {% for address in addresses %}
-assert(hints.set('{{ name }} {{ address }}').result == true)
+assert(C.kr_rule_local_address('{{ name }}', '{{ address }}',
+	{{ boolean(nodata) }}, {{ local_data_ttl(ttl)}}, {{ policy_get_tagset(tags) }}) == 0)
 {% endfor %}
 {%- endfor -%}
 {%- endmacro %}
 
 
-{% macro local_data_addresses_files(files) -%}
+{% macro local_data_addresses_files(files, nodata, ttl, tags) -%}
 {% for file in files %}
-assert(hints.add_hosts('{{ file }}').result == true)
+assert(C.kr_rule_local_hosts('{{ file }}', {{ boolean(nodata) }},
+	{{ local_data_ttl(ttl)}}, {{ policy_get_tagset(tags) }}) == 0)
 {% endfor %}
 {%- endmacro %}
 
