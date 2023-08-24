@@ -25,7 +25,10 @@ prometheus-client = "*"
 [tool.poetry.group.dev.dependencies]
 poetry = "^1.4.2"
 pyparsing = "^3.0.9"
-poethepoet = "^0.18.1"
+poethepoet = [
+    { version = "^0.18.1", python = "^3.7" },
+    { version = "^0.22.0", python = "^3.8" }
+]
 debugpy = "^1.6.7"
 
 [tool.poetry.group.test.dependencies]
@@ -65,7 +68,8 @@ format = { shell = "black knot_resolver_manager/ tests/ scripts/ build.py; isort
 fixdeps = { shell = "poetry install; npm install; npm update", help = "Install/update dependencies according to configuration files"}
 commit = { shell = "scripts/commit", help = "Invoke every single check before commiting" }
 container = { cmd = "scripts/container.py", help = "Manage containers" }
-kresctl = { script = "knot_resolver_manager.cli.main:main", help="run kresctl" }
+kresctl = { script = "knot_resolver_manager.cli.main:main", cwd="${POE_PWD}", help="run kresctl" }
+kresctl-nocwd = { script = "knot_resolver_manager.cli.main:main", help="run kresctl" } # Python <3.8 and poethepoet <0.22.0 compatibility (see also `./poe`)
 clean = """
   rm -rf .coverage
          .mypy_cache
