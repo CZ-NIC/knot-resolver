@@ -14,46 +14,37 @@ from knot_resolver_manager.datamodel.types import (
 from knot_resolver_manager.utils.modeling import ConfigSchema
 
 
-class SubtreeSchema(ConfigSchema):
+class RuleSchema(ConfigSchema):
     """
-    Local data and configuration of subtree.
+    Local data rule configuration.
 
     ---
-    type: Type of the subtree.
+    name: Hostname(s).
+    address: Address(es) to pair with hostname(s).
+    file: Path to file(s) with hostname and IP address(es) pairs in '/etc/hosts' like format.
+    subtree: Type of subtree.
     tags: Tags to link with other policy rules.
-    ttl: Default TTL value used for added local subtree.
-    nodata: Use NODATA synthesis. NODATA will be synthesised for matching name, but mismatching type(e.g. AAAA query when only A exists).
-    roots: Subtree roots.
+    ttl: Optional, TTL value used for these answers.
+    nodata: Optional, use NODATA synthesis. NODATA will be synthesised for matching name, but mismatching type(e.g. AAAA query when only A exists).
     """
 
-    # addresses: Subtree addresses.
-    # roots_file: Subtree roots from given file.
-    # roots_url: Subtree roots form given URL.
-    # refresh: Refresh time to update data from 'roots-file' or 'roots-url'.
-
-    type: Literal["empty", "nxdomain", "redirect"]
+    name: Optional[ListOrItem[DomainName]] = None
+    address: Optional[ListOrItem[IPAddress]] = None
+    subtree: Optional[Literal["empty", "nxdomain", "redirect"]] = None
+    file: Optional[ListOrItem[File]] = None
     tags: Optional[List[IDPattern]] = None
     ttl: Optional[TimeUnit] = None
-    nodata: bool = True
-    roots: Optional[List[DomainName]] = None
+    nodata: Optional[bool] = None
 
-    # # These aren't implemented yet.
-    # addresses: Optional[List[IPAddress]] = None
-    # roots_file: Optional[File] = None
-    # roots_url: Optional[EscapedStr] = None
-    # refresh: Optional[TimeUnit] = None
-
-    # def _validate(self) -> None:
-    #    options_sum = sum([bool(self.roots), bool(self.roots_file), bool(self.roots_url)])
-    #    if options_sum > 1:
-    #        raise ValueError("only one of, 'roots', 'roots-file' or 'roots-url' can be configured")
-    #    elif options_sum < 1:
-    #        raise ValueError("one of, 'roots', 'roots-file' or 'roots-url' must be configured")
-    #    if self.refresh and not (self.roots_file or self.roots_url):
-    #        raise ValueError("'refresh' can be only configured with 'roots-file' or 'roots-url'")
     def _validate(self) -> None:
-        if self.roots is None:
-            raise ValueError("'roots' is missing")
+        options_sum = sum([bool(self.address), bool(self.subtree), bool(self.file)])
+        if options_sum > 1:
+            raise ValueError("only one of 'address', 'subtree' or 'file' can be configured")
+        elif options_sum < 1:
+            raise ValueError("one of 'address', 'subtree' or 'file' must be configured")
+
+        if bool(self.file) == bool(self.name):
+            raise ValueError("one of 'file' or 'name' must be configured")
 
 
 class RPZSchema(ConfigSchema):
@@ -81,7 +72,7 @@ class LocalDataSchema(ConfigSchema):
     addresses: Direct addition of hostname and IP addresses pairs.
     addresses_files: Direct addition of hostname and IP addresses pairs from files in '/etc/hosts' like format.
     records: Direct addition of records in DNS zone file format.
-    subtrees: Direct addition of subtrees.
+    rules: Local data rules.
     rpz: List of Response Policy Zones and its configuration.
     """
 
@@ -92,5 +83,5 @@ class LocalDataSchema(ConfigSchema):
     addresses: Optional[Dict[DomainName, ListOrItem[IPAddress]]] = None
     addresses_files: Optional[List[File]] = None
     records: Optional[EscapedStr] = None
-    subtrees: Optional[List[SubtreeSchema]] = None
+    rules: Optional[List[RuleSchema]] = None
     rpz: Optional[List[RPZSchema]] = None

@@ -1,4 +1,4 @@
-{% from 'macros/local_data_macros.lua.j2' import local_data_subtree_root, local_data_records, local_data_root_fallback_addresses, local_data_root_fallback_addresses_files, local_data_addresses, local_data_addresses_files %}
+{% from 'macros/local_data_macros.lua.j2' import local_data_rules, local_data_records, local_data_root_fallback_addresses, local_data_root_fallback_addresses_files, local_data_addresses, local_data_addresses_files %}
 {% from 'macros/common_macros.lua.j2' import boolean %}
 
 modules = { 'hints > iterate' }
@@ -28,19 +28,9 @@ modules = { 'hints > iterate' }
 {{ local_data_records(cfg.local_data.records, false, cfg.local_data.ttl, cfg.local_data.nodata) }}
 {%- endif %}
 
-{# subtrees #}
-{% if cfg.local_data.subtrees -%}
-{% for subtree in cfg.local_data.subtrees %}
-{% if subtree.roots -%}
-{% for root in subtree.roots %}
-{{ local_data_subtree_root(root, subtree.type, subtree.ttl or cfg.local_data.ttl, subtree.tags) }}
-{% endfor %}
-{%- elif subtree.roots_file -%}
-{# TODO: not implemented yet #}
-{%- elif subtree.roots_url -%}
-{# TODO: not implemented yet #}
-{%- endif %}
-{% endfor %}
+{# rules #}
+{% if cfg.local_data.rules -%}
+{{ local_data_rules(cfg.local_data.rules, cfg.local_data.nodata, cfg.local_data.ttl) }}
 {%- endif %}
 
 {# rpz #}

@@ -25,20 +25,31 @@ hints.root_file('{{ file }}')
 {%- endif -%}
 {%- endmacro -%}
 
-{% macro local_data_addresses(pairs, nodata, ttl, tags) -%}
-{%- for name, addresses in pairs.items() -%}
-{% for address in addresses %}
+
+{% macro kr_rule_local_address(name, address, nodata, ttl, tags=none) -%}
 assert(C.kr_rule_local_address('{{ name }}', '{{ address }}',
-	{{ boolean(nodata) }}, {{ local_data_ttl(ttl)}}, {{ policy_get_tagset(tags) }}) == 0)
+    {{ boolean(nodata) }}, {{ local_data_ttl(ttl)}}, {{ policy_get_tagset(tags) }}) == 0)
+{%- endmacro -%}
+
+
+{% macro local_data_addresses(pairs, nodata, ttl) -%}
+{% for name, addresses in pairs.items() %}
+{% for address in obj %}
+{{ kr_rule_local_address(name, address, nodata, ttl) }}
 {% endfor %}
-{%- endfor -%}
+{% endfor%}
+{%- endmacro %}
+
+
+{% macro kr_rule_local_hosts(file, nodata, ttl, tags=none) -%}
+assert(C.kr_rule_local_hosts('{{ file }}', {{ boolean(nodata) }},
+    {{ local_data_ttl(ttl)}}, {{ policy_get_tagset(tags) }}) == 0)
 {%- endmacro %}
 
 
 {% macro local_data_addresses_files(files, nodata, ttl, tags) -%}
 {% for file in files %}
-assert(C.kr_rule_local_hosts('{{ file }}', {{ boolean(nodata) }},
-	{{ local_data_ttl(ttl)}}, {{ policy_get_tagset(tags) }}) == 0)
+{{ kr_rule_local_hosts(file, nodata, ttl, tags) }}
 {% endfor %}
 {%- endmacro %}
 
@@ -59,7 +70,29 @@ assert(C.kr_rule_local_hosts('{{ file }}', {{ boolean(nodata) }},
 assert(C.kr_rule_zonefile({{ id }})==0)
 {%- endmacro %}
 
-{% macro local_data_subtree_root(root, type, ttl, tags) -%}
-assert(C.kr_rule_local_subtree(todname('{{ root }}'),
-	C.KR_RULE_SUB_{{ type.upper() }}, {{ local_data_ttl(ttl) }}, {{ policy_get_tagset(tags) }}) == 0)
+
+{% macro kr_rule_local_subtree(name, type, ttl, tags=none) -%}
+assert(C.kr_rule_local_subtree(todname('{{ name }}'),
+    C.KR_RULE_SUB_{{ type.upper() }}, {{ local_data_ttl(ttl) }}, {{ policy_get_tagset(tags) }}) == 0)
+{%- endmacro %}
+
+
+{% macro local_data_rules(items, nodata, ttl) -%}
+{% for item in items %}
+{% if item.name %}
+{% for name in item.name %}
+{% if item.address %}
+{% for address in item.address %}
+{{ kr_rule_local_address(name, address, nodata if item.nodata is none else item.nodata, item.ttl or ttl, item.tags) }}
+{% endfor %}
+{% elif item.subtree %}
+{{ kr_rule_local_subtree(name, item.subtree, item.ttl or ttl, item.tags) }}
+{% endif %}
+{% endfor %}
+{% elif item.file %}
+{% for file in item.file %}
+{{ kr_rule_local_hosts(file, nodata if item.nodata is none else item.nodata, item.ttl or ttl, item.tags) }}
+{% endfor %}
+{% endif %}
+{% endfor %}
 {%- endmacro %}

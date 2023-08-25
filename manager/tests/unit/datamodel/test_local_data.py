@@ -3,32 +3,33 @@ from typing import Any
 import pytest
 from pytest import raises
 
-from knot_resolver_manager.datamodel.local_data_schema import LocalDataSchema, SubtreeSchema
+from knot_resolver_manager.datamodel.local_data_schema import RuleSchema
 from knot_resolver_manager.utils.modeling.exceptions import DataValidationError
 
 
 @pytest.mark.parametrize(
     "val",
     [
-        {"type": "empty", "roots": ["sub2.example.org"]},
-        {"type": "nxdomain", "roots": ["sub3.example.org", "sub5.example.net."], "ttl": "1h"},
-        # {"type": "empty", "roots-url": "https://example.org/blocklist.txt", "refresh": "1d"},
-        # {"type": "nxdomain", "roots-file": "/etc/hosts"},  # must be an existing file or validation will fail
-        {"type": "redirect", "roots": ["sub4.example.org"]},
+        {"name": ["sub2.example.org"], "subtree": "empty"},
+        {"name": ["sub3.example.org", "sub5.example.net."], "subtree": "nxdomain", "ttl": "1h"},
+        {"name": ["sub4.example.org"], "subtree": "redirect"},
+        {"name": ["sub5.example.org"], "address": ["127.0.0.1"]},
+        {"file": "/etc/hosts", "ttl": "20m", "nodata": True},
     ],
 )
 def test_subtree_valid(val: Any):
-    SubtreeSchema(val)
+    RuleSchema(val)
 
 
 @pytest.mark.parametrize(
     "val",
     [
-        {"type": "empty"},
-        {"type": "empty", "roots": ["sub2.example.org"], "roots-url": "https://example.org/blocklist.txt"},
-        {"type": "redirect", "roots": ["sub4.example.org"], "refresh": "1d"},
+        {"subtree": "empty"},
+        {"name": ["sub2.example.org"], "file": "/etc/hosts"},
+        {"name": ["sub4.example.org"], "address": ["127.0.0.1"], "subtree": "empty"},
+        {"name": ["sub4.example.org"], "subtree": "redirect", "file": "/etc/hosts"},
     ],
 )
 def test_subtree_invalid(val: Any):
     with raises(DataValidationError):
-        SubtreeSchema(val)
+        RuleSchema(val)
