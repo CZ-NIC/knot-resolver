@@ -85,7 +85,8 @@ assert(C.kr_rule_local_subtree(todname('{{ name }}'),
 {% for address in item.address %}
 {{ kr_rule_local_address(name, address, nodata if item.nodata is none else item.nodata, item.ttl or ttl, item.tags) }}
 {% endfor %}
-{% elif item.subtree %}
+{% endif %}
+{% if item.subtree %}
 {{ kr_rule_local_subtree(name, item.subtree, item.ttl or ttl, item.tags) }}
 {% endif %}
 {% endfor %}

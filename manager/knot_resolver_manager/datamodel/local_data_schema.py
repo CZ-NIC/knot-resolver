@@ -38,13 +38,18 @@ class RuleSchema(ConfigSchema):
 
     def _validate(self) -> None:
         options_sum = sum([bool(self.address), bool(self.subtree), bool(self.file)])
-        if options_sum > 1:
+        if options_sum == 2 and bool(self.address) and self.subtree in {"empty", "redirect"}:
+            pass # these combinations still make sense
+        elif options_sum > 1:
             raise ValueError("only one of 'address', 'subtree' or 'file' can be configured")
         elif options_sum < 1:
             raise ValueError("one of 'address', 'subtree' or 'file' must be configured")
 
         if bool(self.file) == bool(self.name):
             raise ValueError("one of 'file' or 'name' must be configured")
+
+        if bool(self.nodata) and bool(self.subtree) and not bool(self.address):
+            raise ValueError("'nodata' defined but unused with 'subtree'")
 
 
 class RPZSchema(ConfigSchema):
