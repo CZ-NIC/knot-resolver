@@ -34,7 +34,7 @@ It provides various input formats described in following subsections.
 
    .. option:: addresses-files: <list of paths>
 
-      Optional direct addition of hostname and IP address pairs from files in ``/etc/hosts`` like format.
+      Optional, direct addition of hostname and IP address pairs from files in ``/etc/hosts`` like format.
 
    .. code-block:: yaml
 
@@ -95,20 +95,73 @@ It provides various input formats described in following subsections.
    Advanced rules
    --------------
 
-   .. option:: subtrees: <list>
+   .. option:: rules: <list>
 
-      This allows defining more complex sets of rules.
-      It allows blocking whole subtrees.
+      This allows defining more complex sets of rules for records and subtrees.
+      For example, it allows blocking whole subtrees.
 
-      .. future: or use tags on ``addresses`` and ``records` rules
+      .. option:: name: <domain name or list>
 
-      .. option:: type: empty|nxdomain|redirect
+         Optional, hostname(s)/subtree(s) to which the rule applies.
 
-         Type of this subtree:
+      .. option:: address: <address or list>
+
+         Optional, IP address(es) to pair with hostname(s).
+
+         .. code-block:: yaml
+
+            local-data:
+              rules:
+                # hostname and IP address pair
+                - name: a3.example.com
+                  address: 2001:db8::3
+                  tags: [example]
+                  ttl: 10m
+
+      .. option:: subtree: empty|nxdomain|redirect
+
+         Optional, type of this subtree:
 
           - ``empty`` is an empty zone with just SOA and NS at the top
           - ``nxdomain`` replies ``NXDOMAIN`` everywhere, though in some cases that looks slightly weird
           - ``redirect`` answers with local-data records from the top of the zone, inside the whole virtual subtree
+
+         .. code-block:: yaml
+
+            local-data:
+              rules:
+                - name: [ evil.example.org, malware.example.net ]
+                  subtree: empty
+                  tags: [ malware ]
+                - name: a5.example
+                  subtree: redirect
+                  address: 2001:db8::5
+
+      .. option:: file: <path or list>
+
+         Optional, direct addition of hostname and IP address pairs from files in ``/etc/hosts`` like format.
+
+         .. code-block:: yaml
+
+            local-data:
+              rules:
+                - file: custom.hosts
+                  tags: [ malware ]
+                  ttl: 20m
+                  nodata: false
+
+      .. option:: records: <zonefile format string>
+
+         Optional, direct addition of records in DNS zonefile format.
+         The zonefile syntax is more flexible, e.g. it can define any type of records.
+
+         .. code-block:: yaml
+
+            local-data:
+              rules:
+                - records: |
+                    www.google.com.  CNAME  forcesafesearch.google.com.
+                  tags: [ adult ]
 
       .. option:: tags: <list of tags>
 
@@ -117,6 +170,11 @@ It provides various input formats described in following subsections.
       .. option:: ttl: <time s|m|h|d>
 
          Optional, TTL of answers from this rule.  Uses ``/local-data/ttl`` if unspecified.
+
+      .. option:: nodata: true|false
+
+         Optional, enabling NODATA synthesis, false if disabling. Uses ``/local-data/nodata`` if unspecified.
+         If set to true, an empty answer will be synthesised for matching name but mismatching type (e.g. AAAA query when only A hint exists).
 
    .. future
       .. option:: addresses: <list of addresses>
@@ -140,17 +198,3 @@ It provides various input formats described in following subsections.
       .. option:: refresh: <time ms|s|m|h|d>
 
          Refresh time to update data from :option:`roots-file <roots-file: <path>>` or :option:`roots-url <roots-url: <url>>`.
-
-
-   .. code-block:: yaml
-
-      local-data:
-        subtrees:
-          - type: empty
-            tags: [ malware ]
-            roots: [ evil.example.org, malware.example.net ]
-
-.. future
-      - records: |
-          www.google.com.  CNAME  forcesafesearch.google.com.
-        tags: [ adult ]
