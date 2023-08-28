@@ -12,7 +12,10 @@ class ListOrItem(BaseGenericTypeWrapper[Union[List[T], T]]):
     def __init__(self, source_value: Any, object_path: str = "/") -> None:  # pylint: disable=unused-argument
         super().__init__(source_value)
         self._value_orig: Union[List[T], T] = source_value
+
         self._list: List[T] = source_value if isinstance(source_value, list) else [source_value]
+        if len(self) == 0:
+            raise ValueError("empty list is not allowed")
 
     def __getitem__(self, index: Any) -> T:
         return self._list[index]
@@ -28,6 +31,9 @@ class ListOrItem(BaseGenericTypeWrapper[Union[List[T], T]]):
 
     def __eq__(self, o: object) -> bool:
         return isinstance(o, ListOrItem) and o._value_orig == self._value_orig
+
+    def __len__(self) -> int:
+        return len(self._list)
 
     def serialize(self) -> Union[List[T], T]:
         return self._value_orig
