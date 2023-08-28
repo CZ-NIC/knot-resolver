@@ -548,27 +548,24 @@ int kr_rule_local_data_ins(const knot_rrset_t *rrs, const knot_rdataset_t *sig_r
 int local_data_ins(knot_db_val_t key, const knot_rrset_t *rrs,
 			const knot_rdataset_t *sig_rds, kr_rule_tags_t tags)
 {
-	// Allocate the data in DB.
+	// Prepare the data into a temporary buffer.
 	const int rr_ssize = rdataset_dematerialize_size(&rrs->rrs);
-	const int to_alloc = sizeof(tags) + sizeof(rrs->ttl) + rr_ssize
-			+ rdataset_dematerialize_size(sig_rds);
-	knot_db_val_t val = { .data = NULL, .len = to_alloc };
-	int ret = ruledb_op(write, &key, &val, 1);
-	if (ret) {
-		// ENOSPC seems to be the only expectable error.
-		kr_assert(ret == kr_error(ENOSPC));
-		return kr_error(ret);
-	}
+	const int val_len = sizeof(tags) + sizeof(rrs->ttl) + rr_ssize
+				+ rdataset_dematerialize_size(sig_rds);
+	uint8_t buf[val_len], *data = buf;
+	memcpy(data, &tags, sizeof(tags));
+	data += sizeof(tags);
+	memcpy(data, &rrs->ttl, sizeof(rrs->ttl));
+	data += sizeof(rrs->ttl);
+	rdataset_dematerialize(&rrs->rrs, data);
+	data += rr_ssize;
+	rdataset_dematerialize(sig_rds, data);
 
-	// Write all the data.
-	memcpy(val.data, &tags, sizeof(tags));
-	val.data += sizeof(tags);
-	memcpy(val.data, &rrs->ttl, sizeof(rrs->ttl));
-	val.data += sizeof(rrs->ttl);
-	rdataset_dematerialize(&rrs->rrs, val.data);
-	val.data += rr_ssize;
-	rdataset_dematerialize(sig_rds, val.data);
-	return kr_ok();
+	knot_db_val_t val = { .data = buf, .len = val_len };
+	int ret = ruledb_op(write, &key, &val, 1);
+	// ENOSPC seems to be the only expectable error.
+	kr_assert(ret == 0 || ret == kr_error(ENOSPC));
+	return ret;
 }
 int kr_rule_local_data_del(const knot_rrset_t *rrs, kr_rule_tags_t tags)
 {
@@ -794,28 +791,25 @@ int kr_rule_local_subtree(const knot_dname_t *apex, enum kr_rule_sub_t type,
 	uint8_t key_data[KEY_MAXLEN];
 	knot_db_val_t key = zla_key(apex, key_data);
 
-	knot_db_val_t val = {
-		.data = NULL,
-		.len = sizeof(tags) + sizeof(ztype),
-	};
+	// Prepare the data into a temporary buffer.
 	const bool has_ttl = ttl != KR_RULE_TTL_DEFAULT;
-	if (has_ttl)
-		val.len += sizeof(ttl);
-	int ret = ruledb_op(write, &key, &val, 1);
-	if (ret) {
-		// ENOSPC seems to be the only expectable error.
-		kr_assert(ret == kr_error(ENOSPC));
-		return kr_error(ret);
-	}
-	memcpy(val.data, &tags, sizeof(tags));
-	val.data += sizeof(tags);
-	memcpy(val.data, &ztype, sizeof(ztype));
-	val.data += sizeof(ztype);
+	const int val_len = sizeof(tags) + sizeof(ztype) + (has_ttl ? sizeof(ttl) : 0);
+	uint8_t buf[val_len], *data = buf;
+	memcpy(data, &tags, sizeof(tags));
+	data += sizeof(tags);
+	memcpy(data, &ztype, sizeof(ztype));
+	data += sizeof(ztype);
 	if (has_ttl) {
-		memcpy(val.data, &ttl, sizeof(ttl));
-		val.data += sizeof(ttl);
+		memcpy(data, &ttl, sizeof(ttl));
+		data += sizeof(ttl);
 	}
-	return kr_ok();
+	kr_require(data == buf + val_len);
+
+	knot_db_val_t val = { .data = buf, .len = val_len };
+	int ret = ruledb_op(write, &key, &val, 1);
+	// ENOSPC seems to be the only expectable error.
+	kr_assert(ret == 0 || ret == kr_error(ENOSPC));
+	return ret;
 }
 
 

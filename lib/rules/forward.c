@@ -143,27 +143,28 @@ int kr_rule_forward(const knot_dname_t *apex, kr_rule_fwd_flags_t flags,
 	uint8_t key_data[KEY_MAXLEN];
 	knot_db_val_t key = zla_key(apex, key_data);
 
-	const size_t targets_bytes = count * sizeof(union kr_sockaddr);
-	knot_db_val_t val = {
-		.data = NULL,
-		.len = sizeof(tags) + sizeof(ztype) + sizeof(flags) + targets_bytes,
-	};
-	int ret = ruledb_op(write, &key, &val, 1);
-	if (kr_fails_assert(ret >= 0))
-		return kr_error(ret);
-	memcpy(val.data, &tags, sizeof(tags));
-	val.data += sizeof(tags);
-	memcpy(val.data, &ztype, sizeof(ztype));
-	val.data += sizeof(ztype);
-	memcpy(val.data, &flags, sizeof(flags));
-	val.data += sizeof(flags);
+	// Prepare the data into a temporary buffer.
+	const int targets_len = count * sizeof(union kr_sockaddr);
+	const int val_len = sizeof(tags) + sizeof(ztype) + sizeof(flags) + targets_len;
+	uint8_t buf[val_len], *data = buf;
+	memcpy(data, &tags, sizeof(tags));
+	data += sizeof(tags);
+	memcpy(data, &ztype, sizeof(ztype));
+	data += sizeof(ztype);
+	memcpy(data, &flags, sizeof(flags));
+	data += sizeof(flags);
+	// targets[i] may be shorter than union kr_sockaddr, so we zero it in advance
+	memset(data, 0, targets_len);
 	for (int i = 0; i < count; ++i) {
-		// targets[i] may be shorter than union kr_sockaddr, so we zero-pad
 		// LATER: for is_auth we really drop anything but address (e.g. port!=53)
-		union kr_sockaddr a = { 0 };
-		memcpy(&a, targets[i], kr_sockaddr_len(targets[i]));
-		memcpy(val.data, &a, sizeof(a));
-		val.data += sizeof(a);
+		memcpy(data, targets[i], kr_sockaddr_len(targets[i]));
+		data += sizeof(union kr_sockaddr);
 	}
-	return kr_ok();
+	kr_require(data == buf + val_len);
+
+	knot_db_val_t val = { .data = buf, .len = val_len };
+	int ret = ruledb_op(write, &key, &val, 1);
+	// ENOSPC seems to be the only expectable error.
+	kr_assert(ret == 0 || ret == kr_error(ENOSPC));
+	return ret;
 }
