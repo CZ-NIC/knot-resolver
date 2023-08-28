@@ -64,7 +64,7 @@ static int tag_names_default(void)
 	kr_rule_tags_t empty = 0;
 	val.data = &empty;
 	val.len = sizeof(empty);
-	return ruledb_op(write, &key, &val, 1);
+	return ruledb_op(write, &key, &val, 1); // we got ENOENT, so simple write is OK
 }
 
 int kr_rule_tag_add(const char *tag, kr_rule_tags_t *tagset)
@@ -117,17 +117,19 @@ int kr_rule_tag_add(const char *tag, kr_rule_tags_t *tagset)
 	const kr_rule_tags_t tag_new = 1 << ix;
 	kr_require((tag_new & bmp) == 0);
 
-	// Update the mappings
+	// Update the bitmap.  ATM ruledb does not overwrite, so we `remove` before `write`.
 	bmp |= tag_new;
 	val.data = &bmp;
 	val.len = sizeof(bmp);
+	ret = ruledb_op(remove, &key_tb, 1);  kr_assert(ret == 1);
 	ret = ruledb_op(write, &key_tb, &val, 1);
 	if (ret != 0)
 		return kr_error(ret);
+	// Record this tag's mapping.
 	uint8_t ix_8t = ix;
 	val.data = &ix_8t;
 	val.len = sizeof(ix_8t);
-	ret = ruledb_op(write, &key, &val, 1); // key remained correct
+	ret = ruledb_op(write, &key, &val, 1); // key remained correct since ENOENT
 	if (ret != 0)
 		return kr_error(ret);
 	*tagset |= tag_new;
@@ -180,6 +182,7 @@ int kr_rules_init(const char *path, size_t maxsize)
 	uint8_t key_rs[] = "\0rulesets";
 	knot_db_val_t key = { .data = key_rs, .len = sizeof(key_rs) };
 	knot_db_val_t rulesets = { .data = &RULESET_DEFAULT, .len = strlen(RULESET_DEFAULT) + 1 };
+	ret = ruledb_op(remove, &key, 1);  kr_assert(ret == 0 || ret == 1);
 	ret = ruledb_op(write, &key, &rulesets, 1);
 	if (ret == 0) return kr_ok();
 failure:
@@ -562,7 +565,7 @@ int local_data_ins(knot_db_val_t key, const knot_rrset_t *rrs,
 	rdataset_dematerialize(sig_rds, data);
 
 	knot_db_val_t val = { .data = buf, .len = val_len };
-	int ret = ruledb_op(write, &key, &val, 1);
+	int ret = ruledb_op(write, &key, &val, 1); // TODO: overwriting on ==tags?
 	// ENOSPC seems to be the only expectable error.
 	kr_assert(ret == 0 || ret == kr_error(ENOSPC));
 	return ret;
@@ -583,6 +586,7 @@ int kr_rule_local_data_merge(const knot_rrset_t *rrs, const kr_rule_tags_t tags)
 	knot_db_val_t val;
 	// Transaction: we assume that we're in a RW transaction already,
 	// so that here we already "have a lock" on the last version.
+	// FIXME: iterate over multiple tags, once iterator supports RW TXN
 	int ret = ruledb_op(read, &key, &val, 1);
 	if (abs(ret) == abs(ENOENT))
 		goto fallback;
@@ -806,7 +810,7 @@ int kr_rule_local_subtree(const knot_dname_t *apex, enum kr_rule_sub_t type,
 	kr_require(data == buf + val_len);
 
 	knot_db_val_t val = { .data = buf, .len = val_len };
-	int ret = ruledb_op(write, &key, &val, 1);
+	int ret = ruledb_op(write, &key, &val, 1); // TODO: overwriting on ==tags?
 	// ENOSPC seems to be the only expectable error.
 	kr_assert(ret == 0 || ret == kr_error(ENOSPC));
 	return ret;
@@ -898,11 +902,12 @@ int kr_view_insert_action(const char *subnet, const char *action)
 		memcpy(key.data, RULESET_DEFAULT, rsp_len);
 	}
 
-	// Insert & commit.
+	// Insert.  We overwrite, as subnet is the only condition so far and that's in key.
 	knot_db_val_t val = {
 		.data = (void *)/*const-cast*/action,
 		.len = strlen(action),
 	};
+	int ret = ruledb_op(remove, &key, 1);  kr_assert(ret == 0 || ret == 1);
 	return ruledb_op(write, &key, &val, 1);
 }
 

@@ -162,8 +162,12 @@ int kr_rule_forward(const knot_dname_t *apex, kr_rule_fwd_flags_t flags,
 	}
 	kr_require(data == buf + val_len);
 
+	// We don't allow combining forwarding rule with anything else
+	// on the same apex, including another forwarding rule (at least not yet).
+	int ret = ruledb_op(remove, &key, 1);
+	kr_assert(ret == 0 || ret == 1);
 	knot_db_val_t val = { .data = buf, .len = val_len };
-	int ret = ruledb_op(write, &key, &val, 1);
+	ret = ruledb_op(write, &key, &val, 1);
 	// ENOSPC seems to be the only expectable error.
 	kr_assert(ret == 0 || ret == kr_error(ENOSPC));
 	return ret;

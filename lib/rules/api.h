@@ -68,10 +68,11 @@ const uint32_t KR_RULE_TTL_DEFAULT;
 /* APIs to modify the rule DB.
  *
  * FIXME:
+ *  - overwriting semantics; often even the API docs is wrong here ATM
  *  - a way to read/modify a rule?
  */
 
-/** Insert/overwrite a local data rule.
+/** Add a local data rule.
  *
  * Into the default rule-set ATM.
  * Special NODATA case: use a CNAME type with zero records (TTL matters). */
@@ -80,7 +81,8 @@ int kr_rule_local_data_ins(const knot_rrset_t *rrs, const knot_rdataset_t *sig_r
 				kr_rule_tags_t tags);
 /** Merge RRs into a local data rule.
  *
- * - If tags don't match, overwrite the data and return kr_error(EEXIST).
+ * - FIXME: with multiple tags variants for the same name-type pair,
+ *     you typically end up with a single RR per RRset
  * - RRSIGs get dropped, if any were attached.
  * - We assume that this is called with a RW transaction open already,
  *   which is always true in normal usage (long RW txn covering whole config).
