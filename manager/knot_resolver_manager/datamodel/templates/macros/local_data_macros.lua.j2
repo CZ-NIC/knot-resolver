@@ -94,6 +94,8 @@ assert(C.kr_rule_local_subtree(todname('{{ name }}'),
 {% for file in item.file %}
 {{ kr_rule_local_hosts(file, nodata if item.nodata is none else item.nodata, item.ttl or ttl, item.tags) }}
 {% endfor %}
+{% elif item.records %}
+{{ local_data_records(item.records, false, item.ttl or ttl, nodata if item.nodata is none else item.nodata, tags) }}
 {% endif %}
 {% endfor %}
 {%- endmacro %}

@@ -16,37 +16,40 @@ from knot_resolver_manager.utils.modeling import ConfigSchema
 
 class RuleSchema(ConfigSchema):
     """
-    Local data rule configuration.
+    Local data advanced rule configuration.
 
     ---
     name: Hostname(s).
+    subtree: Type of subtree.
     address: Address(es) to pair with hostname(s).
     file: Path to file(s) with hostname and IP address(es) pairs in '/etc/hosts' like format.
-    subtree: Type of subtree.
+    records: Direct addition of records in DNS zone file format.
     tags: Tags to link with other policy rules.
     ttl: Optional, TTL value used for these answers.
     nodata: Optional, use NODATA synthesis. NODATA will be synthesised for matching name, but mismatching type(e.g. AAAA query when only A exists).
     """
 
     name: Optional[ListOrItem[DomainName]] = None
-    address: Optional[ListOrItem[IPAddress]] = None
     subtree: Optional[Literal["empty", "nxdomain", "redirect"]] = None
+    address: Optional[ListOrItem[IPAddress]] = None
     file: Optional[ListOrItem[File]] = None
+    records: Optional[EscapedStr] = None
     tags: Optional[List[IDPattern]] = None
     ttl: Optional[TimeUnit] = None
     nodata: Optional[bool] = None
 
     def _validate(self) -> None:
-        options_sum = sum([bool(self.address), bool(self.subtree), bool(self.file)])
+        options_sum = sum([bool(self.address), bool(self.subtree), bool(self.file), bool(self.records)])
         if options_sum == 2 and bool(self.address) and self.subtree in {"empty", "redirect"}:
-            pass # these combinations still make sense
+            pass  # these combinations still make sense
         elif options_sum > 1:
             raise ValueError("only one of 'address', 'subtree' or 'file' can be configured")
         elif options_sum < 1:
-            raise ValueError("one of 'address', 'subtree' or 'file' must be configured")
+            raise ValueError("one of 'address', 'subtree', 'file' or 'records' must be configured")
 
-        if bool(self.file) == bool(self.name):
-            raise ValueError("one of 'file' or 'name' must be configured")
+        options_sum2 = sum([bool(self.name), bool(self.file), bool(self.records)])
+        if options_sum2 != 1:
+            raise ValueError("one of 'name', 'file or 'records' must be configured")
 
         if bool(self.nodata) and bool(self.subtree) and not bool(self.address):
             raise ValueError("'nodata' defined but unused with 'subtree'")
