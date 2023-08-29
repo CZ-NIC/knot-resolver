@@ -644,10 +644,13 @@ pkg:alma-9:
 #  allow_failure: true  # SUSE is always special
 # }}}
 
+# docs: {{{
 pages:
   image: $CI_REGISTRY/packaging/apkg/lxc/fedora-36
   stage: deploy
   needs: []
+  variables:
+    DOCS_ENV_NAME: Docs/Development/$CI_COMMIT_REF_NAME/$CI_COMMIT_SHORT_SHA
   script:
     - git submodule update --init --recursive
     - apkg build-dep -y
@@ -657,6 +660,10 @@ pages:
     - meson build_doc -Ddoc=enabled
     - ninja -C build_doc doc
     - mv doc/html public
+  environment:
+    name: $DOCS_ENV_NAME
+    url: https://$CI_PROJECT_NAMESPACE.pages.nic.cz/-/knot-resolver/-/jobs/$CI_JOB_ID/artifacts/public/index.html
   artifacts:
     paths:
       - public
+# }}}
