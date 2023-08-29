@@ -16,8 +16,6 @@ variables:
   MESON_TEST: meson test -C build_ci* -t 4 --print-errorlogs
   PREFIX: $CI_PROJECT_DIR/.local
   EMAIL: 'ci@nic'
-  RELEASE_DOCS_ENV_NAME:
-    description: "Name of the release environment. This will usually be the Knot Resolver version number."
 
 image: $CI_REGISTRY/knot/knot-resolver/ci/debian-11:knot-$KNOT_VERSION
 default:
@@ -685,6 +683,11 @@ docs:release:
   needs:
     - docs:develop
   when: manual
+  only:
+    refs:
+      - tags
+  variables:
+    RELEASE_DOCS_ENV_NAME: $CI_COMMIT_TAG
   script: echo "Propagating artifacts into release environment"
   artifacts:
     paths:
