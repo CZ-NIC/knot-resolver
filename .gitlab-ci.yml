@@ -645,12 +645,18 @@ pkg:alma-9:
 # }}}
 
 # docs: {{{
-pages:
+
+# This job deploys the Knot Resolver documentation into a development
+# environment, which may be found at
+# <https://gitlab.nic.cz/knot/knot-resolver/-/environments/folders/docs-develop>.
+# The actual URL is found in the `environment.url` property, where
+# $CI_PROJECT_NAMESPACE will be "knot" on the upstream GitLab.
+docs:develop:
   image: $CI_REGISTRY/packaging/apkg/lxc/fedora-36
   stage: deploy
   needs: []
   variables:
-    DOCS_ENV_NAME: Docs/Development/$CI_COMMIT_REF_NAME/$CI_COMMIT_SHORT_SHA
+    DOCS_ENV_NAME: $CI_COMMIT_REF_NAME-$CI_COMMIT_SHORT_SHA
   script:
     - git submodule update --init --recursive
     - apkg build-dep -y
@@ -659,11 +665,40 @@ pages:
     - pip3 install sphinx_rtd_theme
     - meson build_doc -Ddoc=enabled
     - ninja -C build_doc doc
-    - mv doc/html public
-  environment:
-    name: $DOCS_ENV_NAME
-    url: https://$CI_PROJECT_NAMESPACE.pages.nic.cz/-/knot-resolver/-/jobs/$CI_JOB_ID/artifacts/public/index.html
   artifacts:
     paths:
-      - public
+      - doc/html
+  environment:
+    name: docs-develop/$DOCS_ENV_NAME
+    url: https://$CI_PROJECT_NAMESPACE.pages.nic.cz/-/knot-resolver/-/jobs/$CI_JOB_ID/artifacts/doc/html/index.html
+
+# This job deploys the Knot Resolver documentation into a release environment,
+# which may be found at
+# <https://gitlab.nic.cz/knot/knot-resolver/-/environments/folders/docs-release>.
+# The actual URL is found in the `environment.url` property, where
+# $CI_PROJECT_NAMESPACE will be "knot" on the upstream GitLab.
+# The job requires the `DOCS_ENV_NAME` variable to be set by the user.
+docs:release:
+  stage: deploy
+  needs:
+    - docs:develop
+  variables:
+    RELEASE_DOCS_ENV_NAME: $CI_COMMIT_REF_NAME-$CI_COMMIT_SHORT_SHA # TODO
+  when: manual
+  script: echo "Propagating artifacts into release environment"
+  artifacts:
+    paths:
+      - doc/html
+  environment:
+    name: docs-release/$RELEASE_DOCS_ENV_NAME
+    url: https://$CI_PROJECT_NAMESPACE.pages.nic.cz/-/knot-resolver/-/jobs/$CI_JOB_ID/artifacts/doc/html/index.html
+
+# This job deploys the current docs as <https://knot.pages.nic.cz/knot-resolver>
+docs:public:
+  stage: deploy
+  needs:
+    - docs:develop
+  script: mv doc/html public
+  when: manual
+
 # }}}
