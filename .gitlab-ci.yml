@@ -644,7 +644,9 @@ pkg:alma-9:
 #  allow_failure: true  # SUSE is always special
 # }}}
 
-pages:
+# docs: {{{
+
+docs:build:
   image: $CI_REGISTRY/packaging/apkg/lxc/fedora-36
   stage: deploy
   needs: []
@@ -656,7 +658,58 @@ pages:
     - pip3 install sphinx_rtd_theme
     - meson build_doc -Ddoc=enabled
     - ninja -C build_doc doc
-    - mv doc/html public
   artifacts:
     paths:
-      - public
+      - doc/html
+
+# This job deploys the Knot Resolver documentation into a development
+# environment, which may be found at
+# <https://gitlab.nic.cz/knot/knot-resolver/-/environments/folders/docs-develop>.
+# The actual URL is found in the `environment.url` property, where
+# $CI_PROJECT_NAMESPACE will be "knot" on the upstream GitLab.
+docs:develop:
+  stage: deploy
+  needs:
+    - docs:build
+  except:
+    refs:
+      - tags
+  script:
+    - echo "Propagating artifacts into develop environment"
+  artifacts:
+    paths:
+      - doc/html
+  environment:
+    name: docs-develop/$CI_COMMIT_REF_NAME
+    url: https://$CI_PROJECT_NAMESPACE.pages.nic.cz/-/knot-resolver/-/jobs/$CI_JOB_ID/artifacts/doc/html/index.html
+
+# This job deploys the Knot Resolver documentation into a release environment,
+# which may be found at
+# <https://gitlab.nic.cz/knot/knot-resolver/-/environments/folders/docs-release>.
+# The actual URL is found in the `environment.url` property, where
+# $CI_PROJECT_NAMESPACE will be "knot" on the upstream GitLab.
+# The job requires the `DOCS_ENV_NAME` variable to be set by the user.
+docs:release:
+  stage: deploy
+  needs:
+    - docs:build
+  only:
+    refs:
+      - tags
+  script: echo "Propagating artifacts into release environment"
+  artifacts:
+    paths:
+      - doc/html
+  environment:
+    name: docs-release/$CI_COMMIT_TAG
+    url: https://$CI_PROJECT_NAMESPACE.pages.nic.cz/-/knot-resolver/-/jobs/$CI_JOB_ID/artifacts/doc/html/index.html
+
+# This job deploys the current docs as <https://knot.pages.nic.cz/knot-resolver>
+docs:public:
+  stage: deploy
+  needs:
+    - docs:build
+  script: mv doc/html public
+  when: manual
+
+# }}}
