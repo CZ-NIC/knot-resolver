@@ -11,7 +11,7 @@ cd "$(dirname ${0})/.."
 
 if ! git describe --tags --exact-match; then
     # devel version
-    VERSION_TAG=$(git tag --merged HEAD --sort=-taggerdate | head -1)
+    VERSION_TAG=$(git describe --tags | cut -d- -f1)
     VERSION=${VERSION_TAG#v}
     GIT_HASH=$(git rev-parse --short=6 HEAD)
     N_COMMITS=$(git rev-list $VERSION_TAG.. --count)
