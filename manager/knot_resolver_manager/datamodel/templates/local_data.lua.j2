@@ -25,7 +25,7 @@ modules = { 'hints > iterate' }
 
 {# records #}
 {% if cfg.local_data.records -%}
-{{ local_data_records(cfg.local_data.records, false, cfg.local_data.ttl, cfg.local_data.nodata) }}
+{{ local_data_records(cfg.local_data.records, false, cfg.local_data.nodata, cfg.local_data.ttl) }}
 {%- endif %}
 
 {# rules #}
@@ -36,6 +36,6 @@ modules = { 'hints > iterate' }
 {# rpz #}
 {% if cfg.local_data.rpz -%}
 {% for rpz in cfg.local_data.rpz %}
-{{ local_data_records(rpz.file, true, cfg.local_data.ttl, cfg.local_data.nodata, rpz.tags) }}
+{{ local_data_records(rpz.file, true, cfg.local_data.nodata, cfg.local_data.ttl, rpz.tags) }}
 {% endfor %}
 {%- endif %}
