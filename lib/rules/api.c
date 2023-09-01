@@ -934,6 +934,7 @@ int kr_view_select_action(const struct kr_request *req, knot_db_val_t *selected)
 	// Init code for managing the ruleset part of the key.
 	// LATER(optim.): we might cache the ruleset list a bit
 	uint8_t * const key_data_ruleset_end = key.data;
+	uint8_t * const key_data_end = key.data + key.len;
 	knot_db_val_t rulesets = { NULL, 0 };
 	{
 		uint8_t key_rs[] = "\0rulesets";
@@ -949,6 +950,7 @@ int kr_view_select_action(const struct kr_request *req, knot_db_val_t *selected)
 			const size_t rsp_len = strnlen(rulesets_str, rulesets.len);
 			kr_require(rsp_len <= KEY_RULESET_MAXLEN - 1);
 			key.data = key_data_ruleset_end - rsp_len;
+			key.len = key_data_end - (uint8_t *)key.data;
 			memcpy(key.data, rulesets_str, rsp_len);
 			rulesets_str += rsp_len + 1;
 			rulesets.len -= rsp_len + 1;
@@ -959,10 +961,7 @@ int kr_view_select_action(const struct kr_request *req, knot_db_val_t *selected)
 		const size_t addr_start_i = key_data_ruleset_end + sizeof(KEY_VIEW_SRC4)
 					- (const uint8_t *)key.data;
 
-		knot_db_val_t key_leq = {
-			.data = key.data,
-			.len = key.len + (key_data_ruleset_end - (uint8_t *)key.data),
-		};
+		knot_db_val_t key_leq = key;
 		knot_db_val_t val;
 		ret = ruledb_op(read_leq, &key_leq, &val);
 		for (; true; ret = ruledb_op(read_less, &key_leq, &val)) {
