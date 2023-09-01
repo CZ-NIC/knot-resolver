@@ -334,20 +334,20 @@ int rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt)
 		for (int i = 0; i < 1 + want_CNAME; ++i) {
 			memcpy(key_data + KEY_DNAME_END_OFFSET + 2, &types[i], sizeof(rrtype));
 			knot_db_val_t val;
-			// LATER: use cursor to iterate over multiple rules on the same key,
-			// testing tags on each
-			ret = ruledb_op(read, &key, &val, 1);
-			switch (ret) {
-				case -ENOENT: continue;
-				case 0: break;
-				default: return kr_error(ret);
-			}
-			if (!kr_rule_consume_tags(&val, qry->request)) continue;
+			// Multiple variants are possible, with different tags.
+			for (ret = ruledb_op(it_first, &key, &val);
+					ret == 0;
+					ret = ruledb_op(it_next, &val)) {
+				if (!kr_rule_consume_tags(&val, qry->request))
+					continue;
 
-			// We found a rule that applies to the dname+rrtype+req.
-			ret = answer_exact_match(qry, pkt, types[i],
-						 val.data, val.data + val.len);
-			return ret ? kr_error(ret) : RET_ANSWERED;
+				// We found a rule that applies to the dname+rrtype+req.
+				ret = answer_exact_match(qry, pkt, types[i],
+							 val.data, val.data + val.len);
+				return ret ? kr_error(ret) : RET_ANSWERED;
+			}
+			if (kr_fails_assert(ret == 0 || ret == -ENOENT))
+				return kr_error(ret);
 		}
 
 		/* Find the closest zone-like apex that applies.
@@ -714,15 +714,14 @@ static int answer_zla_redirect(struct kr_query *qry, knot_pkt_t *pkt, const char
 	knot_db_val_t key = local_data_key(&rrs, key_data, ruleset_name);
 
 	knot_db_val_t val;
-	ret = ruledb_op(read, &key, &val, 1);
-	switch (ret) {
-		case -ENOENT: goto nodata;
-		case 0: break;
-		default: return ret;
+	// Multiple variants are possible, with different tags.
+	for (ret = ruledb_op(it_first, &key, &val); ret == 0; ret = ruledb_op(it_next, &val)) {
+		if (kr_rule_consume_tags(&val, qry->request))
+			return answer_exact_match(qry, pkt, qry->stype,
+							val.data, val.data + val.len);
 	}
-	if (kr_rule_consume_tags(&val, qry->request)) // found a match
-		return answer_exact_match(qry, pkt, qry->stype,
-						val.data, val.data + val.len);
+	if (ret && ret != -ENOENT)
+		return ret;
 
 nodata: // Want NODATA answer (or NOERROR if it hits apex SOA).
 	// Start constructing the (pseudo-)packet.
@@ -984,6 +983,8 @@ int kr_view_select_action(const struct kr_request *req, knot_db_val_t *selected)
 				}
 			}
 			// We certainly have a matching key (join of various sub-cases).
+			// LATER: we'd iterate on this key's entries and find one
+			//   that matches additional conditions (optional ones in future)
 			if (kr_log_is_debug(RULES, NULL)) {
 				// it's complex to get zero-terminated string for the action
 				char act_0t[val.len + 1];
