@@ -106,4 +106,15 @@ struct kr_cdb_api {
 	 * and reopens it if it isn't; it errors out if the file doesn't exist anymore.
 	 * \return 0 if OK, 1 if reopened OK, < 0 kr_error */
 	int (*check_health)(kr_cdb_pt db, struct kr_cdb_stats *stat);
+
+
+	/** Start iterating; return the first *val with *key.
+	 *
+	 * This only makes sense if !is_cache.
+	 * TODO: it only works inside RO transactions for now.
+	 */
+	int (*it_first)(kr_cdb_pt db, struct kr_cdb_stats *stat,
+			const knot_db_val_t *key, knot_db_val_t *val);
+	/** Advance to the next *val with the same key. */
+	int (*it_next)(kr_cdb_pt db, struct kr_cdb_stats *stat, knot_db_val_t *val);
 };
