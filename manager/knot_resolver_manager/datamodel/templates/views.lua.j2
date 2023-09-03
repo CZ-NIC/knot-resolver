@@ -7,14 +7,14 @@
 {% for subnet in view.subnets %}
 
 {% if view.tags -%}
-{{ view_insert_action(subnet, policy_tags_assign(view.tags)) }}
+{{ view_insert_action(view, subnet, policy_tags_assign(view.tags)) }}
 {% elif view.answer %}
-{{ view_insert_action(subnet, view_answer(view.answer)) }}
+{{ view_insert_action(view, subnet, view_answer(view.answer)) }}
 {%- endif %}
 
 {%- set flags = view_flags(view.options) -%}
 {% if flags -%}
-{{ view_insert_action(subnet, quotes(policy_flags(flags))) }}
+{{ view_insert_action(view, subnet, quotes(policy_flags(flags))) }}
 {%- endif %}
 
 {% endfor %}

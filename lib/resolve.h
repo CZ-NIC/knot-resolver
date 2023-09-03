@@ -186,7 +186,7 @@ int kr_resolver_init(module_array_t *modules, knot_mm_t *pool);
 KR_EXPORT
 void kr_resolver_deinit(void);
 
-/* Kept outside, because kres-gen.lua can't handle this depth
+/* Kept outside struct kr_request, because kres-gen.lua can't handle this depth
  * (and lines here were too long anyway). */
 struct kr_request_qsource_flags {
 	bool tcp:1; /**< true if the request is not on UDP; only meaningful if (dst_addr). */

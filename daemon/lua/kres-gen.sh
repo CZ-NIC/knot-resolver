@@ -148,6 +148,8 @@ ${CDEFS} ${LIBKRES} types <<-EOF
 	enum kr_log_group
 	struct kr_query_data_src
 	enum kr_rule_sub_t
+	enum kr_proto
+	kr_proto_set
 EOF
 
 ${CDEFS} ${KRESD} variables <<-EOF

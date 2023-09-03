@@ -31,7 +31,7 @@ const uint32_t KR_RULE_TTL_DEFAULT = 300;
     - KEY_ZONELIKE_A  + dname_lf (no '\0' at end)
 	-> zone-like apex (on the given name)
     - KEY_VIEW_SRC4 or KEY_VIEW_SRC6 + subnet_encode()
-	-> action-rule string; see kr_view_insert_action()
+	-> conditions + action-rule string; see kr_view_insert_action()
  */
 
 /*const*/ char RULESET_DEFAULT[] = "d";
@@ -874,8 +874,10 @@ bool subnet_is_prefix(uint8_t a, uint8_t b)
 		memcpy(key.data, arr, sizeof(arr)); \
 	} while (false)
 
-int kr_view_insert_action(const char *subnet, const char *action)
+int kr_view_insert_action(const char *subnet, const char *dst_subnet,
+			kr_proto_set protos, const char *action)
 {
+	if (*dst_subnet == '\0') dst_subnet = NULL; // convenience for the API
 	ENSURE_the_rules;
 	// Parse the subnet string.
 	union kr_sockaddr saddr;
@@ -901,13 +903,81 @@ int kr_view_insert_action(const char *subnet, const char *action)
 		memcpy(key.data, RULESET_DEFAULT, rsp_len);
 	}
 
-	// Insert.  We overwrite, as subnet is the only condition so far and that's in key.
-	knot_db_val_t val = {
-		.data = (void *)/*const-cast*/action,
-		.len = strlen(action),
-	};
-	int ret = ruledb_op(remove, &key, 1);  kr_assert(ret == 0 || ret == 1);
+	// We have the key; start constructing the value to insert.
+	const int dst_maxlen = 1 + (dst_subnet ? kr_family_len(saddr.ip.sa_family) : 0);
+	const int action_len = strlen(action);
+	uint8_t buf[sizeof(protos) + dst_maxlen + action_len];
+	uint8_t *data = buf;
+	int dlen = 0;
+
+	memcpy(data, &protos, sizeof(protos));
+	data += sizeof(protos);
+	dlen += sizeof(protos);
+
+	uint8_t dst_bitlen = 0;
+	if (dst_subnet) {
+		// For simplicity, we always write the whole address,
+		// even if some bytes at the end are useless (keep it iff dst_bitlen > 0).
+		int ret = kr_straddr_subnet(data + sizeof(dst_bitlen), dst_subnet);
+		if (ret < 0) {
+			kr_log_error(RULES, "failed to parse destination subnet: %s\n",
+					dst_subnet);
+			return kr_error(ret);
+		}
+		if (saddr.ip.sa_family != kr_straddr_family(dst_subnet)) {
+			kr_log_error(RULES,
+				"destination subnet mismatching IPv4 vs. IPv6: %s\n",
+				dst_subnet);
+			return kr_error(EINVAL);
+		}
+		dst_bitlen = ret;
+	}
+	memcpy(data, &dst_bitlen, sizeof(dst_bitlen));
+	if (dst_bitlen > 0) {
+		data += dst_maxlen; // address bytes already written above
+		dlen += dst_maxlen;
+	} else {
+		data += sizeof(dst_bitlen);
+		dlen += sizeof(dst_bitlen);
+	}
+
+	memcpy(data, action, action_len);
+	data += action_len;
+	dlen += action_len;
+
+	kr_require(data <= buf + dlen);
+	knot_db_val_t val = { .data = buf, .len = dlen };
 	return ruledb_op(write, &key, &val, 1);
+}
+
+static enum kr_proto req_proto(const struct kr_request *req)
+{
+	if (!req->qsource.addr)
+		return KR_PROTO_INTERNAL;
+	const struct kr_request_qsource_flags fl = req->qsource.flags;
+	if (fl.http)
+		return KR_PROTO_DOH;
+	if (fl.tcp)
+		return fl.tls ? KR_PROTO_DOT : KR_PROTO_TCP53;
+	// UDP in some form
+	return fl.tls ? KR_PROTO_DOQ : KR_PROTO_UDP53;
+}
+static bool req_proto_matches(const struct kr_request *req, kr_proto_set proto_set)
+{
+	if (!proto_set) // empty set always matches
+		return true;
+	kr_proto_set mask = 1 << req_proto(req);
+	return mask & proto_set;
+}
+static void log_action(const struct kr_request *req, knot_db_val_t act)
+{
+	if (!kr_log_is_debug(RULES, req))
+		return;
+	// it's complex to get zero-terminated string for the action
+	char act_0t[act.len + 1];
+	memcpy(act_0t, act.data, act.len);
+	act_0t[act.len] = 0;
+	VERBOSE_MSG(req->rplan.initial, "=> view selected action: %s\n", act_0t);
 }
 
 int kr_view_select_action(const struct kr_request *req, knot_db_val_t *selected)
@@ -983,18 +1053,37 @@ int kr_view_select_action(const struct kr_request *req, knot_db_val_t *selected)
 				}
 			}
 			// We certainly have a matching key (join of various sub-cases).
-			// LATER: we'd iterate on this key's entries and find one
-			//   that matches additional conditions (optional ones in future)
-			if (kr_log_is_debug(RULES, NULL)) {
-				// it's complex to get zero-terminated string for the action
-				char act_0t[val.len + 1];
-				memcpy(act_0t, val.data, val.len);
-				act_0t[val.len] = 0;
-				VERBOSE_MSG(req->rplan.initial, "=> view selected action: %s\n",
-					act_0t);
+			// But multiple variants are possible, and conditions inside values.
+			for (ret = ruledb_op(it_first, &key_leq, &val);
+					ret == 0;
+					ret = ruledb_op(it_next, &val)) {
+				kr_proto_set protos;
+				if (deserialize_fails_assert(&val, &protos))
+					continue;
+				if (!req_proto_matches(req, protos))
+					continue;
+				uint8_t dst_bitlen;
+				if (deserialize_fails_assert(&val, &dst_bitlen))
+					continue;
+				if (dst_bitlen) {
+					const int abytes = kr_inaddr_len(addr);
+					const char *dst_a = kr_inaddr(req->qsource.dst_addr);
+					if (kr_fails_assert(val.len >= abytes))
+						continue;
+					if (kr_bitcmp(val.data, dst_a, dst_bitlen) != 0)
+						continue;
+					val.data += abytes;
+					val.len  -= abytes;
+				}
+				// we passed everything; `val` contains just the action
+				log_action(req, val);
+				*selected = val;
+				return kr_ok();
 			}
-			*selected = val;
-			return kr_ok();
+			// Key matched but none of the condition variants;
+			// we may still get a match with a wider subnet rule -> continue.
+			// LATER(optim.): it's possible that something could be made
+			//   somewhat faster in this various jumping around keys.
 		}
 	}
 	return kr_error(ENOENT);

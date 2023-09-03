@@ -24,13 +24,18 @@ class ViewSchema(ConfigSchema):
     Configuration parameters that allow you to create personalized policy rules and other.
 
     ---
-    subnets: Identifies the client based on his subnet.
+    subnets: Identifies the client based on his subnet.  Rule with more precise subnet takes priority.
+    dst_subnet: Destination subnet, as an additional condition.
+    protocols: Transport protocol, as an additional condition.
     tags: Tags to link with other policy rules.
     answer: Direct approach how to handle request from clients identified by the view.
     options: Configuration options for clients identified by the view.
     """
 
     subnets: List[IPNetwork]
+    dst_subnet: Optional[IPNetwork] = None  # could be a list as well, iterated in template
+    protocols: Optional[List[Literal["udp53", "tcp53", "dot", "doh", "doq"]]] = None
+
     tags: Optional[List[IDPattern]] = None
     answer: Optional[Literal["allow", "refused", "noanswer"]] = None
     options: ViewOptionsSchema = ViewOptionsSchema()

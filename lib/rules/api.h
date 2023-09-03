@@ -16,6 +16,27 @@ typedef uint64_t kr_rule_tags_t;
 /// Tags "capacity", i.e. numbered from 0 to _CAP - 1.
 #define KR_RULE_TAGS_CAP (sizeof(kr_rule_tags_t) * 8)
 
+/** DNS protocol set - mutually exclusive options, contrary to kr_request_qsource_flags
+ *
+ * The XDP flag is not discerned here, as it could apply to any protocol.
+ *  (not right now, but libknot does support it for TCP, so that would complete everything)
+ *
+ * TODO: probably unify with enum protolayer_grp.
+ */
+enum kr_proto {
+	KR_PROTO_INTERNAL = 0, /// no protocol, e.g. useful to mark internal requests
+	KR_PROTO_UDP53,
+	KR_PROTO_TCP53,
+	KR_PROTO_DOT,
+	KR_PROTO_DOH,
+	KR_PROTO_DOQ, /// unused for now
+	KR_PROTO_COUNT,
+};
+/** Bitmap of enum kr_proto options. */
+typedef uint8_t kr_proto_set;
+static_assert(sizeof(kr_proto_set) * 8 >= KR_PROTO_COUNT, "bad combination of type sizes");
+
+
 /** Open the rule DB.
  *
  * You can call this to override the path or size (NULL/0 -> default).
@@ -149,16 +170,24 @@ int kr_rule_local_subtree(const knot_dname_t *apex, enum kr_rule_sub_t type,
 /** Insert a view action into the default ruleset.
  *
  * \param subnet String specifying a subnet, e.g. "192.168.0.0/16".
+ * \param dst_subnet String specifying a subnet to be matched by the destination address. (or empty/NULL)
+ * \param protos Set of transport protocols. (or 0 to always match)
  * \param action Currently a string to execute, like in old policies, e.g. `policy.REFUSE`
  *
- * The concept of chain actions isn't respected; the most prioritized rule wins.
- * If exactly the same subnet is specified repeatedly, that rule gets overwritten silently.
- * TODO: improve? (return code, warning, ...)
- * TODO: some way to do multiple actions?  Will be useful e.g. with option-setting actions.
- *    On implementation side this would probably be multi-value LMDB, cf. local_data rules.
+ * TODO: improve? (return code, warning, ...)  Internal queries never get matched.
+ *
+ * The concept of chain actions isn't respected; at most one action is chosen.
+ * The winner needs to fulfill all conditions.  Closer subnet match is preferred,
+ * but otherwise the priority is unspecified (it is deterministic, though).
+ *
+ * There's no detection of action rules that clash in this way,
+ * even if all conditions match exactly.
+ * TODO we might consider some overwriting semantics,
+ *   but the additional conditions make that harder.
  */
 KR_EXPORT
-int kr_view_insert_action(const char *subnet, const char *action);
+int kr_view_insert_action(const char *subnet, const char *dst_subnet,
+			kr_proto_set protos, const char *action);
 
 /** Add a tag by name into a tag-set variable.
  *

@@ -243,6 +243,8 @@ const char *protolayer_protocol_name(enum protolayer_protocol p);
  *
  * For defining new groups, see the docs of `protolayer_grps[]` in
  * `daemon/session2.h`.
+ * 
+ * TODO: probably unify enum protolayer_grp with enum kr_proto.
  *
  * Parameters for XX are:
  *   1. Constant name (for e.g. PROTOLAYER_GRP_* enum value identifiers)
