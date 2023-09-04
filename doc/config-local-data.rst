@@ -75,7 +75,7 @@ It provides various input formats described in following subsections.
 
       .. option:: tags: <list of tags>
 
-         Optional, tags to link with other policy rules, e.g. :ref:`views <config-views>`.
+         Optional, restrict when this RPZ applies.  See :ref:`config-policy-new-tags`.
 
    .. code-block:: yaml
 
@@ -165,7 +165,7 @@ It provides various input formats described in following subsections.
 
       .. option:: tags: <list of tags>
 
-         Optional, tags to link with other policy rules, e.g. :ref:`views <config-views>`.
+         Optional, restrict when this rule applies.  See :ref:`config-policy-new-tags`.
 
       .. option:: ttl: <time s|m|h|d>
 
