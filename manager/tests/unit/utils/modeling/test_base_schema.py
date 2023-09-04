@@ -53,6 +53,14 @@ def test_parsing_str_invalid():
         _TestStr(parse_yaml("v: false"))  # bool
 
 
+def test_parsing_list_empty():
+    class ListSchema(ConfigSchema):
+        empty: List[Any]
+
+    with raises(DataValidationError):
+        ListSchema(parse_yaml("empty: []"))
+
+
 @pytest.mark.parametrize("typ,val", [(_TestInt, 5), (_TestBool, False), (_TestStr, "test")])
 def test_parsing_nested(typ: Type[ConfigSchema], val: Any):
     class UpperSchema(ConfigSchema):

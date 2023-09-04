@@ -54,3 +54,8 @@ def test_list_or_item_invalid(typ: Any, val: Any):
 
     with raises(DataValidationError):
         ListOrItemSchema({"test": val})
+
+
+def test_list_or_item_empty():
+    with raises(ValueError):
+        ListOrItem([])

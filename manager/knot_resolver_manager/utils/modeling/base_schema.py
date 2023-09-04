@@ -294,6 +294,8 @@ class ObjectMapper:
         try:
             for i, val in enumerate(obj):
                 res.append(self.map_object(inner_type, val, object_path=f"{object_path}[{i}]"))
+            if len(res) == 0:
+                raise DataValidationError("empty list is not allowed", object_path)
         except DataValidationError as e:
             errs.append(e)
         except TypeError as e:
