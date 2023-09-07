@@ -11,30 +11,31 @@ Easiest way to configure Knot Resolver is to put YAML configuration in ``/etc/kn
 You can start exploring the configuration by continuing in this chapter or look at the complete :ref:`configuration <configuration-chapter>` documentation.
 
 .. contents::
-    :depth: 1
-    :local:
+   :depth: 1
+   :local:
 
 Complete examples of configuration files can be found `here <https://gitlab.nic.cz/knot/knot-resolver/tree/master/etc/config>`_.
 Examples are also installed as documentation files, typically in ``/usr/share/doc/knot-resolver/examples/`` directory (location may be different based on your Linux distribution).
 
 .. tip::
 
-    You can use :ref:`kresctl <manager-client>` utility to **validate** your configuration before pushing it into the running resolver.
-    It should help prevent many typos in the configuration.
+   You can use :ref:`kresctl <manager-client>` utility to **validate** your configuration before pushing it into the running resolver.
+   It should help prevent many typos in the configuration.
 
-    .. code-block::
+   .. code-block::
 
-        $ kresctl validate /etc/knot-resolver/config.yaml
+      $ kresctl validate /etc/knot-resolver/config.yaml
 
 If you update the configuration file while Knot Resolver is running, you can force the resolver to **reload** it by invoking a ``systemd`` reload command.
 
 .. code-block::
 
-    $ systemctl reload knot-resolver.service
+   $ systemctl reload knot-resolver.service
 
 .. note::
 
-    **Reloading configuration** can fail even when your configuration is valid, because some options cannot be changed while running. You can always find an explanation of the error in the log accesed by the ``journalctl -eu knot-resolver`` command.
+   **Reloading configuration** can fail even when your configuration is valid, because some options cannot be changed while running.
+   You can always find an explanation of the error in the log accesed by the ``journalctl -eu knot-resolver`` command.
 
 ===============================
 Listening on network interfaces
@@ -46,19 +47,21 @@ Encrypted DNS queries using ``DNS-over-TLS`` protocol are accepted on all IP add
 
 .. code-block:: yaml
 
-    network:
-        listen:
-        - interface: ['192.0.2.1', '2001:db8::1'] # port 53 is default
-        - interface: 'eth0'
-            port: 853
-            kind: 'dot' # DNS-over-TLS
+   network:
+     listen:
+       - interface: # port 53 is default
+           - 192.0.2.1
+           - 2001:db8::1
+       - interface: eth0
+         port: 853
+         kind: dot # DNS-over-TLS
 
 For more details look at the :ref:`network configuration <config-network>`.
 
 .. warning::
 
-    On machines with multiple IP addresses on the same interface avoid listening on wildcards ``0.0.0.0`` or ``::``.
-    Knot Resolver could answer from different IP addresses if the network address ranges overlap, and clients would refuse such a response.
+   On machines with multiple IP addresses on the same interface avoid listening on wildcards ``0.0.0.0`` or ``::``.
+   Knot Resolver could answer from different IP addresses if the network address ranges overlap, and clients would refuse such a response.
 
 
 .. _examle-internal:
@@ -79,19 +82,20 @@ This configuration will forward two listed domains to a DNS server with IP addre
 
 .. code-block:: yaml
 
-    policy:
+   forward:
+     # define list of internal-only domains
+     - subtree:
+         - company.example
+         - internal.example
+       # forward all queries belonging to domains in the list above to IP address '192.0.2.44'
+       servers:
+         - 192.0.2.44
+       # common options configuration for internal-only domains
+       options:
+         authoritative: true
+         dnssec: false
 
-
-.. .. code-block:: lua
-
-..     -- define list of internal-only domains
-..     internalDomains = policy.todnames({'company.example', 'internal.example'})
-
-..     -- forward all queries belonging to domains in the list above to IP address '192.0.2.44'
-..     policy.add(policy.suffix(policy.FLAGS({'NO_CACHE'}), internalDomains))
-..     policy.add(policy.suffix(policy.STUB({'192.0.2.44'}), internalDomains))
-
-See chapter :ref:`dns-graft` for more details.
+See :ref:`forwarding <config-forward>` chapter for more details.
 
 
 .. _examle-isp:
@@ -110,24 +114,18 @@ Limiting client access
 
 With exception of public resolvers, a DNS resolver should resolve only queries sent by clients in its own network. This restriction limits attack surface on the resolver itself and also for the rest of the Internet.
 
-In a situation where access to DNS resolver is not limited using IP firewall, you can implement access restrictions which combines query source information with :ref:`policy rules <mod-policy>`.
+In a situation where access to DNS resolver is not limited using IP firewall, you can implement access restrictions which combines query source information with :ref:`policy rules <config-policy-new>`.
 Following configuration allows only queries from clients in subnet ``192.0.2.0/24`` and refuses all the rest.
 
 .. code-block:: yaml
 
-    view:
-
-    policy:
-
-.. .. code-block:: lua
-
-..     modules.load('view')
-
-..     -- whitelist queries identified by subnet
-..     view:addr('192.0.2.0/24', policy.all(policy.PASS))
-
-..     -- drop everything that hasn't matched
-..     view:addr('0.0.0.0/0', policy.all(policy.DROP))
+   views:
+     # refuse everything that hasn't matched
+     - subnet: 0.0.0.0/0
+       answer: refused
+     # whitelist queries identified by subnet
+     - subnet: 192.168.1.0/24
+       answer: allow
 
 ^^^^^^^^^^^^^^^^^^^^^^^^
 TLS server configuration
@@ -141,9 +139,12 @@ First step is to enable TLS on listening interfaces:
 .. code-block:: yaml
 
     network:
-        listen:
-        - interface: ['192.0.2.1', '2001:db8::1']
-            kind: 'dot' # DNS-over-TLS, port 853 is default
+      listen:
+        # DNS over TLS on port 853
+        - interface:
+            - 192.0.2.1
+            - 2001:db8::1
+          kind: dot
 
 By default a self-signed certificate is generated.
 Second step is then obtaining and configuring your own TLS certificates signed by a trusted CA.
@@ -151,27 +152,26 @@ Once the certificate was obtained a path to certificate files can be specified:
 
 .. code-block:: yaml
 
-    network:
-        tls:
-            cert-file: '/etc/knot-resolver/server-cert.pem'
-            key-file: '/etc/knot-resolver/server-key.pem'
+   network:
+     tls:
+       cert-file: '/etc/knot-resolver/server-cert.pem'
+       key-file: '/etc/knot-resolver/server-key.pem'
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 Mandatory domain blocking
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Some jurisdictions mandate blocking access to certain domains.
-This can be achieved using following :ref:`policy rule <mod-policy>`:
+This can be achieved using by using :option:`rules <rules: <list>>`.
 
 .. code-block:: yaml
 
-    policy:
-
-.. .. code-block:: lua
-
-..     policy.add(
-..         policy.suffix(policy.DENY,
-..                 policy.todnames({'example.com.', 'blocked.example.net.'})))
+   local-data:
+     rules:
+       - name:
+           - example.com.
+           - blocked.example.net.
+         type: nxdomain
 
 
 .. _examle-personal:
@@ -186,60 +186,74 @@ and to protect them from eavesdropping by TLS encryption.
 
 .. warning::
 
-    Latest research has proven that encrypting DNS traffic is not sufficient to protect privacy of users.
-    For this reason we recommend all users to use full VPN instead of encrypting *just* DNS queries.
-    Following configuration is provided **only for users who cannot encrypt all their traffic**.
-    For more information please see following articles:
+   Latest research has proven that encrypting DNS traffic is not sufficient to protect privacy of users.
+   For this reason we recommend all users to use full VPN instead of encrypting *just* DNS queries.
+   Following configuration is provided **only for users who cannot encrypt all their traffic**.
+   For more information please see following articles:
 
-    - Simran Patil and Nikita Borisov. 2019. What can you learn from an IP? (`slides <https://irtf.org/anrw/2019/slides-anrw19-final44.pdf>`_, `the article itself <https://dl.acm.org/authorize?N687437>`_)
-    - `Bert Hubert. 2019. Centralised DoH is bad for Privacy, in 2019 and beyond <https://labs.ripe.net/Members/bert_hubert/centralised-doh-is-bad-for-privacy-in-2019-and-beyond>`_
+   - Simran Patil and Nikita Borisov. 2019. What can you learn from an IP? (`slides <https://irtf.org/anrw/2019/slides-anrw19-final44.pdf>`_, `the article itself <https://dl.acm.org/authorize?N687437>`_)
+   - `Bert Hubert. 2019. Centralised DoH is bad for Privacy, in 2019 and beyond <https://labs.ripe.net/Members/bert_hubert/centralised-doh-is-bad-for-privacy-in-2019-and-beyond>`_
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Forwarding over TLS protocol (DNS-over-TLS)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Forwarding over TLS protocol protects DNS queries sent out by resolver.
-It can be configured using :ref:`TLS forwarding <tls-forwarding>` which provides methods for authentication.
-.. It can be configured using :ref:`policy.TLS_FORWARD <tls-forwarding>` which provides methods for authentication.
-See list of `DNS Privacy Test Servers`_ supporting DNS-over-TLS to test your configuration.
-
-Read more on :ref:`tls-forwarding`.
-
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Forwarding to multiple targets
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-With the use of slice function, it is possible to split the
-.. With the use of :any:`policy.slice` function, it is possible to split the
-entire DNS namespace into distinct "slices". When used in conjunction with
-:ref:`TLS forwarding <tls-forwarding>`, it's possible to forward different queries to different
-.. :ref:`policy.TLS_FORWARD <tls-forwarding>`, it's possible to forward different queries to different
-remote resolvers. As a result no single remote resolver will get complete list
-of all queries performed by this client.
-
-.. warning::
-
-    Beware that this method has not been scientifically tested and there might be
-    types of attacks which will allow remote resolvers to infer more information about the client.
-    Again: If possible encrypt **all** your traffic and not just DNS queries!
+It can be configured using :ref:`forwarding <config-forward>` which provides settings for authentication.
 
 .. code-block:: yaml
 
-    policy:
-        # TODO
+   forward:
+     # encrypted public resolver, for all names
+     - subtree: "."
+       servers:
+         - address:
+             - 2001:148f:fffe::1
+             - 193.17.47.1
+           transport: tls
+           hostname: odvr.nic.cz
 
-.. .. code-block:: lua
+.. tip::
 
-..     policy.add(policy.slice(
-..        policy.slice_randomize_psl(),
-..        policy.TLS_FORWARD({{'192.0.2.1', hostname='res.example.com'}}),
-..        policy.TLS_FORWARD({
-..           -- multiple servers can be specified for a single slice
-..           -- the one with lowest round-trip time will be used
-..           {'193.17.47.1', hostname='odvr.nic.cz'},
-..           {'185.43.135.1', hostname='odvr.nic.cz'},
-..        })
-..     ))
+   See list of `DNS Privacy Test Servers`_ supporting DNS-over-TLS to test your configuration.
+
+.. future
+
+   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   Forwarding to multiple targets
+   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+   With the use of slice function, it is possible to split the
+   .. With the use of :any:`policy.slice` function, it is possible to split the
+   entire DNS namespace into distinct "slices". When used in conjunction with
+   :ref:`TLS forwarding <tls-forwarding>`, it's possible to forward different queries to different
+   .. :ref:`policy.TLS_FORWARD <tls-forwarding>`, it's possible to forward different queries to different
+   remote resolvers. As a result no single remote resolver will get complete list
+   of all queries performed by this client.
+
+   .. warning::
+
+      Beware that this method has not been scientifically tested and there might be
+      types of attacks which will allow remote resolvers to infer more information about the client.
+      Again: If possible encrypt **all** your traffic and not just DNS queries!
+
+   .. code-block:: yaml
+
+      policy:
+         # TODO
+
+   .. code-block:: lua
+
+      policy.add(policy.slice(
+         policy.slice_randomize_psl(),
+         policy.TLS_FORWARD({{'192.0.2.1', hostname='res.example.com'}}),
+         policy.TLS_FORWARD({
+            -- multiple servers can be specified for a single slice
+            -- the one with lowest round-trip time will be used
+            {'193.17.47.1', hostname='odvr.nic.cz'},
+            {'185.43.135.1', hostname='odvr.nic.cz'},
+         })
+      ))
 
 ^^^^^^^^^^^^^^^^^^^^
 Non-persistent cache
