@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 set -o pipefail -o errexit
 
-if [ "$2" != types ] && [ "$2" != functions ]; then
-	echo "Usage: $0 libkres (types|functions)" >&2
+if [ "$2" != types ] && [ "$2" != functions ] && [ "$2" != variables ]; then
+	echo "Usage: $0 libkres (types|functions|variables)" >&2
 	echo "    and input identifiers, one per line." >&2
 	echo "    You need debug symbols in the library." >&2
 	echo
@@ -47,7 +47,7 @@ grep -v '^#\|^$' | while read -r ident; do
 	if [ "$2" = functions ]; then
 		output="$("${GDB[@]}" --ex "info functions ^$ident\$" \
 				| sed '0,/^All functions/ d; /^File .*:$/ d')"
-	else # types
+	elif [ "$2" = types ]; then
 		case "$ident" in
 			struct\ *|union\ *|enum\ *)
 				output="$("${GDB[@]}" --ex "ptype $ident" \
@@ -63,6 +63,11 @@ grep -v '^#\|^$' | while read -r ident; do
 						| sed "0,/^type = /s/^type = /typedef /; $ s/$/ $ident;/")"
 				;;
 		esac
+	elif [ "$2" = variables ]; then
+		output="$("${GDB[@]}" --ex "info variables -q ^$ident\$" \
+				| sed -e '0,/^File .*:$/ d' -e '/^File .*:$/,$ d')"
+	else
+		exit 1
 	fi
 	# LuaJIT FFI blows up on "uint" type
 	output="$(echo "$output" | sed 's/\buint\b/unsigned int/g')"

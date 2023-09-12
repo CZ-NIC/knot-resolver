@@ -11,6 +11,13 @@
 
 struct kr_rules *the_rules = NULL;
 
+/* The default TTL value is a compromise and probably of little practical impact.
+ * - answering from local rules should be quite cheap,
+ *   so very high values are not expected to bring any improvements
+ * - on the other hand, rules are not expected to change very dynamically
+ */
+const uint32_t KR_RULE_TTL_DEFAULT = 300;
+
 /* DB key-space summary
 
  - "\0" starts special keys like "\0rulesets" or "\0stamp"
@@ -403,7 +410,7 @@ int rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt)
 				return RET_CONT_CACHE;
 			}
 			// The other types optionally specify TTL.
-			uint32_t ttl = RULE_TTL_DEFAULT;
+			uint32_t ttl = KR_RULE_TTL_DEFAULT;
 			if (val.len >= sizeof(ttl)) // allow omitting -> can't kr_assert
 				deserialize_fails_assert(&val, &ttl);
 			if (kr_fails_assert(val.len == 0)) {
@@ -412,14 +419,14 @@ int rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt)
 			}
 			// Finally execute the rule.
 			switch (ztype) {
-			case VAL_ZLAT_EMPTY:
-			case VAL_ZLAT_NXDOMAIN:
-			case VAL_ZLAT_NODATA:
+			case KR_RULE_SUB_EMPTY:
+			case KR_RULE_SUB_NXDOMAIN:
+			case KR_RULE_SUB_NODATA:
 				ret = answer_zla_empty(ztype, qry, pkt, zla_lf, ttl);
 				if (ret == kr_error(EAGAIN))
 					goto shorten;
 				return ret ? ret : RET_ANSWERED;
-			case VAL_ZLAT_REDIRECT:
+			case KR_RULE_SUB_REDIRECT:
 				ret = answer_zla_redirect(qry, pkt, ruleset_name, zla_lf, ttl);
 				return ret ? kr_error(ret) : RET_ANSWERED;
 			default:
@@ -622,8 +629,8 @@ fallback:
 static int answer_zla_empty(val_zla_type_t type, struct kr_query *qry, knot_pkt_t *pkt,
 				const knot_db_val_t zla_lf, uint32_t ttl)
 {
-	if (kr_fails_assert(type == VAL_ZLAT_EMPTY || type == VAL_ZLAT_NXDOMAIN
-				|| type == VAL_ZLAT_NODATA))
+	if (kr_fails_assert(type == KR_RULE_SUB_EMPTY || type == KR_RULE_SUB_NXDOMAIN
+				|| type == KR_RULE_SUB_NODATA))
 		return kr_error(EINVAL);
 
 	knot_dname_t apex_name[KNOT_DNAME_MAXLEN];
@@ -631,7 +638,7 @@ static int answer_zla_empty(val_zla_type_t type, struct kr_query *qry, knot_pkt_
 	CHECK_RET(ret);
 
 	const bool hit_apex = knot_dname_is_equal(qry->sname, apex_name);
-	if (hit_apex && type == VAL_ZLAT_NODATA)
+	if (hit_apex && type == KR_RULE_SUB_NODATA)
 		return kr_error(EAGAIN);
 
 	/* Start constructing the (pseudo-)packet. */
@@ -641,7 +648,8 @@ static int answer_zla_empty(val_zla_type_t type, struct kr_query *qry, knot_pkt_
 	memset(&arrset, 0, sizeof(arrset));
 
 	/* Construct SOA or NS data (hardcoded content).  _EMPTY has a proper zone apex. */
-	const bool want_NS = hit_apex && type == VAL_ZLAT_EMPTY && qry->stype == KNOT_RRTYPE_NS;
+	const bool want_NS = hit_apex && type == KR_RULE_SUB_EMPTY
+				&& qry->stype == KNOT_RRTYPE_NS;
 	arrset.set.rr = knot_rrset_new(apex_name, want_NS ? KNOT_RRTYPE_NS : KNOT_RRTYPE_SOA,
 					KNOT_CLASS_IN, ttl, &pkt->mm);
 	if (kr_fails_assert(arrset.set.rr))
@@ -659,12 +667,12 @@ static int answer_zla_empty(val_zla_type_t type, struct kr_query *qry, knot_pkt_
 	arrset.set.expiring = false;
 
 	/* Small differences if we exactly hit the name or even type. */
-	if (type == VAL_ZLAT_NODATA || (type == VAL_ZLAT_EMPTY && hit_apex)) {
+	if (type == KR_RULE_SUB_NODATA || (type == KR_RULE_SUB_EMPTY && hit_apex)) {
 		knot_wire_set_rcode(pkt->wire, KNOT_RCODE_NOERROR);
 	} else {
 		knot_wire_set_rcode(pkt->wire, KNOT_RCODE_NXDOMAIN);
 	}
-	if (type == VAL_ZLAT_EMPTY && hit_apex
+	if (type == KR_RULE_SUB_EMPTY && hit_apex
 			&& (qry->stype == KNOT_RRTYPE_SOA || qry->stype == KNOT_RRTYPE_NS)) {
 		ret = knot_pkt_begin(pkt, KNOT_ANSWER);
 	} else {
@@ -682,7 +690,7 @@ static int answer_zla_empty(val_zla_type_t type, struct kr_query *qry, knot_pkt_
 	qry->flags.NO_MINIMIZE = true;
 
 	VERBOSE_MSG(qry, "=> satisfied by local data (%s zone)\n",
-		     type == VAL_ZLAT_EMPTY ? "empty" : "nxdomain");
+		     type == KR_RULE_SUB_EMPTY ? "empty" : "nxdomain");
 	return kr_ok();
 }
 
@@ -765,10 +773,24 @@ knot_db_val_t zla_key(const knot_dname_t *apex, uint8_t key_data[KEY_MAXLEN])
 	key.len = key_data + KEY_DNAME_END_OFFSET - (uint8_t *)key.data;
 	return key;
 }
-int insert_trivial_zone(val_zla_type_t ztype, uint32_t ttl,
-			const knot_dname_t *apex, kr_rule_tags_t tags)
+int kr_rule_local_subtree(const knot_dname_t *apex, enum kr_rule_sub_t type,
+			  uint32_t ttl, kr_rule_tags_t tags)
 {
+	// type-check
+	switch (type) {
+	case KR_RULE_SUB_EMPTY:
+	case KR_RULE_SUB_NXDOMAIN:
+	case KR_RULE_SUB_NODATA:
+	case KR_RULE_SUB_REDIRECT:
+		break;
+	default:
+		kr_assert(false);
+		return kr_error(EINVAL);
+	}
+	const val_zla_type_t ztype = type;
+
 	ENSURE_the_rules;
+
 	uint8_t key_data[KEY_MAXLEN];
 	knot_db_val_t key = zla_key(apex, key_data);
 
@@ -776,7 +798,7 @@ int insert_trivial_zone(val_zla_type_t ztype, uint32_t ttl,
 		.data = NULL,
 		.len = sizeof(tags) + sizeof(ztype),
 	};
-	const bool has_ttl = ttl != RULE_TTL_DEFAULT;
+	const bool has_ttl = ttl != KR_RULE_TTL_DEFAULT;
 	if (has_ttl)
 		val.len += sizeof(ttl);
 	int ret = ruledb_op(write, &key, &val, 1);
@@ -794,23 +816,6 @@ int insert_trivial_zone(val_zla_type_t ztype, uint32_t ttl,
 		val.data += sizeof(ttl);
 	}
 	return kr_ok();
-}
-
-int kr_rule_local_data_emptyzone(const knot_dname_t *apex, kr_rule_tags_t tags)
-{
-	return insert_trivial_zone(VAL_ZLAT_EMPTY, RULE_TTL_DEFAULT, apex, tags);
-}
-int kr_rule_local_data_nxdomain(const knot_dname_t *apex, kr_rule_tags_t tags)
-{
-	return insert_trivial_zone(VAL_ZLAT_NXDOMAIN, RULE_TTL_DEFAULT, apex, tags);
-}
-int kr_rule_local_data_nodata(const knot_dname_t *apex, kr_rule_tags_t tags)
-{
-	return insert_trivial_zone(VAL_ZLAT_NODATA, RULE_TTL_DEFAULT, apex, tags);
-}
-int kr_rule_local_data_redirect(const knot_dname_t *apex, kr_rule_tags_t tags)
-{
-	return insert_trivial_zone(VAL_ZLAT_REDIRECT, RULE_TTL_DEFAULT, apex, tags);
 }
 
 
@@ -929,6 +934,7 @@ int kr_view_select_action(const struct kr_request *req, knot_db_val_t *selected)
 	// Init code for managing the ruleset part of the key.
 	// LATER(optim.): we might cache the ruleset list a bit
 	uint8_t * const key_data_ruleset_end = key.data;
+	uint8_t * const key_data_end = key.data + key.len;
 	knot_db_val_t rulesets = { NULL, 0 };
 	{
 		uint8_t key_rs[] = "\0rulesets";
@@ -944,6 +950,7 @@ int kr_view_select_action(const struct kr_request *req, knot_db_val_t *selected)
 			const size_t rsp_len = strnlen(rulesets_str, rulesets.len);
 			kr_require(rsp_len <= KEY_RULESET_MAXLEN - 1);
 			key.data = key_data_ruleset_end - rsp_len;
+			key.len = key_data_end - (uint8_t *)key.data;
 			memcpy(key.data, rulesets_str, rsp_len);
 			rulesets_str += rsp_len + 1;
 			rulesets.len -= rsp_len + 1;
@@ -954,10 +961,7 @@ int kr_view_select_action(const struct kr_request *req, knot_db_val_t *selected)
 		const size_t addr_start_i = key_data_ruleset_end + sizeof(KEY_VIEW_SRC4)
 					- (const uint8_t *)key.data;
 
-		knot_db_val_t key_leq = {
-			.data = key.data,
-			.len = key.len + (key_data_ruleset_end - (uint8_t *)key.data),
-		};
+		knot_db_val_t key_leq = key;
 		knot_db_val_t val;
 		ret = ruledb_op(read_leq, &key_leq, &val);
 		for (; true; ret = ruledb_op(read_less, &key_leq, &val)) {

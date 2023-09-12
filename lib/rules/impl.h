@@ -11,8 +11,6 @@
 #undef VERBOSE_MSG
 #define VERBOSE_MSG(qry, ...) kr_log_q((qry), RULES,  ## __VA_ARGS__)
 
-#define RULE_TTL_DEFAULT ((uint32_t)10800)
-
 /** Insert all the default rules. in ./defaults.c */
 int rules_defaults_insert(void);
 
@@ -46,28 +44,11 @@ int rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt);
 
 /** The first byte of zone-like apex value is its type. */
 typedef uint8_t val_zla_type_t;
+/** This effectively contains enum kr_rule_sub_t */
 enum {
-	/** Empty zone. No data in DB value after this byte.
-	 *
-	 * TODO: add
-	 *  - SOA rdata (maybe, optional, remainder of DB value)
-	 *  Same for _NXDOMAIN and _NODATA, too.
-	 */
-	VAL_ZLAT_EMPTY = 1,
-	/** Forced NXDOMAIN. */
-	VAL_ZLAT_NXDOMAIN,
-	/** Forced NODATA.  Does not apply on exact name (e.g. it's similar to DNAME) */
-	VAL_ZLAT_NODATA,
-	/** Redirect: anything beneath has the same data as apex (except NS+SOA). */
-	VAL_ZLAT_REDIRECT,
 	/** Forward, i.e. override upstream for this subtree (resolver or auth). */
-	VAL_ZLAT_FORWARD,
+	VAL_ZLAT_FORWARD = 128,
 };
-/** For now see kr_rule_local_data_emptyzone() and friends.
- *
- * TODO: probably make something like this the preferred API. */
-int insert_trivial_zone(val_zla_type_t ztype, uint32_t ttl,
-			const knot_dname_t *apex, kr_rule_tags_t tags);
 
 extern /*const*/ char RULESET_DEFAULT[];
 

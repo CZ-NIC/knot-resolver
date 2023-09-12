@@ -71,10 +71,11 @@ KR_EXPORT const char *malloc_conf = "narenas:1";
 #define TCP_BACKLOG_DEFAULT 128
 #endif
 
-/** I don't know why linker is dropping this _zonefile function otherwise. TODO: revisit. */
+/** I don't know why linker is dropping these functions otherwise. TODO: revisit. */
 KR_EXPORT void kr_misc_unused(void)
 {
 	kr_rule_zonefile(NULL);
+	kr_rule_local_address(NULL, NULL, false, 0, 0);
 }
 
 struct args the_args_value;  /** Static allocation for the_args singleton. */

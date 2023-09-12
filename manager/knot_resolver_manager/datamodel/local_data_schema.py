@@ -14,40 +14,45 @@ from knot_resolver_manager.datamodel.types import (
 from knot_resolver_manager.utils.modeling import ConfigSchema
 
 
-class SubtreeSchema(ConfigSchema):
+class RuleSchema(ConfigSchema):
     """
-    Local data and configuration of subtree.
+    Local data advanced rule configuration.
 
     ---
-    type: Type of the subtree.
+    name: Hostname(s).
+    subtree: Type of subtree.
+    address: Address(es) to pair with hostname(s).
+    file: Path to file(s) with hostname and IP address(es) pairs in '/etc/hosts' like format.
+    records: Direct addition of records in DNS zone file format.
     tags: Tags to link with other policy rules.
-    ttl: Default TTL value used for added local subtree.
-    nodata: Use NODATA synthesis. NODATA will be synthesised for matching name, but mismatching type(e.g. AAAA query when only A exists).
-    addresses: Subtree addresses.
-    roots: Subtree roots.
-    roots_file: Subtree roots from given file.
-    roots_url: Subtree roots form given URL.
-    refresh: Refresh time to update data from 'roots-file' or 'roots-url'.
+    ttl: Optional, TTL value used for these answers.
+    nodata: Optional, use NODATA synthesis. NODATA will be synthesised for matching name, but mismatching type(e.g. AAAA query when only A exists).
     """
 
-    type: Literal["empty", "nxdomain", "redirect"]
+    name: Optional[ListOrItem[DomainName]] = None
+    subtree: Optional[Literal["empty", "nxdomain", "redirect"]] = None
+    address: Optional[ListOrItem[IPAddress]] = None
+    file: Optional[ListOrItem[File]] = None
+    records: Optional[EscapedStr] = None
     tags: Optional[List[IDPattern]] = None
     ttl: Optional[TimeUnit] = None
-    nodata: bool = True
-    addresses: Optional[List[IPAddress]] = None
-    roots: Optional[List[DomainName]] = None
-    roots_file: Optional[File] = None
-    roots_url: Optional[EscapedStr] = None
-    refresh: Optional[TimeUnit] = None
+    nodata: Optional[bool] = None
 
     def _validate(self) -> None:
-        options_sum = sum([bool(self.roots), bool(self.roots_file), bool(self.roots_url)])
-        if options_sum > 1:
-            raise ValueError("only one of, 'roots', 'roots-file' or 'roots-url' can be configured")
+        options_sum = sum([bool(self.address), bool(self.subtree), bool(self.file), bool(self.records)])
+        if options_sum == 2 and bool(self.address) and self.subtree in {"empty", "redirect"}:
+            pass  # these combinations still make sense
+        elif options_sum > 1:
+            raise ValueError("only one of 'address', 'subtree' or 'file' can be configured")
         elif options_sum < 1:
-            raise ValueError("one of, 'roots', 'roots-file' or 'roots-url' must be configured")
-        if self.refresh and not (self.roots_file or self.roots_url):
-            raise ValueError("'refresh' can be only configured with 'roots-file' or 'roots-url'")
+            raise ValueError("one of 'address', 'subtree', 'file' or 'records' must be configured")
+
+        options_sum2 = sum([bool(self.name), bool(self.file), bool(self.records)])
+        if options_sum2 != 1:
+            raise ValueError("one of 'name', 'file or 'records' must be configured")
+
+        if bool(self.nodata) and bool(self.subtree) and not bool(self.address):
+            raise ValueError("'nodata' defined but unused with 'subtree'")
 
 
 class RPZSchema(ConfigSchema):
@@ -75,7 +80,7 @@ class LocalDataSchema(ConfigSchema):
     addresses: Direct addition of hostname and IP addresses pairs.
     addresses_files: Direct addition of hostname and IP addresses pairs from files in '/etc/hosts' like format.
     records: Direct addition of records in DNS zone file format.
-    subtrees: Direct addition of subtrees.
+    rules: Local data rules.
     rpz: List of Response Policy Zones and its configuration.
     """
 
@@ -86,5 +91,5 @@ class LocalDataSchema(ConfigSchema):
     addresses: Optional[Dict[DomainName, ListOrItem[IPAddress]]] = None
     addresses_files: Optional[List[File]] = None
     records: Optional[EscapedStr] = None
-    subtrees: Optional[List[SubtreeSchema]] = None
+    rules: Optional[List[RuleSchema]] = None
     rpz: Optional[List[RPZSchema]] = None

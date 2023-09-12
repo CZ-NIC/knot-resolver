@@ -147,14 +147,17 @@ ${CDEFS} ${LIBKRES} types <<-EOF
 	kr_log_level_t
 	enum kr_log_group
 	struct kr_query_data_src
+	enum kr_rule_sub_t
 EOF
 
-# static variables; these lines might not be simple to generate
-printf "
-kr_layer_t kr_layer_t_static;
-_Bool kr_dbg_assertion_abort;
-int kr_dbg_assertion_fork;
-"
+${CDEFS} ${KRESD} variables <<-EOF
+	kr_layer_t_static
+EOF
+${CDEFS} ${LIBKRES} variables <<-EOF
+	kr_dbg_assertion_abort
+	kr_dbg_assertion_fork
+	KR_RULE_TTL_DEFAULT
+EOF
 
 printf "
 typedef int32_t (*kr_stale_cb)(int32_t ttl, const knot_dname_t *owner, uint16_t type,
@@ -293,10 +296,11 @@ ${CDEFS} ${LIBKRES} functions <<-EOF
 	kr_view_insert_action
 	kr_view_select_action
 	kr_rule_tag_add
-	kr_rule_local_data_emptyzone
-	kr_rule_local_data_nxdomain
+	kr_rule_local_subtree
 	kr_rule_zonefile
 	kr_rule_forward
+	kr_rule_local_address
+	kr_rule_local_hosts
 EOF
 
 

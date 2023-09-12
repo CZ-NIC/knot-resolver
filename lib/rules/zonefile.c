@@ -84,13 +84,14 @@ static void cname_scan2rule(zs_scanner_t *s)
 		// Exact RPZ semantics would be hard here, it makes more sense
 		// to apply also to a subtree, and corresponding wildcard rule
 		// usually accompanies this rule anyway.
-		ret = insert_trivial_zone(VAL_ZLAT_NXDOMAIN, s->r_ttl, apex, c->tags);
+		ret = kr_rule_local_subtree(apex, KR_RULE_SUB_NXDOMAIN, s->r_ttl, c->tags);
 	} else if (knot_dname_is_wildcard(s->r_data) && s->r_data[2] == 0) {
 		// "CNAME *." -> NODATA
 		knot_dname_t *apex = s->r_owner;
 		if (knot_dname_is_wildcard(apex)) {
 			apex += 2;
-			ret = insert_trivial_zone(VAL_ZLAT_NODATA, s->r_ttl, apex, c->tags);
+			ret = kr_rule_local_subtree(apex, KR_RULE_SUB_NODATA,
+							s->r_ttl, c->tags);
 		} else { // using special kr_rule_ semantics of empty CNAME RRset
 			knot_rrset_t rrs;
 			knot_rrset_init(&rrs, apex, KNOT_RRTYPE_CNAME,
@@ -214,7 +215,7 @@ int kr_rule_zonefile(const struct kr_rule_zonefile_config *c)
 	zs_scanner_t s_storage, *s = &s_storage;
 	/* zs_init(), zs_set_input_file(), zs_set_processing() returns -1 in case of error,
 	 * so don't print error code as it meaningless. */
-	uint32_t ttl = c->ttl ? c->ttl : RULE_TTL_DEFAULT; // 0 would be nonsense
+	uint32_t ttl = c->ttl ? c->ttl : KR_RULE_TTL_DEFAULT; // 0 would be nonsense
 	int ret = zs_init(s, NULL, KNOT_CLASS_IN, ttl);
 	if (ret) {
 		kr_log_error(RULES, "error initializing zone scanner instance, error: %i (%s)\n",

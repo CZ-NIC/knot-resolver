@@ -56,6 +56,14 @@ KR_EXPORT
 int kr_view_select_action(const struct kr_request *req, knot_db_val_t *selected);
 
 
+/** Default TTL for answers from local data rules.
+ *
+ * This applies to rules defined by the user, not the default rules.
+ * Some types of rules save space when using this default.
+ * This definition exists mainly for usage from lua.
+ */
+KR_EXPORT extern
+const uint32_t KR_RULE_TTL_DEFAULT;
 
 /* APIs to modify the rule DB.
  *
@@ -80,6 +88,32 @@ int kr_rule_local_data_ins(const knot_rrset_t *rrs, const knot_rdataset_t *sig_r
 KR_EXPORT
 int kr_rule_local_data_merge(const knot_rrset_t *rrs, kr_rule_tags_t tags);
 
+/** Add a name-address pair into rules.
+ *
+ * - both forward and reverse mapping is added
+ * - merging is used; see kr_rule_local_data_merge()
+ * - NODATA is optionally inserted
+ */
+KR_EXPORT
+int kr_rule_local_address(const char *name, const char *addr,
+				bool use_nodata, uint32_t ttl, kr_rule_tags_t tags);
+
+/** For a given name, remove one address  ##or all of them (if == NULL).
+ *
+ * Also remove the corresponding reverse record and (optionally) NODATA mark.
+ * Bug: it removes the whole forward RRset.
+ */
+KR_EXPORT
+int kr_rule_local_address_del(const char *name, const char *addr,
+				bool use_nodata, kr_rule_tags_t tags);
+
+/** Load name-address pairs into rules from a hosts-like file.
+ *
+ * Same as kr_rule_data_address() but from a file.
+ */
+KR_EXPORT
+int kr_rule_local_hosts(const char *path, bool use_nodata, uint32_t ttl, kr_rule_tags_t tags);
+
 /** Remove a local data rule.
  *
  * \return the number of deleted rules or error < 0
@@ -90,28 +124,25 @@ int kr_rule_local_data_merge(const knot_rrset_t *rrs, kr_rule_tags_t tags);
 KR_EXPORT
 int kr_rule_local_data_del(const knot_rrset_t *rrs, kr_rule_tags_t tags);
 
-// TODO: perhaps expose an enum to unify these simple subtree rules?
 
-/** Insert an empty zone.
+enum kr_rule_sub_t {
+	/// Empty zone, i.e. with SOA and NS
+	KR_RULE_SUB_EMPTY = 1,
+	/// NXDOMAIN for everything; TODO: SOA owner is hard.
+	KR_RULE_SUB_NXDOMAIN,
+	/// NODATA answers but not on exact name (e.g. it's similar to DNAME)
+	KR_RULE_SUB_NODATA,
+	/// Redirect: anything beneath has the same data as apex (except NS+SOA).
+	KR_RULE_SUB_REDIRECT,
+};
+/** Insert a simple sub-tree rule.
  *
  * - into the default rule-set
  * - SOA and NS for generated answers aren't overridable.
- * - TTL is RULE_TTL_DEFAULT
  */
 KR_EXPORT
-int kr_rule_local_data_emptyzone(const knot_dname_t *apex, kr_rule_tags_t tags);
-
-/** Insert an "NXDOMAIN zone".  TODO: SOA owner is hard. */
-KR_EXPORT
-int kr_rule_local_data_nxdomain(const knot_dname_t *apex, kr_rule_tags_t tags);
-/** Insert a "NODATA zone".  These functions are all similar. */
-KR_EXPORT
-int kr_rule_local_data_nodata(const knot_dname_t *apex, kr_rule_tags_t tags);
-
-/** Insert a redirect zone.
- * Into the default rule-set ATM.  SOA for generated NODATA answers isn't overridable. */
-KR_EXPORT
-int kr_rule_local_data_redirect(const knot_dname_t *apex, kr_rule_tags_t tags);
+int kr_rule_local_subtree(const knot_dname_t *apex, enum kr_rule_sub_t type,
+			  uint32_t ttl, kr_rule_tags_t tags);
 
 /** Insert a view action into the default ruleset.
  *
