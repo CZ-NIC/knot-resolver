@@ -822,11 +822,14 @@ docs:release:
     url: https://$CI_PROJECT_NAMESPACE.pages.nic.cz/-/knot-resolver/-/jobs/$CI_JOB_ID/artifacts/doc/html/index.html
 
 # This job deploys the current docs as <https://knot.pages.nic.cz/knot-resolver>
-docs:public:
+pages:
   stage: deploy
   needs:
     - docs:build
   script: mv doc/html public
   when: manual
+  artifacts:
+    paths:
+      - public
 
 # }}}
