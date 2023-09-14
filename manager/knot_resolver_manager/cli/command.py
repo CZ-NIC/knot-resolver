@@ -1,14 +1,21 @@
 import argparse
+import os
 from abc import ABC, abstractmethod  # pylint: disable=[no-name-in-module]
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Type, TypeVar
 from urllib.parse import quote
+
+from knot_resolver_manager.constants import CONFIG_FILE_ENV_VAR
+from knot_resolver_manager.utils.modeling import parsing
 
 T = TypeVar("T", bound=Type["Command"])
 
 CompWords = Dict[str, Optional[str]]
 
 _registered_commands: List[Type["Command"]] = []
+
+# FIXME ostava: Someone put a FIXME on this value without an explanation, so who knows what is wrong with it?
+DEFAULT_SOCKET = "http+unix://%2Fvar%2Frun%2Fknot-resolver%2Fmanager.sock"
 
 
 def register_command(cls: T) -> T:
@@ -37,7 +44,26 @@ class CommandArgs:
         self.subparser: argparse.ArgumentParser = namespace.subparser
         self.command: Type["Command"] = namespace.command
 
-        self.socket: str = namespace.socket[0]
+        config_env = os.getenv(CONFIG_FILE_ENV_VAR)
+        if len(namespace.socket) == 0 and len(namespace.config) == 0 and config_env is not None:
+            namespace.config = [config_env]
+
+        self.socket: str = DEFAULT_SOCKET
+        if len(namespace.socket) > 0:
+            self.socket = namespace.socket[0]
+        elif len(namespace.config) > 0:
+            with open(namespace.config[0], "r") as f:
+                config = parsing.try_to_parse(f.read())
+            if "management" in config:
+                management = config["management"]
+                if "unix_socket" in management:
+                    self.socket = management["unix_socket"]
+                elif "interface" in management:
+                    split = management["interface"].split("@")
+                    host = split[0]
+                    port = split[1] if len(split) >= 2 else 80
+                    self.socket = f"http://{host}:{port}"
+
         if Path(self.socket).exists():
             self.socket = f'http+unix://{quote(self.socket, safe="")}/'
         if self.socket.endswith("/"):

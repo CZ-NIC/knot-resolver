@@ -28,13 +28,26 @@ def create_main_argument_parser() -> argparse.ArgumentParser:
     #     default=False,
     #     required=False,
     # )
-    parser.add_argument(
+    config_or_socket = parser.add_mutually_exclusive_group()
+    config_or_socket.add_argument(
         "-s",
         "--socket",
         action="store",
         type=str,
-        help="Optional, path to Unix-domain socket or network interface of the management API.",
-        default=["http+unix://%2Fvar%2Frun%2Fknot-resolver%2Fmanager.sock"],  # FIXME
+        help="Optional, path to Unix-domain socket or network interface of the management API. "
+        "Cannot be used together with '--config'.",
+        default=[],
+        nargs=1,
+        required=False,
+    )
+    config_or_socket.add_argument(
+        "-c",
+        "--config",
+        action="store",
+        type=str,
+        help="Optional, path to Knot Resolver declarative configuration to retrieve socket or network "
+        "interface of the management API from. Cannot be used together with '--socket'.",
+        default=[],
         nargs=1,
         required=False,
     )
