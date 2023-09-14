@@ -114,17 +114,17 @@ Limiting client access
 
 With exception of public resolvers, a DNS resolver should resolve only queries sent by clients in its own network. This restriction limits attack surface on the resolver itself and also for the rest of the Internet.
 
-In a situation where access to DNS resolver is not limited using IP firewall, you can implement access restrictions which combines query source information with :ref:`policy rules <config-policy-new>`.
-Following configuration allows only queries from clients in subnet ``192.0.2.0/24`` and refuses all the rest.
+In a situation where access to DNS resolver is not limited using IP firewall, you can implement access restrictions.
+The following example allows only queries from clients in subnet ``192.0.2.0/24`` and refuses all the rest.
 
 .. code-block:: yaml
 
    views:
      # refuse everything that hasn't matched
-     - subnet: 0.0.0.0/0
+     - subnets: [ 0.0.0.0/0, "::/0" ]
        answer: refused
      # whitelist queries identified by subnet
-     - subnet: 192.168.1.0/24
+     - subnets: [ 192.0.2.0/24 ]
        answer: allow
 
 ^^^^^^^^^^^^^^^^^^^^^^^^
