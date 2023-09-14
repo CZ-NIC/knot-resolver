@@ -70,7 +70,7 @@ For more details look at the :ref:`network configuration <config-network>`.
 Example: Internal Resolver
 ==========================
 
-This is an example of typical configuration for company-internal resolver which is not accessible from outside of company network.
+This is an example configuration snippet typical for company-internal resolver which is not accessible from outside of company network.
 
 ^^^^^^^^^^^^^^^^^^^^^
 Internal-only domains
@@ -104,7 +104,7 @@ See :ref:`forwarding <config-forward>` chapter for more details.
 Example: ISP Resolver
 =====================
 
-The following configuration is typical for Internet Service Providers who offer DNS resolver
+The following configuration snippets are typical for Internet Service Providers who offer DNS resolver
 service to their own clients in their own network. Please note that running a *public DNS resolver*
 is more complicated and not covered by this example.
 
