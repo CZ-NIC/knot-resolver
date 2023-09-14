@@ -60,8 +60,8 @@ For more details look at the :ref:`network configuration <config-network>`.
 
 .. warning::
 
-   On machines with multiple IP addresses on the same interface avoid listening on wildcards ``0.0.0.0`` or ``::``.
-   Knot Resolver could answer from different IP addresses if the network address ranges overlap, and clients would refuse such a response.
+   On machines with multiple IP addresses avoid listening on wildcards ``0.0.0.0`` or ``::``.
+   If a client can be reached through multiple addresses, UDP answers from a wildcard address might pick a wrong source address, and such responses should then get refused.
 
 
 .. _examle-internal:

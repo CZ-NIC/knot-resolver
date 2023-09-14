@@ -69,7 +69,8 @@ First you need to decide what service should be available on given IP address
 
 .. warning::
 
-    On machines with multiple IP addresses avoid listening on wildcards ``0.0.0.0`` or ``::``. Knot Resolver could answer from different IP addresses if the network address ranges overlap, and clients would probably refuse such a response.
+   On machines with multiple IP addresses avoid listening on wildcards ``0.0.0.0`` or ``::``.
+   If a client can be reached through multiple addresses, UDP answers from a wildcard address might pick a wrong source address, and such responses should then get refused.
 
 
 .. _config-network-proxyv2:
