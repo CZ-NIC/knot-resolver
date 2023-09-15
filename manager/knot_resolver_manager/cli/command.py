@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Type, TypeVar
 from urllib.parse import quote
 
-from knot_resolver_manager.constants import CONFIG_FILE_ENV_VAR
+from knot_resolver_manager.constants import DEFAULT_MANAGER_CONFIG_FILE, CONFIG_FILE_ENV_VAR
 from knot_resolver_manager.utils.modeling import parsing
 
 T = TypeVar("T", bound=Type["Command"])
@@ -37,6 +37,49 @@ def install_commands_parsers(parser: argparse.ArgumentParser) -> None:
         subparser.set_defaults(command=typ, subparser=subparser)
 
 
+def get_socket_from_config(config: Path, optional_file: bool) -> Optional[str]:
+    try:
+        with open(config, "r") as f:
+            data = parsing.try_to_parse(f.read())
+        if "management" in data:
+            management = data["management"]
+            if "unix_socket" in management:
+                return management["unix_socket"]
+            elif "interface" in management:
+                split = management["interface"].split("@")
+                host = split[0]
+                port = split[1] if len(split) >= 2 else 80
+                return f"http://{host}:{port}"
+        return None
+    except OSError as e:
+        if not optional_file:
+            raise e
+        return None
+
+
+def determine_socket(namespace: argparse.Namespace) -> str:
+    if len(namespace.socket) > 0:
+        return namespace.socket[0]
+
+    socket: Optional[str] = None
+    if len(namespace.config) > 0:
+        socket = get_socket_from_config(namespace.config[0], False)
+        if socket is not None:
+            return socket
+    else:
+        config_env = os.getenv(CONFIG_FILE_ENV_VAR)
+        if config_env is not None:
+            socket = get_socket_from_config(Path(config_env), False)
+            if socket is not None:
+                return socket
+        else:
+            socket = get_socket_from_config(DEFAULT_MANAGER_CONFIG_FILE, True)
+            if socket is not None:
+                return socket
+
+    return DEFAULT_SOCKET
+
+
 class CommandArgs:
     def __init__(self, namespace: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
         self.namespace = namespace
@@ -44,25 +87,7 @@ class CommandArgs:
         self.subparser: argparse.ArgumentParser = namespace.subparser
         self.command: Type["Command"] = namespace.command
 
-        config_env = os.getenv(CONFIG_FILE_ENV_VAR)
-        if len(namespace.socket) == 0 and len(namespace.config) == 0 and config_env is not None:
-            namespace.config = [config_env]
-
-        self.socket: str = DEFAULT_SOCKET
-        if len(namespace.socket) > 0:
-            self.socket = namespace.socket[0]
-        elif len(namespace.config) > 0:
-            with open(namespace.config[0], "r") as f:
-                config = parsing.try_to_parse(f.read())
-            if "management" in config:
-                management = config["management"]
-                if "unix_socket" in management:
-                    self.socket = management["unix_socket"]
-                elif "interface" in management:
-                    split = management["interface"].split("@")
-                    host = split[0]
-                    port = split[1] if len(split) >= 2 else 80
-                    self.socket = f"http://{host}:{port}"
+        self.socket: str = determine_socket(namespace)
 
         if Path(self.socket).exists():
             self.socket = f'http+unix://{quote(self.socket, safe="")}/'
