@@ -45,8 +45,8 @@ def create_main_argument_parser() -> argparse.ArgumentParser:
         "--config",
         action="store",
         type=str,
-        help="Optional, path to Knot Resolver declarative configuration to retrieve socket or network "
-        "interface of the management API from. Cannot be used together with '--socket'.",
+        help="Optional, path to Knot Resolver declarative configuration to retrieve Unix-domain socket or "
+        "network interface of the management API from. Cannot be used together with '--socket'.",
         default=[],
         nargs=1,
         required=False,

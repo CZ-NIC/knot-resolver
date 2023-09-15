@@ -2,3 +2,4 @@ Sphinx>=3.0.0
 sphinx-tabs
 breathe
 json-schema-for-humans
+sphinx_rtd_theme
