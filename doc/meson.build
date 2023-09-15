@@ -33,7 +33,6 @@ if get_option('doc') == 'enabled'
   if not sphinx_build.found()
     sphinx_build = find_program('sphinx-build')
   endif
-  makeinfo = find_program('makeinfo', required: false)
 
   # python dependencies: breathe, sphinx_rtd_theme
   python_breathe = run_command('python3', '-c', 'import breathe', check: false)
@@ -70,14 +69,6 @@ if get_option('doc') == 'enabled'
     install_dir: doc_dir,
   )
 
-  if makeinfo.found()
-    # install info docs
-    install_subdir(
-      meson.current_source_dir() / 'texinfo' / '.install',
-      strip_directory: true,
-      install_dir: info_dir,
-    )
-  endif
 endif
 
 

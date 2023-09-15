@@ -89,16 +89,6 @@ man_pages = [
      [u'CZ.NIC Labs'], 1)
 ]
 
-# -- Options for Texinfo output ------------------------------------------------
-
-# Grouping the document tree into Texinfo files. List of tuples
-# (source start file, target name, title, author,
-#  dir menu entry, description, category)
-texinfo_documents = [
-    ('index', 'knot-resolver', u'Knot Resolver', u'CZ.NIC Labs',
-     'Knot Resolver', 'Caching DNS resolver.', 'Network services'),
-]
-
 # reStructuredText that will be included at the beginning of every source file that is read.
 # This is a possible place to add substitutions that should be available in every file.
 rst_prolog = """
