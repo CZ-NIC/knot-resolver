@@ -123,8 +123,6 @@ Resolver:
    "Doxygen_", "``documentation``", "Generating API documentation."
    "Sphinx_, sphinx-tabs_ and sphinx_rtd_theme_", "``documentation``", "Building this
    documentation."
-   "Texinfo_", "``documentation``", "Generating this documentation in Info
-   format."
    "breathe_", "``documentation``", "Exposing Doxygen API doc to Sphinx."
    "libprotobuf_ 3.0+", "``modules/dnstap``", "Protocol Buffers support for
    dnstap_."
@@ -329,7 +327,6 @@ For development, it's possible to build the container directly from your git tre
 .. _Sphinx: http://sphinx-doc.org/
 .. _sphinx-tabs: https://sphinx-tabs.readthedocs.io
 .. _sphinx_rtd_theme: https://pypi.python.org/pypi/sphinx_rtd_theme
-.. _Texinfo: https://www.gnu.org/software/texinfo/
 .. _pkg-config: https://www.freedesktop.org/wiki/Software/pkg-config/
 .. _libknot: https://gitlab.nic.cz/knot/knot-dns
 .. _cmocka: https://cmocka.org/
