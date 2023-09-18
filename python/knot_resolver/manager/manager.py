@@ -55,6 +55,13 @@ async def _deny_max_worker_changes(config_old: KresConfig, config_new: KresConfi
     return Result.ok(None)
 
 
+async def _subprocess_desc(subprocess: Subprocess) -> object:
+    return {
+        "type": subprocess.type.name,
+        "pid": await subprocess.get_pid(),
+    }
+
+
 class KresManager:  # pylint: disable=too-many-instance-attributes
     """
     Core of the whole operation. Orchestrates individual instances under some
@@ -235,9 +242,9 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
             logger.debug("Canary process test passed.")
             return Result.ok(None)
 
-    async def get_pids(self, proc_type: Optional[SubprocessType]) -> List[int]:
+    async def get_processes(self, proc_type: Optional[SubprocessType]) -> List[object]:
         processes = await self._controller.get_all_running_instances()
-        return [await pr.get_pid() for pr in processes if proc_type is None or pr.type == proc_type]
+        return [await _subprocess_desc(pr) for pr in processes if proc_type is None or pr.type == proc_type]
 
     async def _reload_system_state(self) -> None:
         async with self._manager_lock:

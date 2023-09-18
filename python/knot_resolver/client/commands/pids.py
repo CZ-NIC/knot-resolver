@@ -6,13 +6,14 @@ from typing import Iterable, List, Optional, Tuple, Type
 from knot_resolver.client.command import Command, CommandArgs, CompWords, register_command
 from knot_resolver.utils.requests import request
 
-PIDS_TYPE = Iterable
+PROCESSES_TYPE = Iterable
 
 
 @register_command
 class PidsCommand(Command):
     def __init__(self, namespace: argparse.Namespace) -> None:
         self.proc_type: Optional[str] = namespace.proc_type
+        self.verbose: int = namespace.verbose
 
         super().__init__(namespace)
 
@@ -27,6 +28,13 @@ class PidsCommand(Command):
             nargs="?",
             default="all",
         )
+        pids.add_argument(
+            "-v",
+            "--verbose",
+            help="Optional, makes the output more verbose, in a machine-readable format.",
+            action="count",
+            default=0,
+        )
         return pids, PidsCommand
 
     @staticmethod
@@ -34,16 +42,21 @@ class PidsCommand(Command):
         return {}
 
     def run(self, args: CommandArgs) -> None:
-        response = request(args.socket, "GET", f"pids/{self.proc_type}")
+        response = request(args.socket, "GET", f"processes/{self.proc_type}")
 
         if response.status == 200:
-            pids = json.loads(response.body)
-            if isinstance(pids, PIDS_TYPE):
-                for pid in pids:
-                    print(pid)
+            processes = json.loads(response.body)
+            if isinstance(processes, PROCESSES_TYPE):
+                if self.verbose < 1:
+                    for p in processes:
+                        print(p["pid"])
+                else:
+                    for p in processes:
+                        print(p)
+
             else:
                 print(
-                    f"Unexpected response type '{type(pids).__name__}' from manager. Expected '{PIDS_TYPE.__name__}'",
+                    f"Unexpected response type '{type(processes).__name__}' from manager. Expected '{PROCESSES_TYPE.__name__}'",
                     file=sys.stderr,
                 )
                 sys.exit(1)
