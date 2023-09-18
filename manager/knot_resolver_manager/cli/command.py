@@ -5,17 +5,17 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Type, TypeVar
 from urllib.parse import quote
 
-from knot_resolver_manager.constants import DEFAULT_MANAGER_CONFIG_FILE, CONFIG_FILE_ENV_VAR
+from knot_resolver_manager.constants import CONFIG_FILE_ENV_VAR, DEFAULT_MANAGER_CONFIG_FILE, MANAGER_API_SOCK_ENV_VAR
+from knot_resolver_manager.datamodel.config_schema import DEFAULT_MANAGER_API_SOCK
+from knot_resolver_manager.datamodel.types import FilePath, IPAddressPort
 from knot_resolver_manager.utils.modeling import parsing
+from knot_resolver_manager.utils.modeling.exceptions import DataValidationError
 
 T = TypeVar("T", bound=Type["Command"])
 
 CompWords = Dict[str, Optional[str]]
 
 _registered_commands: List[Type["Command"]] = []
-
-# FIXME ostava: Someone put a FIXME on this value without an explanation, so who knows what is wrong with it?
-DEFAULT_SOCKET = "http+unix://%2Fvar%2Frun%2Fknot-resolver%2Fmanager.sock"
 
 
 def register_command(cls: T) -> T:
@@ -41,16 +41,17 @@ def get_socket_from_config(config: Path, optional_file: bool) -> Optional[str]:
     try:
         with open(config, "r") as f:
             data = parsing.try_to_parse(f.read())
-        if "management" in data:
-            management = data["management"]
+        mkey = "management"
+        if mkey in data:
+            management = data[mkey]
             if "unix_socket" in management:
-                return management["unix_socket"]
+                return str(FilePath(management["unix_socket"], object_path=f"/{mkey}/unix-socket"))
             elif "interface" in management:
-                split = management["interface"].split("@")
-                host = split[0]
-                port = split[1] if len(split) >= 2 else 80
-                return f"http://{host}:{port}"
+                ip = IPAddressPort(management["interface"], object_path=f"/{mkey}/interface")
+                return f"http://{ip.addr}:{ip.port}"
         return None
+    except ValueError as e:
+        raise DataValidationError(*e.args)
     except OSError as e:
         if not optional_file:
             raise e
@@ -58,26 +59,31 @@ def get_socket_from_config(config: Path, optional_file: bool) -> Optional[str]:
 
 
 def determine_socket(namespace: argparse.Namespace) -> str:
+    # 1) socket from 'kresctl --socket' argument
     if len(namespace.socket) > 0:
         return namespace.socket[0]
 
+    config_path = os.getenv(CONFIG_FILE_ENV_VAR)
+    socket_env = os.getenv(MANAGER_API_SOCK_ENV_VAR)
+
     socket: Optional[str] = None
+    # 2) socket from config file ('kresctl --config' argument)
     if len(namespace.config) > 0:
         socket = get_socket_from_config(namespace.config[0], False)
-        if socket is not None:
-            return socket
+    # 3) socket from config file (environment variable)
+    elif config_path:
+        socket = get_socket_from_config(Path(config_path), False)
+    # 4) socket from environment variable
+    elif socket_env:
+        socket = socket_env
+    # 5) socket from config file (default config file constant)
     else:
-        config_env = os.getenv(CONFIG_FILE_ENV_VAR)
-        if config_env is not None:
-            socket = get_socket_from_config(Path(config_env), False)
-            if socket is not None:
-                return socket
-        else:
-            socket = get_socket_from_config(DEFAULT_MANAGER_CONFIG_FILE, True)
-            if socket is not None:
-                return socket
+        socket = get_socket_from_config(DEFAULT_MANAGER_CONFIG_FILE, True)
 
-    return DEFAULT_SOCKET
+    if socket:
+        return socket
+    # 6) socket default
+    return DEFAULT_MANAGER_API_SOCK
 
 
 class CommandArgs:
