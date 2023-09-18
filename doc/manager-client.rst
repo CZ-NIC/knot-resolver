@@ -30,9 +30,9 @@ the :option:`--config <-c <config>, --config <config>>` or
 :option:`--socket <-s <socket>, --socket <socket>>` option to tell
 ``kresctl`` where to look for the API.
 
-If the ``management`` key is not present in the configuration file, ``kresctl``
-attempts to connect to the ``/var/run/knot-resolver/manager.sock`` Unix-domain
-socket, which is the Manager's default communication channel.
+If the :ref:`management <manager-api>` key is not present in the configuration file,
+``kresctl`` attempts to connect to the ``/var/run/knot-resolver/manager.sock``
+Unix-domain socket, which is the Manager's default communication channel.
 
 By default, ``kresctl`` tries to find the correct communication channel in
 ``/etc/knot-resolver/config.yaml``, or, if present, the file specified by the
