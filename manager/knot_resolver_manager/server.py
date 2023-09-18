@@ -333,7 +333,7 @@ class Server:
         await self._reload_config()
         return web.Response(text="Reloading...")
 
-    async def _handler_pids(self, request: web.Request) -> web.Response:
+    async def _handler_processes(self, request: web.Request) -> web.Response:
         """
         Route handler for listing PIDs of subprocesses
         """
@@ -352,7 +352,7 @@ class Server:
                 return web.Response(text=f"Invalid process type '{ptstr}'", status=400)
 
         return web.json_response(
-            await self._manager.get_pids(proc_type),
+            await self._manager.get_processes(proc_type),
             headers={"Access-Control-Allow-Origin": "*"},
             dumps=partial(json.dumps, indent=4),
         )
@@ -373,7 +373,7 @@ class Server:
                 web.get("/metrics/json", self._handler_metrics_json),
                 web.get("/metrics/prometheus", self._handler_metrics_prometheus),
                 web.post("/cache/clear", self._handler_cache_clear),
-                web.get("/pids{path:.*}", self._handler_pids),
+                web.get("/processes{path:.*}", self._handler_processes),
             ]
         )
 
