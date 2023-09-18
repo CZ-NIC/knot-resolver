@@ -9,7 +9,7 @@ from knot_resolver_manager.utils import which
 from knot_resolver_manager.utils.requests import request
 
 
-PIDS_TYPE = List
+PROCS_TYPE = List
 
 
 @register_command
@@ -58,19 +58,19 @@ class DebugCommand(Command):
         gdb_cmd = str(which.which(self.gdb))
         sudo_cmd = str(which.which("sudo"))
 
-        response = request(args.socket, "GET", f"pids/{self.proc_type}")
+        response = request(args.socket, "GET", f"processes/{self.proc_type}")
         if response.status != 200:
             print(response, file=sys.stderr)
             sys.exit(1)
 
-        pids = json.loads(response.body)
-        if not isinstance(pids, PIDS_TYPE):
+        procs = json.loads(response.body)
+        if not isinstance(procs, PROCS_TYPE):
             print(
-                f"Unexpected response type '{type(pids).__name__}' from manager. Expected '{PIDS_TYPE.__name__}'",
+                f"Unexpected response type '{type(procs).__name__}' from manager. Expected '{PROCS_TYPE.__name__}'",
                 file=sys.stderr,
             )
             sys.exit(1)
-        if len(pids) == 0:
+        if len(procs) == 0:
             print(
                 f"There are no processes of type '{self.proc_type}' available to debug",
                 file=sys.stderr,
@@ -82,12 +82,12 @@ class DebugCommand(Command):
             exec_args.extend([sudo_cmd, "--"])
 
         # attach to PIDs
-        exec_args.extend([gdb_cmd, "--pid", str(pids[0])])
+        exec_args.extend([gdb_cmd, "--pid", str(procs[0]["pid"])])
         inferior = 2
-        for pid in pids[1:]:
+        for proc in procs[1:]:
             exec_args.extend(["-init-eval-command", "add-inferior"])
             exec_args.extend(["-init-eval-command", f"inferior {inferior}"])
-            exec_args.extend(["-init-eval-command", f"attach {pid}"])
+            exec_args.extend(["-init-eval-command", f'attach {proc["pid"]}'])
             inferior += 1
 
         exec_args.extend(["-init-eval-command", "inferior 1"])
