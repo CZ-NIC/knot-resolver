@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Type, TypeVar
 from urllib.parse import quote
 
-from knot_resolver_manager.constants import CONFIG_FILE_ENV_VAR, DEFAULT_MANAGER_CONFIG_FILE, MANAGER_API_SOCK_ENV_VAR
+from knot_resolver_manager.constants import API_SOCK_ENV_VAR, CONFIG_FILE_ENV_VAR, DEFAULT_MANAGER_CONFIG_FILE
 from knot_resolver_manager.datamodel.config_schema import DEFAULT_MANAGER_API_SOCK
 from knot_resolver_manager.datamodel.types import FilePath, IPAddressPort
 from knot_resolver_manager.utils.modeling import parsing
@@ -64,7 +64,7 @@ def determine_socket(namespace: argparse.Namespace) -> str:
         return namespace.socket[0]
 
     config_path = os.getenv(CONFIG_FILE_ENV_VAR)
-    socket_env = os.getenv(MANAGER_API_SOCK_ENV_VAR)
+    socket_env = os.getenv(API_SOCK_ENV_VAR)
 
     socket: Optional[str] = None
     # 2) socket from config file ('kresctl --config' argument)

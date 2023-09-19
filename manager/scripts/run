@@ -35,10 +35,10 @@ if [ -z "${KRES_MANAGER_CONFIG:-}" ]; then
     KRES_MANAGER_CONFIG="$KRES_MANAGER_RUNTIME/config.dev.yaml"
 fi
 
-if [ -z "${MANAGER_API_SOCK:-}" ]; then
-    MANAGER_API_SOCK="$KRES_MANAGER_RUNTIME/manager.sock"
+if [ -z "${KRES_MANAGER_API_SOCK:-}" ]; then
+    KRES_MANAGER_API_SOCK="$KRES_MANAGER_RUNTIME/manager.sock"
 fi
 
 export KRES_MANAGER_CONFIG
-export MANAGER_API_SOCK
+export KRES_MANAGER_API_SOCK
 python3 -m knot_resolver_manager $@
