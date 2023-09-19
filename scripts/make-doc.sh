@@ -1,6 +1,7 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-3.0-or-later
-cd "$(dirname ${0})/.."
+set -o errexit -o nounset
+cd "$(dirname "${0}")/.."
 
 # generate JSON schema for the manager's declarative config
 pushd manager
@@ -14,12 +15,6 @@ pushd doc
 doxygen
 popd
 
-SPHINX=$(command -v sphinx-build-3)
-if [ $? -ne 0 ]; then
-    SPHINX=$(command -v sphinx-build)
-fi
-
-set -o errexit -o nounset
-
+SPHINX=$(type -P sphinx-build-3 sphinx-build | head -n1)
 rm -rf doc/html
-${SPHINX} ${@} -b html -d doc/.doctrees doc doc/html
+"$SPHINX" "$@" -b html -d doc/.doctrees doc doc/html
