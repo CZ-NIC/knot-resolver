@@ -31,8 +31,7 @@ class MetricsCommand(Command):
         return {}
 
     def run(self, args: CommandArgs) -> None:
-        url = f"{args.socket}/metrics"
-        response = request("GET", url)
+        response = request(args.socket, "GET", "metrics")
 
         if response.status == 200:
             if self.file:

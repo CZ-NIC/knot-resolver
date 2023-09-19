@@ -21,7 +21,7 @@ class StopCommand(Command):
         return stop, StopCommand
 
     def run(self, args: CommandArgs) -> None:
-        response = request("POST", f"{args.socket}/stop")
+        response = request(args.socket, "POST", "stop")
 
         if response.status != 200:
             print(response, file=sys.stderr)

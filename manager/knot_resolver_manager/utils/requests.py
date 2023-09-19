@@ -3,9 +3,24 @@ import sys
 from http.client import HTTPConnection
 from typing import Any, Optional, Union
 from urllib.error import HTTPError, URLError
+from urllib.parse import quote
 from urllib.request import AbstractHTTPHandler, Request, build_opener, install_opener, urlopen
 
 from typing_extensions import Literal
+
+
+class SocketDesc:
+    def __init__(self, socket_def: str, source: str):
+        self.source = source
+        if ":" in socket_def:
+            # `socket_def` contains a schema, probably already URI-formatted, use directly
+            self.uri = socket_def
+        else:
+            # `socket_def` is probably a path, convert to URI
+            self.uri = f'http+unix://{quote(socket_def, safe="")}'
+
+        while self.uri.endswith("/"):
+            self.uri = self.uri[:-1]
 
 
 class Response:
@@ -17,12 +32,28 @@ class Response:
         return f"status: {self.status}\nbody:\n{self.body}"
 
 
+def _print_conn_error(error_desc: str, url: str, socket_source: str) -> None:
+    msg = f"""
+        {error_desc}
+        \tURL: {url}
+        \tSourced from: {socket_source}
+        Is the URL correct?
+        \tUnix socket would start with http+unix:// and URL encoded path.
+        \tInet sockets would start with http:// and domain or ip
+    """
+    print(msg, file=sys.stderr)
+
+
 def request(
+    socket_desc: SocketDesc,
     method: Literal["GET", "POST", "HEAD", "PUT", "DELETE"],
-    url: str,
+    path: str,
     body: Optional[str] = None,
     content_type: str = "application/json",
 ) -> Response:
+    while path.startswith("/"):
+        path = path[1:]
+    url = f"{socket_desc.uri}/{path}"
     req = Request(
         url,
         method=method,
@@ -38,14 +69,9 @@ def request(
         return Response(err.code, err.read().decode("utf8"))
     except URLError as err:
         if err.errno == 111 or isinstance(err.reason, ConnectionRefusedError):
-            msg = f"""
-                Connection refused.
-                \tURL: {url}
-                Is the URL correct?
-                \tUnix socket would start with http+unix:// and URL encoded path.
-                \tInet sockets would start with http:// and domain or ip
-            """
-            print(msg, file=sys.stderr)
+            _print_conn_error("Connection refused.", url, socket_desc.source)
+        elif err.errno == 2 or isinstance(err.reason, FileNotFoundError):
+            _print_conn_error("No such file or directory.", url, socket_desc.source)
         else:
             print(f"{err}: url={url}", file=sys.stderr)
         sys.exit(1)
