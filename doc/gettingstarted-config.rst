@@ -6,21 +6,21 @@
 Configuration
 *************
 
-Easiest way to configure Knot Resolver is to put YAML configuration in ``/etc/knot-resolver/config.yaml`` file.
+The easiest way to configure Knot Resolver is via the ``/etc/knot-resolver/config.yaml`` file containing a declarative YAML configuration.
 
-You can start exploring the configuration by continuing in this chapter or look at the complete :ref:`configuration <configuration-chapter>` documentation.
+You can start exploring the configuration by reading further in this chapter, or you can take a look at the complete :ref:`configuration <configuration-chapter>` documentation.
 
 .. contents::
    :depth: 1
    :local:
 
-Complete examples of configuration files can be found `here <https://gitlab.nic.cz/knot/knot-resolver/tree/master/etc/config>`_.
-Examples are also installed as documentation files, typically in ``/usr/share/doc/knot-resolver/examples/`` directory (location may be different based on your Linux distribution).
+Complete example configuration files can be found `in Knot Resolver's source repository <https://gitlab.nic.cz/knot/knot-resolver/tree/master/etc/config>`_.
+Examples are also installed as documentation files, typically in the ``/usr/share/doc/knot-resolver/examples/`` directory (the location may differ based on your Linux distribution).
 
 .. tip::
 
-   You can use :ref:`kresctl <manager-client>` utility to **validate** your configuration before pushing it into the running resolver.
-   It should help prevent many typos in the configuration.
+   The :ref:`kresctl <manager-client>` utility may be used to **validate** your configuration before you push it to the running resolver.
+   This can help prevent typos in the configuration from causing resolver outages.
 
    .. code-block::
 
@@ -34,16 +34,16 @@ If you update the configuration file while Knot Resolver is running, you can for
 
 .. note::
 
-   **Reloading configuration** can fail even when your configuration is valid, because some options cannot be changed while running.
+   **Reloading configuration** may fail, even when your configuration is valid, because some options cannot be changed while running.
    You can always find an explanation of the error in the log accesed by the ``journalctl -eu knot-resolver`` command.
 
 ===============================
 Listening on network interfaces
 ===============================
 
-The first thing you will probably want to configure are the network interfaces to listen to.
-The following example instructs the resolver to receive standard unencrypted DNS queries on ``192.0.2.1`` and ``2001:db8::1`` IP addresses.
-Encrypted DNS queries using ``DNS-over-TLS`` protocol are accepted on all IP addresses of ``eth0`` network interface, TCP port ``853``.
+The first thing you will probably want to configure are the network interfaces to listen on.
+The following example instructs the resolver to receive standard unencrypted DNS queries on IP addresses ``192.0.2.1`` and ``2001:db8::1``.
+Encrypted DNS queries using the DNS-over-TLS protocol are accepted on all IP addresses of the ``eth0`` network interface, TCP port ``853``.
 
 .. code-block:: yaml
 
@@ -56,38 +56,40 @@ Encrypted DNS queries using ``DNS-over-TLS`` protocol are accepted on all IP add
          port: 853
          kind: dot # DNS-over-TLS
 
-For more details look at the :ref:`network configuration <config-network>`.
+For more details, see :ref:`network configuration <config-network>`.
 
 .. warning::
 
-   On machines with multiple IP addresses avoid listening on wildcards ``0.0.0.0`` or ``::``.
-   If a client can be reached through multiple addresses, UDP answers from a wildcard address might pick a wrong source address, and such responses should then get refused.
+   On machines with multiple IP addresses, avoid listening on wildcards like
+   ``0.0.0.0`` or ``::``. If a client can be reached through multiple addresses,
+   UDP answers from a wildcard address might pick a wrong source address - most
+   well-behaved clients will then refuse such a response.
 
 
-.. _examle-internal:
+.. _example-internal:
 
 ==========================
 Example: Internal Resolver
 ==========================
 
-This is an example configuration snippet typical for company-internal resolver which is not accessible from outside of company network.
+This is an example configuration snippet typical for a company-internal resolver inaccessible from the outside of a company network.
 
 ^^^^^^^^^^^^^^^^^^^^^
 Internal-only domains
 ^^^^^^^^^^^^^^^^^^^^^
 
 An internal-only domain is a domain not accessible from the public Internet.
-In order to resolve internal-only domains a query policy has to be added to forward queries to a correct internal server.
-This configuration will forward two listed domains to a DNS server with IP address ``192.0.2.44``.
+In order to resolve internal-only domains, a query policy needs to be added to forward queries to a correct internal server.
+This configuration will forward the two listed domains to an internal authoritative DNS server with the IP address ``192.0.2.44``.
 
 .. code-block:: yaml
 
    forward:
-     # define list of internal-only domains
+     # define a list of internal-only domains
      - subtree:
          - company.example
          - internal.example
-       # forward all queries belonging to domains in the list above to IP address '192.0.2.44'
+       # forward all queries belonging to the domains in the list above to IP address '192.0.2.44'
        servers:
          - 192.0.2.44
        # common options configuration for internal-only domains
@@ -95,27 +97,27 @@ This configuration will forward two listed domains to a DNS server with IP addre
          authoritative: true
          dnssec: false
 
-See :ref:`forwarding <config-forward>` chapter for more details.
+See the :ref:`forwarding <config-forward>` chapter for more details.
 
 
-.. _examle-isp:
+.. _example-isp:
 
 =====================
 Example: ISP Resolver
 =====================
 
-The following configuration snippets are typical for Internet Service Providers who offer DNS resolver
-service to their own clients in their own network. Please note that running a *public DNS resolver*
-is more complicated and not covered by this example.
+The following configuration snippets are typical for Internet Service Providers offering DNS resolver
+services to their own clients on their own network. Please note that running a *public DNS resolver*
+is a more complicated use-case and not covered by this example.
 
 ^^^^^^^^^^^^^^^^^^^^^^
 Limiting client access
 ^^^^^^^^^^^^^^^^^^^^^^
 
-With exception of public resolvers, a DNS resolver should resolve only queries sent by clients in its own network. This restriction limits attack surface on the resolver itself and also for the rest of the Internet.
+With the exception of public resolvers, a DNS resolver should resolve only queries sent by clients in its own network. This restriction limits the attack surface on the resolver itself, as well as the rest of the Internet.
 
-In a situation where access to DNS resolver is not limited using IP firewall, you can implement access restrictions.
-The following example allows only queries from clients in subnet ``192.0.2.0/24`` and refuses all the rest.
+In a situation where access to your DNS resolver is not limited using an IP firewall, you may want to implement access restrictions.
+The following example allows only queries from clients on the subnet ``192.0.2.0/24`` and refuses all the rest.
 
 .. code-block:: yaml
 
@@ -131,8 +133,8 @@ The following example allows only queries from clients in subnet ``192.0.2.0/24`
 TLS server configuration
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-Today clients are demanding secure transport for DNS queries between client machine and DNS resolver.
-The recommended way to achieve this is to start DNS-over-TLS server and accept also encrypted queries.
+Knot Resolver supports secure transport for DNS queries between client machines and the resolvers, a feature whose popular demand is on the rise.
+The recommended way to achieve this is to start a DNS-over-TLS server and accept encrypted queries.
 
 First step is to enable TLS on listening interfaces:
 
@@ -146,9 +148,9 @@ First step is to enable TLS on listening interfaces:
             - 2001:db8::1
           kind: dot
 
-By default a self-signed certificate is generated.
-Second step is then obtaining and configuring your own TLS certificates signed by a trusted CA.
-Once the certificate was obtained a path to certificate files can be specified:
+By default, a self-signed certificate is generated.
+The second step is then obtaining and configuring your own TLS certificates signed by a trusted CA.
+Once a certificate was obtained, a path to the certificate files can be specified as follows:
 
 .. code-block:: yaml
 
@@ -174,7 +176,7 @@ This can be achieved using by using :option:`rules <rules: <list>>`.
          type: nxdomain
 
 
-.. _examle-personal:
+.. _example-personal:
 
 ==========================
 Example: Personal Resolver
@@ -182,14 +184,14 @@ Example: Personal Resolver
 
 DNS queries can be used to gather data about user behavior.
 Knot Resolver can be configured to forward DNS queries elsewhere,
-and to protect them from eavesdropping by TLS encryption.
+to protect the users from being eavesdropped on by using TLS encryption.
 
 .. warning::
 
-   Latest research has proven that encrypting DNS traffic is not sufficient to protect privacy of users.
-   For this reason we recommend all users to use full VPN instead of encrypting *just* DNS queries.
-   Following configuration is provided **only for users who cannot encrypt all their traffic**.
-   For more information please see following articles:
+   Latest research has proven that encrypting DNS traffic is not sufficient to protect the users' privacy.
+   Therefore, we recommend all users to use a full VPN instead of encrypting *just* DNS queries.
+   The following configuration is provided **only for users who are not able to encrypt all their traffic**.
+   For more information, please see the following articles:
 
    - Simran Patil and Nikita Borisov. 2019. What can you learn from an IP? (`slides <https://irtf.org/anrw/2019/slides-anrw19-final44.pdf>`_, `the article itself <https://dl.acm.org/authorize?N687437>`_)
    - `Bert Hubert. 2019. Centralised DoH is bad for Privacy, in 2019 and beyond <https://labs.ripe.net/Members/bert_hubert/centralised-doh-is-bad-for-privacy-in-2019-and-beyond>`_
@@ -198,8 +200,8 @@ and to protect them from eavesdropping by TLS encryption.
 Forwarding over TLS protocol (DNS-over-TLS)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forwarding over TLS protocol protects DNS queries sent out by resolver.
-It can be configured using :ref:`forwarding <config-forward>` which provides settings for authentication.
+Forwarding over the TLS protocol protects DNS queries sent out by the resolver.
+It can be configured using :ref:`forwarding <config-forward>`, which provides settings for authentication.
 
 .. code-block:: yaml
 
@@ -259,19 +261,19 @@ It can be configured using :ref:`forwarding <config-forward>` which provides set
 Non-persistent cache
 ^^^^^^^^^^^^^^^^^^^^
 
-Knot Resolver's cache contains data clients queried for.
+Knot Resolver's cache contains data its clients queried for.
 If you are concerned about attackers who are able to get access to your
-computer system in power-off state and your storage device is not secured by
-encryption you can move the cache to tmpfs_.
-See chapter :ref:`cache_persistence`.
+computer system in power-off state, and your storage device is not secured by
+encryption, you can move the cache to tmpfs_.
+See :ref:`cache_persistence`.
 
 .. .. raw:: html
 
 ..    <h2>Next steps</h2>
 
-.. Congratulations! Your resolver is now up and running and ready for queries. For
-.. serious deployments do not forget to read :ref:`configuration-chapter` and
-.. :ref:`operation-chapter` chapters.
+.. Congratulations! Your resolver is now up and running and ready to accept queries. For
+.. serious deployments, do not forget to read the chapters :ref:`configuration-chapter` and
+.. :ref:`operation-chapter`.
 
 .. _`DNS Privacy Test Servers`: https://dnsprivacy.org/wiki/display/DP/DNS+Privacy+Test+Servers
 .. _tmpfs: https://en.wikipedia.org/wiki/Tmpfs

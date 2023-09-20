@@ -4,10 +4,10 @@ Addresses and services
 ----------------------
 
 Addresses, ports, protocols, and API calls available for clients communicating
-with resolver are configured in :option:`network/listen <network/listen: <list>>`.
+with the resolver are configured in :option:`network/listen <network/listen: <list>>`.
 
-First you need to decide what service should be available on given IP address
-+ port combination.
+First, you need to decide what type of service should be available on a given IP
+address + port combination.
 
 .. csv-table::
    :header: "Protocol/service", :option:`kind <kind: dns|xdp|dot|doh2|doh-legacy>`
@@ -26,18 +26,19 @@ First you need to decide what service should be available on given IP address
 
    .. option:: unix-socket: <path>
 
-      Path to unix domain socket to listen to.
+      Path to a unix domain socket to listen on.
 
    .. option:: interface: <address or interface>
 
-      IP address or interface name to listen on, can also be a list of addresses and interface names.
-      Optionaly, the port number can be specified using ``@`` as separator, e.g. ``127.0.0.1@3535`` or ``eth0@5353``.
+      IP address or interface name to listen on. May also be a list of addresses
+      and interface names. Optionally, the port number may be specified using
+      ``@`` as a separator, e.g. ``127.0.0.1@3535`` or ``eth0@5353``.
 
    .. option:: port: <1-65535>
 
       :default: 53 (dns, xdp), 853 (dot), 443 (doh2, doh-legacy)
 
-      Port number to listen to.
+      Port number to listen on.
 
    .. option:: kind: dns|xdp|dot|doh2|doh-legacy
 
@@ -69,8 +70,10 @@ First you need to decide what service should be available on given IP address
 
 .. warning::
 
-   On machines with multiple IP addresses avoid listening on wildcards ``0.0.0.0`` or ``::``.
-   If a client can be reached through multiple addresses, UDP answers from a wildcard address might pick a wrong source address, and such responses should then get refused.
+   On machines with multiple IP addresses, avoid listening on wildcards like
+   ``0.0.0.0`` or ``::``. If a client can be reached through multiple addresses,
+   UDP answers from a wildcard address might pick a wrong source address - most
+   well-behaved clients will then refuse such a response.
 
 
 .. _config-network-proxyv2:
@@ -82,17 +85,16 @@ Knot Resolver supports proxies that utilize the `PROXYv2 protocol <https://www.h
 to identify clients.
 
 A PROXY header contains the IP address of the original client who sent a query.
-This allows the resolver to treat queries as if they actually came from
-the client's IP address rather than the address of the proxy they came through.
-For example, :ref:`Views and ACLs <config-views>` are able to work properly when
+This allows the resolver to treat queries as if they actually came from the
+client's IP address, rather than the address of the proxy they came through. For
+example, :ref:`Views and ACLs <config-views>` are able to work as intended when
 PROXYv2 is in use.
 
-Since allowing usage of the PROXYv2 protocol for all clients would be a security
-vulnerability, because clients would then be able to spoof their IP addresses via
-the PROXYv2 header, the resolver requires you to specify explicitly which clients
-are allowed to send PROXYv2 headers.
-
-PROXYv2 queries from clients who are not explicitly allowed to use this protocol
+Allowing usage of the PROXYv2 protocol for all clients would be a security
+vulnerability, because clients would then be able to spoof their IP addresses
+via the PROXYv2 header. Because of this, the resolver requires explicit
+specification of which clients are allowed to send PROXYv2 headers. Queries with
+PROXYv2 headers from clients who are not explicitly allowed to use the protocol
 will be discarded.
 
 .. option:: network/proxy-protocol: false|<options>
