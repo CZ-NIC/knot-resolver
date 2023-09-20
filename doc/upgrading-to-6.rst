@@ -1,26 +1,85 @@
 .. SPDX-License-Identifier: GPL-3.0-or-later
 
-.. _gettingstarted-startup:
+.. _upgrading-to-6:
 
-*****************************
-Upgrading to 6.0.0 from 5.x.x
-*****************************
+************************
+Upgrading to version 6.x
+************************
 
-Version 6 of Knot Resolver brings one significant change - it introduces *Knot Resolver Manager* - a new way for interacting with Knot Resolver. The Manager brings several new features:
+New version 6.x of Knot Resolver brings many major and minor changes.
+The most significant change is the introduction of a new process called ``knot-resolver-manager`` which represents a new way of interaction with Knot Resolver.
 
-* **new declarative configuration**
-* HTTP API to change configuration on the fly without downtime
-* it hides complexities of running multiple instances of ``kresd``
+* easier process management that hides complexities of running multiple instances of ``kresd`` process (``kresd@1``, ``kresd@2``, ...)
+* new :ref:`declarative configuration <config-overview>` in YAML language that can be validated before running
+* :ref:`manager-api` to change configuration on the fly without downtime
+* new :ref:`manager-client` to help with configuration validation and more
 
-Now, you might be worried about the future of ``kresd``. No worries, you can use ``kresd`` directly the same way you did before, nothing changes there right now. However, in the long run, we might make breaking changes in the way ``kresd`` is configured and using it directly is from now on considered advanced.
+Since version 6, Knot Resolver uses the new systemd integration ``knot-resolver.service`` instead of ``kresd@.service``.
+So you can control the resolver using this systemd service.
 
-With the release of version 6, there is a new way to configure and control your running ``kresd`` instances
-so that you don't have to configure multiple systemd services. The new Knot Resolver Manager handles it for you.
-In the table below, you can find comparison of how things were done before and how they can be done now.
+.. code-block:: bash
 
+      $ systemctl start knot-resolver # you can also use: stop, restart, reload or enable/disable
 
-Command rosetta
-===============
+There is no need for managing multiple instances of ``kresd@.service`` like before version 6.
+However, ``kresd`` processes still run in the background as separate workers and are managed by new process ``knot-resolver-manager``.
+
+Number of ``kresd`` workers can be configured directly in the new declarative configuration file.
+Knot Resolver's new configuration is by default located in ``/etc/knot-resolver/config.yaml``.
+
+.. code-block:: yaml
+
+   # /etc/knot-resolver/config.yaml
+
+   workers: 4
+
+See more in :ref:`multiple workers <config-multiple-workers>` documentation.
+
+.. note::
+
+   You might be worried about the future of ``kresd``.
+   No worries, you can use ``kresd`` directly the same way you did before, nothing changes there right now.
+   However, in the long run, we can make major changes to the way ``kresd`` is configured and using it directly is considered advanced from now on.
+
+Configuration
+=============
+
+Knot Resolver is able to run without any additional configuration, that is, configuration file ``/etc/knot-resolver/config.yaml`` is empty.
+The resolver then listens on localhost with standard unencrypted DNS protocol port 53.
+
+To write a configuration you can start with :ref:`getting started chapter for configuration <gettingstarted-config>`.
+
+If you need to rewrite the old Lua configuration to the new declarative one,
+it's a good idea to find the option you want to convert in the :ref:`internal Lua configuration <internal-lua-config>`,
+and the equivalent option will very likely be in the :ref:`new declarative configuration <configuration-chapter>` documentation in a similar place.
+The documentation structure is basically the same.
+Otherwise, you will have to search for the option in the documentation separately.
+
+If you have some custom Lua code in your configuration, you can use it in :ref:`lua section <config-lua>` of declarativ configuration.
+However, it has some limitations and we cannot guarantee 100% functionality.
+For example, a configuration based on the systemd instance name will not work.
+
+Reconfiguration
+---------------
+
+To load the modified configuration without, just use ``reload`` and all running workers should be reconfigured without the resolver downtime.
+This was not possible before version 6. It was necessary to manually restart all running ``kresd@`` instances.
+
+.. code-block:: bash
+
+   $ systemctl reload knot-resolver
+
+It is also possible to use :ref:`manager-api` and :ref:`manager-client` for runtime reconfiguration.
+
+Some configuration changes are not safe to load at runtime and the resolver needs to be fully restarted.
+You should get a relevant error message if this happens during the resolver reload process.
+
+.. code-block:: bash
+
+   $ systemctl restart knot-resolver
+
+Useful commands rosetta
+=======================
 
 In the table below, you can compare the way Knot Resolver was used before and how it can be used now.
 
@@ -33,7 +92,7 @@ start resolver with 4 worker processes      set ``/workers`` to 4 in the config 
 rolling restart after updating config       ``systemctl reload knot-resolver`` (or use API or ``kresctl``)                               manually restart individual ``kresd@`` services one by one
 open logs of all instances                  ``journalctl -u knot-resolver``                                                              ``journalctl -u system-kresd.slice``
 open log of a single kresd instances        ``journalctl -u knot-resolver _PID=xxx``                                                     ``journalctl -u kresd@1``
-updating config programatically             use HTTP API or ``kresctl`` command                                                          write a custom tool to generate new config and restart ``kresd``'s
+updating config programmatically            use HTTP API or ``kresctl`` command                                                          write a custom tool to generate new config and restart ``kresd``'s
 handling errors during config changes       HTTP API just reports error, resolver keeps running with previous config                     custom tools for every user
 validate new config                         ``kresctl validate path/to/new/config.yaml`` (not fully bullet proof), then try to run it     run ``kresd`` with the config and see if it fails
 look at the Lua config                      ``kresctl convert path/to/new/config.yaml``                                                   ``cat /path/to/config.conf``
