@@ -1,3 +1,4 @@
+import errno
 import socket
 import sys
 from http.client import HTTPConnection
@@ -68,9 +69,9 @@ def request(
     except HTTPError as err:
         return Response(err.code, err.read().decode("utf8"))
     except URLError as err:
-        if err.errno == 111 or isinstance(err.reason, ConnectionRefusedError):
+        if err.errno == errno.ECONNREFUSED or isinstance(err.reason, ConnectionRefusedError):
             _print_conn_error("Connection refused.", url, socket_desc.source)
-        elif err.errno == 2 or isinstance(err.reason, FileNotFoundError):
+        elif err.errno == errno.ENOENT or isinstance(err.reason, FileNotFoundError):
             _print_conn_error("No such file or directory.", url, socket_desc.source)
         else:
             print(f"{err}: url={url}", file=sys.stderr)
