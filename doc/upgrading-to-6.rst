@@ -24,7 +24,7 @@ So you can control the resolver using this systemd service.
 There is no need for managing multiple instances of ``kresd@.service`` like before version 6.
 However, ``kresd`` processes still run in the background as separate workers and are managed by new process ``knot-resolver-manager``.
 
-Number of ``kresd`` workers can be configured directly in the new declarative configuration file.
+The number of ``kresd`` workers can be configured directly in the new declarative configuration file.
 Knot Resolver's new configuration is by default located in ``/etc/knot-resolver/config.yaml``.
 
 .. code-block:: yaml
@@ -55,14 +55,14 @@ and the equivalent option will very likely be in the :ref:`new declarative confi
 The documentation structure is basically the same.
 Otherwise, you will have to search for the option in the documentation separately.
 
-If you have some custom Lua code in your configuration, you can use it in :ref:`lua section <config-lua>` of declarativ configuration.
+If you have some custom Lua code in your configuration, you can use it in :ref:`lua section <config-lua>` of declarative configuration.
 However, it has some limitations and we cannot guarantee 100% functionality.
 For example, a configuration based on the systemd instance name will not work.
 
 Reconfiguration
 ---------------
 
-To load the modified configuration without, just use ``reload`` and all running workers should be reconfigured without the resolver downtime.
+To load the modified configuration, just use ``reload`` and all running workers should be reconfigured without the resolver downtime.
 This was not possible before version 6. It was necessary to manually restart all running ``kresd@`` instances.
 
 .. code-block:: bash
