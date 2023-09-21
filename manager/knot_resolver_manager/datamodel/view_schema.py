@@ -42,4 +42,4 @@ class ViewSchema(ConfigSchema):
 
     def _validate(self) -> None:
         if bool(self.tags) == bool(self.answer):
-            raise ValueError("only one of 'tags' and 'answer' options must be configured")
+            raise ValueError("exactly one of 'tags' and 'answer' must be configured")

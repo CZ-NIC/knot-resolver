@@ -5,11 +5,6 @@
 {%- endfor -%}
 {%- endmacro -%}
 
-{% macro view_insert_action(view, subnet, action) -%}
-assert(C.kr_view_insert_action('{{ subnet }}', '{{ view.dst_subnet or '' }}',
-	{{ get_proto_set(view.protocols) }}, {{ action }})==0)
-{%- endmacro %}
-
 {% macro view_flags(options) -%}
 {% if not options.minimize -%}
 "NO_MINIMIZE",
