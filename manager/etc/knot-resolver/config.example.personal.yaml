@@ -1,0 +1,19 @@
+# Refer to manual: https://knot-resolver.readthedocs.io/en/stable/
+
+network:
+  listen:
+    # unencrypted DNS on port 53
+    - interface: &interfaces
+        - 127.0.0.1
+        - "::1"
+    # DNS over TLS on port 853
+    - interface: *interfaces
+      kind: dot
+    # DNS over HTTPS on port 443
+    # - interface: *interfaces
+    #   kind: doh2
+
+cache:
+  size-max: 100M
+  # prefetch expiring/frequent records
+  prediction: true

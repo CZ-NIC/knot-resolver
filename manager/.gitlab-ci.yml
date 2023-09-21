@@ -12,6 +12,14 @@ default:
     - linux
     - amd64
 
+examples:py3.11:
+  stage: check
+  script:
+    - poetry install --only main,dev
+    - poe examples
+  variables:
+    PYTHON_INTERPRETER: python3.11
+
 lint:py3.11:
   stage: check
   script:
@@ -19,7 +27,6 @@ lint:py3.11:
     - poe check
   variables:
     PYTHON_INTERPRETER: python3.11
-
 
 .unit: &unit
   stage: check

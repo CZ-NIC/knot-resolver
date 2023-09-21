@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# ensure consistent behaviour
+src_dir="$(dirname "$(realpath "$0")")"
+source $src_dir/_env.sh
+
+# validate all configuration examples
+for example in $PWD/etc/knot-resolver/config.example.*.yaml;
+do
+    poe kresctl validate --no-strict $example;
+done

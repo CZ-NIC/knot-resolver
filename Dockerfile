@@ -43,7 +43,7 @@ RUN apt-get install -y /pkg/*/*.deb && \
 	rm -rf /var/lib/apt/lists/* && \
 	mkdir /config
 
-COPY manager/etc/knot-resolver/config.docker.yaml /config/config.yaml
+COPY manager/etc/knot-resolver/config.example.docker.yaml /config/config.yaml
 
 LABEL cz.knot-resolver.vendor="CZ.NIC"
 LABEL maintainer="knot-resolver-users@lists.nic.cz"
