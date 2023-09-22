@@ -139,35 +139,36 @@ def _create_fast_proxy(config: KresConfig) -> Any:
     return getattr(proxy, "fast")
 
 
+def _convert_proc_state(proc: Any) -> SubprocessStatus:
+    conversion_tbl = {
+        # "STOPPED": None,  # filtered out elsewhere
+        "STARTING": SubprocessStatus.RUNNING,
+        "RUNNING": SubprocessStatus.RUNNING,
+        "BACKOFF": SubprocessStatus.RUNNING,
+        "STOPPING": SubprocessStatus.RUNNING,
+        "EXITED": SubprocessStatus.FAILED,
+        "FATAL": SubprocessStatus.FAILED,
+        "UNKNOWN": SubprocessStatus.UNKNOWN,
+    }
+
+    if proc["statename"] in conversion_tbl:
+        status = conversion_tbl[proc["statename"]]
+    else:
+        logger.warning(f"Unknown supervisord process state {proc['statename']}")
+        status = SubprocessStatus.UNKNOWN
+    return status
+
+
 def _list_running_subprocesses(config: KresConfig) -> Dict[SupervisordKresID, SubprocessStatus]:
     supervisord = _create_supervisord_proxy(config)
     processes: Any = supervisord.getAllProcessInfo()
-
-    def convert(proc: Any) -> SubprocessStatus:
-        conversion_tbl = {
-            # "STOPPED": None,  # filtered out elsewhere
-            "STARTING": SubprocessStatus.RUNNING,
-            "RUNNING": SubprocessStatus.RUNNING,
-            "BACKOFF": SubprocessStatus.RUNNING,
-            "STOPPING": SubprocessStatus.RUNNING,
-            "EXITED": SubprocessStatus.FAILED,
-            "FATAL": SubprocessStatus.FAILED,
-            "UNKNOWN": SubprocessStatus.UNKNOWN,
-        }
-
-        if proc["statename"] in conversion_tbl:
-            status = conversion_tbl[proc["statename"]]
-        else:
-            logger.warning(f"Unknown supervisord process state {proc['statename']}")
-            status = SubprocessStatus.UNKNOWN
-        return status
 
     # there will be a manager process as well, but we don't want to report anything on ourselves
     processes = [pr for pr in processes if pr["name"] != "manager"]
 
     # convert all the names
     return {
-        SupervisordKresID.from_string(f"{pr['group']}:{pr['name']}"): convert(pr)
+        SupervisordKresID.from_string(f"{pr['group']}:{pr['name']}"): _convert_proc_state(pr)
         for pr in processes
         if pr["statename"] != "STOPPED"
     }
@@ -219,6 +220,12 @@ class SupervisordSubprocess(Subprocess):
             info = supervisord.getProcessInfo(self.name)
             self._pid = info["pid"]
         return self._pid
+
+    @async_in_a_thread
+    def get_status(self) -> SubprocessStatus:
+        supervisord = _create_supervisord_proxy(self._config)
+        info = supervisord.getProcessInfo(self.name)
+        return _convert_proc_state(info)
 
     def get_used_config(self) -> KresConfig:
         return self._config

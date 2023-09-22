@@ -23,6 +23,12 @@ class SubprocessType(Enum):
     GC = auto()
 
 
+class SubprocessStatus(Enum):
+    RUNNING = auto()
+    FAILED = auto()
+    UNKNOWN = auto()
+
+
 T = TypeVar("T", bound="KresID")
 
 
@@ -163,6 +169,10 @@ class Subprocess(ABC):
     async def get_pid(self) -> int:
         pass
 
+    @abstractmethod
+    async def get_status(self) -> SubprocessStatus:
+        pass
+
     @property
     def type(self) -> SubprocessType:
         return self.id.subprocess_type
@@ -200,12 +210,6 @@ class Subprocess(ABC):
                 # proper closing of the socket is only implemented in later versions of python
                 if sys.version_info.minor >= 7:
                     await writer.wait_closed()  # type: ignore
-
-
-class SubprocessStatus(Enum):
-    RUNNING = auto()
-    FAILED = auto()
-    UNKNOWN = auto()
 
 
 class SubprocessController(ABC):
