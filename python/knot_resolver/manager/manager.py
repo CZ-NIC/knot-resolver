@@ -59,6 +59,7 @@ async def _subprocess_desc(subprocess: Subprocess) -> object:
     return {
         "type": subprocess.type.name,
         "pid": await subprocess.get_pid(),
+        "status": subprocess.status().name,
     }
 
 
