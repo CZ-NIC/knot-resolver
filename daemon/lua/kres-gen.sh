@@ -295,6 +295,7 @@ ${CDEFS} ${LIBKRES} functions <<-EOF
 	packet_ttl
 # New policy
 	kr_rules_init
+	kr_rules_commit
 	kr_view_insert_action
 	kr_view_select_action
 	kr_rule_tag_add

@@ -51,7 +51,12 @@ int kr_rules_init_ensure(void);
 KR_EXPORT
 void kr_rules_deinit(void);
 
-/** Commit or abort changes done to the rule DB so far. */
+/** Commit or abort changes done to the rule DB so far.
+ *
+ * Normally commit happens only on successfully loading a config file.
+ * However, an advanced user may get in trouble e.g. if calling resolve() from there,
+ * causing even an assertion failure.  In that case they might want to commit explicitly.
+ */
 KR_EXPORT
 int kr_rules_commit(bool accept);
 
