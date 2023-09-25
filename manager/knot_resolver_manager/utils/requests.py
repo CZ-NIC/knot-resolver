@@ -4,7 +4,7 @@ import sys
 from http.client import HTTPConnection
 from typing import Any, Optional, Union
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote
+from urllib.parse import quote, unquote, urlparse
 from urllib.request import AbstractHTTPHandler, Request, build_opener, install_opener, urlopen
 
 from typing_extensions import Literal
@@ -34,13 +34,20 @@ class Response:
 
 
 def _print_conn_error(error_desc: str, url: str, socket_source: str) -> None:
+    host: str
+    try:
+        parsed_url = urlparse(url)
+        host = unquote(parsed_url.hostname or "(Unknown)")
+    except Exception as e:
+        host = f"(Invalid URL: {e})"
     msg = f"""
-        {error_desc}
-        \tURL: {url}
-        \tSourced from: {socket_source}
-        Is the URL correct?
-        \tUnix socket would start with http+unix:// and URL encoded path.
-        \tInet sockets would start with http:// and domain or ip
+{error_desc}
+\tURL:           {url}
+\tHost/Path:     {host}
+\tSourced from:  {socket_source}
+Is the URL correct?
+\tUnix socket would start with http+unix:// and URL encoded path.
+\tInet sockets would start with http:// and domain or ip
     """
     print(msg, file=sys.stderr)
 
@@ -74,7 +81,7 @@ def request(
         elif err.errno == errno.ENOENT or isinstance(err.reason, FileNotFoundError):
             _print_conn_error("No such file or directory.", url, socket_desc.source)
         else:
-            print(f"{err}: url={url}", file=sys.stderr)
+            _print_conn_error(str(err), url, socket_desc.source)
         sys.exit(1)
 
 
