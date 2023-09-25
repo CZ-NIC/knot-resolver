@@ -26,6 +26,19 @@ echo Knot Manager API is accessible on http://localhost:5000
 echo -------------------------------------------------------
 
 # create runtime directories
-mkdir -p etc/knot-resolver/runtime etc/knot-resolver/cache
+if [ -z "${KRES_MANAGER_RUNTIME:-}" ]; then
+    KRES_MANAGER_RUNTIME="etc/knot-resolver"
+fi
+mkdir -p "$KRES_MANAGER_RUNTIME/runtime" "$KRES_MANAGER_RUNTIME/cache"
 
-python3 -m knot_resolver_manager -c etc/knot-resolver/config.dev.yaml $@
+if [ -z "${KRES_MANAGER_CONFIG:-}" ]; then
+    KRES_MANAGER_CONFIG="$KRES_MANAGER_RUNTIME/config.dev.yaml"
+fi
+
+if [ -z "${KRES_MANAGER_API_SOCK:-}" ]; then
+    KRES_MANAGER_API_SOCK="$KRES_MANAGER_RUNTIME/manager.sock"
+fi
+
+export KRES_MANAGER_CONFIG
+export KRES_MANAGER_API_SOCK
+python3 -m knot_resolver_manager $@

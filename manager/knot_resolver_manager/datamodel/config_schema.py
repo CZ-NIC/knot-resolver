@@ -27,6 +27,8 @@ from knot_resolver_manager.utils.modeling.base_schema import lazy_default
 
 _DEFAULT_RUNDIR = "/var/run/knot-resolver"
 
+DEFAULT_MANAGER_API_SOCK = _DEFAULT_RUNDIR + "/manager.sock"
+
 logger = logging.getLogger(__name__)
 
 
@@ -110,7 +112,7 @@ class KresConfig(ConfigSchema):
         rundir: Dir = lazy_default(Dir, _DEFAULT_RUNDIR)
         workers: Union[Literal["auto"], IntPositive] = IntPositive(1)
         max_workers: IntPositive = IntPositive(_default_max_worker_count())
-        management: ManagementSchema = lazy_default(ManagementSchema, {"unix-socket": "./manager.sock"})
+        management: ManagementSchema = lazy_default(ManagementSchema, {"unix-socket": DEFAULT_MANAGER_API_SOCK})
         webmgmt: Optional[WebmgmtSchema] = None
         options: OptionsSchema = OptionsSchema()
         network: NetworkSchema = NetworkSchema()

@@ -40,7 +40,7 @@ class SchemaCommand(Command):
 
     def run(self, args: CommandArgs) -> None:
         if self.live:
-            response = request("GET", f"{args.socket}/schema")
+            response = request(args.socket, "GET", "schema")
             if response.status != 200:
                 print(response, file=sys.stderr)
                 sys.exit(1)

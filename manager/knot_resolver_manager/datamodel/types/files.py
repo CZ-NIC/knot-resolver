@@ -132,7 +132,7 @@ class FilePath(UncheckedPath):
     ) -> None:
         super().__init__(source_value, parents=parents, object_path=object_path)
         p = self._value.parent
-        if self.strict_validation and not p.exists() or not p.is_dir():
+        if self.strict_validation and (not p.exists() or not p.is_dir()):
             raise ValueError(f"path '{self._value}' does not point inside an existing directory")
         if self.strict_validation and self._value.is_dir():
             raise ValueError(f"path '{self._value}' points to a directory when we expected a file")

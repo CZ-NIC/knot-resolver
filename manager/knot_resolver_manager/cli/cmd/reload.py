@@ -29,7 +29,7 @@ class ReloadCommand(Command):
         return {}
 
     def run(self, args: CommandArgs) -> None:
-        response = request("POST", f"{args.socket}/reload")
+        response = request(args.socket, "POST", "reload")
 
         if response.status != 200:
             print(response, file=sys.stderr)

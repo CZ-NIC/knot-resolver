@@ -21,20 +21,43 @@ It also provides tooling to work with declarative configuration (:option:`valida
 Connecting to the management API
 ================================
 
-Most :ref:`commands <manager-client-commands>` require connection to the :ref:`management API <manager-api>`.
-With default Knot Resolver configuration, ``kresctl`` should communicate with the resolver withou need to specify :option:`--socket` option.
-If not, this option must be set for each command.
+Most :ref:`commands <manager-client-commands>` require connection to the
+:ref:`management API <manager-api>`. With a standard Knot Resolver installation
+using :ref:`distribution packages <gettingstarted-install>`, ``kresctl``
+should communicate with the running resolver without any additional configuration.
+For nonstandard installations and deployments, you may need to use either
+the :option:`--config <-c <config>, --config <config>>` or
+:option:`--socket <-s <socket>, --socket <socket>>` option to tell
+``kresctl`` where to look for the API.
+
+If the :ref:`management <manager-api>` key is not present in the configuration file,
+``kresctl`` attempts to connect to the ``/var/run/knot-resolver/manager.sock``
+Unix-domain socket, which is the Manager's default communication channel.
+
+By default, ``kresctl`` tries to find the correct communication channel in
+``/etc/knot-resolver/config.yaml``, or, if present, the file specified by the
+``KRES_MANAGER_CONFIG`` environment variable.
 
 .. option:: -s <socket>, --socket <socket>
 
-    :default: "./manager.sock"
-
-    Optional, path to Unix-domain socket or network interface of the :ref:`management API <manager-api>`.
+    Optional, path to Unix-domain socket or network interface of the
+    :ref:`management API <manager-api>`. Cannot be used together with
+    :option:`--socket <-s <socket>, --socket <socket>>`.
 
 .. code-block:: bash
 
-    $ kresctl --socket http://127.0.0.1@5000 {command} # network interface, port 5000
+    $ kresctl --socket http://localhost:5000 {command} # network interface, port 5000
     $ kresctl --socket /path/to/socket.sock {command}  # unix-domain socket location
+
+.. option:: -c <config>, --config <config>
+
+    Optional, path to Knot Resolver declarative configuration to retrieve
+    Unix-domain socket or network interface of the management API from. Cannot
+    be used together with :option:`--socket <-s <socket>, --socket <socket>>`.
+
+.. code-block:: bash
+
+    $ kresctl --config /path/to/config.yaml {command}
 
 .. _manager-client-commands:
 

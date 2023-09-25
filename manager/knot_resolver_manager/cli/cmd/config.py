@@ -227,7 +227,7 @@ class ConfigCommand(Command):
             sys.exit()
 
         new_config = None
-        url = f"{args.socket}/v1/config{self.path}"
+        path = f"v1/config{self.path}"
         method = operation_to_method(self.operation)
 
         if self.operation == Operations.SET:
@@ -241,7 +241,7 @@ class ConfigCommand(Command):
                 # use STDIN also when file is not specified
                 new_config = input("Type new configuration: ")
 
-        response = request(method, url, json_dump(new_config) if new_config else None)
+        response = request(args.socket, method, path, json_dump(new_config) if new_config else None)
 
         if response.status != 200:
             print(response, file=sys.stderr)
