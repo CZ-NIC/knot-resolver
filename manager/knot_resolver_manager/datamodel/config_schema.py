@@ -4,7 +4,7 @@ import socket
 import sys
 from typing import Any, Dict, List, Optional, Union
 
-from jinja2 import Environment, FileSystemLoader, Template
+from jinja2 import Environment, FileSystemLoader, StrictUndefined, Template
 from typing_extensions import Literal
 
 from knot_resolver_manager.constants import MAX_WORKERS
@@ -47,7 +47,7 @@ _TEMPLATES_DIR = _get_templates_dir()
 
 def template_from_str(template: str) -> Template:
     ldr = FileSystemLoader(_TEMPLATES_DIR)
-    env = Environment(trim_blocks=True, lstrip_blocks=True, loader=ldr)
+    env = Environment(trim_blocks=True, lstrip_blocks=True, loader=ldr, undefined=StrictUndefined)
     return env.from_string(template)
 
 
