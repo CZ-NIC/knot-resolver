@@ -66,7 +66,7 @@ def test_policy_suffix_common():
 {{ policy_suffix_common(action, suffix, common) }}"""
 
     tmpl = template_from_str(tmpl_str)
-    assert tmpl.render(action=action, suffix=suffix) == f"policy.suffix_common({action},{suffix})"
+    assert tmpl.render(action=action, suffix=suffix, common=None) == f"policy.suffix_common({action},{suffix})"
     assert (
         tmpl.render(action=action, suffix=suffix, common=common) == f"policy.suffix_common({action},{suffix},{common})"
     )
@@ -89,7 +89,7 @@ def test_policy_rpz():
 {{ policy_rpz(action, path, watch) }}"""
 
     tmpl = template_from_str(tmpl_str)
-    assert tmpl.render(action=action, path=path) == f"policy.rpz({action},'{path}',false)"
+    assert tmpl.render(action=action, path=path, watch=None) == f"policy.rpz({action},'{path}',false)"
     assert tmpl.render(action=action, path=path, watch=True) == f"policy.rpz({action},'{path}',true)"
 
 

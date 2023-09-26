@@ -14,7 +14,7 @@
 {% macro string_table(table) -%}
 {%- if table is string -%}
 '{{ table|string }}'
-{%- else-%}
+{%- elif table -%}
 {
 {%- for item in table -%}
 '{{ item|string }}',
@@ -56,7 +56,7 @@ kres.type.{{ item|string }},
 {%- else-%}
 {
 {%- for item in servers -%}
-{%- if item.address -%}
+{%- if item.address is defined -%}
 '{{ item.address|string }}',
 {%- else -%}
 '{{ item|string }}',
@@ -70,7 +70,7 @@ kres.type.{{ item|string }},
 {% macro tls_servers_table(servers) -%}
 {
 {%- for item in servers -%}
-{%- if item.address -%}
+{%- if item.address is defined-%}
 {'{{ item.address|string }}',{{ tls_server_auth(item) }}},
 {%- else -%}
 '{{ item|string }}',
