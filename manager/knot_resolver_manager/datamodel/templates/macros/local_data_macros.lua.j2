@@ -34,7 +34,7 @@ assert(C.kr_rule_local_address('{{ name }}', '{{ address }}',
 
 {% macro local_data_addresses(pairs, nodata, ttl) -%}
 {% for name, addresses in pairs.items() %}
-{% for address in obj %}
+{% for address in addresses %}
 {{ kr_rule_local_address(name, address, nodata, ttl) }}
 {% endfor %}
 {% endfor%}
