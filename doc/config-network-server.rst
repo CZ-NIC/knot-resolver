@@ -6,6 +6,16 @@ Addresses and services
 Addresses, ports, protocols, and API calls available for clients communicating
 with the resolver are configured in :option:`network/listen <network/listen: <list>>`.
 
+.. code-block:: yaml
+
+   network: # typical examples
+     listen:
+       - interface: lo # plain DNS on localhost, port 53
+       - interface: eth0
+         kind: dot
+       - interface: [ 127.0.0.1, '::1' ]
+         kind: doh2
+
 First, you need to decide what type of service should be available on a given IP
 address + port combination.
 
@@ -54,15 +64,10 @@ address + port combination.
 
 .. code-block:: yaml
 
-   network:
+   network: # some unusual examples
      listen:
-       - interface: '::1'  # default port is 53
-       - interface: lo
+       - interface: '::1'
          port: 3535
-       - interface: eth0
-         kind: dot  # default port is 853
-       - interface: [127.0.0.1, '::1']
-         kind: doh2  # default port is 443
        - interface: eth0
          port: 5353  # custom port number, default is 53 for XDP
          kind: xdp
