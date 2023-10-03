@@ -44,6 +44,13 @@ address + port combination.
       and interface names. Optionally, the port number may be specified using
       ``@`` as a separator, e.g. ``127.0.0.1@3535`` or ``eth0@5353``.
 
+      .. warning::
+
+         On machines with multiple IP addresses, avoid listening on wildcards like
+         ``0.0.0.0`` or ``::``. If a client can be reached through multiple addresses,
+         UDP answers from a wildcard address might pick a wrong source address - most
+         well-behaved clients will then refuse such a response.
+
    .. option:: port: <1-65535>
 
       :default: 53 (dns, xdp), 853 (dot), 443 (doh2, doh-legacy)
@@ -72,13 +79,6 @@ address + port combination.
          port: 5353  # custom port number, default is 53 for XDP
          kind: xdp
        - unix-socket: /tmp/kres-socket  # bind to unix domain socked
-
-.. warning::
-
-   On machines with multiple IP addresses, avoid listening on wildcards like
-   ``0.0.0.0`` or ``::``. If a client can be reached through multiple addresses,
-   UDP answers from a wildcard address might pick a wrong source address - most
-   well-behaved clients will then refuse such a response.
 
 
 .. _config-network-proxyv2:
