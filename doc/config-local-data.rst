@@ -8,6 +8,21 @@ Local Data and RPZ
 Local overrides for DNS data may be defined in the :option:`local-data <local-data:>` configuration tree.
 It provides various input formats described in following subsections.
 
+.. code-block:: yaml
+
+   # Some typical use cases:
+   local-data:
+     addresses:
+       a1.example.com: 2001:db8::1
+       a2.example.org: [ 192.0.2.2, 192.0.2.3, 2001:db8::4 ]
+     addresses-files:
+       - /etc/hosts
+     records: |
+       www.google.com.  CNAME  forcesafesearch.google.com.
+     rpz:
+       - file: /tmp/blocklist.rpz
+
+
 .. option:: local-data:
 
    .. option:: ttl: <time ms|s|m|h|d>
