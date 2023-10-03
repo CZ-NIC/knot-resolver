@@ -107,7 +107,7 @@ class LoggingSchema(ConfigSchema):
 
         ---
         level: Global logging level.
-        target: Global logging stream target. "from-env" uses $KRES_LOG_TARGET and defaults to "stdout".
+        target: Global logging stream target. "from-env" uses $KRES_LOGGING_TARGET and defaults to "stdout".
         groups: List of groups for which 'debug' logging level is set.
         dnssec_bogus: Logging a message for each DNSSEC validation failure.
         dnstap: Logging DNS requests and responses to a unix socket.
