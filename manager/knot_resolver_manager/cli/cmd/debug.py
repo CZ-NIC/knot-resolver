@@ -78,11 +78,15 @@ class DebugCommand(Command):
 
         exec_args = []
 
+        # Put `sudo --` at the beginning of the command.
         if self.sudo:
             exec_args.extend([sudo_cmd, "--"])
 
-        # attach to PIDs
-        exec_args.extend([gdb_cmd, "--pid", str(procs[0]["pid"])])
+        # Attach GDB to processes - the first process gets passed as a regular `--pid` argument to GDB, the
+        # rest are attached using the `add-inferior` and `attach` GDB commands. This way, we are now debugging
+        # multiple processes.
+        exec_args.extend([gdb_cmd])
+        exec_args.extend(["-init-eval-command", f'attach {procs[0]["pid"]}'])
         inferior = 2
         for proc in procs[1:]:
             exec_args.extend(["-init-eval-command", "add-inferior"])
@@ -90,7 +94,18 @@ class DebugCommand(Command):
             exec_args.extend(["-init-eval-command", f'attach {proc["pid"]}'])
             inferior += 1
 
-        exec_args.extend(["-init-eval-command", "inferior 1"])
+        num_inferiors = inferior - 1
+        if num_inferiors > 1:
+            # Now we switch back to the first process and add additional provided GDB arguments.
+            exec_args.extend(["-init-eval-command", "inferior 1"])
+            exec_args.extend(
+                [
+                    "-init-eval-command",
+                    "echo \\n\\nYou are now debugging multiple Knot Resolver processes. To switch between "
+                    "them, use the 'inferior <n>' command, where <n> is an integer from 1 to "
+                    f"{num_inferiors}.\\n\\n",
+                ]
+            )
         exec_args.extend(self.gdb_args)
 
         print(f"exec_args = {exec_args}")
