@@ -1,6 +1,9 @@
-{% macro view_insert_action(subnet, action) -%}
-assert(C.kr_view_insert_action('{{ subnet }}',{{ action }})==0)
-{%- endmacro %}
+{%- macro get_proto_set(protocols) -%}
+0
+{%- for p in protocols or [] -%}
+ + 2^C.KR_PROTO_{{ p.upper() }}
+{%- endfor -%}
+{%- endmacro -%}
 
 {% macro view_flags(options) -%}
 {% if not options.minimize -%}

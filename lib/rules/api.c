@@ -31,7 +31,7 @@ const uint32_t KR_RULE_TTL_DEFAULT = 300;
     - KEY_ZONELIKE_A  + dname_lf (no '\0' at end)
 	-> zone-like apex (on the given name)
     - KEY_VIEW_SRC4 or KEY_VIEW_SRC6 + subnet_encode()
-	-> action-rule string; see kr_view_insert_action()
+	-> conditions + action-rule string; see kr_view_insert_action()
  */
 
 /*const*/ char RULESET_DEFAULT[] = "d";
@@ -64,7 +64,7 @@ static int tag_names_default(void)
 	kr_rule_tags_t empty = 0;
 	val.data = &empty;
 	val.len = sizeof(empty);
-	return ruledb_op(write, &key, &val, 1);
+	return ruledb_op(write, &key, &val, 1); // we got ENOENT, so simple write is OK
 }
 
 int kr_rule_tag_add(const char *tag, kr_rule_tags_t *tagset)
@@ -117,17 +117,19 @@ int kr_rule_tag_add(const char *tag, kr_rule_tags_t *tagset)
 	const kr_rule_tags_t tag_new = 1 << ix;
 	kr_require((tag_new & bmp) == 0);
 
-	// Update the mappings
+	// Update the bitmap.  ATM ruledb does not overwrite, so we `remove` before `write`.
 	bmp |= tag_new;
 	val.data = &bmp;
 	val.len = sizeof(bmp);
+	ret = ruledb_op(remove, &key_tb, 1);  kr_assert(ret == 1);
 	ret = ruledb_op(write, &key_tb, &val, 1);
 	if (ret != 0)
 		return kr_error(ret);
+	// Record this tag's mapping.
 	uint8_t ix_8t = ix;
 	val.data = &ix_8t;
 	val.len = sizeof(ix_8t);
-	ret = ruledb_op(write, &key, &val, 1); // key remained correct
+	ret = ruledb_op(write, &key, &val, 1); // key remained correct since ENOENT
 	if (ret != 0)
 		return kr_error(ret);
 	*tagset |= tag_new;
@@ -180,6 +182,7 @@ int kr_rules_init(const char *path, size_t maxsize)
 	uint8_t key_rs[] = "\0rulesets";
 	knot_db_val_t key = { .data = key_rs, .len = sizeof(key_rs) };
 	knot_db_val_t rulesets = { .data = &RULESET_DEFAULT, .len = strlen(RULESET_DEFAULT) + 1 };
+	ret = ruledb_op(remove, &key, 1);  kr_assert(ret == 0 || ret == 1);
 	ret = ruledb_op(write, &key, &rulesets, 1);
 	if (ret == 0) return kr_ok();
 failure:
@@ -331,20 +334,20 @@ int rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt)
 		for (int i = 0; i < 1 + want_CNAME; ++i) {
 			memcpy(key_data + KEY_DNAME_END_OFFSET + 2, &types[i], sizeof(rrtype));
 			knot_db_val_t val;
-			// LATER: use cursor to iterate over multiple rules on the same key,
-			// testing tags on each
-			ret = ruledb_op(read, &key, &val, 1);
-			switch (ret) {
-				case -ENOENT: continue;
-				case 0: break;
-				default: return kr_error(ret);
-			}
-			if (!kr_rule_consume_tags(&val, qry->request)) continue;
+			// Multiple variants are possible, with different tags.
+			for (ret = ruledb_op(it_first, &key, &val);
+					ret == 0;
+					ret = ruledb_op(it_next, &val)) {
+				if (!kr_rule_consume_tags(&val, qry->request))
+					continue;
 
-			// We found a rule that applies to the dname+rrtype+req.
-			ret = answer_exact_match(qry, pkt, types[i],
-						 val.data, val.data + val.len);
-			return ret ? kr_error(ret) : RET_ANSWERED;
+				// We found a rule that applies to the dname+rrtype+req.
+				ret = answer_exact_match(qry, pkt, types[i],
+							 val.data, val.data + val.len);
+				return ret ? kr_error(ret) : RET_ANSWERED;
+			}
+			if (kr_fails_assert(ret == 0 || ret == -ENOENT))
+				return kr_error(ret);
 		}
 
 		/* Find the closest zone-like apex that applies.
@@ -548,27 +551,24 @@ int kr_rule_local_data_ins(const knot_rrset_t *rrs, const knot_rdataset_t *sig_r
 int local_data_ins(knot_db_val_t key, const knot_rrset_t *rrs,
 			const knot_rdataset_t *sig_rds, kr_rule_tags_t tags)
 {
-	// Allocate the data in DB.
+	// Prepare the data into a temporary buffer.
 	const int rr_ssize = rdataset_dematerialize_size(&rrs->rrs);
-	const int to_alloc = sizeof(tags) + sizeof(rrs->ttl) + rr_ssize
-			+ rdataset_dematerialize_size(sig_rds);
-	knot_db_val_t val = { .data = NULL, .len = to_alloc };
-	int ret = ruledb_op(write, &key, &val, 1);
-	if (ret) {
-		// ENOSPC seems to be the only expectable error.
-		kr_assert(ret == kr_error(ENOSPC));
-		return kr_error(ret);
-	}
+	const int val_len = sizeof(tags) + sizeof(rrs->ttl) + rr_ssize
+				+ rdataset_dematerialize_size(sig_rds);
+	uint8_t buf[val_len], *data = buf;
+	memcpy(data, &tags, sizeof(tags));
+	data += sizeof(tags);
+	memcpy(data, &rrs->ttl, sizeof(rrs->ttl));
+	data += sizeof(rrs->ttl);
+	rdataset_dematerialize(&rrs->rrs, data);
+	data += rr_ssize;
+	rdataset_dematerialize(sig_rds, data);
 
-	// Write all the data.
-	memcpy(val.data, &tags, sizeof(tags));
-	val.data += sizeof(tags);
-	memcpy(val.data, &rrs->ttl, sizeof(rrs->ttl));
-	val.data += sizeof(rrs->ttl);
-	rdataset_dematerialize(&rrs->rrs, val.data);
-	val.data += rr_ssize;
-	rdataset_dematerialize(sig_rds, val.data);
-	return kr_ok();
+	knot_db_val_t val = { .data = buf, .len = val_len };
+	int ret = ruledb_op(write, &key, &val, 1); // TODO: overwriting on ==tags?
+	// ENOSPC seems to be the only expectable error.
+	kr_assert(ret == 0 || ret == kr_error(ENOSPC));
+	return ret;
 }
 int kr_rule_local_data_del(const knot_rrset_t *rrs, kr_rule_tags_t tags)
 {
@@ -586,6 +586,7 @@ int kr_rule_local_data_merge(const knot_rrset_t *rrs, const kr_rule_tags_t tags)
 	knot_db_val_t val;
 	// Transaction: we assume that we're in a RW transaction already,
 	// so that here we already "have a lock" on the last version.
+	// FIXME: iterate over multiple tags, once iterator supports RW TXN
 	int ret = ruledb_op(read, &key, &val, 1);
 	if (abs(ret) == abs(ENOENT))
 		goto fallback;
@@ -713,15 +714,14 @@ static int answer_zla_redirect(struct kr_query *qry, knot_pkt_t *pkt, const char
 	knot_db_val_t key = local_data_key(&rrs, key_data, ruleset_name);
 
 	knot_db_val_t val;
-	ret = ruledb_op(read, &key, &val, 1);
-	switch (ret) {
-		case -ENOENT: goto nodata;
-		case 0: break;
-		default: return ret;
+	// Multiple variants are possible, with different tags.
+	for (ret = ruledb_op(it_first, &key, &val); ret == 0; ret = ruledb_op(it_next, &val)) {
+		if (kr_rule_consume_tags(&val, qry->request))
+			return answer_exact_match(qry, pkt, qry->stype,
+							val.data, val.data + val.len);
 	}
-	if (kr_rule_consume_tags(&val, qry->request)) // found a match
-		return answer_exact_match(qry, pkt, qry->stype,
-						val.data, val.data + val.len);
+	if (ret && ret != -ENOENT)
+		return ret;
 
 nodata: // Want NODATA answer (or NOERROR if it hits apex SOA).
 	// Start constructing the (pseudo-)packet.
@@ -794,28 +794,25 @@ int kr_rule_local_subtree(const knot_dname_t *apex, enum kr_rule_sub_t type,
 	uint8_t key_data[KEY_MAXLEN];
 	knot_db_val_t key = zla_key(apex, key_data);
 
-	knot_db_val_t val = {
-		.data = NULL,
-		.len = sizeof(tags) + sizeof(ztype),
-	};
+	// Prepare the data into a temporary buffer.
 	const bool has_ttl = ttl != KR_RULE_TTL_DEFAULT;
-	if (has_ttl)
-		val.len += sizeof(ttl);
-	int ret = ruledb_op(write, &key, &val, 1);
-	if (ret) {
-		// ENOSPC seems to be the only expectable error.
-		kr_assert(ret == kr_error(ENOSPC));
-		return kr_error(ret);
-	}
-	memcpy(val.data, &tags, sizeof(tags));
-	val.data += sizeof(tags);
-	memcpy(val.data, &ztype, sizeof(ztype));
-	val.data += sizeof(ztype);
+	const int val_len = sizeof(tags) + sizeof(ztype) + (has_ttl ? sizeof(ttl) : 0);
+	uint8_t buf[val_len], *data = buf;
+	memcpy(data, &tags, sizeof(tags));
+	data += sizeof(tags);
+	memcpy(data, &ztype, sizeof(ztype));
+	data += sizeof(ztype);
 	if (has_ttl) {
-		memcpy(val.data, &ttl, sizeof(ttl));
-		val.data += sizeof(ttl);
+		memcpy(data, &ttl, sizeof(ttl));
+		data += sizeof(ttl);
 	}
-	return kr_ok();
+	kr_require(data == buf + val_len);
+
+	knot_db_val_t val = { .data = buf, .len = val_len };
+	int ret = ruledb_op(write, &key, &val, 1); // TODO: overwriting on ==tags?
+	// ENOSPC seems to be the only expectable error.
+	kr_assert(ret == 0 || ret == kr_error(ENOSPC));
+	return ret;
 }
 
 
@@ -877,8 +874,10 @@ bool subnet_is_prefix(uint8_t a, uint8_t b)
 		memcpy(key.data, arr, sizeof(arr)); \
 	} while (false)
 
-int kr_view_insert_action(const char *subnet, const char *action)
+int kr_view_insert_action(const char *subnet, const char *dst_subnet,
+			kr_proto_set protos, const char *action)
 {
+	if (*dst_subnet == '\0') dst_subnet = NULL; // convenience for the API
 	ENSURE_the_rules;
 	// Parse the subnet string.
 	union kr_sockaddr saddr;
@@ -904,12 +903,81 @@ int kr_view_insert_action(const char *subnet, const char *action)
 		memcpy(key.data, RULESET_DEFAULT, rsp_len);
 	}
 
-	// Insert & commit.
-	knot_db_val_t val = {
-		.data = (void *)/*const-cast*/action,
-		.len = strlen(action),
-	};
+	// We have the key; start constructing the value to insert.
+	const int dst_maxlen = 1 + (dst_subnet ? kr_family_len(saddr.ip.sa_family) : 0);
+	const int action_len = strlen(action);
+	uint8_t buf[sizeof(protos) + dst_maxlen + action_len];
+	uint8_t *data = buf;
+	int dlen = 0;
+
+	memcpy(data, &protos, sizeof(protos));
+	data += sizeof(protos);
+	dlen += sizeof(protos);
+
+	uint8_t dst_bitlen = 0;
+	if (dst_subnet) {
+		// For simplicity, we always write the whole address,
+		// even if some bytes at the end are useless (keep it iff dst_bitlen > 0).
+		int ret = kr_straddr_subnet(data + sizeof(dst_bitlen), dst_subnet);
+		if (ret < 0) {
+			kr_log_error(RULES, "failed to parse destination subnet: %s\n",
+					dst_subnet);
+			return kr_error(ret);
+		}
+		if (saddr.ip.sa_family != kr_straddr_family(dst_subnet)) {
+			kr_log_error(RULES,
+				"destination subnet mismatching IPv4 vs. IPv6: %s\n",
+				dst_subnet);
+			return kr_error(EINVAL);
+		}
+		dst_bitlen = ret;
+	}
+	memcpy(data, &dst_bitlen, sizeof(dst_bitlen));
+	if (dst_bitlen > 0) {
+		data += dst_maxlen; // address bytes already written above
+		dlen += dst_maxlen;
+	} else {
+		data += sizeof(dst_bitlen);
+		dlen += sizeof(dst_bitlen);
+	}
+
+	memcpy(data, action, action_len);
+	data += action_len;
+	dlen += action_len;
+
+	kr_require(data <= buf + dlen);
+	knot_db_val_t val = { .data = buf, .len = dlen };
 	return ruledb_op(write, &key, &val, 1);
+}
+
+static enum kr_proto req_proto(const struct kr_request *req)
+{
+	if (!req->qsource.addr)
+		return KR_PROTO_INTERNAL;
+	const struct kr_request_qsource_flags fl = req->qsource.flags;
+	if (fl.http)
+		return KR_PROTO_DOH;
+	if (fl.tcp)
+		return fl.tls ? KR_PROTO_DOT : KR_PROTO_TCP53;
+	// UDP in some form
+	return fl.tls ? KR_PROTO_DOQ : KR_PROTO_UDP53;
+}
+static bool req_proto_matches(const struct kr_request *req, kr_proto_set proto_set)
+{
+	if (!proto_set) // empty set always matches
+		return true;
+	kr_proto_set mask = 1 << req_proto(req);
+	return mask & proto_set;
+}
+static void log_action(const struct kr_request *req, knot_db_val_t act)
+{
+	if (!kr_log_is_debug(RULES, req))
+		return;
+	// it's complex to get zero-terminated string for the action
+	char act_0t[act.len + 1];
+	memcpy(act_0t, act.data, act.len);
+	act_0t[act.len] = 0;
+	VERBOSE_MSG(req->rplan.initial, "=> view selected action: %s\n", act_0t);
 }
 
 int kr_view_select_action(const struct kr_request *req, knot_db_val_t *selected)
@@ -985,16 +1053,37 @@ int kr_view_select_action(const struct kr_request *req, knot_db_val_t *selected)
 				}
 			}
 			// We certainly have a matching key (join of various sub-cases).
-			if (kr_log_is_debug(RULES, NULL)) {
-				// it's complex to get zero-terminated string for the action
-				char act_0t[val.len + 1];
-				memcpy(act_0t, val.data, val.len);
-				act_0t[val.len] = 0;
-				VERBOSE_MSG(req->rplan.initial, "=> view selected action: %s\n",
-					act_0t);
+			// But multiple variants are possible, and conditions inside values.
+			for (ret = ruledb_op(it_first, &key_leq, &val);
+					ret == 0;
+					ret = ruledb_op(it_next, &val)) {
+				kr_proto_set protos;
+				if (deserialize_fails_assert(&val, &protos))
+					continue;
+				if (!req_proto_matches(req, protos))
+					continue;
+				uint8_t dst_bitlen;
+				if (deserialize_fails_assert(&val, &dst_bitlen))
+					continue;
+				if (dst_bitlen) {
+					const int abytes = kr_inaddr_len(addr);
+					const char *dst_a = kr_inaddr(req->qsource.dst_addr);
+					if (kr_fails_assert(val.len >= abytes))
+						continue;
+					if (kr_bitcmp(val.data, dst_a, dst_bitlen) != 0)
+						continue;
+					val.data += abytes;
+					val.len  -= abytes;
+				}
+				// we passed everything; `val` contains just the action
+				log_action(req, val);
+				*selected = val;
+				return kr_ok();
 			}
-			*selected = val;
-			return kr_ok();
+			// Key matched but none of the condition variants;
+			// we may still get a match with a wider subnet rule -> continue.
+			// LATER(optim.): it's possible that something could be made
+			//   somewhat faster in this various jumping around keys.
 		}
 	}
 	return kr_error(ENOENT);

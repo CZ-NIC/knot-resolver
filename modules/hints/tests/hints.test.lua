@@ -1,5 +1,6 @@
 -- SPDX-License-Identifier: GPL-3.0-or-later
 local utils = require('test_utils')
+local C = require('ffi').C
 
 -- setup resolver
 modules = { 'hints > iterate' }
@@ -36,6 +37,9 @@ local function test_nxdomain()
 	hints.config() -- clean start
 	hints.use_nodata(false)
 	hints.add_hosts('hints.test.hosts')
+	-- We commit manually, as in these tests we query before loading config finishes.
+	C.kr_rules_commit(true)
+
 	-- TODO: prefilling or some other way of getting NXDOMAIN (instead of SERVFAIL)
 	utils.check_answer('bad name gives NXDOMAIN',
 		'badname.lan', kres.type.A, kres.rcode.SERVFAIL)
@@ -50,6 +54,7 @@ local function test_nodata()
 	hints.config() -- clean start
 	hints.use_nodata(true) -- default ATM but let's not depend on that
 	hints['myname.lan'] = '2001:db8::1'
+	C.kr_rules_commit(true)
 	utils.check_answer('another type gives NODATA',
 		'myname.lan', kres.type.MX, utils.NODATA)
 	utils.check_answer('record itself is OK',

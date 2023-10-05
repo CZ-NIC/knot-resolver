@@ -856,6 +856,16 @@ function policy.TAGS_ASSIGN(names)
 	return 'policy.tags_assign_bitmap(' .. tostring(bitmap) .. ')'
 end
 
+-- Perform a list of actions sequentially; meant for kr_view_insert_action().
+function policy.COMBINE(list)
+	if #list == 1 then return list[1] end
+	local r = 'function(state,req) '
+		for _, item in ipairs(list) do
+			r = r .. item .. '(state,req); '
+		end
+	return r .. 'end'
+end
+
 --[[ Insert a forwarding rule, i.e. override upstream for one DNS subtree.
 
 Throws lua exceptions when detecting something fishy.

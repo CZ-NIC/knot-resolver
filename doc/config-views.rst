@@ -5,19 +5,66 @@
 Views and ACLs
 ==============
 
-Views allow to match clients based on source subnets, e.g. "who asked the query".
-This allows you to achieve access control, personalized blacklists and filters based on where a DNS request came from.
+Views allow to differentiate resolver behavior based on "who asked the query".
+This allows you to achieve access control, personalized blacklists and filters based on how the DNS request came.
+
+.. code-block:: yaml
+
+   views:
+     # only allow answering to specific subnets
+     - subnets: [ 0.0.0.0/0, "::/0" ] # words starting with :: need quoting
+       answer: refused
+     - subnets: [ 10.0.10.0/24, 127.0.0.1, "::1" ]
+       answer: allow
 
 Views allow you to combine query source information with other policy rules using :ref:`tags <config-policy-new-tags>`.
 
-The :option:`views <views: <list>>` defines a list of rules.  For each request, the resolver chooses the rule with the most specific subnet matching the client's address (at most one rule may be chosen).
-Such a rule may tell the resolver to refuse to answer, set some additional options, or choose which groups of content rules would apply (see :ref:`tags <config-policy-new-tags>`).
+.. code-block:: yaml
+
+   views:
+     # Apply `malware` and `localnames` rules to these clients and turn off dns64.
+     # We'd also need to use these tags inside local-data: to really change anything.
+     - subnets: [ 2001:db8:1::/56 ]
+       tags: [ malware, localnames ]
+       options:
+         dns64: false
+
+-----
 
 .. option:: views: <list>
 
+Views define a list of rules where each rule contains some matching condition(s) and some action(s).
+
+For each request, the resolver chooses a single rule matching all of its conditions.
+Rules with more precise client subnets have preference, but other priorities are undefined.
+The chosen rule may tell the resolver to refuse to answer, set some additional options, or choose which groups of content rules would apply.
+
+Conditions
+----------
+
    .. option:: subnets: <list of subnets>
 
-      Identifies the client based on his subnet.
+      Identifies the client based on their source address.
+      This is the only mandatory part of each rule.
+      You may use ``[ 0.0.0.0/0, "::/0" ]`` to match all external requests.
+
+   .. option:: dst_subnet <string>
+
+      Destination subnet, i.e. restricting the IP address that accepted the query.
+
+      .. warning::
+
+         If you configured listening on wildcards `0.0.0.0` or `::`,
+         the destination address for UDP queries will be just that
+         instead of the real address.
+
+   .. option:: protocols <list of strings>
+
+      List of protocols for the query; subset of:
+      ``udp53``, ``tcp53``, ``dot``, ``doh``, ``doq``.
+
+Actions
+-------
 
    .. option:: tags: <list of tags>
 
@@ -25,10 +72,11 @@ Such a rule may tell the resolver to refuse to answer, set some additional optio
 
    .. option:: answer: allow|refused|noanswer
 
-      Optional, direct approach how to handle request from clients identified by a view.
+      Direct approach how to handle request from clients identified by a view.
 
-      * **allow** - Clients query resolution is allowed.
       * **refused** - Terminate query resolution and return REFUSED to the requestor.
+      * **allow** - Query resolution is allowed.
+        This option is useful for cutting exceptions inside larger disallowed subnets.
       * **noanswer** - Terminate query resolution and do not return any answer to the requestor.
 
       .. warning::
@@ -49,21 +97,3 @@ Such a rule may tell the resolver to refuse to answer, set some additional optio
 
          Enable/disable DNS64.
 
-.. code-block:: yaml
-
-   views:
-     # only allow answering to specific subnets
-     - subnets: [ 0.0.0.0/0, "::/0" ] # words starting with :: need quoting
-       answer: refused
-     - subnets: [ 10.0.10.0/24, 127.0.0.1, "::1" ]
-       answer: allow
-
-.. code-block:: yaml
-
-   views:
-     - subnets: [ 2001:db8:1::/56 ]
-       tags: [ malware localnames ]
-       options:
-         dns64: true
-
-.. _RPZ: https://dnsrpz.info/

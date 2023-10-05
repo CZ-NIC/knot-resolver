@@ -1,21 +1,24 @@
 {% from 'macros/common_macros.lua.j2' import quotes %}
-{% from 'macros/view_macros.lua.j2' import view_insert_action, view_flags, view_answer %}
+{% from 'macros/view_macros.lua.j2' import get_proto_set, view_flags, view_answer %}
 {% from 'macros/policy_macros.lua.j2' import policy_flags, policy_tags_assign %}
 
 {% if cfg.views %}
 {% for view in cfg.views %}
 {% for subnet in view.subnets %}
 
-{% if view.tags -%}
-{{ view_insert_action(subnet, policy_tags_assign(view.tags)) }}
-{% elif view.answer %}
-{{ view_insert_action(subnet, view_answer(view.answer)) }}
+assert(C.kr_view_insert_action('{{ subnet }}', '{{ view.dst_subnet or '' }}',
+  {{ get_proto_set(view.protocols) }}, policy.COMBINE({
+{%- set flags = view_flags(view.options) -%}
+{% if flags %}
+	{{ quotes(policy_flags(flags)) }},
 {%- endif %}
 
-{%- set flags = view_flags(view.options) -%}
-{% if flags -%}
-{{ view_insert_action(subnet, quotes(policy_flags(flags))) }}
+{% if view.tags %}
+	{{ policy_tags_assign(view.tags) }},
+{% elif view.answer %}
+	{{ view_answer(view.answer) }},
 {%- endif %}
+  })) == 0)
 
 {% endfor %}
 {% endfor %}

@@ -244,7 +244,8 @@ static int cdb_commit(kr_cdb_pt db, struct kr_cdb_stats *stats, bool accept)
 	return ret;
 }
 
-/** Obtain a read-only cursor (and a read-only transaction). */
+/** Obtain a read-only cursor (and a read-only transaction).
+ * TODO: allow RW transaction (for ruledb iterator) */
 static int txn_curs_get(struct lmdb_env *env, MDB_cursor **curs, struct kr_cdb_stats *stats)
 {
 	if (kr_fails_assert(env && curs))
@@ -386,11 +387,7 @@ static int cdb_open_env(struct lmdb_env *env, const char *path, const size_t map
 	ret = mdb_txn_begin(env->env, NULL, 0, &txn);
 	if (ret != MDB_SUCCESS) goto error_mdb;
 
-
-	//FIXME: perhaps we want MDB_DUPSORT in future,
-	//  but for that we'd have to avoid MDB_RESERVE.
-	//  (including a proper assertion, instead of sometimes-crash inside lmdb)
-	const unsigned dbi_flags = 0; //is_cache ? 0 : MDB_DUPSORT;
+	const unsigned dbi_flags = env->is_cache ? 0 : MDB_DUPSORT;
 	ret = mdb_dbi_open(txn, NULL, dbi_flags, &env->dbi);
 	if (ret != MDB_SUCCESS) {
 		mdb_txn_abort(txn);
@@ -675,17 +672,34 @@ static int cdb_readv(kr_cdb_pt db, struct kr_cdb_stats *stats,
 }
 
 static int cdb_write(struct lmdb_env *env, MDB_txn **txn, const knot_db_val_t *key,
-			knot_db_val_t *val, unsigned flags,
-			struct kr_cdb_stats *stats)
+			knot_db_val_t *val, struct kr_cdb_stats *stats)
 {
 	/* Convert key structs and write */
 	MDB_val _key = val_knot2mdb(*key);
 	MDB_val _val = val_knot2mdb(*val);
 	stats->write++;
-	int ret = mdb_put(*txn, env->dbi, &_key, &_val, flags);
 
+	/* This is LMDB specific optimisation,
+	 * if caller specifies value with NULL data and non-zero length,
+	 * LMDB will preallocate the entry for caller and leave write
+	 * transaction open, caller is responsible for syncing thus committing transaction.
+	 */
+	unsigned mdb_flags = 0;
+	if (val->len > 0 && val->data == NULL) {
+		if (kr_fails_assert(env->is_cache))
+			return kr_error(EINVAL); // incompatible with MDB_DUPSORT
+		mdb_flags |= MDB_RESERVE;
+	}
+	/* If the same key-value pair was there, we do not add yet another copy
+	 * and consider it kr_ok() and ignore MDB_KEYEXIST. */
+	if (!env->is_cache)
+		mdb_flags |= MDB_NODUPDATA;
+
+	int ret = mdb_put(*txn, env->dbi, &_key, &_val, mdb_flags);
+
+	const bool is_dup = !env->is_cache && ret == MDB_KEYEXIST;
 	/* We don't try to recover from MDB_TXN_FULL. */
-	if (ret != MDB_SUCCESS) {
+	if (ret != MDB_SUCCESS && !is_dup) {
 		txn_abort(env);
 		return lmdb_error(env, ret);
 	}
@@ -703,18 +717,8 @@ static int cdb_writev(kr_cdb_pt db, struct kr_cdb_stats *stats,
 	MDB_txn *txn = NULL;
 	int ret = txn_get(env, &txn, false);
 
-	for (int i = 0; ret == kr_ok() && i < maxcount; ++i) {
-		/* This is LMDB specific optimisation,
-		 * if caller specifies value with NULL data and non-zero length,
-		 * LMDB will preallocate the entry for caller and leave write
-		 * transaction open, caller is responsible for syncing thus committing transaction.
-		 */
-		unsigned mdb_flags = 0;
-		if (val[i].len > 0 && val[i].data == NULL) {
-			mdb_flags |= MDB_RESERVE;
-		}
-		ret = cdb_write(env, &txn, &key[i], &val[i], mdb_flags, stats);
-	}
+	for (int i = 0; ret == kr_ok() && i < maxcount; ++i)
+		ret = cdb_write(env, &txn, &key[i], &val[i], stats);
 
 	return ret;
 }
@@ -729,9 +733,8 @@ static int cdb_remove(kr_cdb_pt db, struct kr_cdb_stats *stats,
 
 	for (int i = 0; ret == kr_ok() && i < maxcount; ++i) {
 		MDB_val _key = val_knot2mdb(keys[i]);
-		MDB_val val = { 0, NULL };
 		stats->remove++;
-		ret = lmdb_error(env, mdb_del(txn, env->dbi, &_key, &val));
+		ret = lmdb_error(env, mdb_del(txn, env->dbi, &_key, NULL));
 		if (ret == kr_ok())
 			deleted++;
 		else if (ret == KNOT_ENOENT) {
@@ -860,7 +863,8 @@ static int cdb_read_less(kr_cdb_pt db, struct kr_cdb_stats *stats,
 	MDB_val key2_m = val_knot2mdb(*key);
 	MDB_val val2_m = { 0, NULL };
 	stats->read_less++;
-	ret = mdb_cursor_get(curs, &key2_m, &val2_m, MDB_PREV);
+	// It could keep on the same `key` when MDB_PREV was used.
+	ret = mdb_cursor_get(curs, &key2_m, &val2_m, MDB_PREV_NODUP);
 	if (!ret) {
 		/* finalize the output */
 		*key = val_mdb2knot(key2_m);
@@ -904,6 +908,47 @@ knot_db_t *kr_cdb_pt2knot_db_t(kr_cdb_pt db)
 	return libknot_db;
 }
 
+static int cdb_it_first(kr_cdb_pt db, struct kr_cdb_stats *stats,
+			const knot_db_val_t *key, knot_db_val_t *val)
+{
+	if (kr_fails_assert(db && key && key->data && val))
+		return kr_error(EINVAL);
+	struct lmdb_env *env = db2env(db);
+	if (kr_fails_assert(!env->is_cache))
+		return kr_error(EINVAL);
+
+	MDB_cursor *curs = NULL;
+	int ret = txn_curs_get(env, &curs, stats);
+	if (ret) return ret;
+
+	MDB_val key2_m = val_knot2mdb(*key);
+	MDB_val val2_m = { 0, NULL };
+	ret = mdb_cursor_get(curs, &key2_m, &val2_m, MDB_SET);
+	if (ret) return lmdb_error(env, ret);
+	ret = mdb_cursor_get(curs, &key2_m, &val2_m, MDB_FIRST_DUP);
+	if (ret) return lmdb_error(env, ret);
+	*val = val_mdb2knot(val2_m);
+	return kr_ok();
+}
+static int cdb_it_next(kr_cdb_pt db, struct kr_cdb_stats *stats, knot_db_val_t *val)
+{
+	if (kr_fails_assert(db && val))
+		return kr_error(EINVAL);
+	struct lmdb_env *env = db2env(db);
+	if (kr_fails_assert(!env->is_cache && env->txn.ro_curs_active))
+		return kr_error(EINVAL);
+
+	MDB_cursor *curs = NULL;
+	int ret = txn_curs_get(env, &curs, stats);
+	if (ret) return ret;
+	MDB_val val2_m = { 0, NULL };
+	ret = mdb_cursor_get(curs, NULL, &val2_m, MDB_NEXT_DUP);
+	if (ret) return lmdb_error(env, ret);
+	*val = val_mdb2knot(val2_m);
+	return kr_ok();
+}
+
+
 const struct kr_cdb_api *kr_cdb_lmdb(void)
 {
 	static const struct kr_cdb_api api = {
@@ -914,6 +959,7 @@ const struct kr_cdb_api *kr_cdb_lmdb(void)
 		cdb_read_leq, cdb_read_less,
 		cdb_usage_percent, cdb_get_maxsize,
 		cdb_check_health,
+		cdb_it_first, cdb_it_next,
 	};
 	return &api;
 }

@@ -148,6 +148,8 @@ ${CDEFS} ${LIBKRES} types <<-EOF
 	enum kr_log_group
 	struct kr_query_data_src
 	enum kr_rule_sub_t
+	enum kr_proto
+	kr_proto_set
 EOF
 
 ${CDEFS} ${KRESD} variables <<-EOF
@@ -293,6 +295,7 @@ ${CDEFS} ${LIBKRES} functions <<-EOF
 	packet_ttl
 # New policy
 	kr_rules_init
+	kr_rules_commit
 	kr_view_insert_action
 	kr_view_select_action
 	kr_rule_tag_add

@@ -6,16 +6,6 @@ from knot_resolver_manager.datamodel.config_schema import template_from_str
 from knot_resolver_manager.datamodel.view_schema import ViewOptionsSchema, ViewSchema
 
 
-def test_view_insert_action():
-    subnet = "10.0.0.0/8"
-    action = "policy.DENY"
-    tmpl_str = """{% from 'macros/view_macros.lua.j2' import view_insert_action %}
-{{ view_insert_action(subnet, action) }}"""
-
-    tmpl = template_from_str(tmpl_str)
-    assert tmpl.render(subnet=subnet, action=action) == f"assert(C.kr_view_insert_action('{ subnet }',{ action })==0)"
-
-
 def test_view_flags():
     tmpl_str = """{% from 'macros/view_macros.lua.j2' import view_flags %}
 {{ view_flags(options) }}"""
