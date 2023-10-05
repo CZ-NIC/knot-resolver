@@ -1,13 +1,15 @@
-Knot Resolver 6.0.0 (2023-mm-dd)
+Knot Resolver 6.0.4 (2023-10-05)
 ================================
 
-Improvements
-------------
-- Knot Resolver v6 alpha starts
-- 6.0.x versions are dedicated to alpha cycle
+6.0.x are "early access" versions,
+not generally recommended for production use.
+
+6.0 contains biggest changes in the history of Knot Resolver releases.
+You will have to rewrite your configuration.  See documentation, in particular:
+https://knot.pages.nic.cz/knot-resolver/upgrading-to-6.html
 
 
-Knot Resolver 5.7.0 (2023-0m-dd)
+Knot Resolver 5.7.0 (2023-08-22)
 ================================
 
 Security
