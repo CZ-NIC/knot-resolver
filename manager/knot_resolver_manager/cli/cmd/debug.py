@@ -2,6 +2,7 @@ import argparse
 import json
 import os
 import sys
+from pathlib import Path
 from typing import List, Optional, Tuple, Type
 
 from knot_resolver_manager.cli.command import Command, CommandArgs, CompWords, register_command
@@ -46,7 +47,7 @@ class DebugCommand(Command):
             "--gdb",
             help="GDB command (may be a command on PATH, or an absolute path)",
             type=str,
-            default="gdb",
+            default=None,
         )
         return debug, DebugCommand
 
@@ -55,8 +56,24 @@ class DebugCommand(Command):
         return {}
 
     def run(self, args: CommandArgs) -> None:
-        gdb_cmd = str(which.which(self.gdb))
-        sudo_cmd = str(which.which("sudo"))
+        if self.gdb is None:
+            try:
+                gdb_cmd = str(which.which("gdb"))
+            except RuntimeError:
+                print("Could not find 'gdb' in $PATH. Is GDB installed?", file=sys.stderr)
+                sys.exit(1)
+        elif "/" not in self.gdb:
+            try:
+                gdb_cmd = str(which.which(self.gdb))
+            except RuntimeError:
+                print(f"Could not find '{self.gdb}' in $PATH.", file=sys.stderr)
+                sys.exit(1)
+        else:
+            gdb_cmd_path = Path(self.gdb).absolute()
+            if not gdb_cmd_path.exists():
+                print(f"Could not find '{self.gdb}'.", file=sys.stderr)
+                sys.exit(1)
+            gdb_cmd = str(gdb_cmd_path)
 
         response = request(args.socket, "GET", f"processes/{self.proc_type}")
         if response.status != 200:
@@ -80,12 +97,18 @@ class DebugCommand(Command):
 
         # Put `sudo --` at the beginning of the command.
         if self.sudo:
+            try:
+                sudo_cmd = str(which.which("sudo"))
+            except RuntimeError:
+                print("Could not find 'sudo' in $PATH. Is sudo installed?", file=sys.stderr)
+                sys.exit(1)
             exec_args.extend([sudo_cmd, "--"])
 
-        # Attach GDB to processes - the first process gets passed as a regular `--pid` argument to GDB, the
-        # rest are attached using the `add-inferior` and `attach` GDB commands. This way, we are now debugging
-        # multiple processes.
+        # Attach GDB to processes - the processes are attached using the `add-inferior` and `attach` GDB
+        # commands. This way, we can debug multiple processes.
         exec_args.extend([gdb_cmd])
+        exec_args.extend(["-init-eval-command", "set detach-on-fork off"])
+        exec_args.extend(["-init-eval-command", "set schedule-multiple on"])
         exec_args.extend(["-init-eval-command", f'attach {procs[0]["pid"]}'])
         inferior = 2
         for proc in procs[1:]:
