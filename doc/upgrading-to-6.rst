@@ -6,26 +6,26 @@
 Upgrading to version 6.x
 ************************
 
-New version 6.x of Knot Resolver brings many major and minor changes.
-The most significant change is the introduction of a new process called ``knot-resolver-manager`` which represents a new way of interaction with Knot Resolver.
+The new version 6.x of Knot Resolver brings many major and minor changes.
+The most significant one is the introduction of a new process called ``knot-resolver-manager``, which represents a new way of interaction with Knot Resolver:
 
-* easier process management that hides complexities of running multiple instances of ``kresd`` process (``kresd@1``, ``kresd@2``, ...)
-* new :ref:`declarative configuration <config-overview>` in YAML language that can be validated before running
+* easier process management that hides complexities of running multiple instances of the ``kresd`` process (``kresd@1``, ``kresd@2``, ...)
+* new :ref:`declarative configuration <config-overview>` in YAML that can be validated before running
 * :ref:`manager-api` to change configuration on the fly without downtime
 * new :ref:`manager-client` to help with configuration validation and more
 
-Since version 6, Knot Resolver uses the new systemd integration ``knot-resolver.service`` instead of ``kresd@.service``.
-So you can control the resolver using this systemd service.
+Starting with version 6, Knot Resolver uses the new systemd integration ``knot-resolver.service`` instead of ``kresd@.service``.
+You can now control the resolver using this systemd service:
 
 .. code-block:: bash
 
       $ systemctl start knot-resolver # you can also use: stop, restart, reload or enable/disable
 
 There is no need for managing multiple instances of ``kresd@.service`` like before version 6.
-However, ``kresd`` processes still run in the background as separate workers and are managed by new process ``knot-resolver-manager``.
+However, ``kresd`` processes still run in the background as separate workers and are managed by the new ``knot-resolver-manager`` process.
 
 The number of ``kresd`` workers can be configured directly in the new declarative configuration file.
-Knot Resolver's new configuration is by default located in ``/etc/knot-resolver/config.yaml``.
+Knot Resolver's new configuration is located in ``/etc/knot-resolver/config.yaml`` by default.
 
 .. code-block:: yaml
 
@@ -38,16 +38,16 @@ See more in :ref:`multiple workers <config-multiple-workers>` documentation.
 .. note::
 
    You might be worried about the future of ``kresd``.
-   No worries, you can use ``kresd`` directly the same way you did before, nothing changes there right now.
-   However, in the long run, we can make major changes to the way ``kresd`` is configured and using it directly is considered advanced from now on.
+   No worries, you can still use ``kresd`` directly the same way you did before, nothing changes there right now.
+   However, in the long run, we can make major changes to the way ``kresd`` is configured and using it directly is considered an advanced practice from now on.
 
 Configuration
 =============
 
-Knot Resolver is able to run without any additional configuration, that is, configuration file ``/etc/knot-resolver/config.yaml`` is empty.
-The resolver then listens on localhost with standard unencrypted DNS protocol port 53.
+Knot Resolver is able to run without any additional configuration, i.e. the configuration file ``/etc/knot-resolver/config.yaml`` may be empty.
+The resolver then listens on ``localhost`` with the standard unencrypted DNS protocol port 53.
 
-To write a configuration you can start with :ref:`getting started chapter for configuration <gettingstarted-config>`.
+To write your own configuration, you can start with the :ref:`getting started chapter for configuration <gettingstarted-config>`.
 
 If you need to rewrite the old Lua configuration to the new declarative one,
 it's a good idea to find the option you want to convert in the :ref:`internal Lua configuration <internal-lua-config>`,
@@ -55,15 +55,16 @@ and the equivalent option will very likely be in the :ref:`new declarative confi
 The documentation structure is basically the same.
 Otherwise, you will have to search for the option in the documentation separately.
 
-If you have some custom Lua code in your configuration, you can use it in :ref:`lua section <config-lua>` of declarative configuration.
+If you have some custom Lua code in your configuration, you can use it in the :ref:`lua section <config-lua>` of the declarative configuration.
 However, it has some limitations and we cannot guarantee 100% functionality.
-For example, a configuration based on the systemd instance name will not work.
+For example, a configuration that uses the systemd instance name will not work.
 
 Reconfiguration
 ---------------
 
-To load the modified configuration, just use ``reload`` and all running workers should be reconfigured without the resolver downtime.
-This was not possible before version 6. It was necessary to manually restart all running ``kresd@`` instances.
+To load the modified configuration, use the ``reload`` command.
+All running workers will be restarted sequentially, resulting in a zero-downtime configuration reload.
+This was not possible before version 6, as it was necessary to manually restart all running ``kresd@`` instances.
 
 .. code-block:: bash
 
@@ -71,7 +72,7 @@ This was not possible before version 6. It was necessary to manually restart all
 
 It is also possible to use :ref:`manager-api` and :ref:`manager-client` for runtime reconfiguration.
 
-Some configuration changes are not safe to load at runtime and the resolver needs to be fully restarted.
+Some configuration changes (e.g. changes to the ``management`` key) are not safe to load at runtime, and the resolver then needs to be fully restarted.
 You should get a relevant error message if this happens during the resolver reload process.
 
 .. code-block:: bash
@@ -84,7 +85,7 @@ Useful commands rosetta
 In the table below, you can compare the way Knot Resolver was used before and how it can be used now.
 
 ==========================================  ===========================================================================================  ==================================================================
-Task                                        How to do it now                                                                             How it was done before           
+Task                                        How to do it now                                                                             How it was done before
 ==========================================  ===========================================================================================  ==================================================================
 start resolver                              ``systemctl start knot-resolver``                                                            ``systemctl start kresd@1``
 stop resolver                               ``systemctl stop knot-resolver``                                                             ``systemctl stop kresd@1``

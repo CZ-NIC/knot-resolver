@@ -8,7 +8,7 @@ Welcome to Knot Resolver's documentation!
 Knot Resolver is an open-source implementation of a caching validating DNS resolver.
 Modular architecture keeps the core tiny and efficient, and it also provides a state-machine like API for extensions.
 
-If you are completely a new user or new to version 6, please start with chapters for :ref:`getting started <gettingstarted-chapter>` and :ref:`upgrading guide <upgrading-to-6>`.
+If you are a completely new user or new to version 6, please start with chapters for :ref:`getting started <gettingstarted-chapter>` and :ref:`upgrading guide <upgrading-to-6>`.
 
 .. toctree::
    :caption: Getting Started
