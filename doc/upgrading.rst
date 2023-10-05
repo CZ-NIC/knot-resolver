@@ -29,10 +29,11 @@ newer versions when they are released.
 .. _`supervisord`: http://supervisord.org/
 
 
-5.x to 6.0
+5.x to 6.x
 ==========
 
-* `detailed upgrade guide <upgrading-to-6>`
+* see the more detailed guide for `upgrading to version 6.x <upgrading-to-6>`
+
 
 5.4 to 5.5
 ==========

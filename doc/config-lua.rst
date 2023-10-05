@@ -59,14 +59,3 @@ In the declarative configuration there is a ``lua`` section where you can insert
 .. note::
 
    The script is applied after the declarative configuration, so it can change the configuration defined in it.
-
-.. toctree::
-   :maxdepth: 2
-
-   config-lua-overview
-   config-lua-network
-   config-lua-performance
-   config-lua-policy
-   config-lua-logging-monitoring
-   config-lua-dnssec
-   config-lua-experimental
