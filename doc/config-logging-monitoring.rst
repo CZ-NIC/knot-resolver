@@ -7,6 +7,13 @@ Logging, monitoring, diagnostics
 To read service logs use commands usual for your distribution.
 E.g. on distributions using systemd-journald use command ``journalctl -eu knot-resolver``.
 
+.. code-block:: yaml
+
+   logging:
+     groups: [manager, cache]  # enable debug logging level for some groups
+     level: info  # other groups are logged based on this level
+
+
 .. option:: logging:
 
    .. option:: level: crit|err|warning|notice|info|debug
@@ -17,10 +24,11 @@ E.g. on distributions using systemd-journald use command ``journalctl -eu knot-r
       so logs from Knot Resolver should contain only couple lines a day.
       For debugging purposes it is possible to use the very verbose ``debug`` level,
       but that is generally not usable unless restricted in some way (see below).
-
-      Toggle between ``debug`` and ``notice`` log level. Use only for debugging purposes.
-      On busy systems verbose logging can produce several MB of logs per
+      On busy systems the debug-level logging can produce several MB of logs per
       second and will slow down operation.
+
+      In addition, your OS may provide a way to show logs only for some levels,
+      e.g. ``journalctl`` supports passing ``-p warning`` to show lines that are warnings or more severe.
 
       In addition to levels, logging is also divided into the groups.
 
@@ -28,12 +36,6 @@ E.g. on distributions using systemd-journald use command ``journalctl -eu knot-r
 
       Use to turn-on ``debug`` logging for the selected :ref:`groups <config_log_groups>` regardless of the global log level.
       Other groups are logged to the log based on the initial level.
-
-      .. code-block:: yaml
-
-         logging:
-           level: notice  # other groups are logged based on this level
-           groups: [manager, cache]  # enable debug logging level for manager and cache group
 
       .. It is also possible to enable ``debug`` logging level for particular requests,
       .. with :ref:`policies <mod-policy-logging>` or as :ref:`an HTTP service <mod-http-trace>`.

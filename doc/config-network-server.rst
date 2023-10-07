@@ -6,6 +6,16 @@ Addresses and services
 Addresses, ports, protocols, and API calls available for clients communicating
 with the resolver are configured in :option:`network/listen <network/listen: <list>>`.
 
+.. code-block:: yaml
+
+   network: # typical examples
+     listen:
+       - interface: lo # plain DNS on localhost, port 53
+       - interface: eth0
+         kind: dot
+       - interface: [ 127.0.0.1, '::1' ]
+         kind: doh2
+
 First, you need to decide what type of service should be available on a given IP
 address + port combination.
 
@@ -34,6 +44,13 @@ address + port combination.
       and interface names. Optionally, the port number may be specified using
       ``@`` as a separator, e.g. ``127.0.0.1@3535`` or ``eth0@5353``.
 
+      .. warning::
+
+         On machines with multiple IP addresses, avoid listening on wildcards like
+         ``0.0.0.0`` or ``::``. If a client can be reached through multiple addresses,
+         UDP answers from a wildcard address might pick a wrong source address - most
+         well-behaved clients will then refuse such a response.
+
    .. option:: port: <1-65535>
 
       :default: 53 (dns, xdp), 853 (dot), 443 (doh2, doh-legacy)
@@ -54,26 +71,14 @@ address + port combination.
 
 .. code-block:: yaml
 
-   network:
+   network: # some unusual examples
      listen:
-       - interface: '::1'  # default port is 53
-       - interface: lo
+       - interface: '::1'
          port: 3535
-       - interface: eth0
-         kind: dot  # default port is 853
-       - interface: [127.0.0.1, '::1']
-         kind: doh2  # default port is 443
        - interface: eth0
          port: 5353  # custom port number, default is 53 for XDP
          kind: xdp
        - unix-socket: /tmp/kres-socket  # bind to unix domain socked
-
-.. warning::
-
-   On machines with multiple IP addresses, avoid listening on wildcards like
-   ``0.0.0.0`` or ``::``. If a client can be reached through multiple addresses,
-   UDP answers from a wildcard address might pick a wrong source address - most
-   well-behaved clients will then refuse such a response.
 
 
 .. _config-network-proxyv2:
