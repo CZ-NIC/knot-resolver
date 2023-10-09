@@ -1,12 +1,20 @@
-{% macro http_config(http_cfg, kind, tls=true) -%}
-http.config({tls={{ 'true' if tls else 'false'}},
-{%- if http_cfg.cert_file -%}
-    cert='{{ http_cfg.cert_file }}',
-{%- endif -%}
-{%- if http_cfg.key_file -%}
-    key='{{ http_cfg.key_file }}',
-{%- endif -%}
-},'{{ kind }}')
+{% from 'macros/common_macros.lua.j2' import boolean, quotes %}
+
+
+{% macro http_config(service_name=none, tls=false, cert_file=none, key_file=none) -%}
+http.config({
+    tls = {{ boolean(tls) }},
+{% if cert_file %}
+    cert = '{{ cert_file }}',
+{% endif %}
+{% if key_file %}
+    key = '{{ key_file }}',
+{% endif %}
+},
+{% if service_name %}
+'{{ service_name }}'
+{% endif %}
+)
 {%- endmacro %}
 
 
@@ -21,35 +29,145 @@ http.config({tls={{ 'true' if tls else 'false'}},
 {%- endmacro %}
 
 
-{% macro net_listen_unix_socket(path, kind, freebind) -%}
-net.listen('{{ path }}',nil,{kind={{ listen_kind(kind) }},freebind={{ 'true' if freebind else 'false'}}})
-{%- endmacro %}
-
-
-{% macro net_listen_interface(interface, kind, freebind, port) -%}
-net.listen(
-{%- if interface.addr -%}
-'{{ interface.addr }}',
-{%- elif interface.if_name -%}
-net.{{ interface.if_name }},
-{%- endif -%}
-{%- if interface.port -%}
-{{ interface.port }},
-{%- else -%}
-{{ port }},
-{%- endif -%}
-{kind={{ listen_kind(kind) }},freebind={{ 'true' if freebind else 'false'}}})
-{%- endmacro %}
-
-
 {% macro network_listen(listen) -%}
 {%- if listen.unix_socket -%}
 {% for path in listen.unix_socket %}
-{{ net_listen_unix_socket(path, listen.kind, listen.freebind) }}
+{{ net_listen(quotes(path), 'nil', listen.kind, listen.freebind) }}
 {% endfor %}
 {%- elif listen.interface -%}
 {% for interface in listen.interface %}
-{{ net_listen_interface(interface, listen.kind, listen.freebind, listen.port) }}
+
+{%- set vars = {
+    'interface': none,
+    'port': listen.port
+    }
+-%}
+
+{%- if interface.addr -%}
+{%- if vars.update({'interface': quotes(interface.addr)}) -%}{%- endif -%}
+{%- elif interface.if_name -%}
+{%- if vars.update({'interface': 'net.'+interface.if_name|string}) -%}{%- endif -%}
+{%- endif -%}
+
+{%- if interface.port -%}
+{%- if vars.update({'port': interface.port}) -%}{%- endif -%}
+{%- endif -%}
+
+{{ net_listen(vars.interface, vars.port, listen.kind, listen.freebind) }}
 {% endfor %}
+{%- endif -%}
+{%- endmacro %}
+
+
+{% macro net_listen(interface, port='nil', kind='dns', freebind=false, nic_queue=none) -%}
+net.listen({{ interface }}, {{ port }}, {
+    kind = {{ listen_kind(kind) }},
+    freebind = {{ boolean(freebind) }},
+{% if nic_queue %}
+    nic_queue = {{ nic_queue }},
+{% endif %}
+})
+{%- endmacro %}
+
+
+{% macro net_tls(cert_file=none, key_file=none) -%}
+net.tls(
+{% if cert_file %}
+    cert_file = '{{ cert_file  }}',
+{% endif %}
+{% if key_file %}
+    key_file = '{{ key_file }}',
+{% endif %}
+)
+{%- endmacro %}
+
+
+{% macro net_tls_padding(padding) -%}
+net.tls_padding(
+{%- if padding is true -%}
+true
+{%- elif padding is false -%}
+false
+{%- else -%}
+{{ padding }}
+{%- endif -%}
+)
+{%- endmacro %}
+
+
+{% macro proxy_allowed(proxy_protocol) -%}
+{% if proxy_protocol %}
+net.proxy_allowed({
+{% for item in proxy_protocol.allow %}
+    '{{ item }}',
+{% endfor %}
+})
+{% else %}
+net.proxy_allowed({})
+{% endif %}
+{%- endmacro %}
+
+{% macro renumber_config(config) -%}
+renumber.config = {
+{% for item in config %}
+    {'{{ item.source }}', '{{ item.destination }}'},
+{% endfor %}
+}
+{%- endmacro %}
+
+
+{% macro table_or_server(val) -%}
+{%- if val is string -%}
+{{ quotes(val) }}
+{%- elif val is iterable -%}
+{
+{%- for item in val -%}
+{%- if item.address is defined -%}
+{{ quotes(item.address) }},
+{%- elif item is string -%}
+{{ quotes(item) }},
+{%- else -%}
+{# raise some ERROR #}
+{%- endif -%}
+{%- endfor -%}
+}
+{%- else -%}
+{# raise some ERROR #}
+{%- endif -%}
+{%- endmacro %}
+
+
+{# Return server address or table of server addresses #}
+{% macro tls_servers_table(servers) -%}
+{
+{%- for item in servers -%}
+{%- if item.address is defined-%}
+{'{{ item.address|string }}',{{ tls_server_auth(item) }}},
+{%- else -%}
+'{{ item|string }}',
+{%- endif -%}
+{%- endfor -%}
+}
+{%- endmacro %}
+
+
+{% macro tls_server_auth(server) -%}
+{%- if server.hostname -%}
+hostname='{{ server.hostname|string }}',
+{%- endif -%}
+{%- if server.ca_file -%}
+ca_file='{{ server.ca_file|string }}',
+{%- endif -%}
+{%- if server.pin_sha256 -%}
+pin_sha256=
+{%- if server.pin_sha256 is string -%}
+'{{ server.pin_sha256|string }}',
+{%- else -%}
+{
+{%- for pin in server.pin_sha256 -%}
+'{{ pin|string }}',
+{%- endfor -%}
+}
+{%- endif -%}
 {%- endif -%}
 {%- endmacro %}

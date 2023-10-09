@@ -1,3 +1,10 @@
+{% from 'macros/common_macros.lua.j2' import modules_load, cache_prefill_config, cache_predict_config %}
+{% from 'macros/cache_macros.lua.j2' import prefill_config, predict_config %}
+
+--------------------------------------------------------------------------------
+-- CACHE configuration
+--------------------------------------------------------------------------------
+
 cache.open({{ cfg.cache.size_max.bytes() }}, 'lmdb://{{ cfg.cache.storage }}')
 cache.min_ttl({{ cfg.cache.ttl_min.seconds() }})
 cache.max_ttl({{ cfg.cache.ttl_max.seconds() }})
@@ -5,23 +12,12 @@ cache.ns_tout({{ cfg.cache.ns_timeout.millis() }})
 
 {% if cfg.cache.prefill %}
 -- cache.prefill
-modules.load('prefill')
-prefill.config({
-{% for item in cfg.cache.prefill %}
-    ['{{ item.origin.punycode() }}'] = {
-        url = '{{ item.url }}',
-        interval = {{ item.refresh_interval.seconds() }}
-        {{ "ca_file = '"+item.ca_file+"'," if item.ca_file }}
-    }
-{% endfor %}
-})
+{{ modules_load('prefill') }}
+{{ prefill_config(cfg.cache.prefill) }}
 {% endif %}
 
 {% if cfg.cache.prediction %}
 -- cache.prediction
-modules.load('predict')
-predict.config({
-    window = {{ cfg.cache.prediction.window.minutes() }},
-    period = {{ cfg.cache.prediction.period }},
-})
+{{ modules_load('predict') }}
+{{ predict_config(cfg.cache.prediction) }}
 {% endif %}

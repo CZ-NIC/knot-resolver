@@ -1,42 +1,62 @@
-{% from 'macros/common_macros.lua.j2' import boolean, string_table %}
+{% from 'macros/common_macros.lua.j2' import quotes, boolean, table_or_string %}
+
 
 {% macro forward_options(options) -%}
-{dnssec={{ boolean(options.dnssec) }},auth={{ boolean(options.authoritative) }}}
-{%- endmacro %}
-
-{% macro forward_server(server) -%}
-{% if server.address is defined %}
-{%- for addr in server.address -%}
-{'{{ addr }}',
-{%- if server.transport == 'tls' -%}
-tls=true,
-{%- else -%}
-tls=false,
-{%- endif -%}
-{%- if server.hostname -%}
-hostname='{{ server.hostname }}',
-{%- endif -%}
-{%- if server.pin_sha256 -%}
-pin_sha256={{ string_table(server.pin_sha256) }},
-{%- endif -%}
-{%- if server.ca_file -%}
-ca_file='{{ server.ca_file }}',
-{%- endif -%}
-},
-{%- endfor -%}
-{% else %}
-{'{{ server }}'},
-{%- endif -%}
-{%- endmacro %}
-
-{% macro forward_servers(servers) -%}
 {
-{%- for server in servers -%}
-{{ forward_server(server) }}
-{%- endfor -%}
+    dnssec = {{ boolean(options.dnssec) }},
+    auth = {{ boolean(options.authoritative) }}
 }
 {%- endmacro %}
 
-{% macro policy_rule_forward_add(subtree,options,servers) -%}
-policy.rule_forward_add('{{ subtree }}',{{ forward_options(options) }},{{ forward_servers(servers) }})
+
+{% macro forward_server_config(address, transport, hostname, pin_sha256, ca_file) -%}
+{
+    {{ quotes(address) }},
+    tls = {{ 'true' if transport == 'tls' else 'false' }},
+{% if hostname %}
+    hostname = {{ quotes(hostname) }},
+{% endif %}
+{% if pin_sha256 %}
+    pin_sha256 = {{ table_or_string(pin_sha256) }},
+{% endif %}
+{% if ca_file %}
+    ca_file = {{ quotes(ca_file) }},
+{% endif %}
+}
+{%- endmacro %}
+
+
+{% macro forward_server(server) -%}
+{% if server.address is defined %}
+{% for address in server.address %}
+{{ forward_server_config(address, server.transport, server.hostname, server.pin_sha256, server.ca_file) }},
+{% endfor %}
+{% else %}
+{ {{ quotes(server) }} },
+{%- endif %}
+{%- endmacro %}
+
+
+{% macro forward_servers(servers) %}
+{
+{% for server in servers %}
+    {{ forward_server(server)|indent }}
+{% endfor %}
+}
+{%- endmacro %}
+
+
+{% macro policy_rule_forward_add(subtree, options, servers) -%}
+policy.rule_forward_add(
+    {{ quotes(subtree) }},
+    {{ options|indent }},
+    {{ servers|indent }}
+)
+{%- endmacro %}
+
+
+{% macro forward(fwd) -%}
+{% for subtree in fwd.subtree %}
+{{ policy_rule_forward_add(subtree, forward_options(fwd.options), forward_servers(fwd.servers)) }}
+{% endfor %}
 {%- endmacro %}

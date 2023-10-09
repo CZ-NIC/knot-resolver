@@ -1,4 +1,5 @@
-{% from 'macros/common_macros.lua.j2' import string_table, str2ip_table, qtype_table, servers_table, tls_servers_table %}
+{% from 'macros/common_macros.lua.j2' import table_or_string, table_or_str2ip, table_or_qtype %}
+{% from 'macros/common_macros.lua.j2' import table_or_server, tls_servers_table %}
 
 
 {# Add policy #}
@@ -37,7 +38,7 @@ policy.slice_randomize_psl()
 
 {% macro policy_flags(flags) -%}
 policy.FLAGS({
-{{- flags -}}
+    {{ flags|indent }}
 })
 {%- endmacro %}
 
@@ -45,12 +46,12 @@ policy.FLAGS({
 {# Tags assign #}
 
 {% macro policy_tags_assign(tags) -%}
-policy.TAGS_ASSIGN({{ string_table(tags) }})
+policy.TAGS_ASSIGN({{ table_or_string(tags) }})
 {%- endmacro %}
 
 {% macro policy_get_tagset(tags) -%}
 {%- if tags is defined-%}
-policy.get_tagset({{ string_table(tags) }})
+policy.get_tagset({{ table_or_string(tags) }})
 {%- else -%}
 0
 {%- endif -%}
@@ -124,7 +125,7 @@ policy_qtype({{ action }}, {{ qtype }})
 {%- elif filter.pattern -%}
 {{ policy_pattern(action, filter.pattern) }}
 {%- elif filter.qtype -%}
-{{ policy_qtype_custom_filter(action, qtype_table(filter.qtype)) }}
+{{ policy_qtype_custom_filter(action, table_or_qtype(filter.qtype)) }}
 {%- else -%}
 {{ policy_all(action) }}
 {%- endif %}
@@ -168,12 +169,12 @@ policy.REROUTE(
 {% macro policy_answer(answer) -%}
 policy.ANSWER({[kres.type.{{ answer.rtype }}]={rdata=
 {%- if answer.rtype in ['A','AAAA'] -%}
-{{ str2ip_table(answer.rdata) }},
+{{ table_or_str2ip(answer.rdata) }},
 {%- elif answer.rtype == '' -%}
 {# TODO: Do the same for other record types that require a special rdata type in Lua.
 By default, the raw string from config is used. #}
 {%- else -%}
-{{ string_table(answer.rdata) }},
+{{ table_or_string(answer.rdata) }},
 {%- endif -%}
 ttl={{ answer.ttl.seconds()|int }}}},{{ 'true' if answer.nodata else 'false' }})
 {%- endmacro %}
@@ -213,11 +214,11 @@ policy.REQTRACE
 {%- endmacro %}
 
 {% macro policy_stub(servers) -%}
-policy.STUB({{ servers_table(servers) }})
+policy.STUB({{ table_or_server(servers) }})
 {%- endmacro %}
 
 {% macro policy_forward(servers) -%}
-policy.FORWARD({{ servers_table(servers) }})
+policy.FORWARD({{ table_or_server(servers) }})
 {%- endmacro %}
 
 {% macro policy_tls_forward(servers) -%}

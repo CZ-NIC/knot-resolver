@@ -1,0 +1,20 @@
+{% from 'macros/common_macros.lua.j2' import quotes %}
+{% from 'macros/network_macros.lua.j2' import net_listen, http_config %}
+
+
+{% macro webmgmt_config(config) -%}
+{{ http_config('webmgmt', config.tls, config.cert_file, config.key_file, ) }}
+{%- endmacro %}
+
+
+{% macro webmgmt_listen(webmgmt, kind='webmgmt') -%}
+{% if webmgmt.unix_socket %}
+{{ net_listen(quotes(webmgmt.unix_socket), kind=kind) }}
+{% elif webmgmt.interface %}
+{% if webmgmt.interface.addr %}
+{{ net_listen(quotes(webmgmt.interface.addr), webmgmt.interface.port, kind) }}
+{% elif webmgmt.interface.if_name %}
+{{ net_listen('net.'+webmgmt.interface.if_name|string, webmgmt.interface.port, kind) }}
+{% endif %}
+{% endif %}
+{%- endmacro %}

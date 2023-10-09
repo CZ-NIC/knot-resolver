@@ -1,0 +1,5 @@
+{% from 'macros/common_macros.lua.j2' import boolean %}
+
+{% macro option(option_name, value, negation=false) -%}
+option('{{ option_name }}', {{ boolean(value, negation) }})
+{%- endmacro %}

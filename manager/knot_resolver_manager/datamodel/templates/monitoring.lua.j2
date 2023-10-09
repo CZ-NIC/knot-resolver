@@ -1,33 +1,16 @@
---- control socket location
-local ffi = require('ffi')
-local id = os.getenv('SYSTEMD_INSTANCE')
-if not id then
-	log_error(ffi.C.LOG_GRP_SYSTEM, 'environment variable $SYSTEMD_INSTANCE not set, which should not have been possible due to running under manager')
-else
-	-- Bind to control socket in CWD (= rundir in config)
-    -- FIXME replace with relative path after fixing https://gitlab.nic.cz/knot/knot-resolver/-/issues/720
-	local path = '{{ cwd }}/control/'..id
-    log_warn(ffi.C.LOG_GRP_SYSTEM, 'path = ' .. path)
-	local ok, err = pcall(net.listen, path, nil, { kind = 'control' })
-	if not ok then
-		log_warn(ffi.C.LOG_GRP_NETWORK, 'bind to '..path..' failed '..err)
-	end
-end
+{% from 'macros/common_macros.lua.j2' import modules_load %}
+{% from 'macros/monitoring_macros.lua.j2' import monitoring_control_socket, monitoring_collect_lazy_statistics, monitoring_collect_statistics %}
+
+--------------------------------------------------------------------------------
+-- MONITORING configuration
+--------------------------------------------------------------------------------
+
+{{ monitoring_control_socket() }}
 
 {% if cfg.monitoring.enabled == "always" %}
-modules.load('stats')
+{{ modules_load('stats') }}
 {% endif %}
 
---- function used for statistics collection
-function collect_lazy_statistics()
-	if stats == nil then
-		modules.load('stats')
-	end
+{{ monitoring_collect_lazy_statistics }}
 
-	return tojson(stats.list())
-end
-
---- function used for statistics collection
-function collect_statistics()
-	return tojson(stats.list())
-end
+{{ monitoring_collect_statistics }}

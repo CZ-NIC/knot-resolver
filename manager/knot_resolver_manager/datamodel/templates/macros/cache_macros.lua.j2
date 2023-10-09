@@ -1,0 +1,23 @@
+{% from 'macros/common_macros.lua.j2' import quotes %}
+
+{% macro prefill_config(config) -%}
+prefill.config({
+{% for item in config %}
+    [{{ quotes(item.origin.punycode()) }}] = {
+        url = {{ quotes(item.url) }},
+        interval = {{ item.refresh_interval.seconds() }},
+{% if item.ca_file %}
+        ca_file = {{ quotes(item.ca_file) }},
+{% endif %}
+    }
+{% endfor %}
+})
+{%- endmacro %}
+
+
+{% macro predict_config(config) -%}
+predict.config({
+    window = {{ config.window.minutes() }},
+    period = {{ config.period }},
+})
+{%- endmacro %}

@@ -1,18 +1,24 @@
-{%- macro get_proto_set(protocols) -%}
-0
-{%- for p in protocols or [] -%}
- + 2^C.KR_PROTO_{{ p.upper() }}
-{%- endfor -%}
-{%- endmacro -%}
+{% from 'macros/common_macros.lua.j2' import quotes %}
+{% from 'macros/policy_macros.lua.j2' import policy_flags, policy_tags_assign %}
 
-{% macro view_flags(options) -%}
-{% if not options.minimize -%}
-"NO_MINIMIZE",
-{%- endif %}
-{% if not options.dns64 -%}
-"DNS64_DISABLE",
-{%- endif %}
+
+{% macro view_protocols(protocols) -%}
+0
+{%- for p in protocols or [] %}
+ + 2^C.KR_PROTO_{{ p.upper() }}
+{%- endfor %}
 {%- endmacro %}
+
+
+{% macro view_options_flags(options) -%}
+{% if not options.minimize %}
+"NO_MINIMIZE",
+{% endif %}
+{% if not options.dns64 %}
+"DNS64_DISABLE",
+{% endif %}
+{%- endmacro %}
+
 
 {% macro view_answer(answer) -%}
 {%- if answer == 'allow' -%}
@@ -22,4 +28,27 @@ policy.TAGS_ASSIGN({})
 {%- elif answer == 'noanswer' -%}
 'policy.NO_ANSWER'
 {%- endif -%}
+{%- endmacro %}
+
+
+{% macro view_insert_action(subnet, dst_subnet, protocols, options, tags, answer) -%}
+{%- set flags = view_options_flags(options) -%}
+assert(C.kr_view_insert_action(
+    {{ quotes(subnet) }}, {{ quotes(dst_subnet or '') }},
+    {{ view_protocols(protocols) }},
+{% if flags %}
+    policy.COMBINE({
+        {{ quotes(policy_flags(flags))|indent }},
+{% if tags %}
+        {{ policy_tags_assign(tags)|indent }}
+{% elif answer %}
+        {{ view_answer(answer)|indent }}
+{% endif %}
+    })
+{% elif tags %}
+    {{ policy_tags_assign(tags)|indent }}
+{% elif answer %}
+    {{ view_answer(answer)|indent }}
+{% endif %}
+) == 0)
 {%- endmacro %}

@@ -1,101 +1,85 @@
 {% macro quotes(string) -%}
-'{{ string }}'
+'{{ string|string }}'
 {%- endmacro %}
 
-{% macro boolean(val, negation=false) -%}
-{%- if negation -%}
-{{ 'false' if val else 'true' }}
-{%- else-%}
-{{ 'true' if val else 'false' }}
+
+{% macro boolean(bool, negation=false) -%}
+{%- if bool in [true, 1] -%}
+{{ 'false' if negation else 'true' }}
+{%- elif bool in [false, 0]-%}
+{{ 'true' if negation else 'false' }}
+{%- else -%}
+{# raise some ERROR #}
 {%- endif -%}
 {%- endmacro %}
 
-{# Return string or table of strings #}
-{% macro string_table(table) -%}
-{%- if table is string -%}
-'{{ table|string }}'
-{%- elif table -%}
+
+{# MODULES #}
+
+{% macro modules_load(module_name) -%}
+modules.load({{ quotes(module_name) }})
+{%- endmacro %}
+
+
+{% macro modules_unload(module_name) -%}
+modules.unload({{ quotes(module_name) }})
+{%- endmacro %}
+
+
+{% macro module_loader(bool, module_name) -%}
+{%- if bool is true -%}
+{{ modules_load(module_name) }}
+{%- elif bool is false -%}
+{{ modules_load(module_name) }}
+{{ modules_unload(module_name) }}
+{%- else -%}
+{# raise some ERROR #}
+{%- endif -%}
+{%- endmacro %}
+
+
+{# TABLES #}
+
+{% macro table_or_string(val) -%}
+{%- if val is string -%}
+{{ quotes(val) }}
+{%- elif val is iterable -%}
 {
-{%- for item in table -%}
-'{{ item|string }}',
+{%- for item in val -%}
+{{ quotes(item) }},
 {%- endfor -%}
 }
+{%- else -%}
+{# raise some ERROR #}
 {%- endif -%}
 {%- endmacro %}
 
-{# Return str2ip or table of str2ip #}
-{% macro str2ip_table(table) -%}
-{%- if table is string -%}
-kres.str2ip('{{ table|string }}')
-{%- else-%}
+
+{% macro table_or_str2ip(val) -%}
+{%- if val is string -%}
+kres.str2ip({{ quotes(val) }})
+{%- elif val is iterable -%}
 {
-{%- for item in table -%}
-kres.str2ip('{{ item|string }}'),
+{%- for item in val -%}
+kres.str2ip({{ quotes(item) }}),
 {%- endfor -%}
 }
+{%- else -%}
+{# raise some ERROR #}
 {%- endif -%}
 {%- endmacro %}
 
-{# Return qtype or table of qtype #}
-{% macro qtype_table(table) -%}
-{%- if table is string -%}
-kres.type.{{ table|string }}
-{%- else-%}
+
+{% macro table_or_qtype(val) -%}
+{%- if val is string -%}
+kres.type.{{ val|string }}
+{%- elif val is iterable -%}
 {
-{%- for item in table -%}
+{%- for item in val -%}
 kres.type.{{ item|string }},
 {%- endfor -%}
 }
-{%- endif -%}
-{%- endmacro %}
-
-{# Return server address or table of server addresses #}
-{% macro servers_table(servers) -%}
-{%- if servers is string -%}
-'{{ servers|string }}'
-{%- else-%}
-{
-{%- for item in servers -%}
-{%- if item.address is defined -%}
-'{{ item.address|string }}',
 {%- else -%}
-'{{ item|string }}',
-{%- endif -%}
-{%- endfor -%}
-}
-{%- endif -%}
-{%- endmacro %}
-
-{# Return server address or table of server addresses #}
-{% macro tls_servers_table(servers) -%}
-{
-{%- for item in servers -%}
-{%- if item.address is defined-%}
-{'{{ item.address|string }}',{{ tls_server_auth(item) }}},
-{%- else -%}
-'{{ item|string }}',
-{%- endif -%}
-{%- endfor -%}
-}
-{%- endmacro %}
-
-{% macro tls_server_auth(server) -%}
-{%- if server.hostname -%}
-hostname='{{ server.hostname|string }}',
-{%- endif -%}
-{%- if server.ca_file -%}
-ca_file='{{ server.ca_file|string }}',
-{%- endif -%}
-{%- if server.pin_sha256 -%}
-pin_sha256=
-{%- if server.pin_sha256 is string -%}
-'{{ server.pin_sha256|string }}',
-{%- else -%}
-{
-{%- for pin in server.pin_sha256 -%}
-'{{ pin|string }}',
-{%- endfor -%}
-}
-{%- endif -%}
+{# raise some ERROR #}
 {%- endif -%}
 {%- endmacro %}

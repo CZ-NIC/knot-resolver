@@ -1,0 +1,22 @@
+{% from 'macros/common_macros.lua.j2' import boolean %}
+
+{% macro logging_groups(groups) -%}
+log_groups({
+{% for group in groups %}
+{% if group not in [ "manager", "supervisord" ] %}
+    '{{ group }}',
+{% endif %}
+{% endfor %}
+})
+{%- endmacro %}
+
+{% macro logging_dnstap(config) -%}
+dnstap.config({
+    socket_path = '{{ config.unix_socket }}',
+    client = {
+        log_queries = {{ boolean(config.log_queries) }},
+        log_responses = {{ boolean(config.log_responses) }},
+        log_tcp_rtt = {{ boolean(config.log_tcp_rtt) }}
+    }
+})
+{%- endmacro %}

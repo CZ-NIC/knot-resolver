@@ -1,0 +1,24 @@
+{% from 'macros/common_macros.lua.j2' import quotes, boolean %}
+
+
+{% macro trust_anchors(tas) -%}
+{% for ta in tas %}
+trust_anchors.add({{ quotes(ta) }})
+{% endfor %}
+{%- endmacro %}
+
+
+{% macro negative_trust_anchors(ntas) -%}
+trust_anchors.set_insecure({
+{% for nta in ntas %}
+    {{ quotes(nta) }},
+{% endfor %}
+})
+{%- endmacro %}
+
+
+{% macro trust_anchors_files(tafs) -%}
+{% for taf in tafs %}
+trust_anchors.add_file({{ quotes(taf.file) }},  readonly = {{ boolean(taf.read_only) }})
+{% endfor %}
+{%- endmacro %}

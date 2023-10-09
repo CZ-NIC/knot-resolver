@@ -1,9 +1,11 @@
-{% from 'macros/forward_macros.lua.j2' import policy_rule_forward_add %}
+{% from 'macros/forward_macros.lua.j2' import forward %}
 
 {% if cfg.forward %}
+--------------------------------------------------------------------------------
+-- FORWARD configuration
+--------------------------------------------------------------------------------
+
 {% for fwd in cfg.forward %}
-{% for subtree in fwd.subtree %}
-{{ policy_rule_forward_add(subtree,fwd.options,fwd.servers) }}
-{% endfor %}
+{{ forward(fwd) }}
 {% endfor %}
 {% endif %}

@@ -1,5 +1,9 @@
-{% from 'macros/common_macros.lua.j2' import boolean %}
-{% from 'macros/network_macros.lua.j2' import network_listen, http_config %}
+{% from 'macros/common_macros.lua.j2' import boolean, module_loader, modules_load %}
+{% from 'macros/network_macros.lua.j2' import network_listen, http_config, net_tls, net_tls_padding, proxy_allowed, renumber_config %}
+
+--------------------------------------------------------------------------------
+-- NETWORK configuration
+--------------------------------------------------------------------------------
 
 -- network.do-ipv4/6
 net.ipv4 = {{ boolean(cfg.network.do_ipv4) }}
@@ -19,11 +23,7 @@ net.outgoing_v6('{{ cfg.network.out_interface_v6 }}')
 net.tcp_pipeline({{ cfg.network.tcp_pipeline }})
 
 -- network.edns-keep-alive
-{% if cfg.network.edns_tcp_keepalive %}
-modules.load('edns_keepalive')
-{% else %}
-modules.unload('edns_keepalive')
-{% endif %}
+{{ module_loader(cfg.network.edns_tcp_keepalive, 'edns_keepalive') }}
 
 -- network.edns-buffer-size
 net.bufsize(
@@ -31,9 +31,9 @@ net.bufsize(
     {{ cfg.network.edns_buffer_size.downstream.bytes() }}
 )
 
-{% if cfg.network.tls.cert_file and cfg.network.tls.key_file %}
+{% if cfg.network.tls.cert_file or cfg.network.tls.key_file %}
 -- network.tls
-net.tls('{{ cfg.network.tls.cert_file  }}', '{{ cfg.network.tls.key_file }}')
+{{ net_tls(cfg.network.tls.cert_file, cfg.network.tls.key_file) }}
 {% endif %}
 
 {% if cfg.network.tls.sticket_secret %}
@@ -46,57 +46,33 @@ net.tls_sticket_secret('{{ cfg.network.tls.sticket_secret }}')
 net.tls_sticket_secret_file('{{ cfg.network.tls.sticket_secret_file }}')
 {% endif %}
 
-{% if cfg.network.tls.auto_discovery %}
 -- network.tls.auto-discovery
-modules.load('experimental_dot_auth')
-{% else %}
--- modules.unload('experimental_dot_auth')
-{% endif %}
+{{ module_loader(cfg.network.tls.auto_discovery, 'experimental_dot_auth') }}
 
 -- network.tls.padding
-net.tls_padding(
-{%- if cfg.network.tls.padding == true -%}
-true
-{%- elif cfg.network.tls.padding == false -%}
-false
-{%- else -%}
-{{ cfg.network.tls.padding }}
-{%- endif -%}
-)
+{{ net_tls_padding(cfg.network.tls.padding ) }}
 
 {% if cfg.network.address_renumbering %}
 -- network.address-renumbering
-modules.load('renumber')
-renumber.config = {
-{% for item in cfg.network.address_renumbering %}
-    {'{{ item.source }}', '{{ item.destination }}'},
-{% endfor %}
-}
+{{ modules_load('renumber') }}
+{{ renumber_config(cfg.network.address_renumbering) }}
 {% endif %}
 
-{%- set vars = {'doh_legacy': False} -%}
+-- network.proxy-protocol
+{{ proxy_allowed(cfg.network.proxy_protocol) }}
+
+{%- set vars = {'doh_legacy': false} -%}
 {% for listen in cfg.network.listen if listen.kind == "doh-legacy" -%}
-{%- if vars.update({'doh_legacy': True}) -%}{%- endif -%}
+{%- if vars.update({'doh_legacy': true}) -%}{%- endif -%}
 {%- endfor %}
 
 {% if vars.doh_legacy %}
 -- doh_legacy http config
-modules.load('http')
-{{ http_config(cfg.network.tls,"doh_legacy") }}
-{% endif %}
-
-{% if cfg.network.proxy_protocol %}
--- network.proxy-protocol
-net.proxy_allowed({
-{% for item in cfg.network.proxy_protocol.allow %}
-'{{ item }}',
-{% endfor %}
-})
-{% else %}
-net.proxy_allowed({})
+{{ modules_load('http') }}
+{{ http_config("doh_legacy", true, cfg.network.tls.cert_file, cfg.network.tls.key_file) }}
 {% endif %}
 
 -- network.listen
-{% for listen in cfg.network.listen %}
+{% for listen in cfg.network.listen -%}
 {{ network_listen(listen) }}
-{% endfor %}
+{%- endfor %}

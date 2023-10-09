@@ -1,25 +1,12 @@
-{% from 'macros/common_macros.lua.j2' import boolean %}
+{% from 'macros/common_macros.lua.j2' import modules_load %}
+{% from 'macros/webmgmt_macros.lua.j2' import webmgmt_config, webmgmt_listen %}
 
 {% if cfg.webmgmt -%}
--- webmgmt
-modules.load('http')
-http.config({tls = {{ boolean(cfg.webmgmt.tls) }},
-{%- if cfg.webmgmt.cert_file -%}
-    cert = '{{ cfg.webmgmt.cert_file }}',
-{%- endif -%}
-{%- if cfg.webmgmt.cert_file -%}
-    key = '{{ cfg.webmgmt.key_file }}',
-{%- endif -%}
-}, 'webmgmt')
-net.listen(
-{%- if cfg.webmgmt.unix_socket -%}
-    '{{ cfg.webmgmt.unix_socket }}',nil,
-{%- elif cfg.webmgmt.interface -%}
-    {%- if cfg.webmgmt.interface.addr -%}
-        '{{ cfg.webmgmt.interface.addr }}',{{ cfg.webmgmt.interface.port }},
-    {%- elif cfg.webmgmt.interface.if_name -%}
-        net.{{ cfg.webmgmt.interface.if_name }},{{ cfg.webmgmt.interface.port }},
-    {%- endif -%}
-{%- endif -%}
-{ kind = 'webmgmt' })
+--------------------------------------------------------------------------------
+-- WEBMGMT configuration
+--------------------------------------------------------------------------------
+
+{{ modules_load('http') }}
+{{ webmgmt_config(cfg.webmgmt) }}
+{{ webmgmt_listen(cfg.webmgmt) }}
 {%- endif %}

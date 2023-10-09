@@ -1,39 +1,28 @@
-{% from 'macros/common_macros.lua.j2' import boolean %}
+{% from 'macros/common_macros.lua.j2' import boolean, modules_load, module_loader %}
+{% from 'macros/logging_macros.lua.j2' import logging_groups, logging_dnstap %}
+
+--------------------------------------------------------------------------------
+-- LOGGING configuration
+--------------------------------------------------------------------------------
 
 -- logging.level
 log_level('{{ cfg.logging.level }}')
 
-{% if cfg.logging.target -%}
 -- logging.target
 log_target('{{ cfg.logging.target }}')
-{%- endif %}
 
 {% if cfg.logging.groups %}
 -- logging.groups
-log_groups({
-{% for g in cfg.logging.groups %}
-{% if g != "manager" and g != "supervisord" %}
-    '{{ g }}',
-{% endif %}
-{% endfor %}
-})
+{{ logging_groups(cfg.logging.groups) }}
 {% endif %}
 
-{% if cfg.logging.dnssec_bogus %}
-modules.load('bogus_log')
-{% endif %}
+-- logging.dnssec-bogus
+{{ module_loader(cfg.logging.dnssec_bogus, 'bogus_log') }}
 
 {% if cfg.logging.dnstap -%}
 -- logging.dnstap
-modules.load('dnstap')
-dnstap.config({
-    socket_path = '{{ cfg.logging.dnstap.unix_socket }}',
-    client = {
-        log_queries = {{ boolean(cfg.logging.dnstap.log_queries) }},
-        log_responses = {{ boolean(cfg.logging.dnstap.log_responses) }},
-        log_tcp_rtt = {{ boolean(cfg.logging.dnstap.log_tcp_rtt) }}
-    }
-})
+{{ modules_load('dnstap') }}
+{{ logging_dnstap(cfg.logging.dnstap) }}
 {%- endif %}
 
 -- logging.debugging.assertion-abort

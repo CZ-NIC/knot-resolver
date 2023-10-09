@@ -1,41 +1,46 @@
 {% from 'macros/local_data_macros.lua.j2' import local_data_rules, local_data_records, local_data_root_fallback_addresses, local_data_root_fallback_addresses_files, local_data_addresses, local_data_addresses_files %}
-{% from 'macros/common_macros.lua.j2' import boolean %}
+{% from 'macros/common_macros.lua.j2' import boolean, modules_load %}
 
-modules = { 'hints > iterate' }
+--------------------------------------------------------------------------------
+-- LOCAL-DATA configuration
+--------------------------------------------------------------------------------
 
-{# root-fallback-addresses #}
+-- load 'hints' module
+{{ modules_load('hints > iterate') }}
+
 {% if cfg.local_data.root_fallback_addresses -%}
+-- local-data.root-fallback-addresses
 {{ local_data_root_fallback_addresses(cfg.local_data.root_fallback_addresses) }}
 {%- endif %}
 
-{# root-fallback-addresses-files #}
-{% if cfg.local_data.root_fallback_addresses_files -%}
+{% if cfg.local_data.root_fallback_addresses_files %}
+-- local-data.root-fallback-addresses-files
 {{ local_data_root_fallback_addresses_files(cfg.local_data.root_fallback_addresses_files) }}
 {%- endif %}
 
-{# addresses #}
-{% if cfg.local_data.addresses -%}
+{% if cfg.local_data.addresses %}
+-- local-data.addresses
 {{ local_data_addresses(cfg.local_data.addresses, cfg.local_data.nodata, cfg.local_data.ttl) }}
-{%- endif %}
+{% endif %}
 
-{# addresses-files #}
-{% if cfg.local_data.addresses_files -%}
+{% if cfg.local_data.addresses_files %}
+-- local-data.addresses-files
 {{ local_data_addresses_files(cfg.local_data.addresses_files, cfg.local_data.nodata, cfg.local_data.ttl) }}
-{%- endif %}
+{% endif %}
 
-{# records #}
-{% if cfg.local_data.records -%}
+{% if cfg.local_data.records %}
+-- local-data.records
 {{ local_data_records(cfg.local_data.records, false, cfg.local_data.nodata, cfg.local_data.ttl) }}
-{%- endif %}
+{% endif %}
 
-{# rules #}
-{% if cfg.local_data.rules -%}
+{% if cfg.local_data.rules %}
+-- local-data.rules
 {{ local_data_rules(cfg.local_data.rules, cfg.local_data.nodata, cfg.local_data.ttl) }}
-{%- endif %}
+{% endif %}
 
-{# rpz #}
-{% if cfg.local_data.rpz -%}
+{% if cfg.local_data.rpz %}
+-- local-data.rpz
 {% for rpz in cfg.local_data.rpz %}
 {{ local_data_records(rpz.file, true, cfg.local_data.nodata, cfg.local_data.ttl, rpz.tags) }}
 {% endfor %}
-{%- endif %}
+{% endif %}

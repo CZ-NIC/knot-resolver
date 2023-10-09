@@ -1,0 +1,13 @@
+{% from 'macros/common_macros.lua.j2' import quotes, table_or_string %}
+
+{%- macro dns64_config(config) -%}
+dns64.config({
+    prefix = {{ quotes(config.prefix.to_std().network_address|string) }},
+{% if config.rev_ttl %}
+    rev_ttl = {{ config.rev_ttl.seconds() }},
+{% endif %}
+{% if config.exclude_subnets %}
+    exclude_subnets = {{ table_or_string(config.exclude_subnets) }},
+{% endif %}
+})
+{%- endmacro -%}

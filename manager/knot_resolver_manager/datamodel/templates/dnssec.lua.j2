@@ -1,30 +1,22 @@
-{% from 'macros/common_macros.lua.j2' import boolean %}
+{% from 'macros/common_macros.lua.j2' import boolean, module_loader %}
+{% from 'macros/dnssec_macros.lua.j2' import trust_anchors, negative_trust_anchors, trust_anchors_files %}
 
-{% if not cfg.dnssec %}
--- disable dnssec
+--------------------------------------------------------------------------------
+-- DNSSEC configuration
+--------------------------------------------------------------------------------
+
+{% if cfg.dnssec is false %}
+-- DNSSEC is disabled
 trust_anchors.remove('.')
-{% endif %}
-
--- options.trust-anchor-sentinel
-{% if cfg.dnssec.trust_anchor_sentinel %}
-modules.load('ta_sentinel')
 {% else %}
-modules.unload('ta_sentinel')
-{% endif %}
+-- dnssec.trust-anchor-sentinel
+{{ module_loader(cfg.dnssec.trust_anchor_sentinel, 'ta_sentinel') }}
 
--- options.trust-anchor-signal-query
-{% if cfg.dnssec.trust_anchor_signal_query %}
-modules.load('ta_signal_query')
-{% else %}
-modules.unload('ta_signal_query')
-{% endif %}
+-- dnssec.trust-anchor-signal-query
+{{ module_loader(cfg.dnssec.trust_anchor_signal_query, 'ta_signal_query') }}
 
--- options.time-skew-detection
-{% if cfg.dnssec.time_skew_detection %}
-modules.load('detect_time_skew')
-{% else %}
-modules.unload('detect_time_skew')
-{% endif %}
+-- dnssec.time-skew-detection
+{{ module_loader(cfg.dnssec.time_skew_detection, 'detect_time_skew') }}
 
 -- dnssec.keep-removed
 trust_anchors.keep_removed = {{ cfg.dnssec.keep_removed }}
@@ -36,23 +28,16 @@ trust_anchors.refresh_time = {{ cfg.dnssec.refresh_time.seconds()|string  }}
 
 {% if cfg.dnssec.trust_anchors %}
 -- dnssec.trust-anchors
-{% for ta in cfg.dnssec.trust_anchors %}
-trust_anchors.add('{{ ta }}')
-{% endfor %}
+{{ trust_anchors(cfg.dnssec.trust_anchors) }}
 {% endif %}
 
 {% if cfg.dnssec.negative_trust_anchors %}
 -- dnssec.negative-trust-anchors
-trust_anchors.set_insecure({
-{% for nta in cfg.dnssec.negative_trust_anchors %}
-    '{{ nta }}',
-{% endfor %}
-})
+{{ negative_trust_anchors(cfg.dnssec.negative_trust_anchors) }}
 {% endif %}
 
 {% if cfg.dnssec.trust_anchors_files %}
 -- dnssec.trust-anchors-files
-{% for taf in cfg.dnssec.trust_anchors_files %}
-trust_anchors.add_file('{{ taf.file }}',  readonly = {{ boolean(taf.read_only) }})
-{% endfor %}
+{{ trust_anchors_files(cfg.dnssec.trust_anchors_files) }}
+{% endif %}
 {% endif %}

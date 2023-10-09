@@ -1,11 +1,11 @@
-{% from 'macros/common_macros.lua.j2' import string_table, boolean %}
+{% from 'macros/common_macros.lua.j2' import quotes, table_or_string, boolean %}
 {% from 'macros/policy_macros.lua.j2' import policy_get_tagset, policy_todname %}
 
 
 {% macro local_data_root_fallback_addresses(pairs) -%}
 hints.root({
 {% for name, addresses in pairs.items() %}
-  ['{{ name }}']={{ string_table(addresses) }},
+    [{{ quotes(name) }}] = {{ table_or_string(addresses) }},
 {% endfor %}
 })
 {%- endmacro %}
@@ -13,21 +13,22 @@ hints.root({
 
 {% macro local_data_root_fallback_addresses_files(files) -%}
 {% for file in files %}
-hints.root_file('{{ file }}')
+hints.root_file({{ quotes(file) }})
 {% endfor %}
 {%- endmacro %}
 
-{%- macro local_data_ttl(ttl) -%}
+
+{% macro local_data_ttl(ttl) -%}
 {%- if ttl -%}
 {{ ttl.seconds() }}
 {%- else -%}
 {{ 'C.KR_RULE_TTL_DEFAULT' }}
 {%- endif -%}
-{%- endmacro -%}
+{%- endmacro %}
 
 
 {% macro kr_rule_local_address(name, address, nodata, ttl, tags=none) -%}
-assert(C.kr_rule_local_address('{{ name }}', '{{ address }}',
+assert(C.kr_rule_local_address({{ quotes(name) }}, {{ quotes(address) }},
     {{ boolean(nodata) }}, {{ local_data_ttl(ttl)}}, {{ policy_get_tagset(tags) }}) == 0)
 {%- endmacro -%}
 
@@ -42,7 +43,7 @@ assert(C.kr_rule_local_address('{{ name }}', '{{ address }}',
 
 
 {% macro kr_rule_local_hosts(file, nodata, ttl, tags=none) -%}
-assert(C.kr_rule_local_hosts('{{ file }}', {{ boolean(nodata) }},
+assert(C.kr_rule_local_hosts({{ quotes(file) }}, {{ boolean(nodata) }},
     {{ local_data_ttl(ttl)}}, {{ policy_get_tagset(tags) }}) == 0)
 {%- endmacro %}
 

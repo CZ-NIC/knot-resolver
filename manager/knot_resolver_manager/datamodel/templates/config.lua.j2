@@ -1,3 +1,5 @@
+{% from 'macros/common_macros.lua.j2' import quotes, modules_load %}
+
 {% if not cfg.lua.script_only %}
 
 -- FFI library
@@ -5,57 +7,48 @@ ffi = require('ffi')
 local C = ffi.C
 
 -- hostname
-hostname('{{ cfg.hostname }}')
+hostname({{ quotes(cfg.hostname) }})
 
 {% if cfg.nsid %}
 -- nsid
-modules.load('nsid')
-nsid.name('{{ cfg.nsid }}' .. worker.id)
+{{ modules_load('nsid') }}
+nsid.name({{ quotes(cfg.nsid) }} .. worker.id)
 {% endif %}
 
--- LOGGING section ----------------------------------
 {% include "logging.lua.j2" %}
 
--- MONITORING section -------------------------------
 {% include "monitoring.lua.j2" %}
 
--- WEBMGMT section ----------------------------------
 {% include "webmgmt.lua.j2" %}
 
--- OPTIONS section ----------------------------------
 {% include "options.lua.j2" %}
 
--- NETWORK section ----------------------------------
 {% include "network.lua.j2" %}
 
--- VIEWS section ------------------------------------
 {% include "views.lua.j2" %}
 
--- DNSSEC section -----------------------------------
 {% include "dnssec.lua.j2" %}
 
--- LOCAL-DATA section -------------------------------
 {% include "local_data.lua.j2" %}
 
--- FORWARD section ----------------------------------
 {% include "forward.lua.j2" %}
 
--- CACHE section ------------------------------------
 {% include "cache.lua.j2" %}
 
--- DNS64 section ------------------------------------
 {% include "dns64.lua.j2" %}
 
 {% endif %}
 
--- LUA section --------------------------------------
--- Custom Lua code cannot be validated
+{% if cfg.lua.script_file or cfg.lua.script%}
+--------------------------------------------------------------------------------
+-- LUA custom script
+--------------------------------------------------------------------------------
+-- Additional lua code that cannot be validated.
 
 {% if cfg.lua.script_file %}
-{% import cfg.lua.script_file as script_file %}
-{{ script_file }}
-{% endif %}
-
-{% if cfg.lua.script %}
+{% import cfg.lua.script_file as file_script %}
+{{ file_script }}
+{% elif cfg.lua.script %}
 {{ cfg.lua.script }}
+{% endif %}
 {% endif %}
