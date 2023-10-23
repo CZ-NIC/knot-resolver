@@ -8,7 +8,7 @@ jobs:
     runs-on: macOS-latest
     strategy:
       matrix:
-        knot-version: ['3.1', '3.2']
+        knot-version: ['3.2', '3.3']
 
     steps:
       - name: Checkout resolver code
