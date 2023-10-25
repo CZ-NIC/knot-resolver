@@ -1,35 +1,91 @@
+import pytest
+
 from knot_resolver_manager.datamodel.config_schema import template_from_str
 from knot_resolver_manager.datamodel.network_schema import ListenSchema
 
 
-def test_network_listen():
+@pytest.mark.parametrize(
+    "val,lua",
+    [
+        ("2001:DB8::d0c", "'2001:DB8::d0c'"),
+        (["2001:DB8::d0c", "192.0.2.1"], "{'2001:DB8::d0c','192.0.2.1',}"),
+    ],
+)
+def test_table_or_server(val, lua):
+    tmpl = template_from_str(
+        "{% from 'macros/network_macros.lua.j2' import table_or_server %}" "{{ table_or_server(val) }}"
+    )
+    assert tmpl.render(val=val) == lua
+
+
+@pytest.mark.parametrize(
+    "val,lua",
+    [
+        (
+            ListenSchema({"unix-socket": "/tmp/kresd-socket", "kind": "dot"}),
+            """net.listen('/tmp/kresd-socket', nil, {
+    kind = 'tls',
+    freebind = false,
+})
+""",
+        ),
+        (
+            ListenSchema({"unix-socket": ["/tmp/kresd-socket", "/tmp/kresd-socket2"], "kind": "dot"}),
+            """net.listen('/tmp/kresd-socket', nil, {
+    kind = 'tls',
+    freebind = false,
+})
+net.listen('/tmp/kresd-socket2', nil, {
+    kind = 'tls',
+    freebind = false,
+})
+""",
+        ),
+        (
+            ListenSchema({"interface": "::1@55", "freebind": True}),
+            """net.listen('::1', 55, {
+    kind = 'dns',
+    freebind = true,
+})
+""",
+        ),
+        (
+            ListenSchema({"interface": ["::1@55", "127.0.0.1@5353"]}),
+            """net.listen('::1', 55, {
+    kind = 'dns',
+    freebind = false,
+})
+net.listen('127.0.0.1', 5353, {
+    kind = 'dns',
+    freebind = false,
+})
+""",
+        ),
+        (
+            ListenSchema({"interface": "eth0", "kind": "doh2"}),
+            """net.listen(net.eth0, 443, {
+    kind = 'doh2',
+    freebind = false,
+})
+""",
+        ),
+        (
+            ListenSchema({"interface": ["eth0", "lo"], "port": 5555, "kind": "doh2"}),
+            """net.listen(net.eth0, 5555, {
+    kind = 'doh2',
+    freebind = false,
+})
+net.listen(net.lo, 5555, {
+    kind = 'doh2',
+    freebind = false,
+})
+""",
+        ),
+    ],
+)
+def test_network_listen(val, lua):
     tmpl_str = """{% from 'macros/network_macros.lua.j2' import network_listen %}
 {{ network_listen(listen) }}"""
+
     tmpl = template_from_str(tmpl_str)
-
-    soc = ListenSchema({"unix-socket": "/tmp/kresd-socket", "kind": "dot"})
-    assert tmpl.render(listen=soc) == "net.listen('/tmp/kresd-socket',nil,{kind='tls',freebind=false})\n"
-    soc_list = ListenSchema({"unix-socket": [soc.unix_socket.to_std()[0], "/tmp/kresd-socket2"], "kind": "dot"})
-    assert (
-        tmpl.render(listen=soc_list)
-        == "net.listen('/tmp/kresd-socket',nil,{kind='tls',freebind=false})\n"
-        + "net.listen('/tmp/kresd-socket2',nil,{kind='tls',freebind=false})\n"
-    )
-
-    ip = ListenSchema({"interface": "::1@55", "freebind": True})
-    assert tmpl.render(listen=ip) == "net.listen('::1',55,{kind='dns',freebind=true})\n"
-    ip_list = ListenSchema({"interface": [ip.interface.to_std()[0], "127.0.0.1@5353"]})
-    assert (
-        tmpl.render(listen=ip_list)
-        == "net.listen('::1',55,{kind='dns',freebind=false})\n"
-        + "net.listen('127.0.0.1',5353,{kind='dns',freebind=false})\n"
-    )
-
-    intrfc = ListenSchema({"interface": "eth0", "kind": "doh2"})
-    assert tmpl.render(listen=intrfc) == "net.listen(net.eth0,443,{kind='doh2',freebind=false})\n"
-    intrfc_list = ListenSchema({"interface": [intrfc.interface.to_std()[0], "lo"], "port": 5555, "kind": "doh2"})
-    assert (
-        tmpl.render(listen=intrfc_list)
-        == "net.listen(net.eth0,5555,{kind='doh2',freebind=false})\n"
-        + "net.listen(net.lo,5555,{kind='doh2',freebind=false})\n"
-    )
+    assert tmpl.render(listen=val) == lua

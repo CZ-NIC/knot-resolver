@@ -1,90 +1,103 @@
+import pytest
+
 from knot_resolver_manager.datamodel.config_schema import template_from_str
 from knot_resolver_manager.datamodel.forward_schema import ForwardServerSchema
 
 
-def test_boolean():
-    tmpl_str = """{% from 'macros/common_macros.lua.j2' import boolean %}
-{{ boolean(x) }}"""
-
-    tmpl = template_from_str(tmpl_str)
-    assert tmpl.render(x=True) == "true"
-    assert tmpl.render(x=False) == "false"
-
-
-def test_boolean_neg():
-    tmpl_str = """{% from 'macros/common_macros.lua.j2' import boolean %}
-{{ boolean(x,true) }}"""
-
-    tmpl = template_from_str(tmpl_str)
-    assert tmpl.render(x=True) == "false"
-    assert tmpl.render(x=False) == "true"
+@pytest.mark.parametrize(
+    "val",
+    ["string", 55, 5.5, True, None],
+)
+def test_quotes(val):
+    tmpl = template_from_str("{% from 'macros/common_macros.lua.j2' import quotes %}{{ quotes(string) }}")
+    assert tmpl.render(string=val) == f"'{val}'"
 
 
-def test_string_table():
-    s = "any string"
-    t = [s, "other string"]
-    tmpl_str = """{% from 'macros/common_macros.lua.j2' import string_table %}
-{{ string_table(x) }}"""
-
-    tmpl = template_from_str(tmpl_str)
-    assert tmpl.render(x=s) == f"'{s}'"
-    assert tmpl.render(x=t) == f"{{'{s}','{t[1]}',}}"
-
-
-def test_str2ip_table():
-    s = "2001:DB8::d0c"
-    t = [s, "192.0.2.1"]
-    tmpl_str = """{% from 'macros/common_macros.lua.j2' import str2ip_table %}
-{{ str2ip_table(x) }}"""
-
-    tmpl = template_from_str(tmpl_str)
-    assert tmpl.render(x=s) == f"kres.str2ip('{s}')"
-    assert tmpl.render(x=t) == f"{{kres.str2ip('{s}'),kres.str2ip('{t[1]}'),}}"
+@pytest.mark.parametrize(
+    "val,lua",
+    [(True, "true"), (False, "false"), (1, "true"), (0, "false")],
+)
+def test_boolean(val, lua):
+    tmpl = template_from_str("{% from 'macros/common_macros.lua.j2' import boolean %}{{ boolean(bool, negation) }}")
+    assert tmpl.render(bool=val, negation=False) == lua
+    assert tmpl.render(bool=not bool(val), negation=True) == lua
 
 
-def test_qtype_table():
-    s = "AAAA"
-    t = [s, "TXT"]
-    tmpl_str = """{% from 'macros/common_macros.lua.j2' import qtype_table %}
-{{ qtype_table(x) }}"""
-
-    tmpl = template_from_str(tmpl_str)
-    assert tmpl.render(x=s) == f"kres.type.{s}"
-    assert tmpl.render(x=t) == f"{{kres.type.{s},kres.type.{t[1]},}}"
+# MODULES
 
 
-def test_servers_table():
-    s = "2001:DB8::d0c"
-    t = [s, "192.0.2.1"]
-    tmpl_str = """{% from 'macros/common_macros.lua.j2' import servers_table %}
-{{ servers_table(x) }}"""
-
-    tmpl = template_from_str(tmpl_str)
-    assert tmpl.render(x=s) == f"'{s}'"
-    assert tmpl.render(x=t) == f"{{'{s}','{t[1]}',}}"
-    assert tmpl.render(x=[{"address": s}, {"address": t[1]}]) == f"{{'{s}','{t[1]}',}}"
-
-
-def test_tls_servers_table():
-    d = ForwardServerSchema(
-        # the ca-file is a dummy, because it's existence is checked
-        {"address": ["2001:DB8::d0c"], "hostname": "res.example.com", "ca-file": "/etc/passwd"}
+@pytest.mark.parametrize(
+    "val",
+    ["module_name_to_load"],
+)
+def test_modules_load(val):
+    tmpl = template_from_str(
+        "{% from 'macros/common_macros.lua.j2' import modules_load %}{{ modules_load(module_name) }}"
     )
-    t = [
-        d,
-        ForwardServerSchema(
-            {
-                "address": "192.0.2.1",
-                "pin-sha256": "OTJmODU3ZDMyOWMwOWNlNTU4Y2M0YWNjMjI5NWE2NWJlMzY4MzRmMzY3NGU3NDAwNTI1YjMxZTMxYTgzMzQwMQ==",
-            }
-        ),
-    ]
-    tmpl_str = """{% from 'macros/common_macros.lua.j2' import tls_servers_table %}
-{{ tls_servers_table(x) }}"""
+    assert tmpl.render(module_name=val) == f"modules.load('{val}')"
 
-    tmpl = template_from_str(tmpl_str)
-    assert tmpl.render(x=[d.address, t[1].address]) == f"{{'{d.address}','{t[1].address}',}}"
-    assert (
-        tmpl.render(x=t)
-        == f"{{{{'{d.address}',hostname='{d.hostname}',ca_file='{d.ca_file}',}},{{'{t[1].address}',pin_sha256={{'{t[1].pin_sha256}',}}}},}}"
+
+@pytest.mark.parametrize(
+    "val",
+    ["module_name_to_unload"],
+)
+def test_modules_unload(val):
+    tmpl = template_from_str(
+        "{% from 'macros/common_macros.lua.j2' import modules_unload %}{{ modules_unload(module_name) }}"
     )
+    assert tmpl.render(module_name=val) == f"modules.unload('{val}')"
+
+
+@pytest.mark.parametrize("val,name", [(True, "module_name_to_load"), (False, "module_name_to_unload")])
+def test_module_loader(val, name):
+    tmpl = template_from_str(
+        "{% from 'macros/common_macros.lua.j2' import module_loader %}{{ module_loader(bool, module_name) }}"
+    )
+    lua = tmpl.render(bool=val, module_name=name)
+    if val is True:
+        assert lua == f"modules.load('{name}')"
+    elif val is False:
+        assert lua == f"modules.load('{name}')\nmodules.unload('{name}')"
+
+
+# TABLES
+
+
+@pytest.mark.parametrize(
+    "val,lua",
+    [
+        ("string", "'string'"),
+        (["s1", "s2", "s3"], "{'s1','s2','s3',}"),
+    ],
+)
+def test_table_or_string(val, lua):
+    tmpl = template_from_str(
+        "{% from 'macros/common_macros.lua.j2' import table_or_string %}{{ table_or_string(val) }}"
+    )
+    assert tmpl.render(val=val) == lua
+
+
+@pytest.mark.parametrize(
+    "val,lua",
+    [
+        ("2001:DB8::d0c", "kres.str2ip('2001:DB8::d0c')"),
+        (["2001:DB8::d0c", "192.0.2.1"], "{kres.str2ip('2001:DB8::d0c'),kres.str2ip('192.0.2.1'),}"),
+    ],
+)
+def test_table_or_str2ip(val, lua):
+    tmpl = template_from_str(
+        "{% from 'macros/common_macros.lua.j2' import table_or_str2ip %}{{ table_or_str2ip(val) }}"
+    )
+    assert tmpl.render(val=val) == lua
+
+
+@pytest.mark.parametrize(
+    "val,lua",
+    [
+        ("AAAA", "kres.type.AAAA"),
+        (["AAAA", "TXT"], "{kres.type.AAAA,kres.type.TXT,}"),
+    ],
+)
+def test_table_or_qtype(val, lua):
+    tmpl = template_from_str("{% from 'macros/common_macros.lua.j2' import table_or_qtype %}{{ table_or_qtype(val) }}")
+    assert tmpl.render(val=val) == lua
