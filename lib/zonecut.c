@@ -19,8 +19,7 @@
 /** Information for one NS name + address type. */
 typedef enum {
 	AI_UNINITED = 0,
-	AI_REPUT,	/**< Don't use this addrset, due to: cache_rep, NO_IPV6, ...
-			 * cache_rep approximates various problems when fetching the RRset. */
+	AI_DISABLED,	/**< Can't use this addrset. */
 	AI_CYCLED,	/**< Skipped due to cycle detection; see implementation for details. */
 	AI_LAST_BAD = AI_CYCLED, /** bad states: <= AI_LAST_BAD */
 	AI_UNKNOWN,	/**< Don't know status of this RRset; various reasons. */
@@ -289,9 +288,13 @@ static addrset_info_t fetch_addr(pack_t *addrs, const knot_dname_t *ns, uint16_t
 	int rdlen;
 	switch (rrtype) {
 	case KNOT_RRTYPE_A:
+		if (qry->flags.NO_IPV4)
+			return AI_DISABLED;
 		rdlen = 4;
 		break;
 	case KNOT_RRTYPE_AAAA:
+		if (qry->flags.NO_IPV6 || no6_is_bad())
+			return AI_DISABLED;
 		rdlen = 16;
 		break;
 	default:
