@@ -1,7 +1,7 @@
-{% from 'macros/common_macros.lua.j2' import modules_load %}
+{% from 'macros/common_macros.lua.j2' import quotes, modules_load %}
 
 
-{% macro monitoring_control_socket() -%}
+{% macro monitoring_control_socket(path) -%}
 --- control socket location
 local ffi = require('ffi')
 local id = os.getenv('SYSTEMD_INSTANCE')
@@ -10,7 +10,7 @@ if not id then
 else
     -- Bind to control socket in CWD (= rundir in config)
     -- FIXME replace with relative path after fixing https://gitlab.nic.cz/knot/knot-resolver/-/issues/720
-    local path = '{{ cwd }}/control/'..id
+    local path = {{ quotes(path) }} .. '/control/'.. id
     log_warn(ffi.C.LOG_GRP_SYSTEM, 'path = ' .. path)
     local ok, err = pcall(net.listen, path, nil, { kind = 'control' })
     if not ok then

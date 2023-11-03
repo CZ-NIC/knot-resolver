@@ -5,12 +5,12 @@
 -- MONITORING configuration
 --------------------------------------------------------------------------------
 
-{{ monitoring_control_socket() }}
+{{ monitoring_control_socket(cwd) }}
 
 {% if cfg.monitoring.enabled == "always" %}
 {{ modules_load('stats') }}
 {% endif %}
 
-{{ monitoring_collect_lazy_statistics }}
+{{ monitoring_collect_lazy_statistics() }}
 
-{{ monitoring_collect_statistics }}
+{{ monitoring_collect_statistics() }}
