@@ -1,3 +1,11 @@
+Knot Resolver 5.x.y (202y-mm-dd)
+================================
+
+Bugfixes
+--------
+- fix potential SERVFAIL deadlocks if net.ipv6 = false (#880)
+
+
 Knot Resolver 5.7.0 (2023-08-22)
 ================================
 
