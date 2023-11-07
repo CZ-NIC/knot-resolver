@@ -44,7 +44,7 @@ LogGroupsEnum: TypeAlias = Literal[
     "valdtr",
     "resolv",
     "select",
-    "zonecut",
+    "zoncut",
     "cookie",
     "statis",
     "rebind",
