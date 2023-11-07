@@ -46,11 +46,6 @@ lint:py3.11:
     paths:
       - manager/unit.junit.xml
 
-unit:py3.7:
-  <<: *unit
-  variables:
-    PYTHON_INTERPRETER: python3.7
-
 unit:py3.8:
   <<: *unit
   variables:
