@@ -21,11 +21,22 @@ depends=(
     'libcap-ng'
     'libnghttp2'
     'jemalloc'
+    'python'
+    'python-yaml'
+    'python-aiohttp'
+    'python-typing-extensions'
+    'python-prometheus_client'
+    'python-typing-extensions'
+    'python-jinja'
+    'supervisor'
 )
 makedepends=(
     'cmocka'
     'meson'
     'systemd-libs'
+    'python-build'
+    'python-installer'
+    'python-poetry'
 )
 optdepends=(
     'lua51-basexx: experimental_dot_auth module'
@@ -40,16 +51,18 @@ sha256sums=('SKIP')
 
 build() {
     cd "${srcdir}/${pkgname}-${pkgver}"
-    meson build \
+    meson setup build \
         --buildtype=release \
         --prefix=/usr \
         --sbindir=bin \
         -D keyfile_default=/etc/trusted-key.key \
         -D systemd_files=enabled \
-        -D client=enabled \
         -D malloc=jemalloc \
         -D unit_tests=enabled
     ninja -C build
+    pushd manager
+    python -Pm build --wheel --no-isolation
+    popd
 }
 
 check() {
@@ -61,10 +74,19 @@ package() {
     cd "${srcdir}/${pkgname}-${pkgver}"
     DESTDIR=${pkgdir} ninja -C build install
 
-    # add kresd.target to multi-user.target.wants to support enabling kresd services
+    # add knot-resolver.service to multi-user.target.wants to support enabling the service
     install -d -m 0755 "${pkgdir}/usr/lib/systemd/system/multi-user.target.wants"
-    ln -s ../kresd.target "${pkgdir}/usr/lib/systemd/system/multi-user.target.wants/kresd.target"
+    ln -s ../knot-resolver.service ${pkgdir}/usr/lib/systemd/system/multi-user.target.wants/knot-resolver.service
 
     # remove modules with missing dependencies
     rm "${pkgdir}/usr/lib/knot-resolver/kres_modules/etcd.lua"
+
+    # install knot-resolver-manager
+    pushd manager
+    python -Pm installer --destdir="$pkgdir" dist/*.whl
+    install -m 644 -D etc/knot-resolver/config.yaml ${pkgdir}/etc/knot-resolver/config.yaml
+    install -m 644 -D shell-completion/client.bash ${pkgdir}/usr/share/bash-completion/completions/kresctl
+    install -m 644 -D shell-completion/client.fish ${pkgdir}/usr/share/fish/completions/kresctl.fish
+    popd
+
 }
