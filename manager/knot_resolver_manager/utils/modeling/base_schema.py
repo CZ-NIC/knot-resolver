@@ -642,7 +642,7 @@ class ObjectMapper:
         try:
             obj._validate()
         except ValueError as e:
-            raise DataValidationError(e.args[0] if len(e.args) > 0 else "Validation error", object_path) from e
+            raise DataValidationError(e.args[0] if len(e.args) > 0 else "Validation error", object_path or "/") from e
 
 
 class BaseSchema(Serializable):
