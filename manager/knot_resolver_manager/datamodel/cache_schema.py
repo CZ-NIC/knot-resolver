@@ -4,16 +4,25 @@ from typing_extensions import Literal
 
 from knot_resolver_manager.datamodel.types import (
     Dir,
+    DNSRecordTypeEnum,
     DomainName,
     EscapedStr,
     File,
     IntNonNegative,
+    IntPositive,
     Percent,
     SizeUnit,
     TimeUnit,
 )
 from knot_resolver_manager.utils.modeling import ConfigSchema
 from knot_resolver_manager.utils.modeling.base_schema import lazy_default
+
+
+class CacheClearRPCSchema(ConfigSchema):
+    name: Optional[DomainName] = None
+    exact_name: bool = False
+    rr_type: Optional[DNSRecordTypeEnum] = None
+    chunk_size: IntPositive = IntPositive(100)
 
 
 class PrefillSchema(ConfigSchema):
