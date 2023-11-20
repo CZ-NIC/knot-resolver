@@ -23,6 +23,11 @@ environment variable, e.g.:
 $ COVERITY_SCAN_TOKEN=the_secret_token ./build.sh debian-11-coverity
 ```
 
+Sometimes, the Coverity Scan binaries need to be updated in order to maintain
+compatibility with the cloud service. Simply rebuild this image and push it to
+the registry to achieve this, no other changes (e.g. to the `Dockerfile`) are
+required.
+
 ### debian-buster (10)
 
 Used to serve the same purpose as `debian-11`. As of 2022-03-09, it is still
