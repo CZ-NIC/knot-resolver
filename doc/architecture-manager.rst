@@ -9,7 +9,7 @@ The manager is a component written in Python and a bit of C used for native exte
 
 The manager is mostly modelled around config processing pipeline:
 
-.. image:: architecture-manager.svg
+.. image:: architecture-config.svg
     :width: 100%
     :alt: Diagram showing a configuration change request processing pipeline inside of the manager. The request goes first through an API server, then through parsing, validation and normalization steps, then into an actual system manager, which commands supervisord and other system components such as kresd.
 
