@@ -31,8 +31,8 @@ void kr_log_target_set(kr_log_target_t target);
 
 /* Groups */
 
-/* Don't forget add *_TAG below, log_group_names[] item (log.c) and generate
- * new kres-gen.lua */
+/* Don't forget add *_TAG below, log_group_names[] item (log.c) and generate new kres-gen.lua
+ * and sync the _TAG list with list in ../manager/knot_resolver_manager/datamodel/logging_schema.py */
 enum kr_log_group {
 	LOG_GRP_UNKNOWN = -1,
 	LOG_GRP_SYSTEM = 1,  /* Must be first in enum. */

@@ -12,7 +12,7 @@ log_target('{{ cfg.logging.target }}')
 -- logging.groups
 log_groups({
 {% for g in cfg.logging.groups %}
-{% if g != "manager" and g != "supervisord" %}
+{% if g != "manager" and g != "supervisord" and g != "cache-gc" %}
     '{{ g }}',
 {% endif %}
 {% endfor %}
