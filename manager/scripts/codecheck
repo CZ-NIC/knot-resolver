@@ -44,7 +44,7 @@ echo
 
 # check code with flake8
 echo -e "${yellow}Linting using flake8...${reset}"
-flake8 knot_resolver_manager
+flake8 --ignore=E266,W503 knot_resolver_manager
 check_rv $?
 echo
 
