@@ -22,6 +22,7 @@ LogGroupsEnum: TypeAlias = Literal[
     "manager",
     "supervisord",
     "cache-gc",
+    ## Now the LOG_GRP_*_TAG defines, exactly from ../../../lib/log.h
     "system",
     "cache",
     "io",
@@ -34,8 +35,6 @@ LogGroupsEnum: TypeAlias = Literal[
     "gnutls",
     "tls_cl",
     "xdp",
-    "zimprt",
-    "zscann",
     "doh",
     "dnssec",
     "hint",
@@ -66,7 +65,11 @@ LogGroupsEnum: TypeAlias = Literal[
     "contrl",
     "module",
     "devel",
-    "reqdbg",
+    "renum",
+    "exterr",
+    "rules",
+    "prlayr",
+    # "reqdbg",... (non-displayed section of the enum)
 ]
 
 
