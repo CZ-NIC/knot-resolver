@@ -1,6 +1,10 @@
 Knot Resolver 5.x.y (202y-mm-dd)
 ================================
 
+Improvements
+------------
+- update addresses of B.root-servers.net (!1478)
+
 Bugfixes
 --------
 - fix potential SERVFAIL deadlocks if net.ipv6 = false (#880)
