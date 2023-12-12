@@ -806,6 +806,10 @@ finish:
 	if (stream_fd != STDIN_FILENO) {
 		fclose(out);
 	}
+	/* If a LMDB transaction got open, we can't leave it hanging.
+	 * We accept the changes, if any. */
+	kr_cache_commit(&the_resolver->cache);
+	kr_rules_commit(true);
 }
 
 void io_tty_alloc(uv_handle_t *handle, size_t suggested, uv_buf_t *buf)
