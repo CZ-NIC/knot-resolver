@@ -173,7 +173,7 @@ This can be achieved using by using :option:`rules <rules: <list>>`.
        - name:
            - example.com.
            - blocked.example.net.
-         type: nxdomain
+         subtree: nxdomain
 
 
 .. _example-personal:
