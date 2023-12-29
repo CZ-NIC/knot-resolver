@@ -1,6 +1,10 @@
-# Knot Resolver Manager
+# The Manager
 
-Knot Resolver Manager is a configuration tool for [Knot Resolver](https://gitlab.nic.cz/knot/knot-resolver). The Manager hides the complexity of running several independent resolver processes while ensuring zero-downtime reconfiguration with YAML/JSON declarative configuration and an optional HTTP API for dynamic changes.
+The Manager is a new [Knot Resolver](https://gitlab.nic.cz/knot/knot-resolver) component written in Python that manages the rest of the resolver based on declarative configuration and HTTP API.
+
+- It instructs other processes to start or stop. For that, it uses supervisord, which also works in Docker containers and Linux distributions that do not support systemd. The manager makes it much easier to control Knot Resolver on systems without systemd.
+- It uses a declarative configuration in the YAML format. Together with the sectioning, this makes the configuration much clearer and more readable. It is possible to validate the configuration even before starting the resolver. Internally, the manager will take care of loading or unloading the necessary modules in case of using their functions.
+- It provides an HTTP API, which allows the configuration to be changed on the fly. The API also provides other useful functions such as obtaining aggregated metrics across all kresd processes.
 
 ## Development environment
 
@@ -10,20 +14,17 @@ Because we want to support multiple versions of Python with one codebase, we dev
 
 Install these tools:
 * [pyenv](https://github.com/pyenv/pyenv#installation) - a tool for switching between Python versions without affecting the system (can be installed using distro's package manager)
-* [Poetry](https://python-poetry.org/docs/#installation) - dependency management (note: do not install the package via pip, follow instructions in Poetry's official documentation)
+* [Poetry](https://python-poetry.org/docs/#installation) - dependency management (note: do not install the package via `pip`, follow instructions in Poetry's official documentation)
 
-Be careful, that you need the latest version of Poetry. The setup was tested with Poetry version 1.1.7. Due to it's ability to switch between Python versions, it has to be installed separately to work correctly. Make sure to follow [the latest setup guide](https://python-poetry.org/docs/#installation).
+Be careful, that you need the latest version of Poetry. The setup is tested with Poetry version 1.4.2. Due to it's ability to switch between Python versions, it has to be installed separately to work correctly. Make sure to follow [the latest setup guide](https://python-poetry.org/docs/#installation).
 
-After installing the tools above, the actual fully-featured development environment can be setup using these commands:
+After installing tools above, the actual fully-featured development environment can be setup using these commands:
 
-```sh
-pyenv install 3.7.17
-pyenv install 3.8.17
-pyenv install 3.9.17
-pyenv install 3.10.12
-pyenv install 3.11.4
-poetry env use $(pyenv which python)
-poetry install
+```
+$ pyenv install 3.11.7 3.10.13 3.9.18 3.8.18 3.7.17
+$ pyenv local 3.11.7
+$ poetry env use $(pyenv which python)
+$ poetry install
 ```
 
 With this environment, **everything else should just work**. You can run the same checks the CI runs, all commands listed bellow should pass. If something fails and you did all the steps above, please [open a new issue](https://gitlab.nic.cz/knot/knot-resolver-manager/-/issues/new).
@@ -34,21 +35,19 @@ The only global tools that are strictly required are `Python` and `pip` (or othe
 
 ### Common tasks and interactions with the project
 
-After setting up the environment, you should be able to interract with the project by using `./poe` script. Common actions are:
+After setting up the environment, you should be able to interract with the project by using `./poe` script.
+
+If you don't want to be writing the `./` prefix, you can install [PoeThePoet](https://github.com/nat-n/poethepoet) Python package globally and call `poe` directly. We would also recommend setting up its tab completition. Instructions can be found on [their GitHub page](https://github.com/nat-n/poethepoet#enable-tab-completion-for-your-shell).
+
+All possible commands can be listed by running the `poe` command without arguments or running the `poe help` command. The definition of these commands can be found in the `pyproject.toml` file.
+
+Most common actions are:
 
 * `poe run` - runs the manager from the source
 * `poe docs` - creates HTML documentation
 * `poe test` - unit tests
-* `poe tox` - unit tests in all supported Python versions (must not be run outside of virtualenv, otherwise it fails to find multiple versions of Python)
 * `poe check` - static code analysis
 * `poe format` - runs code formater
-* `poe fixdeps` - update installed dependencies according to the project's configuration
-* `poe clean` - cleanup the repository from unwanted files
-* `poe integration` - run the integration tests
-
-All possible commands can be listed by running the `poe` command without arguments. The definition of these commands can be found in the `pyproject.toml` file.
-
-If you don't want to be writing the `./` prefix, you can install [PoeThePoet](https://github.com/nat-n/poethepoet) Python package globally and call `poe` directly. I would also recommend setting up its tab completition. Instructions can be found on [their GitHub page](https://github.com/nat-n/poethepoet#enable-tab-completion-for-your-shell).
 
 ### Contributing
 
