@@ -356,9 +356,8 @@ static int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 			int retv = validate_rrsig_rr(&val_flgs, covered_labels, rdata_j,
 							key_alg, keytag, vctx);
 			if (retv == kr_error(EAGAIN)) {
-				kr_dnssec_key_free(&created_key);
 				vctx->result = retv;
-				return retv;
+				goto finish;
 			} else if (retv != 0) {
 				continue;
 			}
@@ -392,15 +391,15 @@ static int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 
 			trim_ttl(covered, rdata_j, vctx);
 
-			kr_dnssec_key_free(&created_key);
-			vctx->result = kr_ok();
 			kr_rank_set(&vctx->rrs->at[i]->rank, KR_RANK_SECURE); /* upgrade from bogus */
-			return vctx->result;
+			vctx->result = kr_ok();
+			goto finish;
 		}
 	}
 	/* No applicable key found, cannot be validated. */
-	kr_dnssec_key_free(&created_key);
 	vctx->result = kr_error(ENOENT);
+finish:
+	kr_dnssec_key_free(&created_key);
 	return vctx->result;
 }
 
