@@ -266,6 +266,7 @@ static int validate_records(struct kr_request *req, knot_pkt_t *answer, knot_mm_
 		.err_cnt	= 0,
 		.cname_norrsig_cnt = 0,
 		.result		= 0,
+		.limit_crypto_remains = &qry->vld_limit_crypto_remains,
 		.log_qry	= qry,
 	};
 
@@ -372,6 +373,7 @@ static int validate_keyset(struct kr_request *req, knot_pkt_t *answer, bool has_
 			.has_nsec3	= has_nsec3,
 			.flags		= 0,
 			.result		= 0,
+			.limit_crypto_remains = &qry->vld_limit_crypto_remains,
 			.log_qry	= qry,
 		};
 		int ret = kr_dnskeys_trusted(&vctx, sig_rds, qry->zone_cut.trust_anchor);
@@ -1001,6 +1003,11 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	int ret = 0;
 	struct kr_request *req = ctx->req;
 	struct kr_query *qry = req->current_query;
+
+	if (qry->vld_limit_uid != qry->uid) {
+		qry->vld_limit_uid = qry->uid;
+		qry->vld_limit_crypto_remains = req->ctx->vld_limit_crypto;
+	}
 
 	/* Ignore faulty or unprocessed responses. */
 	if (ctx->state & (KR_STATE_FAIL|KR_STATE_CONSUME)) {

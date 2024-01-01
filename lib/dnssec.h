@@ -43,6 +43,7 @@ struct kr_rrset_validation_ctx {
 	uint32_t flags;			/*!< Output - Flags. */
 	uint32_t err_cnt;		/*!< Output - Number of validation failures. */
 	uint32_t cname_norrsig_cnt;	/*!< Output - Number of CNAMEs missing RRSIGs. */
+	int32_t *limit_crypto_remains;  /*!< Optional pointer to struct kr_query::vld_limit_crypto_remains */
 
 	/** Validation result: kr_error() code.
 	 *

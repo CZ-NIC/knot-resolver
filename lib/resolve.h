@@ -163,6 +163,9 @@ struct kr_context
 
 	map_t trust_anchors;
 	map_t negative_anchors;
+	/** Validator's limit on the number of cryptographic steps for a single upstream packet. */
+	int32_t vld_limit_crypto;
+
 	struct kr_zonecut root_hints;
 	struct kr_cache cache;
 	unsigned cache_rtt_tout_retry_interval;
