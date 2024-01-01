@@ -492,6 +492,7 @@ static int init_resolver(struct engine *engine)
 	/* Open resolution context */
 	ctx->trust_anchors = trie_create(NULL);
 	ctx->negative_anchors = trie_create(NULL);
+	ctx->vld_limit_crypto = KR_VLD_LIMIT_CRYPTO_DEFAULT;
 	ctx->pool = engine->pool;
 	ctx->modules = &engine->modules;
 	ctx->cache_rtt_tout_retry_interval = KR_NS_TIMEOUT_RETRY_INTERVAL;

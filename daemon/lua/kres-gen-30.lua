@@ -336,6 +336,8 @@ struct kr_query {
 	struct kr_qflags forward_flags;
 	uint32_t secret;
 	uint32_t uid;
+	int32_t vld_limit_crypto_remains;
+	uint32_t vld_limit_uid;
 	uint64_t creation_time_mono;
 	uint64_t timestamp_mono;
 	struct timeval timestamp;
@@ -353,6 +355,7 @@ struct kr_context {
 	knot_rrset_t *upstream_opt_rr;
 	trie_t *trust_anchors;
 	trie_t *negative_anchors;
+	int32_t vld_limit_crypto;
 	struct kr_zonecut root_hints;
 	struct kr_cache cache;
 	unsigned int cache_rtt_tout_retry_interval;

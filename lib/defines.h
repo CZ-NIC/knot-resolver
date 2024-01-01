@@ -57,6 +57,8 @@ static inline int KR_COLD kr_error(int x) {
 #define KR_COUNT_NO_NSADDR_LIMIT 5
 #define KR_CONSUME_FAIL_ROW_LIMIT 3 /* Maximum number of KR_STATE_FAIL in a row. */
 
+#define KR_VLD_LIMIT_CRYPTO_DEFAULT 32 /**< default for struct kr_query::vld_limit_crypto */
+
 /*
  * Defines.
  */
