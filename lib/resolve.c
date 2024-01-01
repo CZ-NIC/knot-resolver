@@ -1684,7 +1684,7 @@ int kr_request_set_extended_error(struct kr_request *request, int info_code, con
 		return KNOT_EDNS_EDE_NONE;
 	}
 
-	if (ede_priority(info_code) >= ede_priority(ede->info_code)) {
+	if (ede_priority(info_code) > ede_priority(ede->info_code)) {
 		ede->info_code = info_code;
 		ede->extra_text = extra_text;
 	}
