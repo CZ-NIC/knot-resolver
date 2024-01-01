@@ -240,6 +240,29 @@ fail:
 	return NULL;
 }
 
+/// Return if we want to afford yet another crypto-validation (and account it).
+static bool check_crypto_limit(const kr_rrset_validation_ctx_t *vctx)
+{
+	if (vctx->limit_crypto_remains == NULL)
+		return true; // no limiting
+	if (*vctx->limit_crypto_remains > 0) {
+		--*vctx->limit_crypto_remains;
+		return true;
+	}
+	// We got over limit.  There are optional actions to do.
+	if (vctx->log_qry && kr_log_is_debug_qry(VALIDATOR, vctx->log_qry)) {
+		auto_free char *name_str = kr_dname_text(vctx->zone_name);
+		kr_log_q(vctx->log_qry, VALIDATOR,
+			"expensive crypto limited, mitigating CVE-2023-50387, current zone: %s\n",
+			name_str);
+	}
+	if (vctx->log_qry && vctx->log_qry->request) {
+		kr_request_set_extended_error(vctx->log_qry->request, KNOT_EDNS_EDE_BOGUS,
+				"EAIE: expensive crypto limited, mitigating CVE-2023-50387");
+	}
+	return false;
+}
+
 static int kr_svldr_rrset_with_key(knot_rrset_t *rrs, const knot_rdataset_t *rrsigs,
 				kr_rrset_validation_ctx_t *vctx, const kr_svldr_key_t *key)
 {
@@ -258,6 +281,8 @@ static int kr_svldr_rrset_with_key(knot_rrset_t *rrs, const knot_rdataset_t *rrs
 		} else if (retv != 0) {
 			continue;
 		}
+		if (!check_crypto_limit(vctx))
+			return vctx->result = kr_error(E2BIG);
 		// We only expect non-expanded wildcard records in input;
 		// that also means we don't need to perform non-existence proofs.
 		const int trim_labels = (val_flgs & FLG_WILDCARD_EXPANSION) ? 1 : 0;
@@ -366,6 +391,9 @@ static int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 				if (trim_labels < 0) {
 					break;
 				}
+			}
+			if (!check_crypto_limit(vctx)) {
+				goto finish;
 			}
 			if (kr_check_signature(rdata_j, key, covered, trim_labels) != 0) {
 				vctx->rrs_counters.crypto_invalid++;
