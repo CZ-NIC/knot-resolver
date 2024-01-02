@@ -5,6 +5,7 @@ Improvements
 ------------
 - update addresses of B.root-servers.net (!1478)
 - validator: lower the NSEC3 iteration limit (150 -> 50; !1498)
+- validator: similarly also limit excessive NSEC3 salt length (!1498)
 
 Bugfixes
 --------

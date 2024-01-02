@@ -5,6 +5,8 @@
 #pragma once
 
 #include <libknot/packet/pkt.h>
+#include <libknot/rrtype/nsec3.h>
+#include <libdnssec/nsec.h>
 
 /** High numbers in NSEC3 iterations don't really help security
  *
@@ -13,7 +15,22 @@
  *
    https://datatracker.ietf.org/doc/html/rfc9276#name-recommendation-for-validati
  */
-#define KR_NSEC3_MAX_ITERATIONS 50
+static inline bool kr_nsec3_limited(unsigned int iterations, unsigned int salt_len)
+{
+	const int MAX_ITERATIONS = 50; // limit with short salt length
+	// SHA1 works on 64-byte chunks.
+	// On iterating we hash the salt + 20 bytes of the previous hash.
+	int chunks_per_iter = (20 + salt_len - 1) / 64 + 1;
+	return (iterations + 1) * chunks_per_iter > MAX_ITERATIONS + 1;
+}
+static inline bool kr_nsec3_limited_rdata(const knot_rdata_t *rd)
+{
+	return kr_nsec3_limited(knot_nsec3_iters(rd), knot_nsec3_salt_len(rd));
+}
+static inline bool kr_nsec3_limited_params(const dnssec_nsec3_params_t *params)
+{
+	return kr_nsec3_limited(params->iterations, params->salt.size);
+}
 
 /**
  * Name error response check (RFC5155 7.2.2).
@@ -36,7 +53,7 @@ int kr_nsec3_name_error_response_check(const knot_pkt_t *pkt, knot_section_t sec
  *                     KNOT_ERANGE - NSEC3 RR that covers a wildcard
  *                     has been found, but has opt-out flag set;
  *                     otherwise - error.
- * Records over KR_NSEC3_MAX_ITERATIONS are skipped, so you probably get kr_error(ENOENT).
+ * Too expensive NSEC3 records are skipped, so you probably get kr_error(ENOENT).
  */
 int kr_nsec3_wildcard_answer_response_check(const knot_pkt_t *pkt, knot_section_t section_id,
                                             const knot_dname_t *sname, int trim_to_next);
