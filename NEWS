@@ -1,9 +1,10 @@
-Knot Resolver 5.x.y (202y-mm-dd)
+Knot Resolver 5.7.1 (2024-0m-dd)
 ================================
 
 Improvements
 ------------
 - update addresses of B.root-servers.net (!1478)
+- validator: lower the NSEC3 iteration limit (150 -> 50; !1498)
 
 Bugfixes
 --------
