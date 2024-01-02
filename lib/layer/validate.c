@@ -128,14 +128,15 @@ static bool maybe_downgrade_nsec3(const ranked_rr_array_entry_t *e, struct kr_qu
 	const knot_rdataset_t *rrs = &e->rr->rrs;
 	knot_rdata_t *rd = rrs->rdata;
 	for (int j = 0; j < rrs->count; ++j, rd = knot_rdataset_next(rd)) {
-		if (knot_nsec3_iters(rd) > KR_NSEC3_MAX_ITERATIONS)
+		if (kr_nsec3_limited_rdata(rd))
 			goto do_downgrade;
 	}
 	return false;
 
 do_downgrade: // we do this deep inside calls because of having signer name available
-	VERBOSE_MSG(qry, "<= DNSSEC downgraded due to NSEC3 iterations %d > %d\n",
-			(int)knot_nsec3_iters(rd), (int)KR_NSEC3_MAX_ITERATIONS);
+	VERBOSE_MSG(qry,
+		"<= DNSSEC downgraded due to expensive NSEC3: %d iterations, %d salt length\n",
+		(int)knot_nsec3_iters(rd), (int)knot_nsec3_salt_len(rd));
 	qry->flags.DNSSEC_WANT = false;
 	qry->flags.DNSSEC_INSECURE = true;
 	rank_records(qry, true, KR_RANK_INSECURE, vctx->zone_name);
