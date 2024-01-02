@@ -71,7 +71,7 @@ static int hash_name(dnssec_binary_t *hash, const dnssec_nsec3_params_t *params,
 		return kr_error(EINVAL);
 	if (!name)
 		return kr_error(EINVAL);
-	if (kr_fails_assert(params->iterations <= KR_NSEC3_MAX_ITERATIONS)) {
+	if (kr_fails_assert(!kr_nsec3_limited_params(params))) {
 		/* This if is mainly defensive; it shouldn't happen. */
 		return kr_error(EINVAL);
 	}
@@ -565,7 +565,7 @@ int kr_nsec3_wildcard_answer_response_check(const knot_pkt_t *pkt, knot_section_
 		const knot_rrset_t *rrset = knot_pkt_rr(sec, i);
 		if (rrset->type != KNOT_RRTYPE_NSEC3)
 			continue;
-		if (knot_nsec3_iters(rrset->rrs.rdata) > KR_NSEC3_MAX_ITERATIONS) {
+		if (kr_nsec3_limited_rdata(rrset->rrs.rdata)) {
 			/* Avoid hashing with too many iterations.
 			 * If we get here, the `sname` wildcard probably ends up bogus,
 			 * but it gets downgraded to KR_RANK_INSECURE when validator

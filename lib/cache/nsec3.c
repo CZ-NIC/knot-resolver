@@ -84,7 +84,7 @@ static knot_db_val_t key_NSEC3_name(struct key *k, const knot_dname_t *name,
 		.data = (uint8_t *)/*const-cast*/name,
 	};
 
-	if (kr_fails_assert(nsec_p->libknot.iterations <= KR_NSEC3_MAX_ITERATIONS)) {
+	if (kr_fails_assert(!kr_nsec3_limited_params(&nsec_p->libknot))) {
 		/* This is mainly defensive; it shouldn't happen thanks to downgrades. */
 		return VAL_EMPTY;
 	}
