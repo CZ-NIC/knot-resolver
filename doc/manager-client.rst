@@ -42,7 +42,7 @@ By default, ``kresctl`` tries to find the correct communication channel in
 
     Optional, path to Unix-domain socket or network interface of the
     :ref:`management API <manager-api>`. Cannot be used together with
-    :option:`--socket <-s <socket>, --socket <socket>>`.
+    :option:`--config <-c <config>, --config <config>>`.
 
 .. code-block:: bash
 
