@@ -33,4 +33,4 @@ Patch version
 This definition is not applicable to versions older than 5.2.0.
 
 .. include:: ../NEWS
-
+    :end-before: 5.x branch longterm support
