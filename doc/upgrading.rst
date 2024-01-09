@@ -32,7 +32,7 @@ newer versions when they are released.
 5.x to 6.x
 ==========
 
-* see the more detailed guide for `upgrading to version 6.x <upgrading-to-6>`
+* see the more detailed guide for :ref:`upgrading to version 6.x <upgrading-to-6>`
 
 
 5.4 to 5.5
