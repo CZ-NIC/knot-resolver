@@ -1,5 +1,12 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-3.0-or-later
+
+# avoid confusing changes in ordering
+if ! locale | grep -q '^LC_COLLATE=.*\.UTF-8'; then
+	echo 'Error: you need to run this script with an .UTF-8 locale.'
+	exit 2
+fi
+
 set -o nounset -o xtrace
 
 function spdx_originator_to_authors {
