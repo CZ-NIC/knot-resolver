@@ -811,15 +811,4 @@ docs:release:
     name: docs-release/$CI_COMMIT_TAG
     url: https://$CI_PROJECT_NAMESPACE.pages.nic.cz/-/knot-resolver/-/jobs/$CI_JOB_ID/artifacts/doc/html/index.html
 
-# This job deploys the current docs as <https://knot.pages.nic.cz/knot-resolver>
-pages:
-  stage: deploy
-  needs:
-    - docs:build
-  script: mv doc/html public
-  when: manual
-  artifacts:
-    paths:
-      - public
-
 # }}}
