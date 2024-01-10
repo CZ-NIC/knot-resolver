@@ -15,6 +15,10 @@ if os.environ.get('READTHEDOCS', None) == 'True':
 # Add any Sphinx extension module names here, as strings.
 extensions = ['sphinx.ext.todo', 'sphinx.ext.viewcode', 'breathe']
 
+theme_major = sphinx_rtd_theme.__version__.partition('.')[0]
+if theme_major == '2':
+    extensions.append('sphinxcontrib.jquery')
+
 # Breathe configuration
 breathe_projects = {"libkres": "doxyxml"}
 breathe_default_project = "libkres"
