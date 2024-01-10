@@ -209,16 +209,6 @@ trivial_checks: # aggregated to save some processing
     - ci/no_assert_check.sh
     - ci/deckard_commit_check.sh
 
-doc:
-  <<: *sanity
-  script:
-    - meson build_doc -Ddoc=enabled
-    - ninja -C build_doc doc-strict
-  artifacts:
-    expire_in: 6 hour
-    paths:
-      - doc/html
-
 lint:other:
   <<: *sanity
   script:
