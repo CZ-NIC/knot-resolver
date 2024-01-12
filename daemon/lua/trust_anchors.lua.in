@@ -20,7 +20,7 @@ local function upgrade_required(msg)
 		msg = ''
 	end
 	panic('Configuration upgrade required: ' .. msg .. 'Please refer to ' ..
-		'https://knot-resolver.readthedocs.io/en/stable/upgrading.html')
+		'https://www.knot-resolver.cz/documentation/latest/upgrading.html')
 end
 
 -- TODO: Move bootstrap to a separate module or even its own binary

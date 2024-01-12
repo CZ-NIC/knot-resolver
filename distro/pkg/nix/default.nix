@@ -53,7 +53,7 @@ unwrapped = stdenv.mkDerivation rec {
 
   nativeBuildInputs = [ pkg-config meson ninja ];
 
-  # http://knot-resolver.readthedocs.io/en/latest/build.html#requirements
+  # http://www.knot-resolver.cz/documentation/latest/build.html#dependencies
   buildInputs = [ knot-dns lua.lua libuv gnutls lmdb ]
     ++ optionals stdenv.isLinux [ systemd libcap_ng ]
     ++ [ jemalloc nghttp2 ]

@@ -93,7 +93,7 @@ To start all enabled kresd daemons, you can also use the provided \fIkresd.targe
 .SH "SEE ALSO"
 \fIkresd(8)\fR,
 \fIsystemd.unit(5)\fR,
-\fIhttps://knot-resolver.readthedocs.io/en/v@version@/\fR
+\fIhttps://www.knot-resolver.cz/documentation/latest/\fR
 
 .SH "AUTHORS"
 .B kresd

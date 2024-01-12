@@ -20,7 +20,7 @@ PolicyActionEnum = Literal[
     "reqtrace",
 ]
 
-# FLAGS from https://knot-resolver.readthedocs.io/en/stable/lib.html?highlight=options#c.kr_qflags
+# FLAGS from https://www.knot-resolver.cz/documentation/latest/lib.html?highlight=options#c.kr_qflags
 PolicyFlagEnum = Literal[
     "no-minimize",
     "no-ipv4",

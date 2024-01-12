@@ -24,8 +24,8 @@
 Knot Resolver via its HTTP API.
 
 Full documentation is available at
-\fIhttps://knot-resolver.readthedocs.io\fR or in package documentation
-(available as knot-resolver-doc package in most distributions.
+\fIhttps://www.knot-resolver.cz/documentation/latest/\fR or in package
+documentation (available as knot-resolver-doc package in most distributions.
 .SH OPTIONS
 The available options are:
 .TP
@@ -61,7 +61,7 @@ Equivalent to PUT method in the underlying HTTP API.
 .B stop
 Gracefully stops the running resolver.
 .SH "SEE ALSO"
-\fBkresd(8)\fR, @man_seealso_systemd@\fIhttps://knot-resolver.readthedocs.io/en/v@version@/\fR
+\fBkresd(8)\fR, @man_seealso_systemd@\fIhttps://www.knot-resolver.cz/documentation/latest/\fR
 .SH "AUTHORS"
 .B kresd
 developers are mentioned in the AUTHORS file in the distribution.
