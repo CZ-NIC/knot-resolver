@@ -88,7 +88,7 @@ static int load_sym_c(struct kr_module *module, uint32_t api_required)
 		/* In case someone re-compiled against new kresd
 		 * but haven't actually changed the symbols. */
 		kr_log_error(SYSTEM, "module %s requires upgrade.  Please refer to "
-			"https://knot-resolver.readthedocs.io/en/stable/upgrading.html",
+			"https://www.knot-resolver.cz/documentation/latest/upgrading.html",
 			module->name);
 		return kr_error(ENOTSUP);
 	}

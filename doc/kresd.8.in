@@ -64,8 +64,8 @@ and start
 The daemon may be configured also as a plain forwarder using query policies.
 This requires using a config file. Please refer to documentation for
 configuration file options. It is available at
-\fIhttps://knot-resolver.readthedocs.io\fR or in package documentation
-(available as knot-resolver-doc package in most distributions).
+\fIhttps://www.knot-resolver.cz/documentation/latest/\fR or in package
+documentation (available as knot-resolver-doc package in most distributions).
 
 The available CLI options are:
 .TP
@@ -116,7 +116,7 @@ Show short command-line option help.
 .B \-V
 Show the version.
 .SH "SEE ALSO"
-@man_seealso_systemd@\fIhttps://knot-resolver.readthedocs.io/en/v@version@/\fR
+@man_seealso_systemd@\fIhttps://www.knot-resolver.cz/documentation/latest/\fR
 .SH "AUTHORS"
 .B kresd
 developers are mentioned in the AUTHORS file in the distribution.

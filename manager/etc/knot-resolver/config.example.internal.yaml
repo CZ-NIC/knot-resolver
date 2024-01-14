@@ -1,4 +1,4 @@
-# Refer to manual: https://knot-resolver.readthedocs.io/en/stable/
+# Refer to manual: https://www.knot-resolver.cz/documentation/latest/
 
 network:
   listen:
