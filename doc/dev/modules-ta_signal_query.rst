@@ -1,0 +1,1 @@
+../../modules/ta_signal_query/README.rst
