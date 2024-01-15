@@ -1,0 +1,53 @@
+.. SPDX-License-Identifier: GPL-3.0-or-later
+
+#############
+Knot Resolver
+#############
+
+Welcome to Knot Resolver's documentation for developers and advanced users!
+
+.. toctree::
+   :caption: Building for sources
+   :name: build-chapter
+   :maxdepth: 1
+
+   build   
+
+.. toctree::
+   :caption: Lua configuration
+   :name: configuration-lua-chapter
+   :maxdepth: 1
+
+   config-lua-overview
+   config-lua-network
+   config-lua-performance
+   config-lua-policy
+   config-lua-logging-monitoring
+   config-lua-dnssec
+   config-lua-experimental
+   modules-http-custom-services
+
+.. toctree::
+   :caption: Modules and worker API, Lib
+   :name: configuration-lua-chapter
+   :maxdepth: 1
+
+   lib
+   modules_api
+   worker_api
+
+.. toctree::
+   :caption: Architecture
+   :name: architecture-chapter
+   :maxdepth: 1
+
+   manager-dev
+   architecture
+
+Indices and tables
+==================
+
+* :ref:`genindex`
+* :ref:`modindex`
+* :ref:`search`
+

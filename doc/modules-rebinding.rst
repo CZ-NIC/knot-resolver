@@ -1,1 +1,0 @@
-../modules/rebinding/README.rst
