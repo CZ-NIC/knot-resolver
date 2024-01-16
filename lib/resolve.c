@@ -880,7 +880,9 @@ int kr_resolve_consume(struct kr_request *request, struct kr_transport **transpo
 
 	/* Do not finish with bogus answer. */
 	if (qry->flags.DNSSEC_BOGUS)  {
-		if (qry->flags.FORWARD || qry->flags.STUB) {
+		if (qry->flags.FORWARD || qry->flags.STUB
+				/* Probably CPU exhaustion attempt, so do not retry. */
+				|| qry->vld_limit_crypto_remains <= 0) {
 			return KR_STATE_FAIL;
 		}
 		/* Other servers might not have broken DNSSEC. */

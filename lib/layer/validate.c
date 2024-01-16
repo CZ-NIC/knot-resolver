@@ -1176,6 +1176,10 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 		ret = validate_records(req, pkt, req->rplan.pool, has_nsec3);
 		if (ret == KNOT_EDOWNGRADED) {
 			return KR_STATE_DONE;
+		} else if (ret == kr_error(E2BIG)) {
+			qry->flags.DNSSEC_BOGUS = true;
+			return KR_STATE_FAIL;
+
 		} else if (ret != 0) {
 			/* something exceptional - no DNS key, empty pointers etc
 			 * normally it shouldn't happen */
