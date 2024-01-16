@@ -134,7 +134,7 @@ int kr_rrset_validate(kr_rrset_validation_ctx_t *vctx, knot_rrset_t *covered)
 	memset(&vctx->rrs_counters, 0, sizeof(vctx->rrs_counters));
 	for (unsigned i = 0; i < vctx->keys->rrs.count; ++i) {
 		int ret = kr_rrset_validate_with_key(vctx, covered, i, NULL);
-		if (ret == 0) {
+		if (ret == 0 || ret == kr_error(E2BIG)) {
 			return ret;
 		}
 	}
@@ -292,7 +292,7 @@ int kr_svldr_rrset(knot_rrset_t *rrs, const knot_rdataset_t *rrsigs,
 	}
 	for (ssize_t i = 0; i < ctx->keys.len; ++i) {
 		kr_svldr_rrset_with_key(rrs, rrsigs, &ctx->vctx, &ctx->keys.at[i]);
-		if (ctx->vctx.result == 0)
+		if (ctx->vctx.result == 0 || ctx->vctx.result == kr_error(E2BIG))
 			break;
 	}
 	return ctx->vctx.result;
@@ -378,6 +378,7 @@ static int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 				}
 			}
 			if (!check_crypto_limit(vctx)) {
+				vctx->result = kr_error(E2BIG);
 				goto finish;
 			}
 			if (kr_check_signature(rdata_j, key, covered, trim_labels) != 0) {
@@ -460,7 +461,7 @@ int kr_dnskeys_trusted(kr_rrset_validation_ctx_t *vctx, const knot_rdataset_t *s
 		if (ret == 0)
 			ret = kr_svldr_rrset_with_key(keys, sigs, vctx, &key);
 		svldr_key_del(&key);
-		if (ret == 0) {
+		if (ret == 0 || ret == kr_error(E2BIG)) {
 			kr_assert(vctx->result == 0);
 			return vctx->result;
 		}
