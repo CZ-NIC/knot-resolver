@@ -14,21 +14,11 @@ Please, follow the instructions for your packaging system:
 
 .. tabs::
 
-    .. tab:: Debian
+    .. tab:: Debian/Ubuntu
 
         Please follow https://pkg.labs.nic.cz/doc/?project=knot-resolver
 
-    .. tab:: Ubuntu
-
-        .. code:: bash
-
-            sudo apt install software-properties-common
-            sudo add-apt-repository ppa:cz.nic-labs/knot-resolver
-            sudo apt update
-            sudo apt install knot-resolver6
-
-        For details see
-        https://launchpad.net/~cz.nic-labs/+archive/ubuntu/knot-resolver
+        For Ubuntu it is also possible to use https://launchpad.net/~cz.nic-labs/+archive/ubuntu/knot-resolver.
 
     .. tab:: .rpm
 
@@ -36,10 +26,11 @@ Please, follow the instructions for your packaging system:
 
     .. tab:: Docker
 
+        DockerHub page: https://hub.docker.com/r/cznic/knot-resolver
+
         .. code:: bash
 
             sudo docker run -ti --net=host docker.io/cznic/knot-resolver:6
 
-        Hub page: https://hub.docker.com/r/cznic/knot-resolver
-
-If for some reason you need to install Knot Resolver **from sources**, check out `building from sources <./dev/build.html>`_ in developer documentation.
+If for some reason you need to install Knot Resolver **from sources**,
+check out `building from sources <./dev/build.html>`_ section in developer documentation.
