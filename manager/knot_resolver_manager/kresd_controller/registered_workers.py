@@ -2,6 +2,8 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING, Dict, List, Tuple
 
+from knot_resolver_manager.exceptions import SubprocessControllerException
+
 if TYPE_CHECKING:
     from knot_resolver_manager.kresd_controller.interface import KresID, Subprocess
 
