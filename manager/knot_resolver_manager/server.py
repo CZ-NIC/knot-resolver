@@ -242,6 +242,13 @@ class Server:
             charset="utf8",
         )
 
+    async def _handler_cache_clear(self, request: web.Request) -> web.Response:
+        return web.Response(
+            body="test",
+            content_type="text/plain",
+            charset="utf8",
+        )
+
     async def _handler_schema(self, _request: web.Request) -> web.Response:
         return web.json_response(
             KresConfig.json_schema(), headers={"Access-Control-Allow-Origin": "*"}, dumps=partial(json.dumps, indent=4)
@@ -307,6 +314,7 @@ class Server:
                 web.get("/schema", self._handler_schema),
                 web.get("/schema/ui", self._handle_view_schema),
                 web.get("/metrics", self._handler_metrics),
+                web.post("/cache-clear", self._handler_cache_clear),
             ]
         )
 
