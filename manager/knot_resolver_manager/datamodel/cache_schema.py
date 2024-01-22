@@ -2,6 +2,7 @@ from typing import Any, List, Optional, Union
 
 from typing_extensions import Literal
 
+from knot_resolver_manager.datamodel.templates import template_from_str
 from knot_resolver_manager.datamodel.types import (
     Dir,
     DNSRecordTypeEnum,
@@ -17,12 +18,25 @@ from knot_resolver_manager.datamodel.types import (
 from knot_resolver_manager.utils.modeling import ConfigSchema
 from knot_resolver_manager.utils.modeling.base_schema import lazy_default
 
+_CACHE_CLEAR_TEMPLATE = template_from_str(
+    "{% from 'macros/common_macros.lua.j2' import tojson %}"
+    "{% from 'macros/cache_macros.lua.j2' import cache_clear %}"
+    "{{ tojson(cache_clear(params)) }}"
+)
+
 
 class CacheClearRPCSchema(ConfigSchema):
     name: Optional[DomainName] = None
     exact_name: bool = False
     rr_type: Optional[DNSRecordTypeEnum] = None
     chunk_size: IntPositive = IntPositive(100)
+
+    def _validate(self) -> None:
+        if self.rr_type and not self.exact_name:
+            raise ValueError("'rr-type' is only supported with 'exact-name: true'")
+
+    def render_lua(self) -> str:
+        return _CACHE_CLEAR_TEMPLATE.render(params=self)  # pyright: reportUnknownMemberType=false
 
 
 class PrefillSchema(ConfigSchema):

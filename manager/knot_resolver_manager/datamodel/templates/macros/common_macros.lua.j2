@@ -1,3 +1,7 @@
+{% macro tojson(object) -%}
+tojson({{ object }})
+{%- endmacro %}
+
 {% macro quotes(string) -%}
 '{{ string }}'
 {%- endmacro %}
