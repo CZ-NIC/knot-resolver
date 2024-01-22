@@ -10,8 +10,9 @@ from weakref import WeakValueDictionary
 from knot_resolver_manager.constants import kresd_config_file
 from knot_resolver_manager.datamodel.config_schema import KresConfig
 from knot_resolver_manager.exceptions import SubprocessControllerException
-from knot_resolver_manager.statistics import register_resolver_metrics_for, unregister_resolver_metrics_for
 from knot_resolver_manager.utils.async_utils import writefile
+
+from knot_resolver_manager.kresd_controller.registered_workers import register_worker, unregister_worker
 
 logger = logging.getLogger(__name__)
 
@@ -100,7 +101,7 @@ class Subprocess(ABC):
     def __init__(self, config: KresConfig, kid: KresID) -> None:
         self._id = kid
         self._config = config
-        self._metrics_registered: bool = False
+        self._registered_worker: bool = False
 
     async def start(self) -> None:
         # create config file
@@ -109,8 +110,8 @@ class Subprocess(ABC):
         try:
             await self._start()
             if self.type is SubprocessType.KRESD:
-                register_resolver_metrics_for(self)
-                self._metrics_registered = True
+                register_worker(self)
+                self._registered_worker = True
         except SubprocessControllerException as e:
             kresd_config_file(self._config, self.id).unlink()
             raise e
@@ -126,8 +127,8 @@ class Subprocess(ABC):
         await self._restart()
 
     async def stop(self) -> None:
-        if self._metrics_registered:
-            unregister_resolver_metrics_for(self)
+        if self._registered_worker:
+            unregister_worker(self)
         await self._stop()
         await self.cleanup()
 
