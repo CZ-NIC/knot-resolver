@@ -1,10 +1,8 @@
 import logging
 import os
 import socket
-import sys
 from typing import Any, Dict, List, Optional, Union
 
-from jinja2 import Environment, FileSystemLoader, Template
 from typing_extensions import Literal
 
 from knot_resolver_manager.constants import MAX_WORKERS
@@ -19,6 +17,7 @@ from knot_resolver_manager.datamodel.management_schema import ManagementSchema
 from knot_resolver_manager.datamodel.monitoring_schema import MonitoringSchema
 from knot_resolver_manager.datamodel.network_schema import NetworkSchema
 from knot_resolver_manager.datamodel.options_schema import OptionsSchema
+from knot_resolver_manager.datamodel.templates import MAIN_TEMPLATE
 from knot_resolver_manager.datamodel.types import Dir, EscapedStr, IntPositive
 from knot_resolver_manager.datamodel.view_schema import ViewSchema
 from knot_resolver_manager.datamodel.webmgmt_schema import WebmgmtSchema
@@ -30,35 +29,6 @@ _DEFAULT_RUNDIR = "/var/run/knot-resolver"
 DEFAULT_MANAGER_API_SOCK = _DEFAULT_RUNDIR + "/manager.sock"
 
 logger = logging.getLogger(__name__)
-
-
-def _get_templates_dir() -> str:
-    module = sys.modules["knot_resolver_manager.datamodel"].__file__
-    if module:
-        templates_dir = os.path.join(os.path.dirname(module), "templates")
-        if os.path.isdir(templates_dir):
-            return templates_dir
-        raise NotADirectoryError(f"the templates dir '{templates_dir}' is not a directory or does not exist")
-    raise OSError("package 'knot_resolver_manager.datamodel' cannot be located or loaded")
-
-
-_TEMPLATES_DIR = _get_templates_dir()
-
-
-def template_from_str(template: str) -> Template:
-    ldr = FileSystemLoader(_TEMPLATES_DIR)
-    env = Environment(trim_blocks=True, lstrip_blocks=True, loader=ldr)
-    return env.from_string(template)
-
-
-def _import_lua_template() -> Template:
-    path = os.path.join(_TEMPLATES_DIR, "config.lua.j2")
-    with open(path, "r", encoding="UTF-8") as file:
-        template = file.read()
-    return template_from_str(template)
-
-
-_MAIN_TEMPLATE = _import_lua_template()
 
 
 def _cpu_count() -> Optional[int]:
@@ -189,7 +159,7 @@ class KresConfig(ConfigSchema):
         # FIXME the `cwd` argument is used only for configuring control socket path
         # it should be removed and relative path used instead as soon as issue
         # https://gitlab.nic.cz/knot/knot-resolver/-/issues/720 is fixed
-        return _MAIN_TEMPLATE.render(cfg=self, cwd=os.getcwd())  # pyright: reportUnknownMemberType=false
+        return MAIN_TEMPLATE.render(cfg=self, cwd=os.getcwd())  # pyright: reportUnknownMemberType=false
 
 
 def get_rundir_without_validation(data: Dict[str, Any]) -> Dir:
