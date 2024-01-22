@@ -1,8 +1,8 @@
 from typing import List
 
-from knot_resolver_manager.datamodel.config_schema import template_from_str
 from knot_resolver_manager.datamodel.network_schema import AddressRenumberingSchema
 from knot_resolver_manager.datamodel.policy_schema import AnswerSchema
+from knot_resolver_manager.datamodel.templates import template_from_str
 from knot_resolver_manager.datamodel.types import PolicyFlagEnum
 
 
