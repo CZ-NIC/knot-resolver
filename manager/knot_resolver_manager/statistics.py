@@ -11,10 +11,14 @@ from prometheus_client.core import REGISTRY, CounterMetricFamily, HistogramMetri
 from knot_resolver_manager import compat
 from knot_resolver_manager.config_store import ConfigStore, only_on_real_changes
 from knot_resolver_manager.datamodel.config_schema import KresConfig
+from knot_resolver_manager.kresd_controller.registered_workers import (
+    command_registered_workers,
+    get_registered_workers_kids,
+)
 from knot_resolver_manager.utils.functional import Result
 
 if TYPE_CHECKING:
-    from knot_resolver_manager.kresd_controller.interface import KresID, Subprocess
+    from knot_resolver_manager.kresd_controller.interface import KresID
 
 
 logger = logging.getLogger(__name__)
@@ -22,8 +26,6 @@ logger = logging.getLogger(__name__)
 MANAGER_REQUEST_RECONFIGURE_LATENCY = Histogram(
     "manager_request_reconfigure_latency", "Time it takes to change configuration"
 )
-
-_REGISTERED_RESOLVERS: "Dict[KresID, Subprocess]" = {}
 
 
 T = TypeVar("T")
@@ -43,14 +45,6 @@ def async_timing_histogram(metric: Histogram) -> Callable[[Callable[..., Awaitab
         return wrapper
 
     return decorator
-
-
-async def _command_registered_resolvers(cmd: str) -> "Dict[KresID, str]":
-    async def single_pair(sub: "Subprocess") -> "Tuple[KresID, str]":
-        return sub.id, await sub.command(cmd)
-
-    pairs = await asyncio.gather(*(single_pair(inst) for inst in _REGISTERED_RESOLVERS.values()))
-    return dict(pairs)
 
 
 def _counter(name: str, description: str, label: Tuple[str, str], value: float) -> CounterMetricFamily:
@@ -99,7 +93,7 @@ class ResolverCollector:
         lazy = config.monitoring.enabled == "lazy"
         cmd = "collect_lazy_statistics()" if lazy else "collect_statistics()"
         logger.debug("Collecting kresd stats with method '%s'", cmd)
-        stats_raw = await _command_registered_resolvers(cmd)
+        stats_raw = await command_registered_workers(cmd)
         self._stats_raw = stats_raw
 
         # if this function was not called by the prometheus library and calling collect() is imminent,
@@ -145,12 +139,12 @@ class ResolverCollector:
 
         # if we have no data, return metrics with information about it and exit
         if self._stats_raw is None:
-            for kid in _REGISTERED_RESOLVERS:
+            for kid in get_registered_workers_kids():
                 yield self._create_resolver_metrics_loaded_gauge(kid, False)
             return
 
         # if we have data, parse them
-        for kid in _REGISTERED_RESOLVERS:
+        for kid in get_registered_workers_kids():
             success = False
             try:
                 if kid in self._stats_raw:
@@ -331,20 +325,6 @@ class ResolverCollector:
 
 
 _resolver_collector: Optional[ResolverCollector] = None
-
-
-def unregister_resolver_metrics_for(subprocess: "Subprocess") -> None:
-    """
-    Cancel metric collection from resolver "Subprocess"
-    """
-    del _REGISTERED_RESOLVERS[subprocess.id]
-
-
-def register_resolver_metrics_for(subprocess: "Subprocess") -> None:
-    """
-    Register resolver "Subprocess" for metric collection
-    """
-    _REGISTERED_RESOLVERS[subprocess.id] = subprocess
 
 
 async def report_stats() -> bytes:
