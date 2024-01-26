@@ -108,8 +108,9 @@ class Subprocess(ABC):
         await writefile(kresd_config_file(self._config, self.id), lua_config)
         try:
             await self._start()
-            register_resolver_metrics_for(self)
-            self._metrics_registered = True
+            if self.type is SubprocessType.KRESD:
+                register_resolver_metrics_for(self)
+                self._metrics_registered = True
         except SubprocessControllerException as e:
             kresd_config_file(self._config, self.id).unlink()
             raise e
