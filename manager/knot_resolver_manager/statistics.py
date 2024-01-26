@@ -55,13 +55,13 @@ async def _command_registered_resolvers(cmd: str) -> "Dict[KresID, str]":
 
 def _counter(name: str, description: str, label: Tuple[str, str], value: float) -> CounterMetricFamily:
     c = CounterMetricFamily(name, description, labels=(label[0],))
-    c.add_metric(label[1], value)  # type: ignore
+    c.add_metric((label[1],), value)  # type: ignore
     return c
 
 
 def _gauge(name: str, description: str, label: Tuple[str, str], value: float) -> GaugeMetricFamily:
     c = GaugeMetricFamily(name, description, labels=(label[0],))
-    c.add_metric(label[1], value)  # type: ignore
+    c.add_metric((label[1],), value)  # type: ignore
     return c
 
 
@@ -69,7 +69,7 @@ def _histogram(
     name: str, description: str, label: Tuple[str, str], buckets: List[Tuple[str, int]], sum_value: float
 ) -> HistogramMetricFamily:
     c = HistogramMetricFamily(name, description, labels=(label[0],))
-    c.add_metric(label[1], buckets, sum_value=sum_value)  # type: ignore
+    c.add_metric((label[1],), buckets, sum_value=sum_value)  # type: ignore
     return c
 
 
