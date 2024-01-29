@@ -158,6 +158,38 @@ Only one of these arguments can be selected during the execution of a single ``k
 
         $ kresctl metrics ./metrics/data.txt
 
+.. option:: cache-clear
+
+        Purge cache records matching specified criteria.
+
+    .. option:: --exact-name
+
+        If set, only records with the same name are removed.
+
+    .. option:: --rr-type <rr-type>
+
+        Optional, you may additionally specify the type to remove,
+        but that is only supported with :option:`--exact-name` flag set.
+
+    .. option:: --chunk-size <chunk-size>
+
+        :default: 100
+
+        Optional, the number of records to remove in one round.
+        The purpose is not to block the resolver for long.
+        The resolver repeats the command after one millisecond until all matching data are cleared.
+
+    .. option:: <name>
+
+        Optional, subtree to purge; if the name isn't provided,
+        whole cache is purged (and any other parameters are disregarded).
+
+    .. code-block:: bash
+
+        $ kresctl cache-clear
+        $ kresctl cache-clear example.com.
+        $ kresctl cache-clear --exact-name example.com.
+
 
 .. option:: schema
 
