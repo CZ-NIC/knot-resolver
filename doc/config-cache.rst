@@ -54,6 +54,7 @@ Clearing
 --------
 
 There are two specifics to purge cache records matching specified criteria:
+
 * To reliably remove negative cache entries you need to clear subtree with the whole zone. E.g. to clear negative cache entries for (formerly non-existing)
   record ``www.example.com. A`` you need to flush whole subtree starting at zone apex, e.g. `example.com.` [#]_
 * This operation is asynchronous and might not be yet finished when call to ``/cache-clear`` API endpoint returns.
@@ -71,7 +72,7 @@ Parameters
 ``````````
 Parameters for cache clearance are in JSON and are sendt with HTTP request as its body.
 
-.. option:: "name": "<name>""
+.. option:: "name": "<name>"
 
    Optional, subtree to purge; if the name isn't provided, whole cache is purged (and any other parameters are disregarded).
 
