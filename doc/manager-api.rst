@@ -88,7 +88,7 @@ List of API endpoints
 - ``GET /metrics`` provides Prometheus metrics
 - ``GET /`` static response that could be used to determine, whether the Manager is running
 - ``POST /stop`` gracefully stops the Manager, empty request body
-- ``POST /cache-clear`` purges cache records matching specified criteria, see :ref:`cache clearing <config-cache-clear>` section
+- ``POST /cache-clear`` purges cache records matching the specified criteria, see :ref:`cache clearing <config-cache-clear>`
 - ``{GET,PUT,DELETE,PATCH} /v1/config`` allows reading and modifying current configuration
 
 

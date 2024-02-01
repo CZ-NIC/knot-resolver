@@ -160,29 +160,30 @@ Only one of these arguments can be selected during the execution of a single ``k
 
 .. option:: cache-clear
 
-        Purge cache records matching specified criteria.
+        Purge cache records matching the specified criteria.
 
     .. option:: --exact-name
 
-        If set, only records with the same name are removed.
+        If set, only records with the exact same name are removed, not the whole subtree.
 
     .. option:: --rr-type <rr-type>
 
-        Optional, you may additionally specify the type to remove,
-        but that is only supported with :option:`--exact-name` flag set.
+        The record type to remove. Only supported together with :option:`--exact-name`.
+
+        Optional.
 
     .. option:: --chunk-size <chunk-size>
 
         :default: 100
 
-        Optional, the number of records to remove in one round.
-        The purpose is not to block the resolver for long.
-        The resolver repeats the command after one millisecond until all matching data are cleared.
+        The number of records to remove in a single round.
+        The purpose is not to block the resolver for too long.
+        The resolver repeats the command after at least one millisecond, until all the matching data is cleared.
 
-    .. option:: <name>
+    .. option:: [name]
 
-        Optional, subtree to purge; if the name isn't provided,
-        whole cache is purged (and any other parameters are disregarded).
+        The subtree to purge.
+        If not provided, the whole cache is purged (and any other parameters are disregarded).
 
     .. code-block:: bash
 
