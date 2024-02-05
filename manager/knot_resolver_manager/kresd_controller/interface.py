@@ -98,8 +98,8 @@ class Subprocess(ABC):
     One SubprocessInstance corresponds to one manager's subprocess
     """
 
-    def __init__(self, config: KresConfig, kid: KresID) -> None:
-        self._id = kid
+    def __init__(self, config: KresConfig, kresid: KresID) -> None:
+        self._id = kresid
         self._config = config
         self._registered_worker: bool = False
 

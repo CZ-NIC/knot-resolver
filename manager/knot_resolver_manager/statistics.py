@@ -13,7 +13,7 @@ from knot_resolver_manager.config_store import ConfigStore, only_on_real_changes
 from knot_resolver_manager.datamodel.config_schema import KresConfig
 from knot_resolver_manager.kresd_controller.registered_workers import (
     command_registered_workers,
-    get_registered_workers_kids,
+    get_registered_workers_kresids,
 )
 from knot_resolver_manager.utils.functional import Result
 
@@ -125,11 +125,11 @@ class ResolverCollector:
             # when not running, we can start a new loop (we are not in the manager's main thread)
             compat.asyncio.run(self.collect_kresd_stats(_triggered_from_prometheus_library=True))
 
-    def _create_resolver_metrics_loaded_gauge(self, kid: "KresID", loaded: bool) -> GaugeMetricFamily:
+    def _create_resolver_metrics_loaded_gauge(self, kresid: "KresID", loaded: bool) -> GaugeMetricFamily:
         return _gauge(
             "resolver_metrics_loaded",
             "0 if metrics from resolver instance were not loaded, otherwise 1",
-            label=("instance_id", str(kid)),
+            label=("instance_id", str(kresid)),
             value=int(loaded),
         )
 
@@ -139,29 +139,31 @@ class ResolverCollector:
 
         # if we have no data, return metrics with information about it and exit
         if self._stats_raw is None:
-            for kid in get_registered_workers_kids():
-                yield self._create_resolver_metrics_loaded_gauge(kid, False)
+            for kresid in get_registered_workers_kresids():
+                yield self._create_resolver_metrics_loaded_gauge(kresid, False)
             return
 
         # if we have data, parse them
-        for kid in get_registered_workers_kids():
+        for kresid in get_registered_workers_kresids():
             success = False
             try:
-                if kid in self._stats_raw:
-                    raw = self._stats_raw[kid]
+                if kresid in self._stats_raw:
+                    raw = self._stats_raw[kresid]
                     metrics: Dict[str, int] = json.loads(raw[1:-1])
-                    yield from self._parse_resolver_metrics(kid, metrics)
+                    yield from self._parse_resolver_metrics(kresid, metrics)
                     success = True
             except json.JSONDecodeError:
-                logger.warning("Failed to load metrics from resolver instance %s: failed to parse statistics", str(kid))
+                logger.warning(
+                    "Failed to load metrics from resolver instance %s: failed to parse statistics", str(kresid)
+                )
             except KeyError as e:
                 logger.warning(
                     "Failed to load metrics from resolver instance %s: attempted to read missing statistic %s",
-                    str(kid),
+                    str(kresid),
                     str(e),
                 )
 
-            yield self._create_resolver_metrics_loaded_gauge(kid, success)
+            yield self._create_resolver_metrics_loaded_gauge(kresid, success)
 
     def describe(self) -> List[Metric]:
         # this function prevents the collector registry from invoking the collect function on startup
