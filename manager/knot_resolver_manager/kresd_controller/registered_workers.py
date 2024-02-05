@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 _REGISTERED_WORKERS: "Dict[KresID, Subprocess]" = {}
 
 
-def get_registered_workers_kids() -> "List[KresID]":
+def get_registered_workers_kresids() -> "List[KresID]":
     return list(_REGISTERED_WORKERS.keys())
 
 

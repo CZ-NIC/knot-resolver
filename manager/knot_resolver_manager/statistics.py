@@ -13,7 +13,7 @@ from knot_resolver_manager.config_store import ConfigStore, only_on_real_changes
 from knot_resolver_manager.datamodel.config_schema import KresConfig
 from knot_resolver_manager.kresd_controller.registered_workers import (
     command_registered_workers,
-    get_registered_workers_kids,
+    get_registered_workers_kresids,
 )
 from knot_resolver_manager.utils.functional import Result
 
@@ -139,12 +139,12 @@ class ResolverCollector:
 
         # if we have no data, return metrics with information about it and exit
         if self._stats_raw is None:
-            for kid in get_registered_workers_kids():
+            for kid in get_registered_workers_kresids():
                 yield self._create_resolver_metrics_loaded_gauge(kid, False)
             return
 
         # if we have data, parse them
-        for kid in get_registered_workers_kids():
+        for kid in get_registered_workers_kresids():
             success = False
             try:
                 if kid in self._stats_raw:
