@@ -3,7 +3,7 @@ Section: net
 Priority: optional
 Maintainer: Knot Resolver <knot-resolver@labs.nic.cz>
 Build-Depends:
- debhelper (>= 9~),
+ debhelper (>= 11~),
  libcmocka-dev (>= 1.0.0),
  libedit-dev,
  libfstrm-dev,
