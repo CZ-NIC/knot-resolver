@@ -129,22 +129,16 @@ disable= [
     "missing-docstring",
     "no-else-return",
     "no-self-use",
-    "raise-missing-from",
     "too-few-public-methods",
     "unused-import",  # checked by flake8,
-    "bad-continuation", # conflicts with black
-    "consider-using-in", # pyright can't see through in expressions,
     "too-many-return-statements", # would prevent us from using recursive tree traversals
     "logging-fstring-interpolation", # see https://github.com/PyCQA/pylint/issues/1788
     "no-else-raise", # not helpful for readability, when we want explicit branches
     "raising-bad-type", # handled by type checker
     "too-many-arguments",  # sure, but how can we change the signatures to take less arguments? artificially create objects with arguments? That's stupid...
-    "no-member",  # checked by pyright
-    "import-error", # checked by pyright (and pylint does not do it properly)
-    "unsupported-delete-operation", # checked by pyright
-    "unsubscriptable-object", # checked by pyright
-    "unsupported-membership-test", # checked by pyright
     "invalid-overridden-method",  # hopefully checked by type checkers
+    "no-member",  # pylint does not do it properly
+    "import-error", # pylint does not do it properly
 ]
 
 [tool.pylint.SIMILARITIES]
@@ -155,14 +149,6 @@ ignore-imports = "yes"
 
 [tool.pylint.DESIGN]
 max-parents = "10"
-
-[tool.pyright]
-include = [
-    "knot_resolver_manager",
-    "tests"
-]
-exclude = []
-typeCheckingMode = "strict"
 
 [tool.mypy]
 python_version = "3.7"

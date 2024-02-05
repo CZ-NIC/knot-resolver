@@ -69,10 +69,10 @@ class _JSONPtr:
                         try:
                             token = int(token)
                             current = current[token]
-                        except ValueError:
+                        except ValueError as e:
                             raise ValueError(
                                 f"invalid JSON pointer: list '{current_ptr}' require numbers as keys, instead got '{token}'"
-                            )
+                            ) from e
 
                 elif isinstance(current, dict):
                     current = current.get(token, None)

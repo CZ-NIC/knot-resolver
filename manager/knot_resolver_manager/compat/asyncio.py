@@ -2,15 +2,6 @@
 #
 # pylint: disable=no-member
 
-# We disable pyright checks because it can't find method that don't exist in this Python version
-# so the reported error is correct, but due to the version checking conditions, it never happens.
-# Due to backporting, we are also using private methods and non-existent members of classes
-#
-# pyright: reportUnknownMemberType=false
-# pyright: reportUnknownVariableType=false
-# pyright: reportGeneralTypeIssues=false
-# pyright: reportPrivateUsage=false
-
 import asyncio
 import functools
 import logging

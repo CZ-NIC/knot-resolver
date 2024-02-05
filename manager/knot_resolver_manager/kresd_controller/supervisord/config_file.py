@@ -32,7 +32,7 @@ class SupervisordKresID(KresID):
 
     @staticmethod
     def from_string(val: str) -> "SupervisordKresID":
-        if val == "cache-gc" or val == "cache-gc:cache-gc":
+        if val in ("cache-gc", "cache-gc:cache-gc"):
             # the double name is checked because thats how we read it from supervisord
             return SupervisordKresID.new(SubprocessType.GC, 0)
         else:
@@ -170,7 +170,7 @@ async def write_config_file(config: KresConfig) -> None:
     template = await read_resource(__package__, "supervisord.conf.j2")
     assert template is not None
     template = template.decode("utf8")
-    config_string = Template(template).render(  # pyright: reportUnknownMemberType=false
+    config_string = Template(template).render(
         gc=ProcessTypeConfig.create_gc_config(config),
         kresd=ProcessTypeConfig.create_kresd_config(config),
         manager=ProcessTypeConfig.create_manager_config(config),
