@@ -12,7 +12,7 @@ dummy = ModuleType("dummy")
 dummy.__dict__["setup"] = lambda *args, **kwargs: None
 dummy.__dict__["build"] = lambda *args, **kwargs: None
 sys.modules["setuptools"] = dummy
-sys.modules["build"] = dummy
+sys.modules["build_c_extensions"] = dummy
 
 # load install_requires array from setup.py
 spec = importlib.util.spec_from_file_location("setup", sys.argv[1] if len(sys.argv) == 2 else "manager/setup.py")
