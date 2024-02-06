@@ -25,10 +25,7 @@ from knot_resolver_manager.config_store import ConfigStore
 from knot_resolver_manager.constants import DEFAULT_MANAGER_CONFIG_FILE, PID_FILE_NAME, init_user_constants
 from knot_resolver_manager.datamodel.cache_schema import CacheClearRPCSchema
 from knot_resolver_manager.datamodel.config_schema import KresConfig, get_rundir_without_validation
-from knot_resolver_manager.datamodel.globals import (
-    Context,
-    set_global_validation_context,
-)
+from knot_resolver_manager.datamodel.globals import Context, set_global_validation_context
 from knot_resolver_manager.datamodel.management_schema import ManagementSchema
 from knot_resolver_manager.exceptions import CancelStartupExecInsteadException, KresManagerException
 from knot_resolver_manager.kresd_controller import get_best_controller_implementation
@@ -334,6 +331,7 @@ class Server:
                 web.get("/schema/ui", self._handle_view_schema),
                 web.get("/metrics", self._handler_metrics),
                 web.post("/cache-clear", self._handler_cache_clear),
+                web.post("/cache/clear", self._handler_cache_clear),
             ]
         )
 
