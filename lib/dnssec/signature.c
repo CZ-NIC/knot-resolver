@@ -179,11 +179,27 @@ static int sign_ctx_add_records(dnssec_sign_ctx_t *ctx, const knot_rrset_t *cove
 	if (!ctx || !covered || trim_labels < 0)
 		return kr_error(EINVAL);
 
-	// huge block of rrsets can be optionally created
-	static uint8_t wire_buffer[KNOT_WIRE_MAX_PKTSIZE];
+	/* Buffer allocation notes:
+	   - We should be able to afford a larger stack allocation,
+	     as we don't use (this function in) threads.
+	   - The format that's signed has decompressed names,
+	     so it can be significantly more than 64 KiB,
+	     even if it originally did fit into a 64 KiB packet.
+	     Let's tolerate a double of that.
+	   - Older libknot only allowed passing 16-bit size limit.
+	*/
+	uint8_t wire_buffer[
+		#if KNOT_VERSION_HEX < 0x030400
+			KNOT_WIRE_MAX_PKTSIZE
+		#else
+			knot_rrset_size_estimate(covered)
+		#endif
+	];
 	int written = knot_rrset_to_wire(covered, wire_buffer, sizeof(wire_buffer), NULL);
-	if (written < 0)
+	if (written < 0) {
+		kr_assert(KNOT_VERSION_HEX < 0x030400 || written != KNOT_ESPACE);
 		return written;
+	}
 
 	/* Set original ttl. */
 	int ret = adjust_wire_ttl(wire_buffer, written, orig_ttl);
