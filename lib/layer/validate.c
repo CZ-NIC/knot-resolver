@@ -676,7 +676,7 @@ static int rrsig_not_found(const kr_layer_t * const ctx, const knot_pkt_t * cons
 	}
 	/* Add one extra label to cur_top, i.e. descend one level below current zone cut */
 	const knot_dname_t * const cut_next = rr->owner +
-		knot_dname_prefixlen(rr->owner, next_depth - 1, NULL);
+		kr_dname_prefixlen(rr->owner, next_depth - 1);
 
 	/* Spawn that DS sub-query. */
 	struct kr_query * const next = kr_rplan_push(&req->rplan, qry, cut_next,

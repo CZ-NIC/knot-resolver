@@ -606,3 +606,14 @@ KR_EXPORT long long kr_fssize(const char *path);
 /** Simply return de->dname. (useful from Lua) */
 KR_EXPORT const char * kr_dirent_name(const struct dirent *de);
 
+
+/* trivial libknot versions compatibility */
+static inline size_t kr_dname_prefixlen(const uint8_t *name, unsigned nlabels)
+{
+	return knot_dname_prefixlen(name, nlabels
+		#if KNOT_VERSION_HEX < 0x030400
+			, NULL
+		#endif
+	);
+}
+
