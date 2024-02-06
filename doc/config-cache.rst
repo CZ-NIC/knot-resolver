@@ -66,7 +66,7 @@ There are two specifics to purging cache records matching specified criteria:
 
    .. code-block:: none
 
-      $ kresctl cache-clear example.com.
+      $ kresctl cache clear example.com.
 
 .. [#] This is a consequence of DNSSEC negative cache which relies on proofs of non-existence on various owner nodes. It is impossible to efficiently flush part of DNS zones signed with NSEC3.
 

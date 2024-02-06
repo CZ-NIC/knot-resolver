@@ -158,7 +158,7 @@ Only one of these arguments can be selected during the execution of a single ``k
 
         $ kresctl metrics ./metrics/data.txt
 
-.. option:: cache-clear
+.. option:: cache clear
 
         Purge cache records matching the specified criteria.
 
@@ -187,9 +187,9 @@ Only one of these arguments can be selected during the execution of a single ``k
 
     .. code-block:: bash
 
-        $ kresctl cache-clear
-        $ kresctl cache-clear example.com.
-        $ kresctl cache-clear --exact-name example.com.
+        $ kresctl cache clear
+        $ kresctl cache clear example.com.
+        $ kresctl cache clear --exact-name example.com.
 
 
 .. option:: schema
