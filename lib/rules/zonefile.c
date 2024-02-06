@@ -153,7 +153,7 @@ static bool owner_relativize(zs_scanner_t *s)
 		}
 		return false;
 	}
-	const int len = knot_dname_prefixlen(s->r_owner, labels, NULL);
+	const int len = kr_dname_prefixlen(s->r_owner, labels);
 	s->r_owner[len] = '\0'; // not very nice but safe at this point
 	return true;
 }
