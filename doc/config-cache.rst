@@ -57,7 +57,7 @@ There are two specifics to purging cache records matching specified criteria:
 
 * To reliably remove negative cache entries, you need to clear the subtree with the whole zone. E.g. to clear negative cache entries for the (formerly non-existent)
   record ``www.example.com. A``, you need to flush the whole subtree starting at the zone apex, e.g. `example.com.` [#]_
-* This operation is asynchronous and might not yet be finished when the call to the ``/cache-clear`` API endpoint returns.
+* This operation is asynchronous and might not yet be finished when the call to the ``/cache/clear`` API endpoint returns.
   The return value indicates if clearing continues asynchronously or not.
 
 .. tip::
@@ -66,7 +66,7 @@ There are two specifics to purging cache records matching specified criteria:
 
    .. code-block:: none
 
-      $ kresctl cache-clear example.com.
+      $ kresctl cache clear example.com.
 
 .. [#] This is a consequence of DNSSEC negative cache which relies on proofs of non-existence on various owner nodes. It is impossible to efficiently flush part of DNS zones signed with NSEC3.
 
