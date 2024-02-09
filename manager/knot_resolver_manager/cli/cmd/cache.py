@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple, Type
 from knot_resolver_manager.cli.command import Command, CommandArgs, CompWords, register_command
 from knot_resolver_manager.datamodel.cache_schema import CacheClearRPCSchema
 from knot_resolver_manager.utils.modeling.exceptions import AggregateDataValidationError, DataValidationError
-from knot_resolver_manager.utils.modeling.parsing import DataFormat
+from knot_resolver_manager.utils.modeling.parsing import DataFormat, parse_json
 from knot_resolver_manager.utils.requests import request
 
 
@@ -19,6 +19,7 @@ class CacheCommand(Command):
     def __init__(self, namespace: argparse.Namespace) -> None:
         super().__init__(namespace)
         self.operation: Optional[CacheOperations] = namespace.operation if hasattr(namespace, "operation") else None
+        self.out_format: DataFormat = namespace.out_format if hasattr(namespace, "out_format") else DataFormat.YAML
 
         # CLEAR operation
         self.clear_dict: Dict[str, Any] = {}
@@ -70,6 +71,25 @@ class CacheCommand(Command):
             default=None,
         )
 
+        out_format = clear_subparser.add_mutually_exclusive_group()
+        out_format_default = DataFormat.YAML
+        out_format.add_argument(
+            "--json",
+            help="Set output format in JSON format, default.",
+            const=DataFormat.JSON,
+            action="store_const",
+            dest="out_format",
+            default=out_format_default,
+        )
+        out_format.add_argument(
+            "--yaml",
+            help="Set configuration data in YAML format.",
+            const=DataFormat.YAML,
+            action="store_const",
+            dest="out_format",
+            default=out_format_default,
+        )
+
         return cache_parser, CacheCommand
 
     @staticmethod
@@ -90,8 +110,9 @@ class CacheCommand(Command):
 
             body: str = DataFormat.JSON.dict_dump(validated.get_unparsed_data())
             response = request(args.socket, "POST", "cache/clear", body)
+            body_dict = parse_json(response.body)
 
         if response.status != 200:
             print(response, file=sys.stderr)
             sys.exit(1)
-        print(response.body)
+        print(self.out_format.dict_dump(body_dict, indent=4))
