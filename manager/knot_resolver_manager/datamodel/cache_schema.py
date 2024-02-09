@@ -19,9 +19,7 @@ from knot_resolver_manager.utils.modeling import ConfigSchema
 from knot_resolver_manager.utils.modeling.base_schema import lazy_default
 
 _CACHE_CLEAR_TEMPLATE = template_from_str(
-    "{% from 'macros/common_macros.lua.j2' import tojson %}"
-    "{% from 'macros/cache_macros.lua.j2' import cache_clear %}"
-    "{{ tojson(cache_clear(params)) }}"
+    "{% from 'macros/cache_macros.lua.j2' import cache_clear %} {{ cache_clear(params) }}"
 )
 
 

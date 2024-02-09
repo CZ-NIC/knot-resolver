@@ -260,7 +260,7 @@ class Server:
 
         _, result = await command_single_registered_worker(config.render_lua())
         return web.Response(
-            body=result,
+            body=json.dumps(result),
             content_type="application/json",
             charset="utf8",
         )

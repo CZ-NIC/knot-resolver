@@ -69,7 +69,7 @@ def _histogram(
 
 class ResolverCollector:
     def __init__(self, config_store: ConfigStore) -> None:
-        self._stats_raw: "Optional[Dict[KresID, str]]" = None
+        self._stats_raw: "Optional[Dict[KresID, object]]" = None
         self._config_store: ConfigStore = config_store
         self._collection_task: "Optional[asyncio.Task[None]]" = None
         self._skip_immediate_collection: bool = False
@@ -148,8 +148,7 @@ class ResolverCollector:
             success = False
             try:
                 if kresid in self._stats_raw:
-                    raw = self._stats_raw[kresid]
-                    metrics: Dict[str, int] = json.loads(raw[1:-1])
+                    metrics = self._stats_raw[kresid]
                     yield from self._parse_resolver_metrics(kresid, metrics)
                     success = True
             except json.JSONDecodeError:

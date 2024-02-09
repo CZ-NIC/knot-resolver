@@ -514,7 +514,7 @@ modules.load('extended_error')
 -- Load keyfile_default
 trust_anchors.add_file('@keyfile_default@', @unmanaged@)
 
-local function eval_cmd_compile(line, raw)
+local function eval_cmd_compile(line, mode)
 	-- Compatibility sandbox code loading
 	local function load_code(code)
 	    if getfenv then -- Lua 5.1
@@ -523,8 +523,19 @@ local function eval_cmd_compile(line, raw)
 	        return load(code, nil, 't', _ENV)
 	    end
 	end
+
+	-- See `ENGINE_EVAL_MODE_MAP(XX)` C-macro for possible values
 	local err, chunk
-	chunk, err = load_code(raw and 'return '..line or 'return table_print('..line..')')
+	if mode == "LUA_TABLE" then
+		chunk, err = load_code('return table_print(('..line..'))')
+	elseif mode == "RAW" then
+		chunk, err = load_code('return ('..line..')')
+	elseif mode == "JSON" then
+		chunk, err = load_code('return tojson(('..line..'))')
+	else
+		return nil, "invalid mode"
+	end
+
 	if err then
 		chunk, err = load_code(line)
 	end
@@ -532,8 +543,8 @@ local function eval_cmd_compile(line, raw)
 end
 
 -- Interactive command evaluation
-function eval_cmd(line, raw)
-	local chunk, err = eval_cmd_compile(line, raw)
+function eval_cmd(line, mode)
+	local chunk, err = eval_cmd_compile(line, mode)
 	if not err then
 		return chunk()
 	else
@@ -642,7 +653,7 @@ end
 -- must be public because it is called from eval_cmd()
 -- when map() commands are read from control socket
 function _map_luaobj_call_wrapper(cmd)
-	local func = eval_cmd_compile(cmd, true)
+	local func = eval_cmd_compile(cmd, "RAW")
 	local ret = kluautil.kr_table_pack(xpcall(func, debug.traceback))
 	local ok, serial = pcall(krprint.serialize_lua, ret, 'error')
 	if not ok then
@@ -747,7 +758,7 @@ function map(cmd, format)
 	if (#cmd <= 0) then
 		panic('map() command must be non-empty') end
 	-- syntax check on input command to detect typos early
-	local chunk, err = eval_cmd_compile(cmd, false)
+	local chunk, err = eval_cmd_compile(cmd, "LUA_TABLE")
 	if not chunk then
 		panic('failure when compiling map() command: %s', err)
 	end
@@ -785,7 +796,7 @@ function map(cmd, format)
 		log_info(ffi.C.LOG_GRP_SYSTEM, 'executing map() on %s: command %s', path_name, cmd)
 		local ret
 		if local_exec then
-			ret = eval_cmd(cmd)
+			ret = eval_cmd(cmd, "LUA_TABLE")
 		else
 			ret = map_send_recv(cmd, path)
 			-- skip dead sockets (leftovers from dead instances)

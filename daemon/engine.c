@@ -642,7 +642,17 @@ int engine_pcall(lua_State *L, int argc)
 	return lua_pcall(L, argc, LUA_MULTRET, 0);
 }
 
-int engine_cmd(lua_State *L, const char *str, bool raw)
+const char *engine_eval_mode_str(enum engine_eval_mode mode)
+{
+	switch (mode) {
+#define XX(cid) case ENGINE_EVAL_MODE_##cid: return #cid;
+		ENGINE_EVAL_MODE_MAP(XX)
+#undef XX
+	}
+	return "(invalid)";
+}
+
+int engine_cmd(struct lua_State *L, const char *str, enum engine_eval_mode mode)
 {
 	if (L == NULL) {
 		return kr_error(ENOEXEC);
@@ -651,7 +661,7 @@ int engine_cmd(lua_State *L, const char *str, bool raw)
 	/* Evaluate results */
 	lua_getglobal(L, "eval_cmd");
 	lua_pushstring(L, str);
-	lua_pushboolean(L, raw);
+	lua_pushstring(L, engine_eval_mode_str(mode));
 
 	/* Check result. */
 	return engine_pcall(L, 2);

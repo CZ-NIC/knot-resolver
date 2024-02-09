@@ -18,7 +18,7 @@ def get_registered_workers_kresids() -> "List[KresID]":
     return list(_REGISTERED_WORKERS.keys())
 
 
-async def command_single_registered_worker(cmd: str) -> "Tuple[KresID, str]":
+async def command_single_registered_worker(cmd: str) -> "Tuple[KresID, object]":
     for sub in _REGISTERED_WORKERS.values():
         return sub.id, await sub.command(cmd)
     raise SubprocessControllerException(
@@ -27,8 +27,8 @@ async def command_single_registered_worker(cmd: str) -> "Tuple[KresID, str]":
     )
 
 
-async def command_registered_workers(cmd: str) -> "Dict[KresID, str]":
-    async def single_pair(sub: "Subprocess") -> "Tuple[KresID, str]":
+async def command_registered_workers(cmd: str) -> "Dict[KresID, object]":
+    async def single_pair(sub: "Subprocess") -> "Tuple[KresID, object]":
         return sub.id, await sub.command(cmd)
 
     pairs = await asyncio.gather(*(single_pair(inst) for inst in _REGISTERED_WORKERS.values()))

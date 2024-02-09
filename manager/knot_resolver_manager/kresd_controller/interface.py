@@ -1,6 +1,8 @@
 import asyncio
 import itertools
+import json
 import logging
+import struct
 import sys
 from abc import ABC, abstractmethod  # pylint: disable=no-name-in-module
 from enum import Enum, auto
@@ -165,7 +167,7 @@ class Subprocess(ABC):
     def id(self) -> KresID:
         return self._id
 
-    async def command(self, cmd: str) -> str:
+    async def command(self, cmd: str) -> object:
         reader: asyncio.StreamReader
         writer: Optional[asyncio.StreamWriter] = None
         try:
@@ -174,14 +176,18 @@ class Subprocess(ABC):
             # drop prompt
             _ = await reader.read(2)
 
+            # switch to JSON mode
+            writer.write("__json\n".encode("utf8"))
+
             # write command
             writer.write(cmd.encode("utf8"))
             writer.write(b"\n")
             await writer.drain()
 
             # read result
-            result_bytes = await reader.readline()
-            return result_bytes.decode("utf8")[:-1]  # strip trailing newline
+            (msg_len,) = struct.unpack(">I", await reader.read(4))
+            result_bytes = await reader.readexactly(msg_len)
+            return json.loads(result_bytes.decode("utf8"))
 
         finally:
             if writer is not None:

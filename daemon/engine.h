@@ -31,12 +31,26 @@ int engine_init(void);
  * this and before `network_deinit`. */
 void engine_deinit(void);
 
+#define ENGINE_EVAL_MODE_MAP(XX) \
+	XX(LUA_TABLE) \
+	XX(RAW) \
+	XX(JSON) \
+	//
+
+enum engine_eval_mode {
+#define XX(cid) ENGINE_EVAL_MODE_##cid,
+	ENGINE_EVAL_MODE_MAP(XX)
+#undef XX
+};
+
+const char *engine_eval_mode_str(enum engine_eval_mode mode);
+
 /** Perform a lua command within the sandbox.
  *
  *  @return zero on success.
  *  The result will be returned on the lua stack - an error message in case of failure.
  *  http://www.lua.org/manual/5.1/manual.html#lua_pcall */
-int engine_cmd(struct lua_State *L, const char *str, bool raw);
+int engine_cmd(struct lua_State *L, const char *str, enum engine_eval_mode mode);
 
 /** Execute current chunk in the sandbox */
 int engine_pcall(struct lua_State *L, int argc);
