@@ -38,6 +38,18 @@ static inline bool kr_nsec3_limited_params(const dnssec_nsec3_params_t *params)
 	return kr_nsec3_limited(params->iterations, params->salt.size);
 }
 
+/** Return limit on NSEC3 depth.  The point is to avoid doing too much work on SHA1.
+ *
+ * CVE-2023-50868: NSEC3 closest encloser proof can exhaust CPU
+ *
+ * 128 is chosen so that zones with good NSEC3 parameters (giving _price() == 1)
+ * won't be limited in any way.  Performance doesn't seem too bad with that either.
+ */
+static inline int kr_nsec3_max_depth(const dnssec_nsec3_params_t *params)
+{
+	return 128 / kr_nsec3_price(params->iterations, params->salt.size);
+}
+
 
 /**
  * Name error response check (RFC5155 7.2.2).
