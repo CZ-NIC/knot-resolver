@@ -1130,7 +1130,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 			count += (knot_pkt_rr(sec, i)->type == KNOT_RRTYPE_NSEC3);
 		if (count > 8) {
 			VERBOSE_MSG(qry, "<= too many NSEC3 records in AUTHORITY (%d)\n", count);
-			kr_request_set_extended_error(req, KNOT_EDNS_EDE_NSEC3_ITERS,
+			kr_request_set_extended_error(req, 27/*KNOT_EDNS_EDE_NSEC3_ITERS*/,
 				/* It's not about iteration values per se, but close enough. */
 				"DYRH: too many NSEC3 records");
 			qry->flags.DNSSEC_BOGUS = true;
