@@ -146,6 +146,18 @@ static int closest_encloser_match(int *flags, const knot_rrset_t *nsec3,
 	const knot_dname_t *encloser = knot_wire_next_label(name, NULL);
 	*skipped = 1;
 
+	/* Avoid doing too much work on SHA1, mitigating:
+	 *   CVE-2023-50868: NSEC3 closest encloser proof can exhaust CPU
+	 * We log nothing here; it wouldn't be easy from this place
+	 * and huge SNAME should be suspicious on its own.
+	 */
+	const int max_labels = knot_dname_labels(nsec3->owner, NULL) - 1
+				+ kr_nsec3_max_depth(&params);
+	for (int l = knot_dname_labels(encloser, NULL); l > max_labels; --l) {
+		encloser = knot_wire_next_label(encloser, NULL);
+		++(*skipped);
+	}
+
 	while(encloser) {
 		ret = hash_name(&name_hash, &params, encloser);
 		if (ret != 0)
