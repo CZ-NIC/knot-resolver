@@ -1090,6 +1090,21 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 		}
 	}
 
+	/* Check for too many NSEC3 records.  That's an issue, as some parts of validation
+	 * are quadratic in their count, doing nontrivial computations inside.
+	 * Also there seems to be no use in sending many NSEC3 records. */
+	if (!qry->flags.CACHED) {
+		const knot_pktsection_t *sec = knot_pkt_section(pkt, KNOT_AUTHORITY);
+		int count = 0;
+		for (int i = 0; i < sec->count; ++i)
+			count += (knot_pkt_rr(sec, i)->type == KNOT_RRTYPE_NSEC3);
+		if (count > 8) {
+			VERBOSE_MSG(qry, "<= too many NSEC3 records in AUTHORITY (%d)\n", count);
+			qry->flags.DNSSEC_BOGUS = true;
+			return KR_STATE_FAIL;
+		}
+	}
+
 	if (knot_wire_get_aa(pkt->wire) && qtype == KNOT_RRTYPE_DNSKEY) {
 		const knot_rrset_t *ds = qry->zone_cut.trust_anchor;
 		if (ds && !kr_ds_algo_support(ds)) {
