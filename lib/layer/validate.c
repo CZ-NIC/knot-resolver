@@ -128,14 +128,15 @@ static bool maybe_downgrade_nsec3(const ranked_rr_array_entry_t *e, struct kr_qu
 	const knot_rdataset_t *rrs = &e->rr->rrs;
 	knot_rdata_t *rd = rrs->rdata;
 	for (int j = 0; j < rrs->count; ++j, rd = knot_rdataset_next(rd)) {
-		if (knot_nsec3_iters(rd) > KR_NSEC3_MAX_ITERATIONS)
+		if (kr_nsec3_limited_rdata(rd))
 			goto do_downgrade;
 	}
 	return false;
 
 do_downgrade: // we do this deep inside calls because of having signer name available
-	VERBOSE_MSG(qry, "<= DNSSEC downgraded due to NSEC3 iterations %d > %d\n",
-			(int)knot_nsec3_iters(rd), (int)KR_NSEC3_MAX_ITERATIONS);
+	VERBOSE_MSG(qry,
+		"<= DNSSEC downgraded due to expensive NSEC3: %d iterations, %d salt length\n",
+		(int)knot_nsec3_iters(rd), (int)knot_nsec3_salt_len(rd));
 	qry->flags.DNSSEC_WANT = false;
 	qry->flags.DNSSEC_INSECURE = true;
 	rank_records(qry, true, KR_RANK_INSECURE, vctx->zone_name);
@@ -275,6 +276,7 @@ static int validate_records(struct kr_request *req, knot_pkt_t *answer, knot_mm_
 		.err_cnt	= 0,
 		.cname_norrsig_cnt = 0,
 		.result		= 0,
+		.limit_crypto_remains = &qry->vld_limit_crypto_remains,
 		.log_qry	= qry,
 	};
 
@@ -383,6 +385,7 @@ static int validate_keyset(struct kr_request *req, knot_pkt_t *answer, bool has_
 			.has_nsec3	= has_nsec3,
 			.flags		= 0,
 			.result		= 0,
+			.limit_crypto_remains = &qry->vld_limit_crypto_remains,
 			.log_qry	= qry,
 		};
 		int ret = kr_dnskeys_trusted(&vctx, sig_rds, qry->zone_cut.trust_anchor);
@@ -1029,6 +1032,11 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	struct kr_request *req = ctx->req;
 	struct kr_query *qry = req->current_query;
 
+	if (qry->vld_limit_uid != qry->uid) {
+		qry->vld_limit_uid = qry->uid;
+		qry->vld_limit_crypto_remains = req->ctx->vld_limit_crypto;
+	}
+
 	/* Ignore faulty or unprocessed responses. */
 	if (ctx->state & (KR_STATE_FAIL|KR_STATE_CONSUME)) {
 		return ctx->state;
@@ -1119,6 +1127,24 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 		}
 	}
 
+	/* Check for too many NSEC3 records.  That's an issue, as some parts of validation
+	 * are quadratic in their count, doing nontrivial computations inside.
+	 * Also there seems to be no use in sending many NSEC3 records. */
+	if (!qry->flags.CACHED) {
+		const knot_pktsection_t *sec = knot_pkt_section(pkt, KNOT_AUTHORITY);
+		int count = 0;
+		for (int i = 0; i < sec->count; ++i)
+			count += (knot_pkt_rr(sec, i)->type == KNOT_RRTYPE_NSEC3);
+		if (count > 8) {
+			VERBOSE_MSG(qry, "<= too many NSEC3 records in AUTHORITY (%d)\n", count);
+			kr_request_set_extended_error(req, 27/*KNOT_EDNS_EDE_NSEC3_ITERS*/,
+				/* It's not about iteration values per se, but close enough. */
+				"DYRH: too many NSEC3 records");
+			qry->flags.DNSSEC_BOGUS = true;
+			return KR_STATE_FAIL;
+		}
+	}
+
 	if (knot_wire_get_aa(pkt->wire) && qtype == KNOT_RRTYPE_DNSKEY) {
 		const knot_rrset_t *ds = qry->zone_cut.trust_anchor;
 		if (ds && !kr_ds_algo_support(ds)) {
@@ -1151,6 +1177,10 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 		ret = validate_records(req, pkt, req->rplan.pool, has_nsec3);
 		if (ret == KNOT_EDOWNGRADED) {
 			return KR_STATE_DONE;
+		} else if (ret == kr_error(E2BIG)) {
+			qry->flags.DNSSEC_BOGUS = true;
+			return KR_STATE_FAIL;
+
 		} else if (ret != 0) {
 			/* something exceptional - no DNS key, empty pointers etc
 			 * normally it shouldn't happen */

@@ -479,6 +479,7 @@ int kr_resolver_init(module_array_t *modules, knot_mm_t *pool)
 
 	/* Default options (request flags). */
 	the_resolver->options.REORDER_RR = true;
+	the_resolver->vld_limit_crypto = KR_VLD_LIMIT_CRYPTO_DEFAULT;
 
 	/* Open resolution context */
 	the_resolver->trust_anchors = trie_create(NULL);
@@ -764,7 +765,9 @@ int kr_resolve_consume(struct kr_request *request, struct kr_transport **transpo
 
 	/* Do not finish with bogus answer. */
 	if (qry->flags.DNSSEC_BOGUS)  {
-		if (qry->flags.FORWARD || qry->flags.STUB) {
+		if (qry->flags.FORWARD || qry->flags.STUB
+				/* Probably CPU exhaustion attempt, so do not retry. */
+				|| qry->vld_limit_crypto_remains <= 0) {
 			return KR_STATE_FAIL;
 		}
 		/* Other servers might not have broken DNSSEC. */
@@ -1026,7 +1029,7 @@ int kr_request_set_extended_error(struct kr_request *request, int info_code, con
 		return KNOT_EDNS_EDE_NONE;
 	}
 
-	if (ede_priority(info_code) >= ede_priority(ede->info_code)) {
+	if (ede_priority(info_code) > ede_priority(ede->info_code)) {
 		ede->info_code = info_code;
 		ede->extra_text = extra_text;
 	}

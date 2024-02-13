@@ -71,7 +71,7 @@ static int hash_name(dnssec_binary_t *hash, const dnssec_nsec3_params_t *params,
 		return kr_error(EINVAL);
 	if (!name)
 		return kr_error(EINVAL);
-	if (kr_fails_assert(params->iterations <= KR_NSEC3_MAX_ITERATIONS)) {
+	if (kr_fails_assert(!kr_nsec3_limited_params(params))) {
 		/* This if is mainly defensive; it shouldn't happen. */
 		return kr_error(EINVAL);
 	}
@@ -145,6 +145,18 @@ static int closest_encloser_match(int *flags, const knot_rrset_t *nsec3,
 
 	const knot_dname_t *encloser = knot_wire_next_label(name, NULL);
 	*skipped = 1;
+
+	/* Avoid doing too much work on SHA1, mitigating:
+	 *   CVE-2023-50868: NSEC3 closest encloser proof can exhaust CPU
+	 * We log nothing here; it wouldn't be easy from this place
+	 * and huge SNAME should be suspicious on its own.
+	 */
+	const int max_labels = knot_dname_labels(nsec3->owner, NULL) - 1
+				+ kr_nsec3_max_depth(&params);
+	for (int l = knot_dname_labels(encloser, NULL); l > max_labels; --l) {
+		encloser = knot_wire_next_label(encloser, NULL);
+		++(*skipped);
+	}
 
 	while(encloser) {
 		ret = hash_name(&name_hash, &params, encloser);
@@ -565,7 +577,7 @@ int kr_nsec3_wildcard_answer_response_check(const knot_pkt_t *pkt, knot_section_
 		const knot_rrset_t *rrset = knot_pkt_rr(sec, i);
 		if (rrset->type != KNOT_RRTYPE_NSEC3)
 			continue;
-		if (knot_nsec3_iters(rrset->rrs.rdata) > KR_NSEC3_MAX_ITERATIONS) {
+		if (kr_nsec3_limited_rdata(rrset->rrs.rdata)) {
 			/* Avoid hashing with too many iterations.
 			 * If we get here, the `sname` wildcard probably ends up bogus,
 			 * but it gets downgraded to KR_RANK_INSECURE when validator
