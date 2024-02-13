@@ -540,7 +540,7 @@ obs:trigger: &obs_trigger
     url: https://build.opensuse.org/package/show/home:CZ-NIC:$OBS_REPO/knot-resolver
   tags:
     - condor
-  allow_failure: false  # required to make when: manual action blocking
+  allow_failure: true  # required to make when: manual action blocking
   script:
     - scripts/make-obs.sh
     - echo y | scripts/build-in-obs.sh $OBS_REPO
