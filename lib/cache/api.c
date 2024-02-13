@@ -512,7 +512,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 		return kr_ok();
 	}
 	if (rr->type == KNOT_RRTYPE_NSEC3 && rr->rrs.count
-	    && knot_nsec3_iters(rr->rrs.rdata) > KR_NSEC3_MAX_ITERATIONS) {
+	    && kr_nsec3_limited_rdata(rr->rrs.rdata)) {
 		/* This shouldn't happen often, thanks to downgrades during validation. */
 		VERBOSE_MSG(qry, "=> skipping NSEC3 with too many iterations\n");
 		return kr_ok();

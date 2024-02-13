@@ -84,7 +84,7 @@ static knot_db_val_t key_NSEC3_name(struct key *k, const knot_dname_t *name,
 		.data = (uint8_t *)/*const-cast*/name,
 	};
 
-	if (kr_fails_assert(nsec_p->libknot.iterations <= KR_NSEC3_MAX_ITERATIONS)) {
+	if (kr_fails_assert(!kr_nsec3_limited_params(&nsec_p->libknot))) {
 		/* This is mainly defensive; it shouldn't happen thanks to downgrades. */
 		return VAL_EMPTY;
 	}
@@ -272,8 +272,22 @@ int nsec3_encloser(struct key *k, struct answer *ans,
 	const int zname_labels = knot_dname_labels(k->zname, NULL);
 	int last_nxproven_labels = -1;
 	const knot_dname_t *name = qry->sname;
+
+	/* Avoid doing too much work on SHA1; we might consider that a part of mitigating
+	 *    CVE-2023-50868: NSEC3 closest encloser proof can exhaust CPU
+	 * As currently the code iterates from the longest name, we limit that.
+	 * Note that we don't want to limit too much, as the alternative usually includes
+	 * sending more queries upstream, which would come with nontrivial work, too.
+	 */
+	const int max_labels = zname_labels + kr_nsec3_max_depth(&ans->nsec_p.libknot);
+	if (sname_labels > max_labels)
+		VERBOSE_MSG(qry, "=> NSEC3 hashing partly skipped due to too long SNAME (CVE-2023-50868)\n");
+
 	for (int name_labels = sname_labels; name_labels >= zname_labels;
 					--name_labels, name += 1 + name[0]) {
+		if (name_labels > max_labels)
+			continue; // avoid the hashing
+
 		/* Find a previous-or-equal NSEC3 in cache covering the name,
 		 * checking TTL etc. */
 		const knot_db_val_t key = key_NSEC3_name(k, name, false, &ans->nsec_p);

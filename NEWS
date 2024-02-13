@@ -1,12 +1,31 @@
-Knot Resolver 6.0.6 (2024-0m-dd)
+Knot Resolver 6.0.6 (2024-02-13)
 ================================
+
+Security
+--------
+- CVE-2023-50868: NSEC3 closest encloser proof can exhaust CPU
+  * validator: lower the NSEC3 iteration limit (150 -> 50)
+  * validator: similarly also limit excessive NSEC3 salt length
+  * cache: limit the amount of work on SHA1 in NSEC3 aggressive cache
+  * validator: limit the amount of work on SHA1 in NSEC3 proofs
+  * validator: refuse to validate answers with more than 8 NSEC3 records
+
+- CVE-2023-50387 "KeyTrap": DNSSEC verification complexity
+  could be exploited to exhaust CPU resources and stall DNS resolvers.
+  Solution boils down mainly to limiting crypto-validations per packet.
+
+  We would like to thank Elias Heftrig, Haya Schulmann, Niklas Vogel and Michael Waidner
+  from the German National Research Center for Applied Cybersecurity ATHENE
+  for bringing this vulnerability to our attention.
 
 Improvements
 ------------
+- update addresses of B.root-servers.net (!1478)
 - tweak the default run_dir on non-Linux (!1481)
 
 Bugfixes
 --------
+- fix potential SERVFAIL deadlocks if net.ipv6 = false (#880)
 - fix validation of RRsets around 64 KiB size; needs libknot >= 3.4 (!1497)
 
 
@@ -27,8 +46,25 @@ https://knot.pages.nic.cz/knot-resolver/upgrading-to-6.html
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-Knot Resolver 5.x.y (202y-mm-dd)
+Knot Resolver 5.7.1 (2024-02-13)
 ================================
+
+Security
+--------
+- CVE-2023-50868: NSEC3 closest encloser proof can exhaust CPU
+  * validator: lower the NSEC3 iteration limit (150 -> 50)
+  * validator: similarly also limit excessive NSEC3 salt length
+  * cache: limit the amount of work on SHA1 in NSEC3 aggressive cache
+  * validator: limit the amount of work on SHA1 in NSEC3 proofs
+  * validator: refuse to validate answers with more than 8 NSEC3 records
+
+- CVE-2023-50387 "KeyTrap": DNSSEC verification complexity
+  could be exploited to exhaust CPU resources and stall DNS resolvers.
+  Solution boils down mainly to limiting crypto-validations per packet.
+
+  We would like to thank Elias Heftrig, Haya Schulmann, Niklas Vogel and Michael Waidner
+  from the German National Research Center for Applied Cybersecurity ATHENE
+  for bringing this vulnerability to our attention.
 
 Improvements
 ------------
