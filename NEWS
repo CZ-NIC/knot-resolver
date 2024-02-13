@@ -10,6 +10,14 @@ Security
   * validator: limit the amount of work on SHA1 in NSEC3 proofs
   * validator: refuse to validate answers with more than 8 NSEC3 records
 
+- CVE-2023-50387 "KeyTrap": DNSSEC verification complexity
+  could be exploited to exhaust CPU resources and stall DNS resolvers.
+  Solution boils down mainly to limiting crypto-validations per packet.
+
+  We would like to thank Elias Heftrig, Haya Schulmann, Niklas Vogel and Michael Waidner
+  from the German National Research Center for Applied Cybersecurity ATHENE
+  for bringing this vulnerability to our attention.
+
 Improvements
 ------------
 - update addresses of B.root-servers.net (!1478)

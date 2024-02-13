@@ -87,6 +87,12 @@ struct kr_query {
 	struct kr_qflags forward_flags;
 	uint32_t secret;
 	uint32_t uid; /**< Query iteration number, unique within the kr_rplan. */
+
+	/** Remaining limit; see kr_query::vld_limit_crypto docs */
+	int32_t  vld_limit_crypto_remains;
+	/** ::uid value to which this remaining limit applies. */
+	uint32_t vld_limit_uid;
+
 	uint64_t creation_time_mono; /* The time of query's creation (milliseconds).
 				 * Or time of creation of an oldest
 				 * ancestor if it is a subquery. */
