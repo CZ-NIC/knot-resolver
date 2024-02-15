@@ -11,10 +11,14 @@ from prometheus_client.core import REGISTRY, CounterMetricFamily, HistogramMetri
 from knot_resolver_manager import compat
 from knot_resolver_manager.config_store import ConfigStore, only_on_real_changes
 from knot_resolver_manager.datamodel.config_schema import KresConfig
+from knot_resolver_manager.kresd_controller.registered_workers import (
+    command_registered_workers,
+    get_registered_workers_kresids,
+)
 from knot_resolver_manager.utils.functional import Result
 
 if TYPE_CHECKING:
-    from knot_resolver_manager.kresd_controller.interface import KresID, Subprocess
+    from knot_resolver_manager.kresd_controller.interface import KresID
 
 
 logger = logging.getLogger(__name__)
@@ -22,8 +26,6 @@ logger = logging.getLogger(__name__)
 MANAGER_REQUEST_RECONFIGURE_LATENCY = Histogram(
     "manager_request_reconfigure_latency", "Time it takes to change configuration"
 )
-
-_REGISTERED_RESOLVERS: "Dict[KresID, Subprocess]" = {}
 
 
 T = TypeVar("T")
@@ -43,14 +45,6 @@ def async_timing_histogram(metric: Histogram) -> Callable[[Callable[..., Awaitab
         return wrapper
 
     return decorator
-
-
-async def _command_registered_resolvers(cmd: str) -> "Dict[KresID, str]":
-    async def single_pair(sub: "Subprocess") -> "Tuple[KresID, str]":
-        return sub.id, await sub.command(cmd)
-
-    pairs = await asyncio.gather(*(single_pair(inst) for inst in _REGISTERED_RESOLVERS.values()))
-    return dict(pairs)
 
 
 def _counter(name: str, description: str, label: Tuple[str, str], value: float) -> CounterMetricFamily:
@@ -75,7 +69,7 @@ def _histogram(
 
 class ResolverCollector:
     def __init__(self, config_store: ConfigStore) -> None:
-        self._stats_raw: "Optional[Dict[KresID, str]]" = None
+        self._stats_raw: "Optional[Dict[KresID, object]]" = None
         self._config_store: ConfigStore = config_store
         self._collection_task: "Optional[asyncio.Task[None]]" = None
         self._skip_immediate_collection: bool = False
@@ -99,7 +93,7 @@ class ResolverCollector:
         lazy = config.monitoring.enabled == "lazy"
         cmd = "collect_lazy_statistics()" if lazy else "collect_statistics()"
         logger.debug("Collecting kresd stats with method '%s'", cmd)
-        stats_raw = await _command_registered_resolvers(cmd)
+        stats_raw = await command_registered_workers(cmd)
         self._stats_raw = stats_raw
 
         # if this function was not called by the prometheus library and calling collect() is imminent,
@@ -131,11 +125,11 @@ class ResolverCollector:
             # when not running, we can start a new loop (we are not in the manager's main thread)
             compat.asyncio.run(self.collect_kresd_stats(_triggered_from_prometheus_library=True))
 
-    def _create_resolver_metrics_loaded_gauge(self, kid: "KresID", loaded: bool) -> GaugeMetricFamily:
+    def _create_resolver_metrics_loaded_gauge(self, kresid: "KresID", loaded: bool) -> GaugeMetricFamily:
         return _gauge(
             "resolver_metrics_loaded",
             "0 if metrics from resolver instance were not loaded, otherwise 1",
-            label=("instance_id", str(kid)),
+            label=("instance_id", str(kresid)),
             value=int(loaded),
         )
 
@@ -145,29 +139,30 @@ class ResolverCollector:
 
         # if we have no data, return metrics with information about it and exit
         if self._stats_raw is None:
-            for kid in _REGISTERED_RESOLVERS:
-                yield self._create_resolver_metrics_loaded_gauge(kid, False)
+            for kresid in get_registered_workers_kresids():
+                yield self._create_resolver_metrics_loaded_gauge(kresid, False)
             return
 
         # if we have data, parse them
-        for kid in _REGISTERED_RESOLVERS:
+        for kresid in get_registered_workers_kresids():
             success = False
             try:
-                if kid in self._stats_raw:
-                    raw = self._stats_raw[kid]
-                    metrics: Dict[str, int] = json.loads(raw[1:-1])
-                    yield from self._parse_resolver_metrics(kid, metrics)
+                if kresid in self._stats_raw:
+                    metrics = self._stats_raw[kresid]
+                    yield from self._parse_resolver_metrics(kresid, metrics)
                     success = True
             except json.JSONDecodeError:
-                logger.warning("Failed to load metrics from resolver instance %s: failed to parse statistics", str(kid))
+                logger.warning(
+                    "Failed to load metrics from resolver instance %s: failed to parse statistics", str(kresid)
+                )
             except KeyError as e:
                 logger.warning(
                     "Failed to load metrics from resolver instance %s: attempted to read missing statistic %s",
-                    str(kid),
+                    str(kresid),
                     str(e),
                 )
 
-            yield self._create_resolver_metrics_loaded_gauge(kid, success)
+            yield self._create_resolver_metrics_loaded_gauge(kresid, success)
 
     def describe(self) -> List[Metric]:
         # this function prevents the collector registry from invoking the collect function on startup
@@ -331,20 +326,6 @@ class ResolverCollector:
 
 
 _resolver_collector: Optional[ResolverCollector] = None
-
-
-def unregister_resolver_metrics_for(subprocess: "Subprocess") -> None:
-    """
-    Cancel metric collection from resolver "Subprocess"
-    """
-    del _REGISTERED_RESOLVERS[subprocess.id]
-
-
-def register_resolver_metrics_for(subprocess: "Subprocess") -> None:
-    """
-    Register resolver "Subprocess" for metric collection
-    """
-    _REGISTERED_RESOLVERS[subprocess.id] = subprocess
 
 
 async def report_stats() -> bytes:

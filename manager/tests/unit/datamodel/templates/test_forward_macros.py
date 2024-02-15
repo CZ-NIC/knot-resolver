@@ -1,5 +1,5 @@
-from knot_resolver_manager.datamodel.config_schema import template_from_str
 from knot_resolver_manager.datamodel.forward_schema import ForwardSchema
+from knot_resolver_manager.datamodel.templates import template_from_str
 from knot_resolver_manager.datamodel.types import IPAddressOptionalPort
 
 

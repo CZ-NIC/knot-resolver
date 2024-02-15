@@ -1,14 +1,12 @@
 import argparse
-import json
 import sys
 from enum import Enum
 from typing import List, Optional, Tuple, Type
 
-import yaml
 from typing_extensions import Literal
 
 from knot_resolver_manager.cli.command import Command, CommandArgs, CompWords, register_command
-from knot_resolver_manager.utils.modeling import try_to_parse
+from knot_resolver_manager.utils.modeling.parsing import DataFormat, parse_json, try_to_parse
 from knot_resolver_manager.utils.requests import request
 
 
@@ -18,28 +16,12 @@ class Operations(Enum):
     GET = 2
 
 
-class Formats(Enum):
-    JSON = 0
-    YAML = 1
-
-
 def operation_to_method(operation: Operations) -> Literal["PUT", "GET", "DELETE"]:
     if operation == Operations.SET:
         return "PUT"
     elif operation == Operations.DELETE:
         return "DELETE"
     return "GET"
-
-
-def reformat(json_str: str, req_format: Formats) -> str:
-    d = json.loads(json_str)
-    if req_format == Formats.YAML:
-        return yaml.dump(d, indent=4)
-    return json.dumps(d, indent=4)
-
-
-def json_dump(yaml_or_json_str: str) -> str:
-    return json.dumps(try_to_parse(yaml_or_json_str))
 
 
 # def _properties_words(props: Dict[str, Any]) -> CompWords:
@@ -97,7 +79,7 @@ class ConfigCommand(Command):
     def __init__(self, namespace: argparse.Namespace) -> None:
         super().__init__(namespace)
         self.path: str = str(namespace.path) if hasattr(namespace, "path") else ""
-        self.format: Formats = namespace.format if hasattr(namespace, "format") else Formats.JSON
+        self.format: DataFormat = namespace.format if hasattr(namespace, "format") else DataFormat.JSON
         self.operation: Optional[Operations] = namespace.operation if hasattr(namespace, "operation") else None
         self.file: Optional[str] = namespace.file if hasattr(namespace, "file") else None
 
@@ -112,7 +94,7 @@ class ConfigCommand(Command):
 
         # GET operation
         get = config_subparsers.add_parser("get", help="Get current configuration from the resolver.")
-        get.set_defaults(operation=Operations.GET)
+        get.set_defaults(operation=Operations.GET, format=DataFormat.YAML)
 
         get.add_argument(
             "-p",
@@ -132,15 +114,15 @@ class ConfigCommand(Command):
         get_formats = get.add_mutually_exclusive_group()
         get_formats.add_argument(
             "--json",
-            help="Get configuration data in JSON format, default.",
-            const=Formats.JSON,
+            help="Get configuration data in JSON format.",
+            const=DataFormat.JSON,
             action="store_const",
             dest="format",
         )
         get_formats.add_argument(
             "--yaml",
-            help="Get configuration data in YAML format.",
-            const=Formats.YAML,
+            help="Get configuration data in YAML format, default.",
+            const=DataFormat.YAML,
             action="store_const",
             dest="format",
         )
@@ -170,22 +152,6 @@ class ConfigCommand(Command):
             help="Optional, new configuration value.",
             type=str,
             nargs="?",
-        )
-
-        set_formats = set.add_mutually_exclusive_group()
-        set_formats.add_argument(
-            "--json",
-            help="Set configuration data in JSON format, default.",
-            const=Formats.JSON,
-            action="store_const",
-            dest="format",
-        )
-        set_formats.add_argument(
-            "--yaml",
-            help="Set configuration data in YAML format.",
-            const=Formats.YAML,
-            action="store_const",
-            dest="format",
         )
 
         # DELETE operation
@@ -241,7 +207,8 @@ class ConfigCommand(Command):
                 # use STDIN also when file is not specified
                 new_config = input("Type new configuration: ")
 
-        response = request(args.socket, method, path, json_dump(new_config) if new_config else None)
+        body = DataFormat.JSON.dict_dump(try_to_parse(new_config)) if new_config else None
+        response = request(args.socket, method, path, body)
 
         if response.status != 200:
             print(response, file=sys.stderr)
@@ -249,7 +216,7 @@ class ConfigCommand(Command):
 
         if self.operation == Operations.GET and self.file:
             with open(self.file, "w") as f:
-                f.write(reformat(response.body, self.format))
+                f.write(self.format.dict_dump(parse_json(response.body), indent=4))
             print(f"saved to: {self.file}")
         elif response.body:
-            print(reformat(response.body, self.format))
+            print(self.format.dict_dump(parse_json(response.body), indent=4))

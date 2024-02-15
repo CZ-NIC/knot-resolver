@@ -24,10 +24,10 @@ function collect_lazy_statistics()
 		modules.load('stats')
 	end
 
-	return tojson(stats.list())
+	return stats.list()
 end
 
 --- function used for statistics collection
 function collect_statistics()
-	return tojson(stats.list())
+	return stats.list()
 end

@@ -7,6 +7,7 @@ packages = \
  'knot_resolver_manager.cli.cmd',
  'knot_resolver_manager.compat',
  'knot_resolver_manager.datamodel',
+ 'knot_resolver_manager.datamodel.templates',
  'knot_resolver_manager.datamodel.types',
  'knot_resolver_manager.kresd_controller',
  'knot_resolver_manager.kresd_controller.supervisord',
@@ -15,8 +16,7 @@ packages = \
  'knot_resolver_manager.utils.modeling']
 
 package_data = \
-{'': ['*'],
- 'knot_resolver_manager.datamodel': ['templates/*', 'templates/macros/*']}
+{'': ['*'], 'knot_resolver_manager.datamodel.templates': ['macros/*']}
 
 install_requires = \
 ['aiohttp',

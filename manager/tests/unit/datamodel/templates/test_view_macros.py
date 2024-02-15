@@ -2,7 +2,7 @@ from typing import Any
 
 import pytest
 
-from knot_resolver_manager.datamodel.config_schema import template_from_str
+from knot_resolver_manager.datamodel.templates import template_from_str
 from knot_resolver_manager.datamodel.view_schema import ViewOptionsSchema, ViewSchema
 
 

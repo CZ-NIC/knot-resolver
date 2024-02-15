@@ -647,8 +647,9 @@ int io_listen_tcp(uv_loop_t *loop, uv_tcp_t *handle, int fd, int tcp_backlog, bo
 
 
 enum io_stream_mode {
-	io_mode_text = 0,
-	io_mode_binary = 1,
+	IO_MODE_TEXT   = 0,
+	IO_MODE_BINARY = 1,
+	IO_MODE_JSON   = 2,
 };
 
 struct io_stream_data {
@@ -753,20 +754,28 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 
 		/* Pseudo-command for switching to "binary output"; */
 		if (strcmp(cmd, "__binary") == 0) {
-			data->mode = io_mode_binary;
+			data->mode = IO_MODE_BINARY;
+			goto next_iter;
+		}
+		if (strcmp(cmd, "__json") == 0) {
+			data->mode = IO_MODE_JSON;
 			goto next_iter;
 		}
 
-		const bool cmd_failed = engine_cmd(L, cmd, false);
+		const bool cmd_failed = engine_cmd(L, cmd,
+				(data->mode == IO_MODE_JSON)
+					? ENGINE_EVAL_MODE_JSON
+					: ENGINE_EVAL_MODE_LUA_TABLE);
 		const char *message = NULL;
 		size_t len_s;
 		if (lua_gettop(L) > 0) {
 			message = lua_tolstring(L, -1, &len_s);
 		}
 
-		/* Send back the output, either in "binary" or normal mode. */
-		if (data->mode == io_mode_binary) {
-			/* Leader expects length field in all cases */
+		switch (data->mode) {
+		case IO_MODE_BINARY:
+		case IO_MODE_JSON:
+			/* Length-field-prepended mode */
 			if (!message || len_s > UINT32_MAX) {
 				kr_log_error(IO, "unrepresentable response on control socket, "
 						"sending back empty block (command '%s')\n", cmd);
@@ -776,13 +785,16 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 			fwrite(&len_n, sizeof(len_n), 1, out);
 			if (len_s > 0)
 				fwrite(message, len_s, 1, out);
-		} else {
+			break;
+		case IO_MODE_TEXT:
+			/* Human-readable and console-printable mode */
 			if (message)
 				fprintf(out, "%s", message);
 			if (message || !args->quiet)
 				fprintf(out, "\n");
 			if (!args->quiet)
 				fprintf(out, "> ");
+			break;
 		}
 
 		/* Duplicate command and output to logs */
@@ -826,7 +838,7 @@ struct io_stream_data *io_tty_alloc_data(void) {
 	struct io_stream_data *data = mm_alloc(pool, sizeof(struct io_stream_data));
 
 	data->buf = mp_start(pool->ctx, 512);
-	data->mode = io_mode_text;
+	data->mode = IO_MODE_TEXT;
 	data->blen = 0;
 	data->pool = pool;
 

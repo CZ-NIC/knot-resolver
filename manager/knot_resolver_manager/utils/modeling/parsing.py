@@ -7,7 +7,7 @@ from yaml.constructor import ConstructorError
 from yaml.nodes import MappingNode
 
 from .exceptions import DataParsingError
-from .renaming import renamed
+from .renaming import Renamed, renamed
 
 
 # custom hook for 'json.loads()' to detect duplicate keys in data
@@ -63,11 +63,14 @@ class DataFormat(Enum):
         else:
             raise NotImplementedError(f"Parsing of format '{self}' is not implemented")
 
-    def dict_dump(self, data: Dict[str, Any]) -> str:
+    def dict_dump(self, data: Union[Dict[str, Any], Renamed], indent: Optional[int] = None) -> str:
+        if isinstance(data, Renamed):
+            data = data.original()
+
         if self is DataFormat.YAML:
-            return yaml.safe_dump(data)  # type: ignore
+            return yaml.safe_dump(data, indent=indent)  # type: ignore
         elif self is DataFormat.JSON:
-            return json.dumps(data)
+            return json.dumps(data, indent=indent)
         else:
             raise NotImplementedError(f"Exporting to '{self}' format is not implemented")
 

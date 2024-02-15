@@ -23,19 +23,22 @@ from knot_resolver_manager import log, statistics
 from knot_resolver_manager.compat import asyncio as asyncio_compat
 from knot_resolver_manager.config_store import ConfigStore
 from knot_resolver_manager.constants import DEFAULT_MANAGER_CONFIG_FILE, PID_FILE_NAME, init_user_constants
+from knot_resolver_manager.datamodel.cache_schema import CacheClearRPCSchema
 from knot_resolver_manager.datamodel.config_schema import KresConfig, get_rundir_without_validation
-from knot_resolver_manager.datamodel.globals import (
-    Context,
-    set_global_validation_context,
-)
+from knot_resolver_manager.datamodel.globals import Context, set_global_validation_context
 from knot_resolver_manager.datamodel.management_schema import ManagementSchema
 from knot_resolver_manager.exceptions import CancelStartupExecInsteadException, KresManagerException
 from knot_resolver_manager.kresd_controller import get_best_controller_implementation
+from knot_resolver_manager.kresd_controller.registered_workers import command_single_registered_worker
 from knot_resolver_manager.utils import ignore_exceptions_optional
 from knot_resolver_manager.utils.async_utils import readfile
 from knot_resolver_manager.utils.etag import structural_etag
 from knot_resolver_manager.utils.functional import Result
-from knot_resolver_manager.utils.modeling.exceptions import DataParsingError, DataValidationError
+from knot_resolver_manager.utils.modeling.exceptions import (
+    AggregateDataValidationError,
+    DataParsingError,
+    DataValidationError,
+)
 from knot_resolver_manager.utils.modeling.parsing import DataFormat, try_to_parse
 from knot_resolver_manager.utils.modeling.query import query
 from knot_resolver_manager.utils.modeling.types import NoneType
@@ -242,6 +245,26 @@ class Server:
             charset="utf8",
         )
 
+    async def _handler_cache_clear(self, request: web.Request) -> web.Response:
+        data = parse_from_mime_type(await request.text(), request.content_type)
+
+        try:
+            config = CacheClearRPCSchema(data)
+        except (AggregateDataValidationError, DataValidationError) as e:
+            return web.Response(
+                body=e,
+                status=HTTPStatus.BAD_REQUEST,
+                content_type="text/plain",
+                charset="utf8",
+            )
+
+        _, result = await command_single_registered_worker(config.render_lua())
+        return web.Response(
+            body=json.dumps(result),
+            content_type="application/json",
+            charset="utf8",
+        )
+
     async def _handler_schema(self, _request: web.Request) -> web.Response:
         return web.json_response(
             KresConfig.json_schema(), headers={"Access-Control-Allow-Origin": "*"}, dumps=partial(json.dumps, indent=4)
@@ -307,6 +330,7 @@ class Server:
                 web.get("/schema", self._handler_schema),
                 web.get("/schema/ui", self._handle_view_schema),
                 web.get("/metrics", self._handler_metrics),
+                web.post("/cache/clear", self._handler_cache_clear),
             ]
         )
 

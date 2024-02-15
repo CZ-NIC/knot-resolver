@@ -88,6 +88,7 @@ List of API endpoints
 - ``GET /metrics`` provides Prometheus metrics
 - ``GET /`` static response that could be used to determine, whether the Manager is running
 - ``POST /stop`` gracefully stops the Manager, empty request body
+- ``POST /cache/clear`` purges cache records matching the specified criteria, see :ref:`cache clearing <config-cache-clear>`
 - ``{GET,PUT,DELETE,PATCH} /v1/config`` allows reading and modifying current configuration
 
 
@@ -108,4 +109,5 @@ The different HTTP methods perform different modifications of the configuration:
 - ``PATCH`` updates the configuration using `JSON Patch <https://jsonpatch.com/>`_
 
 To prevent race conditions when changing configuration from multiple clients simultaneously, every response from the Manager has an ``ETag`` header set. Requests then accept ``If-Match`` and ``If-None-Match`` headers with the latest ``ETag`` value and the corresponding request processing fails with HTTP error code 412 (precondition failed).
+
 
