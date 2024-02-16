@@ -58,7 +58,7 @@ def get_socket_from_config(config: Path, optional_file: bool) -> Optional[Socket
                 )
         return None
     except ValueError as e:
-        raise DataValidationError(*e.args)
+        raise DataValidationError(*e.args) from e
     except OSError as e:
         if not optional_file:
             raise e

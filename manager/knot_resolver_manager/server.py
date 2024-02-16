@@ -432,7 +432,7 @@ def _set_working_directory(config_raw: Dict[str, Any]) -> None:
     try:
         rundir = get_rundir_without_validation(config_raw)
     except ValueError as e:
-        raise DataValidationError(str(e), "/rundir")
+        raise DataValidationError(str(e), "/rundir") from e
 
     logger.debug(f"Changing working directory to '{rundir.to_path().absolute()}'.")
     os.chdir(rundir.to_path())
@@ -457,12 +457,12 @@ def _lock_working_directory(attempt: int = 0) -> None:
             raise KresManagerException(
                 "Another manager is running in the same working directory."
                 f" PID file is located at {os.getcwd()}/{PID_FILE_NAME}"
-            )
+            ) from e
         else:
             raise KresManagerException(
                 "Another manager is running in the same working directory."
                 f" PID file is located at {os.getcwd()}/{PID_FILE_NAME}"
-            )
+            ) from e
 
     # now we know that we are the only manager running in this directory
 

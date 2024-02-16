@@ -159,7 +159,7 @@ class KresConfig(ConfigSchema):
         # FIXME the `cwd` argument is used only for configuring control socket path
         # it should be removed and relative path used instead as soon as issue
         # https://gitlab.nic.cz/knot/knot-resolver/-/issues/720 is fixed
-        return MAIN_TEMPLATE.render(cfg=self, cwd=os.getcwd())  # pyright: reportUnknownMemberType=false
+        return MAIN_TEMPLATE.render(cfg=self, cwd=os.getcwd())
 
 
 def get_rundir_without_validation(data: Dict[str, Any]) -> Dir:

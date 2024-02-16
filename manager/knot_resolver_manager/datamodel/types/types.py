@@ -147,11 +147,11 @@ class DomainName(StrBase):
         super().__init__(source_value, object_path)
         try:
             punycode = self._value.encode("idna").decode("utf-8") if self._value != "." else "."
-        except ValueError:
+        except ValueError as e:
             raise ValueError(
                 f"conversion of '{self._value}' to IDN punycode representation failed",
                 object_path,
-            )
+            ) from e
 
         if type(self)._re.match(punycode):
             self._punycode = punycode

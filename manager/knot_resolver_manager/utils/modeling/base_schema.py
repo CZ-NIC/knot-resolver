@@ -521,7 +521,7 @@ class ObjectMapper:
         try:
             default = self._create_default(getattr(cls, name, None))
         except ValueError as e:
-            raise DataValidationError(str(e), f"{object_path}/{name}")
+            raise DataValidationError(str(e), f"{object_path}/{name}") from e
 
         value = self.map_object(python_type, default, object_path=f"{object_path}/{name}")
         setattr(obj, name, value)

@@ -39,7 +39,7 @@ class _RaiseDuplicatesLoader(yaml.SafeLoader):
                     node.start_mark,
                     f"found unacceptable key ({exc})",
                     key_node.start_mark,
-                )
+                ) from exc
 
             # check for duplicate keys
             if key in mapping:
@@ -92,4 +92,8 @@ def try_to_parse(data: str) -> Any:
         try:
             return parse_yaml(data)
         except yaml.YAMLError as ye:
-            raise DataParsingError(f"failed to parse data, JSON: {je}, YAML: {ye}")
+            # We do not raise-from here because there are two possible causes
+            # and we may not know which one is the actual one.
+            raise DataParsingError(  # pylint: disable=raise-missing-from
+                f"failed to parse data, JSON: {je}, YAML: {ye}"
+            )

@@ -22,10 +22,10 @@ def ignore_exceptions_optional(
             try:
                 return func(*nargs, **nkwargs)
             except BaseException as e:
-                if isinstance(e, exceptions):  # pyright: reportUnnecessaryIsInstance=false
+                if isinstance(e, exceptions):
                     return default
                 else:
-                    raise e  # pyright: reportGeneralTypeIssues=false
+                    raise e
 
         return f
 
