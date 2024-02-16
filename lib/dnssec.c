@@ -240,8 +240,11 @@ fail:
 	return NULL;
 }
 
-/// Return if we want to afford yet another crypto-validation (and account it).
-static bool check_crypto_limit(const kr_rrset_validation_ctx_t *vctx)
+/** Checks whether we want to allow yet another crypto-validation and if yes,
+ * decrements the remaining number of allowed validations.
+ *
+ * Returns `true` if the crypto-validation is allowed; otherwise false */
+static bool account_crypto_limit(kr_rrset_validation_ctx_t *vctx)
 {
 	if (vctx->limit_crypto_remains == NULL)
 		return true; // no limiting
@@ -281,7 +284,7 @@ static int kr_svldr_rrset_with_key(knot_rrset_t *rrs, const knot_rdataset_t *rrs
 		} else if (retv != 0) {
 			continue;
 		}
-		if (!check_crypto_limit(vctx))
+		if (!account_crypto_limit(vctx))
 			return vctx->result = kr_error(E2BIG);
 		// We only expect non-expanded wildcard records in input;
 		// that also means we don't need to perform non-existence proofs.
@@ -392,7 +395,7 @@ static int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 					break;
 				}
 			}
-			if (!check_crypto_limit(vctx)) {
+			if (!account_crypto_limit(vctx)) {
 				vctx->result = kr_error(E2BIG);
 				goto finish;
 			}
