@@ -31,7 +31,7 @@ net.listen(
 {%- if interface.addr -%}
 '{{ interface.addr }}',
 {%- elif interface.if_name -%}
-net.{{ interface.if_name }},
+net['{{ interface.if_name }}'],
 {%- endif -%}
 {%- if interface.port -%}
 {{ interface.port }},

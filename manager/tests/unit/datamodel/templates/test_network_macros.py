@@ -26,10 +26,10 @@ def test_network_listen():
     )
 
     intrfc = ListenSchema({"interface": "eth0", "kind": "doh2"})
-    assert tmpl.render(listen=intrfc) == "net.listen(net.eth0,443,{kind='doh2',freebind=false})\n"
+    assert tmpl.render(listen=intrfc) == "net.listen(net['eth0'],443,{kind='doh2',freebind=false})\n"
     intrfc_list = ListenSchema({"interface": [intrfc.interface.to_std()[0], "lo"], "port": 5555, "kind": "doh2"})
     assert (
         tmpl.render(listen=intrfc_list)
-        == "net.listen(net.eth0,5555,{kind='doh2',freebind=false})\n"
-        + "net.listen(net.lo,5555,{kind='doh2',freebind=false})\n"
+        == "net.listen(net['eth0'],5555,{kind='doh2',freebind=false})\n"
+        + "net.listen(net['lo'],5555,{kind='doh2',freebind=false})\n"
     )
