@@ -12,9 +12,8 @@ from weakref import WeakValueDictionary
 from knot_resolver_manager.constants import kresd_config_file
 from knot_resolver_manager.datamodel.config_schema import KresConfig
 from knot_resolver_manager.exceptions import SubprocessControllerException
-from knot_resolver_manager.utils.async_utils import writefile
-
 from knot_resolver_manager.kresd_controller.registered_workers import register_worker, unregister_worker
+from knot_resolver_manager.utils.async_utils import writefile
 
 logger = logging.getLogger(__name__)
 

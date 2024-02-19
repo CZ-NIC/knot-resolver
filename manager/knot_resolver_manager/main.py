@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import NoReturn
 
 from knot_resolver_manager import compat
-from knot_resolver_manager.constants import DEFAULT_MANAGER_CONFIG_FILE, CONFIG_FILE_ENV_VAR
+from knot_resolver_manager.constants import CONFIG_FILE_ENV_VAR, DEFAULT_MANAGER_CONFIG_FILE
 from knot_resolver_manager.log import logger_startup
 from knot_resolver_manager.server import start_server
 

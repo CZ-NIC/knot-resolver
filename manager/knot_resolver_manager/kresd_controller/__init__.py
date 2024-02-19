@@ -5,6 +5,7 @@ from imports, they are located in functions which are invoked at the end of this
 We supported multiple subprocess controllers while developing it. It now all converged onto just supervisord.
 The interface however remains so that different controllers can be added in the future.
 """
+
 # pylint: disable=import-outside-toplevel
 
 import asyncio

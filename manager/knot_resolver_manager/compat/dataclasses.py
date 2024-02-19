@@ -2,7 +2,6 @@
 This module contains rather simplistic reimplementation of dataclasses due to them being unsupported on Python 3.6
 """
 
-
 from typing import Any, Dict, Set, Type
 
 dataclasses_import_success = False
