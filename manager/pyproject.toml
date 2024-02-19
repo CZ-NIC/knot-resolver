@@ -14,7 +14,7 @@ script = "build_c_extensions.py"
 generate-setup-file = true
 
 [tool.poetry.dependencies]
-python = "^3.7"
+python = "^3.8"
 aiohttp = "*"
 jinja2 = "*"
 pyyaml = "*"
@@ -23,36 +23,31 @@ typing-extensions = "*"
 prometheus-client = "*"
 
 [tool.poetry.group.dev.dependencies]
-poetry = "^1.4.2"
-pyparsing = "^3.0.9"
-poethepoet = [
-    { version = "^0.18.1", python = "~3.7" },
-    { version = "^0.22.0", python = "^3.8" }
-]
-debugpy = "^1.6.7"
+poetry = "^1.7.1"
+pyparsing = "^3.1.1"
+poethepoet = "^0.24.4"
+debugpy = "^1.8.1"
 
 [tool.poetry.group.test.dependencies]
-pytest = "^7.3.1"
-pytest-cov = "^4.0.0"
-pytest-asyncio = "^0.21.0"
-tox = "^4.5.1"
-tox-pyenv = "^1.1.0"
+pytest = "^8.0.1"
+pytest-cov = "^4.1.0"
+pytest-asyncio = "^0.23.5"
 
 [tool.poetry.group.lint.dependencies]
-black = "^23.3.0"
-isort = "^4.3.21"
+black = "^24.2.0"
+isort = "^5.13.2"
 toml = "^0.10.2"
-mypy = "^1.3.0"
-types-pyyaml = "^6.0.12.10"
-pylint = "^2.13.9"
+mypy = "^1.8.0"
+types-pyyaml = "^6.0.12.12"
+pylint = "^3.0.3"
 flake8 = {version = "*", python = "^3.8.1"}
 
 [tool.poetry.group.docs.dependencies]
 sphinx = "^5.3.0"
-sphinx-tabs = "^3.4.1"
-sphinx-rtd-theme = "^1.2.2"
+sphinx-tabs = "^3.4.5"
+sphinx-rtd-theme = "^2.0.0"
 breathe = "^4.35.0"
-json-schema-for-humans = "^0.45.1"
+json-schema-for-humans = "^0.47"
 
 [tool.poetry.scripts]
 kresctl = 'knot_resolver_manager.cli.main:main'
@@ -64,7 +59,7 @@ run-debug = { cmd = "scripts/run-debug", help = "Run the manager under debugger"
 docs = { cmd = "scripts/docs", help = "Create HTML documentation" }
 test = { shell = "env PYTHONPATH=. pytest --junitxml=unit.junit.xml --cov=knot_resolver_manager --show-capture=all tests/unit/", help = "Run tests" }
 check = { cmd = "scripts/codecheck", help = "Run static code analysis" }
-format = { shell = "black knot_resolver_manager/ tests/ scripts/ build_c_extensions.py; isort -rc .", help = "Run code formatter" }
+format = { shell = "black knot_resolver_manager/ tests/ scripts/ build_c_extensions.py; isort .", help = "Run code formatter" }
 fixdeps = { shell = "poetry install; npm install; npm update", help = "Install/update dependencies according to configuration files"}
 commit = { shell = "scripts/commit", help = "Invoke every single check before commiting" }
 container = { cmd = "scripts/container.py", help = "Manage containers" }
@@ -77,17 +72,15 @@ clean = """
          .pytest_cache
          ./**/__pycache__
          dist
-         .tox
 """
 gen-setuppy = { shell = "python scripts/create_setup.py > setup.py", help = "Generate setup.py file for backwards compatibility" }
-tox = { cmd = "tox", help = "Run tests in tox" }
 integration = {cmd = "python tests/integration/runner.py", help = "Run integration tests" }
 configure-vscode = {cmd = "scripts/configure-vscode", help = "Create VSCode configuration for debugging, virtual envs etc" }
 man = {cmd = "scripts/man", help = "Display manpage from sources" }
 
 [tool.black]
 line-length = 120
-target_version = ['py311']
+target_version = ['py312']
 include = '\.py$'
 exclude = "setup.py"    # Poetry generates it and we want to keep it unchanged
 
@@ -100,25 +93,6 @@ skip_glob = '^((?!py$).)*$'    # isort all Python files
 float_to_top=true
 skip = "setup.py"   # Poetry generates it and we want to keep it unchanged
 
-[tool.tox]
-legacy_tox_ini = """
-[tox]
-isolated_build = True
-envlist = py37, py38, py39, py10, py11
-
-[tox:.package]
-# note tox will use the same python version as under what tox is installed to package
-# so unless this is python 3 you can require a given python version for the packaging
-# environment via the basepython key
-basepython = python3
-
-[testenv]
-deps = poetry
-commands =
-    poetry install -v
-    ./poe test
-"""
-
 [tool.pylint."MESSAGES CONTROL"]
 disable= [
     "broad-except",
@@ -128,7 +102,6 @@ disable= [
     "line-too-long",  # checked by flake8
     "missing-docstring",
     "no-else-return",
-    "no-self-use",
     "too-few-public-methods",
     "unused-import",  # checked by flake8,
     "too-many-return-statements", # would prevent us from using recursive tree traversals
@@ -151,7 +124,7 @@ ignore-imports = "yes"
 max-parents = "10"
 
 [tool.mypy]
-python_version = "3.7"
+python_version = "3.12"
 # strict = true
 disallow_any_generics = true
 disallow_subclassing_any = true
