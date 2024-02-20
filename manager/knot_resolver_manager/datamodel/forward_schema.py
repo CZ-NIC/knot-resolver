@@ -26,7 +26,7 @@ class ForwardServerSchema(ConfigSchema):
 
     def _validate(self) -> None:
         if self.pin_sha256 and (self.hostname or self.ca_file):
-            ValueError("'pin-sha256' cannot be configurad together with 'hostname' or 'ca-file'")
+            raise ValueError("'pin-sha256' cannot be configurad together with 'hostname' or 'ca-file'")
 
 
 class ForwardOptionsSchema(ConfigSchema):

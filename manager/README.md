@@ -17,11 +17,7 @@ Be careful, that you need the latest version of Poetry. The setup was tested wit
 After installing the tools above, the actual fully-featured development environment can be setup using these commands:
 
 ```sh
-pyenv install 3.7.17
-pyenv install 3.8.17
-pyenv install 3.9.17
-pyenv install 3.10.12
-pyenv install 3.11.4
+pyenv install
 poetry env use $(pyenv which python)
 poetry install
 ```
@@ -31,6 +27,8 @@ With this environment, **everything else should just work**. You can run the sam
 ### Minimal development environment
 
 The only global tools that are strictly required are `Python` and `pip` (or other way to install PyPI packages). You can have a look at the `pyproject.toml` file, manually install all other dependencies that you need and be done with that. All `poe` commands (see bellow) can be run manually too, see their definition in `pyproject.toml`. We can't however guarantee, that there won't be any errors.
+
+Please note that Python's development files are also required, since the Manager also includes a C module that interacts with it. I.e., for distros that package development files separately, you will typically need to install `-dev` or `-devel` packages of your current Python version as well.
 
 ### Common tasks and interactions with the project
 

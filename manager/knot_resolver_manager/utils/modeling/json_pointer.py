@@ -3,7 +3,6 @@ Implements JSON pointer resolution based on RFC 6901:
 https://www.rfc-editor.org/rfc/rfc6901
 """
 
-
 from typing import Any, Optional, Tuple, Union
 
 # JSONPtrAddressable = Optional[Union[Dict[str, "JSONPtrAddressable"], List["JSONPtrAddressable"], int, float, bool, str, None]]

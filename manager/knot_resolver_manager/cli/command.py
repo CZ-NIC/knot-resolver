@@ -40,7 +40,7 @@ def install_commands_parsers(parser: argparse.ArgumentParser) -> None:
 
 def get_socket_from_config(config: Path, optional_file: bool) -> Optional[SocketDesc]:
     try:
-        with open(config, "r") as f:
+        with open(config, "r", encoding="utf8") as f:
             data = parsing.try_to_parse(f.read())
         mkey = "management"
         if mkey in data:

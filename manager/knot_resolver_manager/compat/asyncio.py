@@ -91,7 +91,7 @@ def _cancel_all_tasks(loop: AbstractEventLoop) -> None:
     # Backported from:
     # https://github.com/python/cpython/blob/3.9/Lib/asyncio/runners.py#L55-L74
     #
-    to_cancel = tasks.Task.all_tasks(loop)
+    to_cancel = tasks.all_tasks(loop)
     if not to_cancel:
         return
 
@@ -103,7 +103,7 @@ def _cancel_all_tasks(loop: AbstractEventLoop) -> None:
         # since 3.10, the loop argument is removed
         loop.run_until_complete(tasks.gather(*to_cancel, return_exceptions=True))
     else:
-        loop.run_until_complete(tasks.gather(*to_cancel, loop=loop, return_exceptions=True))
+        loop.run_until_complete(tasks.gather(*to_cancel, loop=loop, return_exceptions=True))  # type: ignore[call-overload]
 
     for task in to_cancel:
         if task.cancelled():
