@@ -70,8 +70,9 @@ def request(
     )
     # req.add_header("Authorization", _authorization_header)
 
+    timeout_m = 5  # minutes
     try:
-        with urlopen(req) as response:
+        with urlopen(req, timeout=timeout_m * 60) as response:
             return Response(response.status, response.read().decode("utf8"))
     except HTTPError as err:
         return Response(err.code, err.read().decode("utf8"))
@@ -82,6 +83,15 @@ def request(
             _print_conn_error("No such file or directory.", url, socket_desc.source)
         else:
             _print_conn_error(str(err), url, socket_desc.source)
+        sys.exit(1)
+    except (TimeoutError, socket.timeout):
+        _print_conn_error(
+            f"Connection timed out after {timeout_m} minutes."
+            "\nIt does not mean that the operation necessarily failed."
+            "\nSee Knot Resolver's log for more information.",
+            url,
+            socket_desc.source,
+        )
         sys.exit(1)
 
 
