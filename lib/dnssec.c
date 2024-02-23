@@ -477,7 +477,7 @@ int kr_dnskeys_trusted(kr_rrset_validation_ctx_t *vctx, const knot_rdataset_t *s
 			ret = kr_svldr_rrset_with_key(keys, sigs, vctx, &key);
 		svldr_key_del(&key);
 		if (ret == 0 || ret == kr_error(E2BIG)) {
-			kr_assert(vctx->result == 0);
+			kr_assert(vctx->result == ret);
 			return vctx->result;
 		}
 	}
