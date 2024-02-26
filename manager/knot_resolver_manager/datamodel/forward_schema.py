@@ -1,4 +1,4 @@
-from typing import List, Optional, Union
+from typing import Any, List, Optional, Union
 
 from typing_extensions import Literal
 
@@ -55,3 +55,24 @@ class ForwardSchema(ConfigSchema):
     subtree: ListOrItem[DomainName]
     servers: Union[List[IPAddressOptionalPort], List[ForwardServerSchema]]
     options: ForwardOptionsSchema = ForwardOptionsSchema()
+
+    def _validate(self) -> None:
+        def is_port_custom(servers: List[Any]) -> bool:
+            for server in servers:
+                if isinstance(server, IPAddressOptionalPort) and server.port:
+                    return int(server.port) != 53
+                elif isinstance(server, ForwardServerSchema):
+                    return is_port_custom(server.address.to_std())
+            return False
+
+        def is_transport_tls(servers: List[Any]) -> bool:
+            for server in servers:
+                if isinstance(server, ForwardServerSchema):
+                    return server.transport == "tls"
+            return False
+
+        if self.options.authoritative and is_port_custom(self.servers):
+            raise ValueError("Forwarding to authoritative servers on a custom port is currently not supported.")
+
+        if self.options.authoritative and is_transport_tls(self.servers):
+            raise ValueError("Forwarding to authoritative servers using TLS protocol is not supported.")

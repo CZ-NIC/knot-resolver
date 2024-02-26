@@ -40,6 +40,8 @@ The :option:`forward <forward: <list>>` list of rules overrides which servers ge
          :default: false
 
          The forwarding target is an authoritative server.
+         For those we only support specifying the address, i.e. TLS, ports and IPv6
+         scope IDs (``%interface``) are **not** supported.
 
       .. option:: dnssec: true|false
 

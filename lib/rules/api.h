@@ -229,7 +229,10 @@ typedef struct kr_rule_fwd_flags kr_rule_fwd_flags_t;
 /** Insert/overwrite a forwarding rule.
  *
  * Into the default rule-set ATM.
- * \param targets NULL-terminated array. */
+ * \param targets NULL-terminated array.
+ *
+ * For is_auth == true we only support address, e.g. not specifying port or %interface.
+ */
 KR_EXPORT
 int kr_rule_forward(const knot_dname_t *apex, kr_rule_fwd_flags_t flags,
 			const struct sockaddr * targets[]);
