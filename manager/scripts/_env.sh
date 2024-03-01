@@ -47,6 +47,6 @@ function build_kresd {
 	meson manager/.build_kresd --prefix=$(realpath manager/.install_kresd) --default-library=static --buildtype=debug
 	ninja -C manager/.build_kresd
 	ninja install -C manager/.build_kresd
-	export PATH="$(realpath manager/.install_kresd)/sbin:$PATH"
+	export PYTHONPATH="$(realpath manager/.build_kresd/python):${PYTHONPATH:-}"
 	popd
 }

@@ -231,6 +231,7 @@ subdir('lib')
 subdir('daemon')
 subdir('modules')
 subdir('manager')
+subdir('python')
 subdir('utils')
 if get_option('bench') == 'enabled'
   subdir('bench')
