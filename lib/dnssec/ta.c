@@ -56,14 +56,13 @@ static int dnskey2ds(dnssec_binary_t *dst, const knot_dname_t *owner, const uint
 	/* Accept only keys with Zone and SEP flags that aren't revoked,
 	 * as a precaution.  RFC 5011 also utilizes these flags.
 	 * TODO: kr_dnssec_key_* names are confusing. */
-	const bool flags_ok = kr_dnssec_key_zsk(rdata) && !kr_dnssec_key_revoked(rdata);
-	if (!flags_ok) {
+	if (!kr_dnssec_key_usable(rdata)) {
 		auto_free char *owner_str = kr_dname_text(owner);
 		kr_log_error(TA, "refusing to trust %s DNSKEY because of flags %d\n",
 			owner_str, dnssec_key_get_flags(key));
 		ret = kr_error(EILSEQ);
 		goto cleanup;
-	} else if (!kr_dnssec_key_ksk(rdata)) {
+	} else if (!kr_dnssec_key_sep_flag(rdata)) {
 		auto_free char *owner_str = kr_dname_text(owner);
 		int flags = dnssec_key_get_flags(key);
 		kr_log_warning(TA, "warning: %s DNSKEY is missing the SEP bit; "

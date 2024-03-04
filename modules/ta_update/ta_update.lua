@@ -58,7 +58,7 @@ end
 
 -- Evaluate TA status of a RR according to RFC5011.  The time is in seconds.
 local function ta_present(keyset, rr, hold_down_time)
-	if rr.type == kres.type.DNSKEY and not C.kr_dnssec_key_ksk(rr.rdata) then
+	if rr.type == kres.type.DNSKEY and not C.kr_dnssec_key_sep_flag(rr.rdata) then
 		return false -- Ignore
 	end
 	-- Attempt to extract key_tag
@@ -212,7 +212,7 @@ local function check_upstream(keyset, new_keys)
 		local ta = ta_find(keyset, rr)
 		table.insert(process_keys, ta)
 
-		if rr.type == kres.type.DNSKEY and not C.kr_dnssec_key_ksk(rr.rdata) then
+		if rr.type == kres.type.DNSKEY and not C.kr_dnssec_key_sep_flag(rr.rdata) then
 			goto continue -- Ignore
 		end
 

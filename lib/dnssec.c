@@ -225,7 +225,7 @@ struct kr_svldr_ctx * kr_svldr_new_ctx(const knot_rrset_t *ds, knot_rrset_t *dns
 	array_reserve(ctx->keys, dnskey->rrs.count);
 	knot_rdata_t *krr = dnskey->rrs.rdata;
 	for (int i = 0; i < dnskey->rrs.count; ++i, krr = knot_rdataset_next(krr)) {
-		if (!kr_dnssec_key_zsk(krr->data) || kr_dnssec_key_revoked(krr->data))
+		if (!kr_dnssec_key_usable(krr->data))
 			continue; // key not usable for this
 		kr_svldr_key_t key;
 		if (unlikely(svldr_key_new(krr, NULL/*seems OK here*/, &key) != 0))
@@ -448,6 +448,12 @@ bool kr_ds_algo_support(const knot_rrset_t *ta)
 	return false;
 }
 
+// Now we instantiate these two as non-inline externally linkable code here (for lua).
+KR_EXPORT extern inline KR_PURE
+bool kr_dnssec_key_sep_flag(const uint8_t *dnskey_rdata);
+KR_EXPORT extern inline KR_PURE
+bool kr_dnssec_key_revoked(const uint8_t *dnskey_rdata);
+
 int kr_dnskeys_trusted(kr_rrset_validation_ctx_t *vctx, const knot_rdataset_t *sigs,
 			const knot_rrset_t *ta)
 {
@@ -464,8 +470,8 @@ int kr_dnskeys_trusted(kr_rrset_validation_ctx_t *vctx, const knot_rdataset_t *s
 	 */
 	knot_rdata_t *krr = keys->rrs.rdata;
 	for (int i = 0; i < keys->rrs.count; ++i, krr = knot_rdataset_next(krr)) {
-		/* RFC4035 5.3.1, bullet 8 */ /* ZSK */
-		if (!kr_dnssec_key_zsk(krr->data) || kr_dnssec_key_revoked(krr->data))
+		/* RFC4035 5.3.1, bullet 8 requires the Zone Flag bit */
+		if (!kr_dnssec_key_usable(krr->data))
 			continue;
 
 		kr_svldr_key_t key;
@@ -485,22 +491,6 @@ int kr_dnskeys_trusted(kr_rrset_validation_ctx_t *vctx, const knot_rdataset_t *s
 	/* No useable key found */
 	vctx->result = kr_error(ENOENT);
 	return vctx->result;
-}
-
-bool kr_dnssec_key_zsk(const uint8_t *dnskey_rdata)
-{
-	return knot_wire_read_u16(dnskey_rdata) & 0x0100;
-}
-
-bool kr_dnssec_key_ksk(const uint8_t *dnskey_rdata)
-{
-	return knot_wire_read_u16(dnskey_rdata) & 0x0001;
-}
-
-/** Return true if the DNSKEY is revoked. */
-bool kr_dnssec_key_revoked(const uint8_t *dnskey_rdata)
-{
-	return knot_wire_read_u16(dnskey_rdata) & 0x0080;
 }
 
 int kr_dnssec_key_tag(uint16_t rrtype, const uint8_t *rdata, size_t rdlen)
