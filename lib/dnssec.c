@@ -467,9 +467,13 @@ int kr_dnskeys_trusted(kr_rrset_validation_ctx_t *vctx, const knot_rdataset_t *s
 	/* RFC4035 5.2, bullet 1
 	 * The supplied DS record has been authenticated.
 	 * It has been validated or is part of a configured trust anchor.
+	 *
+	 * We iterate backwards.  That way we try keys with the SEP flag
+	 * before those without it - and thus likely succeed faster.
 	 */
-	knot_rdata_t *krr = keys->rrs.rdata;
-	for (int i = 0; i < keys->rrs.count; ++i, krr = knot_rdataset_next(krr)) {
+	for (int i = keys->rrs.count; --i >= 0; ) {
+		const knot_rdata_t *krr = knot_rdataset_at(&keys->rrs, i);
+
 		/* RFC4035 5.3.1, bullet 8 requires the Zone Flag bit */
 		if (!kr_dnssec_key_usable(krr->data))
 			continue;
