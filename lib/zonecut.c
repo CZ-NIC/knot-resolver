@@ -580,7 +580,7 @@ int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut,
 		trie_clear(cut->nsset);
 		/* Subtract label from QNAME. */
 		if (!is_root) {
-			label = knot_wire_next_label(label, NULL);
+			label = knot_dname_next_label(label);
 		} else {
 			ret = kr_error(ENOENT);
 			break;

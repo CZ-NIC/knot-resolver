@@ -208,7 +208,7 @@ static int sign_ctx_add_records(dnssec_sign_ctx_t *ctx, const knot_rrset_t *cove
 		for (int j = 0; j < trim_labels; ++j) {
 			if (kr_fails_assert(beginp[0]))
 				return kr_error(EINVAL);
-			beginp = (uint8_t *) knot_wire_next_label(beginp, NULL);
+			beginp = (uint8_t *) knot_dname_next_label(beginp);
 			if (kr_fails_assert(beginp))
 				return kr_error(EFAULT);
 		}
