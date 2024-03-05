@@ -51,7 +51,7 @@ static const knot_dname_t *minimized_qname(struct kr_query *query, uint16_t *qty
 	int cut_labels = knot_dname_labels(query->zone_cut.name, NULL);
 	int qname_labels = knot_dname_labels(qname, NULL);
 	while(qname[0] && qname_labels > cut_labels + 1) {
-		qname = knot_wire_next_label(qname, NULL);
+		qname = knot_dname_next_label(qname);
 		qname_labels -= 1;
 	}
 

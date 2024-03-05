@@ -143,7 +143,7 @@ static int closest_encloser_match(int *flags, const knot_rrset_t *nsec3,
 		goto fail;
 	}
 
-	const knot_dname_t *encloser = knot_wire_next_label(name, NULL);
+	const knot_dname_t *encloser = knot_dname_next_label(name);
 	*skipped = 1;
 
 	/* Avoid doing too much work on SHA1, mitigating:
@@ -154,7 +154,7 @@ static int closest_encloser_match(int *flags, const knot_rrset_t *nsec3,
 	const int max_labels = knot_dname_labels(nsec3->owner, NULL) - 1
 				+ kr_nsec3_max_depth(&params);
 	for (int l = knot_dname_labels(encloser, NULL); l > max_labels; --l) {
-		encloser = knot_wire_next_label(encloser, NULL);
+		encloser = knot_dname_next_label(encloser);
 		++(*skipped);
 	}
 
@@ -174,7 +174,7 @@ static int closest_encloser_match(int *flags, const knot_rrset_t *nsec3,
 
 		if (!encloser[0])
 			break;
-		encloser = knot_wire_next_label(encloser, NULL);
+		encloser = knot_dname_next_label(encloser);
 		++(*skipped);
 	}
 
@@ -404,7 +404,7 @@ static int closest_encloser_proof(const knot_pkt_t *pkt,
 		for (unsigned j = 0; j < skipped; ++j) {
 			if (kr_fails_assert(next_closer[0]))
 				return kr_error(EINVAL);
-			next_closer = knot_wire_next_label(next_closer, NULL);
+			next_closer = knot_dname_next_label(next_closer);
 		}
 		for (unsigned j = 0; j < sec->count; ++j) {
 			const knot_rrset_t *rrset_j = knot_pkt_rr(sec, j);
@@ -425,7 +425,7 @@ static int closest_encloser_proof(const knot_pkt_t *pkt,
 
 	if ((flags & FLG_CLOSEST_PROVABLE_ENCLOSER) && (flags & FLG_NAME_COVERED) && next_closer) {
 		if (encloser_name && next_closer[0])
-			*encloser_name = knot_wire_next_label(next_closer, NULL);
+			*encloser_name = knot_dname_next_label(next_closer);
 		if (matching_encloser_nsec3)
 			*matching_encloser_nsec3 = matching;
 		if (covering_next_nsec3)
@@ -569,7 +569,7 @@ int kr_nsec3_wildcard_answer_response_check(const knot_pkt_t *pkt, knot_section_
 	for (int i = 0; i < trim_to_next; ++i) {
 		if (kr_fails_assert(sname[0]))
 			return kr_error(EINVAL);
-		sname = knot_wire_next_label(sname, NULL);
+		sname = knot_dname_next_label(sname);
 	}
 
 	int flags = 0;
