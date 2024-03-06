@@ -1236,7 +1236,7 @@ static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot
 		    && knot_dname_in_bailiwick(qry->sname, parent) >= 0) {
 			requested_name = knot_dname_next_label(parent);
 		}
-	} else if ((qry->stype == KNOT_RRTYPE_DS) && (qry->sname[0] != '\0')) {
+	} else if ((qry->stype == KNOT_RRTYPE_DS) && (requested_name[0] != '\0')) {
 		/* If this is explicit DS query, start from encloser too. */
 		requested_name = knot_dname_next_label(requested_name);
 	}
@@ -1247,6 +1247,7 @@ static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot
 		if (state == KR_STATE_DONE || (state & KR_STATE_FAIL)) {
 			return state;
 		} else if (state == KR_STATE_CONSUME) {
+			kr_require(requested_name[0] != '\0');
 			requested_name = knot_dname_next_label(requested_name);
 		}
 	} while (state == KR_STATE_CONSUME);
