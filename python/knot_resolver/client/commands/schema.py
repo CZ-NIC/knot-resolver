@@ -4,7 +4,7 @@ import sys
 from typing import List, Optional, Tuple, Type
 
 from knot_resolver.client.command import Command, CommandArgs, CompWords, register_command
-from knot_resolver.datamodel.config_schema import KresConfig
+from knot_resolver.datamodel import kres_config_json_schema
 from knot_resolver.utils.requests import request
 
 
@@ -46,7 +46,7 @@ class SchemaCommand(Command):
                 sys.exit(1)
             schema = response.body
         else:
-            schema = json.dumps(KresConfig.json_schema(), indent=4)
+            schema = json.dumps(kres_config_json_schema(), indent=4)
 
         if self.file:
             with open(self.file, "w") as f:

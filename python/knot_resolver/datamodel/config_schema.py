@@ -3,11 +3,12 @@ import os
 import socket
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
-from knot_resolver.constants import API_SOCK_PATH_DEFAULT, RUN_DIR_DEFAULT, WORKERS_MAX_DEFAULT
+from knot_resolver.constants import API_SOCK_PATH_DEFAULT, RUN_DIR_DEFAULT, VERSION, WORKERS_MAX_DEFAULT
 from knot_resolver.datamodel.cache_schema import CacheSchema
 from knot_resolver.datamodel.dns64_schema import Dns64Schema
 from knot_resolver.datamodel.dnssec_schema import DnssecSchema
 from knot_resolver.datamodel.forward_schema import ForwardSchema
+from knot_resolver.datamodel.globals import Context, get_global_validation_context, set_global_validation_context
 from knot_resolver.datamodel.local_data_schema import LocalDataSchema, RPZSchema, RuleSchema
 from knot_resolver.datamodel.logging_schema import LoggingSchema
 from knot_resolver.datamodel.lua_schema import LuaSchema
@@ -234,3 +235,25 @@ def get_rundir_without_validation(data: Dict[str, Any]) -> WritableDir:
     """
 
     return WritableDir(data["rundir"] if "rundir" in data else RUN_DIR_DEFAULT, object_path="/rundir")
+
+
+def kres_config_json_schema() -> Dict[str, Any]:
+    """
+    At this moment, to create any instance of 'ConfigSchema' even with default values, it is necessary to set the global context.
+    In the case of generating a JSON schema, strict validation must be turned off, otherwise it may happen that the creation of the JSON schema fails,
+    It may fail due to non-existence of the directory/file or their rights.
+    This should be fixed in the future. For more info, see 'datamodel.globals.py' module.
+    """
+
+    context = get_global_validation_context()
+    set_global_validation_context(Context(None, False))
+
+    schema = KresConfig.json_schema(
+        schema_id=f"https://www.knot-resolver.cz/documentation/v{VERSION}/_static/config.schema.json",
+        title="Knot Resolver configuration JSON schema",
+        description=f"Version Knot Resolver {VERSION}",
+    )
+    # setting back to previous values
+    set_global_validation_context(context)
+
+    return schema
