@@ -24,7 +24,11 @@ from knot_resolver_manager.compat import asyncio as asyncio_compat
 from knot_resolver_manager.config_store import ConfigStore
 from knot_resolver_manager.constants import DEFAULT_MANAGER_CONFIG_FILE, PID_FILE_NAME, init_user_constants
 from knot_resolver_manager.datamodel.cache_schema import CacheClearRPCSchema
-from knot_resolver_manager.datamodel.config_schema import KresConfig, get_rundir_without_validation
+from knot_resolver_manager.datamodel.config_schema import (
+    KresConfig,
+    get_rundir_without_validation,
+    kres_config_json_schema,
+)
 from knot_resolver_manager.datamodel.globals import Context, set_global_validation_context
 from knot_resolver_manager.datamodel.management_schema import ManagementSchema
 from knot_resolver_manager.exceptions import CancelStartupExecInsteadException, KresManagerException
@@ -281,7 +285,7 @@ class Server:
 
     async def _handler_schema(self, _request: web.Request) -> web.Response:
         return web.json_response(
-            KresConfig.json_schema(), headers={"Access-Control-Allow-Origin": "*"}, dumps=partial(json.dumps, indent=4)
+            kres_config_json_schema(), headers={"Access-Control-Allow-Origin": "*"}, dumps=partial(json.dumps, indent=4)
         )
 
     async def _handle_view_schema(self, _request: web.Request) -> web.Response:

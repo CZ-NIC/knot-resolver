@@ -5,11 +5,16 @@ from typing import Any, Dict, List, Optional, Union
 
 from typing_extensions import Literal
 
-from knot_resolver_manager.constants import MAX_WORKERS
+from knot_resolver_manager.constants import MAX_WORKERS, kres_version
 from knot_resolver_manager.datamodel.cache_schema import CacheSchema
 from knot_resolver_manager.datamodel.dns64_schema import Dns64Schema
 from knot_resolver_manager.datamodel.dnssec_schema import DnssecSchema
 from knot_resolver_manager.datamodel.forward_schema import ForwardSchema
+from knot_resolver_manager.datamodel.globals import (
+    Context,
+    get_global_validation_context,
+    set_global_validation_context,
+)
 from knot_resolver_manager.datamodel.local_data_schema import LocalDataSchema
 from knot_resolver_manager.datamodel.logging_schema import LoggingSchema
 from knot_resolver_manager.datamodel.lua_schema import LuaSchema
@@ -47,6 +52,21 @@ def _default_max_worker_count() -> int:
     if c:
         return c * 10
     return MAX_WORKERS
+
+
+def kres_config_json_schema() -> Dict[str, Any]:
+    context = get_global_validation_context()
+    set_global_validation_context(Context(None, False))
+
+    schema = KresConfig.json_schema(
+        schema_id=f"https://www.knot-resolver.cz/documentation/{kres_version()}/_static/config.schema.json",
+        title="Knot Resolver configuration schema",
+        description=f"Version Knot Resolver {kres_version()}",
+    )
+
+    set_global_validation_context(context)
+
+    return schema
 
 
 class KresConfig(ConfigSchema):

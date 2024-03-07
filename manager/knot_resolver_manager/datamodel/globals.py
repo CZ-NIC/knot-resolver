@@ -38,6 +38,10 @@ def set_global_validation_context(context: Context) -> None:
     _global_context = context
 
 
+def get_global_validation_context() -> Context:
+    return _global_context
+
+
 def reset_global_validation_context() -> None:
     global _global_context
     _global_context = Context(None)

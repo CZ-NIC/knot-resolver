@@ -25,6 +25,11 @@ PID_FILE_NAME = "manager.pid"
 MAX_WORKERS = 256
 
 
+def kres_version() -> str:
+    assert knot_resolver is not None
+    return f"{knot_resolver.__version__}"
+
+
 def kresd_executable() -> Path:
     assert knot_resolver is not None
     return knot_resolver.sbin_dir / "kresd"

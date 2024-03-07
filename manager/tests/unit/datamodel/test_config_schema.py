@@ -2,7 +2,7 @@ import inspect
 import json
 from typing import Any, Dict, Type, cast
 
-from knot_resolver_manager.datamodel import KresConfig
+from knot_resolver_manager.datamodel import KresConfig, kres_config_json_schema
 from knot_resolver_manager.datamodel.lua_schema import LuaSchema
 from knot_resolver_manager.utils.modeling import BaseSchema
 from knot_resolver_manager.utils.modeling.types import (
@@ -79,7 +79,7 @@ def test_dns64_prefix_default():
 
 
 def test_config_json_schema():
-    dct = KresConfig.json_schema()
+    dct = kres_config_json_schema()
 
     def recser(obj: Any, path: str = "") -> None:
         if not isinstance(obj, dict):
