@@ -141,9 +141,9 @@ int kr_rules_init_ensure(void)
 {
 	if (the_rules)
 		return kr_ok();
-	return kr_rules_init(NULL, 0);
+	return kr_rules_init(NULL, 0, true);
 }
-int kr_rules_init(const char *path, size_t maxsize)
+int kr_rules_init(const char *path, size_t maxsize, bool overwrite)
 {
 	if (the_rules)
 		return kr_error(EINVAL);
@@ -157,21 +157,16 @@ int kr_rules_init(const char *path, size_t maxsize)
 		// FIXME: the file will be sparse, but we still need to choose its size somehow.
 		// Later we might improve it to auto-resize in case of running out of space.
 		// Caveat: mdb_env_set_mapsize() can only be called without transactions open.
-		.maxsize = maxsize ? maxsize :
-			(size_t)(sizeof(size_t) > 4 ? 2048 : 500) * 1024*1024,
+		.maxsize = !overwrite ? 0 :
+			(maxsize ? maxsize : (size_t)(sizeof(size_t) > 4 ? 2048 : 500) * 1024*1024),
 	};
 	int ret = the_rules->api->open(&the_rules->db, &the_rules->stats, &opts, NULL);
-	/* No persistence - we always refill from config for now.
-	 * LATER:
-	 *  - Make it include versioning?
-	 *  - "\0stamp" key when loading config(s)?
-	 *  - Don't clear ruleset data that doesn't come directly from config;
-	 *    and add marks for that, etc.
-	 *    (after there actually are any kinds of rules like that)
-	 */
-	if (ret == 0) ret = ruledb_op(clear);
+
+	if (ret == 0 && overwrite) ret = ruledb_op(clear);
 	if (ret != 0) goto failure;
 	kr_require(the_rules->db);
+
+	if (!overwrite) return kr_ok(); // we assume that the caller ensured OK contents
 
 	ret = tag_names_default();
 	if (ret != 0) goto failure;
