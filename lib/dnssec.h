@@ -94,17 +94,29 @@ bool kr_ds_algo_support(const knot_rrset_t *ta);
 int kr_dnskeys_trusted(kr_rrset_validation_ctx_t *vctx, const knot_rdataset_t *sigs,
 			const knot_rrset_t *ta);
 
-/** Return true if the DNSKEY can be used as a ZSK.  */
-KR_EXPORT KR_PURE
-bool kr_dnssec_key_zsk(const uint8_t *dnskey_rdata);
+// flags: https://www.iana.org/assignments/dnskey-flags/dnskey-flags.xhtml
+//        https://datatracker.ietf.org/doc/html/rfc4034#section-2.1
 
-/** Return true if the DNSKEY indicates being KSK (=> has SEP).  */
-KR_EXPORT KR_PURE
-bool kr_dnssec_key_ksk(const uint8_t *dnskey_rdata);
+/** Return true if the DNSKEY has the SEP flag (normally ignored). */
+KR_EXPORT inline KR_PURE
+bool kr_dnssec_key_sep_flag(const uint8_t *dnskey_rdata)
+{
+	return dnskey_rdata[1] & 0x01;
+}
 
 /** Return true if the DNSKEY is revoked. */
-KR_EXPORT KR_PURE
-bool kr_dnssec_key_revoked(const uint8_t *dnskey_rdata);
+KR_EXPORT inline KR_PURE
+bool kr_dnssec_key_revoked(const uint8_t *dnskey_rdata)
+{
+	return dnskey_rdata[1] & 0x80;
+}
+
+/** Return true if the DNSKEY could be used to validate zone records. */
+static inline KR_PURE
+bool kr_dnssec_key_usable(const uint8_t *dnskey_rdata)
+{
+	return (dnskey_rdata[0] & 0x01) && !kr_dnssec_key_revoked(dnskey_rdata);
+}
 
 /** Return DNSKEY tag.
   * @param rrtype RR type (either DS or DNSKEY are supported)
