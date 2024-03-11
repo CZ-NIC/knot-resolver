@@ -39,11 +39,13 @@ static_assert(sizeof(kr_proto_set) * 8 >= KR_PROTO_COUNT, "bad combination of ty
 
 /** Open the rule DB.
  *
- * You can call this to override the path or size (NULL/0 -> default).
- * Not allowed if already open (EINVAL), so this optional call has to come
- * before writing anything into the DB. */
+ * You can call this to override the path or size (NULL/0 -> default)
+ * or choose not to overwrite the DB with just the defaults.
+ *
+ * \return error code.  Not allowed if already open (EINVAL),
+ * so this optional call has to come before writing anything into the DB. */
 KR_EXPORT
-int kr_rules_init(const char *path, size_t maxsize);
+int kr_rules_init(const char *path, size_t maxsize, bool overwrite);
 /** kr_rules_init() but OK if already open, and not allowing to override defaults. */
 KR_EXPORT
 int kr_rules_init_ensure(void);

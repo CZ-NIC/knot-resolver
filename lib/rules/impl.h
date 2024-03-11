@@ -20,7 +20,7 @@ extern struct kr_rules *the_rules;
 
 #define ENSURE_the_rules \
 	if (!the_rules) { \
-		int ret = kr_rules_init(NULL, 0); \
+		int ret = kr_rules_init(NULL, 0, true); \
 		if (ret) return ret; \
 	}
 
