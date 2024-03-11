@@ -4,6 +4,9 @@
 ffi = require('ffi')
 local C = ffi.C
 
+-- Do not clear the DB with rules; we had it prepared by a different process.
+assert(C.kr_rules_init(nil, 0, false) == 0)
+
 -- hostname
 hostname('{{ cfg.hostname }}')
 
