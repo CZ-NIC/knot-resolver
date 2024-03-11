@@ -48,7 +48,7 @@ Conditions
       This is the only mandatory part of each rule.
       You may use ``[ 0.0.0.0/0, "::/0" ]`` to match all external requests.
 
-   .. option:: dst_subnet <string>
+   .. option:: dst-subnet <string>
 
       Destination subnet, i.e. restricting the IP address that accepted the query.
 
