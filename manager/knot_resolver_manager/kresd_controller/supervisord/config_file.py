@@ -10,6 +10,7 @@ from knot_resolver_manager.constants import (
     kresd_cache_dir,
     kresd_config_file_supervisord_pattern,
     kresd_executable,
+    policy_loader_config_file,
     supervisord_config_file,
     supervisord_config_file_tmp,
     supervisord_pid_file,
@@ -95,6 +96,16 @@ class ProcessTypeConfig:
         )
 
     @staticmethod
+    def create_policy_loader_config(config: KresConfig) -> "ProcessTypeConfig":
+        cwd = str(os.getcwd())
+        return ProcessTypeConfig(  # type: ignore[call-arg]
+            logfile=supervisord_subprocess_log_dir(config) / "policy-loader.log",
+            workdir=cwd,
+            command=f"{kresd_executable()} -c {(policy_loader_config_file(config))} - -n",
+            environment="X-SUPERVISORD-TYPE=notify",
+        )
+
+    @staticmethod
     def create_kresd_config(config: KresConfig) -> "ProcessTypeConfig":
         cwd = str(os.getcwd())
         return ProcessTypeConfig(  # type: ignore[call-arg]
@@ -172,11 +183,11 @@ async def write_config_file(config: KresConfig) -> None:
     template = template.decode("utf8")
     config_string = Template(template).render(
         gc=ProcessTypeConfig.create_gc_config(config),
+        loader=ProcessTypeConfig.create_policy_loader_config(config),
         kresd=ProcessTypeConfig.create_kresd_config(config),
         manager=ProcessTypeConfig.create_manager_config(config),
         config=SupervisordConfig.create(config),
     )
-    print(config_string)
     await writefile(supervisord_config_file_tmp(config), config_string)
     # atomically replace (we don't technically need this right now, but better safe then sorry)
     os.rename(supervisord_config_file_tmp(config), supervisord_config_file(config))
