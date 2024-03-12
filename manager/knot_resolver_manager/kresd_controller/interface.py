@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Dict, Iterable, Optional, Type, TypeVar
 from weakref import WeakValueDictionary
 
-from knot_resolver_manager.constants import kresd_config_file
+from knot_resolver_manager.constants import kresd_config_file, policy_loader_config_file
 from knot_resolver_manager.datamodel.config_schema import KresConfig
 from knot_resolver_manager.exceptions import SubprocessControllerException
 from knot_resolver_manager.kresd_controller.registered_workers import register_worker, unregister_worker
@@ -115,7 +115,7 @@ class Subprocess(ABC):
             await writefile(config_file, config_lua)
         elif self.type is SubprocessType.POLICY_LOADER:
             config_lua = self._config.render_lua_policy()
-            config_file = Path("policy-loader.conf")
+            config_file = policy_loader_config_file(self._config)
             await writefile(config_file, config_lua)
 
         try:
@@ -141,7 +141,7 @@ class Subprocess(ABC):
             await writefile(config_file, config_lua)
         elif self.type is SubprocessType.POLICY_LOADER:
             config_lua = self._config.render_lua_policy()
-            config_file = Path("policy-loader.conf")
+            config_file = policy_loader_config_file(self._config)
             await writefile(config_file, config_lua)
 
         # update runtime status
@@ -164,7 +164,7 @@ class Subprocess(ABC):
             config_file = kresd_config_file(self._config, self.id)
             config_file.unlink()
         elif self.type is SubprocessType.POLICY_LOADER:
-            config_file = Path("policy-loader.conf")
+            config_file = policy_loader_config_file(self._config)
             config_file.unlink()
 
     def __eq__(self, o: object) -> bool:
