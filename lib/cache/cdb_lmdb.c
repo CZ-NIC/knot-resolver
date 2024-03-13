@@ -9,7 +9,19 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#ifdef __CYGWIN__
+#include <sys/cygwin.h>
+#include <w32api/fileapi.h>
+#include <w32api/handleapi.h>
+#include <w32api/error.h>
+#include <w32api/errhandlingapi.h>
+// set _WIN32 for lmdb.h
+#define _WIN32 1
+#endif
 #include <lmdb.h>
+#ifdef __CYGWIN__
+#undef _WIN32
+#endif
 
 #include "contrib/cleanup.h"
 #include "contrib/ucw/lib.h"
@@ -43,9 +55,15 @@ struct lmdb_env
 	} txn;
 
 	/* Cached part of struct stat for data.mdb. */
+#ifdef __CYGWIN__
+	uint32_t vol_sno;
+	uint64_t file_idx;
+	uint64_t file_size;
+#else
 	dev_t st_dev;
 	ino_t st_ino;
 	off_t st_size;
+#endif
 	const char *mdb_data_path; /**< path to data.mdb, for convenience */
 };
 
@@ -85,10 +103,20 @@ static int lmdb_error(int error)
 	case MDB_TXN_FULL:
 		return kr_error(ENOSPC);
 	default:
-		kr_log_error(CACHE, "LMDB error: %s\n", mdb_strerror(error));
+		kr_log_error(CACHE, "LMDB error: %d %s\n", error, mdb_strerror(error));
 		return kr_error(error);
 	}
 }
+
+#ifdef __CYGWIN__
+/** @brief Convert Win32 error code. */
+static int w32_error(int error)
+{
+	// use MDB's conversion code
+	kr_log_error(CACHE, "Win32 error: %d %s\n", error, mdb_strerror(error));
+	return kr_error(error);
+}
+#endif
 
 /** Conversion between knot and lmdb structs for values. */
 static inline knot_db_val_t val_mdb2knot(MDB_val v)
@@ -113,10 +141,20 @@ static int refresh_mapsize(struct lmdb_env *env)
 	if (ret) return ret;
 
 	env->mapsize = info.me_mapsize;
+#ifdef __CYGWIN__
+	if (env->mapsize != env->file_size) {
+#else
 	if (env->mapsize != env->st_size) {
+#endif
 		kr_log_info(CACHE, "suspicious size of cache file '%s'"
 				": file size %zu != LMDB map size %zu\n",
-				env->mdb_data_path, (size_t)env->st_size, env->mapsize);
+				env->mdb_data_path,
+#ifdef __CYGWIN__
+				(size_t)env->file_size,
+#else
+				(size_t)env->st_size,
+#endif
+				env->mapsize);
 	}
 	return kr_ok();
 }
@@ -341,11 +379,23 @@ static int cdb_open_env(struct lmdb_env *env, const char *path, const size_t map
 	const unsigned flags = MDB_WRITEMAP | MDB_MAPASYNC | MDB_NOTLS;
 	ret = mdb_env_open(env->env, path, flags, LMDB_FILE_MODE);
 	if (ret != MDB_SUCCESS) goto error_mdb;
-
+#ifdef __CYGWIN__
+	mdb_filehandle_t fd;
+#else
 	mdb_filehandle_t fd = -1;
+#endif
 	ret = mdb_env_get_fd(env->env, &fd);
 	if (ret != MDB_SUCCESS) goto error_mdb;
 
+#ifdef __CYGWIN__
+	BY_HANDLE_FILE_INFORMATION fi;
+	if (!GetFileInformationByHandle(fd, &fi)) {
+		goto error_w32;
+	}
+	env->vol_sno = fi.dwVolumeSerialNumber;
+	env->file_idx = ((uint64_t) fi.nFileIndexHigh) << 32 | fi.nFileIndexLow;
+	env->file_size = ((uint64_t) fi.nFileSizeHigh) << 32 | fi.nFileSizeLow;
+#else
 	struct stat st;
 	if (fstat(fd, &st)) {
 		ret = errno;
@@ -354,7 +404,7 @@ static int cdb_open_env(struct lmdb_env *env, const char *path, const size_t map
 	env->st_dev = st.st_dev;
 	env->st_ino = st.st_ino;
 	env->st_size = st.st_size;
-
+#endif
 	/* Get the real mapsize.  Shrinking can be restricted, etc.
 	 * Unfortunately this is only reliable when not setting the size explicitly. */
 	if (!size_requested) {
@@ -375,7 +425,28 @@ static int cdb_open_env(struct lmdb_env *env, const char *path, const size_t map
 
 #if !defined(__MACOSX__) && !(defined(__APPLE__) && defined(__MACH__))
 	if (size_requested) {
+#ifdef __CYGWIN__
+		uint64_t new_size = MAX(env->mapsize, env->file_size);
+		int32_t new_size_low = new_size & 0xffffffff;
+		int32_t new_size_high = new_size >> 16 >> 16;
+
+		if (SetFilePointer(fd, new_size_low, &new_size_high, 0) == INVALID_SET_FILE_POINTER) {
+			ret = GetLastError();
+			if (ret == NO_ERROR) {
+				ret = 0;
+			} else {
+				ret = w32_error(ret);
+			}
+		} else {
+			ret = 0;
+		}
+
+		if (ret == 0 && !SetEndOfFile(fd)) {
+			ret = w32_error(GetLastError());
+		}
+#else
 		ret = posix_fallocate(fd, 0, MAX(env->mapsize, env->st_size));
+#endif
 	} else {
 		ret = 0;
 	}
@@ -404,6 +475,11 @@ static int cdb_open_env(struct lmdb_env *env, const char *path, const size_t map
 
 error_mdb:
 	ret = lmdb_error(ret);
+#ifdef __CYGWIN__
+	goto error_sys;
+error_w32:
+	ret = w32_error(ret);
+#endif
 error_sys:
 	free_const(env->mdb_data_path);
 	stats->close++;
@@ -478,6 +554,36 @@ static int cdb_check_health(kr_cdb_pt db, struct kr_cdb_stats *stats)
 {
 	struct lmdb_env *env = db2env(db);
 
+#ifdef __CYGWIN__
+	char *w32_path = cygwin_create_path(CCP_POSIX_TO_WIN_A, env->mdb_data_path);
+	if (w32_path == NULL) {
+		int ret = errno;
+		return w32_error(ret);
+	}
+
+	HANDLE fd = CreateFile(w32_path, 0,
+			FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING,
+			FILE_ATTRIBUTE_NORMAL, NULL);
+	if (fd == INVALID_HANDLE_VALUE) {
+		int ret = GetLastError();
+		free(w32_path);
+		return w32_error(ret);
+	}
+	free(w32_path);
+
+	BY_HANDLE_FILE_INFORMATION fi;
+	bool success = GetFileInformationByHandle(fd, &fi);
+	if (!success) {
+		int ret = GetLastError();
+		CloseHandle(fd);
+		return w32_error(ret);
+	}
+	CloseHandle(fd);
+
+	uint64_t file_idx = ((uint64_t) fi.nFileIndexHigh) << 32 | fi.nFileIndexLow;
+
+	if (fi.dwVolumeSerialNumber != env->vol_sno || file_idx != env->file_idx) {
+#else
 	struct stat st;
 	if (stat(env->mdb_data_path, &st)) {
 		int ret = errno;
@@ -485,6 +591,7 @@ static int cdb_check_health(kr_cdb_pt db, struct kr_cdb_stats *stats)
 	}
 
 	if (st.st_dev != env->st_dev || st.st_ino != env->st_ino) {
+#endif
 		kr_log_debug(CACHE, "cache file has been replaced, reopening\n");
 		int ret = reopen_env(env, stats, 0); // we accept mapsize from the new file
 		return ret == 0 ? 1 : ret;
@@ -492,12 +599,23 @@ static int cdb_check_health(kr_cdb_pt db, struct kr_cdb_stats *stats)
 
 	/* Cache check through file size works OK without reopening,
 	 * contrary to methods based on mdb_env_info(). */
+#ifdef __CYGWIN__
+	uint64_t file_size = ((uint64_t) fi.nFileSizeHigh) << 32 | fi.nFileSizeLow;
+	if (file_size == env->file_size)
+#else
 	if (st.st_size == env->st_size)
+#endif
 		return kr_ok();
 	kr_log_info(CACHE, "detected size change (by another instance?) of file '%s'"
 			": file size %zu -> file size %zu\n",
-			env->mdb_data_path, (size_t)env->st_size, (size_t)st.st_size);
+			env->mdb_data_path,
+#ifdef __CYGWIN__
+			(size_t)env->file_size, (size_t)file_size);
+	env->file_size = file_size; // avoid retrying in cycle even if we fail
+#else
+			(size_t)env->st_size, (size_t)st.st_size);
 	env->st_size = st.st_size; // avoid retrying in cycle even if we fail
+#endif
 	return refresh_mapsize(env);
 }
 
