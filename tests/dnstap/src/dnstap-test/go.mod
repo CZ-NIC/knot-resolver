@@ -5,5 +5,13 @@ go 1.17
 require (
 	github.com/cloudflare/dns v0.0.0-20151007113418-e20ffa3da443
 	github.com/dnstap/golang-dnstap v0.4.0
-	google.golang.org/protobuf v1.30.0
+	google.golang.org/protobuf v1.33.0
+)
+
+require (
+	github.com/farsightsec/golang-framestream v0.3.0 // indirect
+	github.com/miekg/dns v1.1.31 // indirect
+	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550 // indirect
+	golang.org/x/net v0.0.0-20190923162816-aa69164e4478 // indirect
+	golang.org/x/sys v0.0.0-20190924154521-2837fb4f24fe // indirect
 )
