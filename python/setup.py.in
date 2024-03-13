@@ -1,0 +1,12 @@
+from setuptools import setup
+
+# TODO: Migrate this to a pyproject.toml once Debian 11 support is dropped.
+setup(
+    name="knot_resolver",
+    version="@kres_version@",
+    description="Knot Resolver helper data for Python",
+    author="Oto Šťáva",
+    author_email="oto.stava@nic.cz",
+    python_requires=">=3.8,<4.0",
+    py_modules=["knot_resolver"],
+)

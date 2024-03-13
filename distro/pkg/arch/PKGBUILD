@@ -60,6 +60,9 @@ build() {
         -D malloc=jemalloc \
         -D unit_tests=enabled
     ninja -C build
+    pushd build/python
+    python -Pm build --wheel --no-isolation
+    popd
     pushd manager
     python -Pm build --wheel --no-isolation
     popd
@@ -80,6 +83,11 @@ package() {
 
     # remove modules with missing dependencies
     rm "${pkgdir}/usr/lib/knot-resolver/kres_modules/etcd.lua"
+
+    # install knot-resolver metadata Python module
+    pushd build/python
+    python -Pm installer --destdir="$pkgdir" dist/*.whl
+    popd
 
     # install knot-resolver-manager
     pushd manager

@@ -195,6 +195,10 @@ CFLAGS="%{optflags}" LDFLAGS="%{?__global_ldflags}" meson build_rpm \
 
 %{NINJA} -v -C build_rpm
 
+pushd build_rpm/python
+%py3_build
+popd
+
 pushd manager
 %py3_build
 popd
@@ -224,6 +228,10 @@ rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/prometheus.lua
 install -m 755 -d %{buildroot}/%{_pkgdocdir}
 mv %{buildroot}/%{_datadir}/doc/%{name}/* %{buildroot}/%{_pkgdocdir}/
 %endif
+
+pushd build_rpm/python
+%py3_install
+popd
 
 # install knot-resolver-manager
 pushd manager
@@ -307,6 +315,13 @@ getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysc
 %{_libdir}/knot-resolver/kres_modules/view.lua
 %{_libdir}/knot-resolver/kres_modules/watchdog.lua
 %{_libdir}/knot-resolver/kres_modules/workarounds.lua
+%{python3_sitelib}/knot_resolver.py
+%{python3_sitelib}/knot_resolver-*
+%if 0%{?suse_version}
+%pycache_only %{python3_sitelib}/__pycache__/knot_resolver.*
+%else
+%{python3_sitelib}/__pycache__/knot_resolver.*
+%endif
 %{_mandir}/man8/kresd.8.gz
 %{_mandir}/man8/kresctl.8.gz
 

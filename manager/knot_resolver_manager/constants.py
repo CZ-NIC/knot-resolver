@@ -1,8 +1,14 @@
+import importlib.util
 import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
-from knot_resolver_manager.utils import which
+# Install config is semi-optional - only needed to actually run Manager, but not
+# for its unit tests.
+if importlib.util.find_spec("knot_resolver"):
+    import knot_resolver  # type: ignore[import-not-found]
+else:
+    knot_resolver = None
 
 if TYPE_CHECKING:
     from knot_resolver_manager.config_store import ConfigStore
@@ -20,11 +26,13 @@ MAX_WORKERS = 256
 
 
 def kresd_executable() -> Path:
-    return which.which("kresd")
+    assert knot_resolver is not None
+    return knot_resolver.sbin_dir / "kresd"
 
 
 def kres_gc_executable() -> Path:
-    return which.which("kres-cache-gc")
+    assert knot_resolver is not None
+    return knot_resolver.sbin_dir / "kres-cache-gc"
 
 
 def kresd_cache_dir(config: "KresConfig") -> Path:
