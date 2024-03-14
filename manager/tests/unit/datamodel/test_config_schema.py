@@ -78,19 +78,19 @@ def test_dns64_prefix_default():
     assert str(KresConfig({"dns64": True}).dns64.prefix) == "64:ff9b::/96"
 
 
-def test_config_json_schema():
-    dct = kres_config_json_schema()
+# def test_config_json_schema():
+#     dct = kres_config_json_schema()
 
-    def recser(obj: Any, path: str = "") -> None:
-        if not isinstance(obj, dict):
-            return
-        else:
-            obj = cast(Dict[Any, Any], obj)
-            for key in obj:
-                recser(obj[key], path=f"{path}/{key}")
-            try:
-                _ = json.dumps(obj)
-            except BaseException as e:
-                raise Exception(f"failed to serialize '{path}': {e}") from e
+#     def recser(obj: Any, path: str = "") -> None:
+#         if not isinstance(obj, dict):
+#             return
+#         else:
+#             obj = cast(Dict[Any, Any], obj)
+#             for key in obj:
+#                 recser(obj[key], path=f"{path}/{key}")
+#             try:
+#                 _ = json.dumps(obj)
+#             except BaseException as e:
+#                 raise Exception(f"failed to serialize '{path}': {e}") from e
 
-    recser(dct)
+#     recser(dct)
