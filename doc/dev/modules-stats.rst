@@ -1,0 +1,1 @@
+../../modules/stats/README.rst

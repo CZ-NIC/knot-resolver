@@ -1,1 +1,0 @@
-../modules/watchdog/README.rst

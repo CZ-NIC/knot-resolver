@@ -209,5 +209,5 @@ and include subrequests. The list maximum size is 5000 entries, make diffs if yo
 
 Clear the list of most frequent iterative queries.
 
-.. include:: ../modules/graphite/README.rst
-.. include:: ../modules/http/prometheus.rst
+.. include:: ../../modules/graphite/README.rst
+.. include:: ../../modules/http/prometheus.rst

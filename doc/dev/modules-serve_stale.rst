@@ -1,0 +1,1 @@
+../../modules/serve_stale/README.rst

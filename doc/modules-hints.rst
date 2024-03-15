@@ -1,1 +1,0 @@
-../modules/hints/README.rst

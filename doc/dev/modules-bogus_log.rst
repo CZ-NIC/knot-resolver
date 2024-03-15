@@ -1,0 +1,1 @@
+../../modules/bogus_log/README.rst

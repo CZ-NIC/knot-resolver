@@ -1,0 +1,1 @@
+../../daemon/bindings/net_client.rst
