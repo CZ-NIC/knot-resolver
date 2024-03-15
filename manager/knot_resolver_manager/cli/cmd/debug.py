@@ -28,7 +28,7 @@ class DebugCommand(Command):
     ) -> Tuple[argparse.ArgumentParser, "Type[Command]"]:
         debug = subparser.add_parser(
             "debug",
-            help="Run GDB on the manager's subprocesses - runs with sudo by default to avoid ptrace_scope issues",
+            help="Run GDB on the manager's subprocesses",
         )
         debug.add_argument(
             "proc_type",
@@ -38,14 +38,14 @@ class DebugCommand(Command):
             default="kresd",
         )
         debug.add_argument(
-            "--no-sudo",
+            "--sudo",
             dest="sudo",
-            help="Do not run GDB with sudo (may not work if your ptrace_scope is 1 or higher)",
-            action="store_false",
+            help="Run GDB with sudo",
+            action="store_true",
         )
         debug.add_argument(
             "--gdb",
-            help="GDB command (may be a command on PATH, or an absolute path)",
+            help="Custom GDB executable (may be a command on PATH, or an absolute path)",
             type=str,
             default=None,
         )

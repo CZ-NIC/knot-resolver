@@ -14,7 +14,7 @@ PROCESSES_TYPE = Iterable
 class PidsCommand(Command):
     def __init__(self, namespace: argparse.Namespace) -> None:
         self.proc_type: Optional[str] = namespace.proc_type
-        self.verbose: int = namespace.verbose
+        self.json: int = namespace.json
 
         super().__init__(namespace)
 
@@ -22,7 +22,7 @@ class PidsCommand(Command):
     def register_args_subparser(
         subparser: "argparse._SubParsersAction[argparse.ArgumentParser]",
     ) -> Tuple[argparse.ArgumentParser, "Type[Command]"]:
-        pids = subparser.add_parser("pids", help="list the PIDs of kresd manager subprocesses")
+        pids = subparser.add_parser("pids", help="List the PIDs of the Manager's subprocesses")
         pids.add_argument(
             "proc_type",
             help="Optional, the type of process to query. May be 'kresd', 'gc', or 'all' (default).",
@@ -30,11 +30,10 @@ class PidsCommand(Command):
             default="all",
         )
         pids.add_argument(
-            "-v",
-            "--verbose",
-            help="Optional, makes the output more verbose, in a machine-readable format.",
-            action="count",
-            default=0,
+            "--json",
+            help="Optional, makes the output more verbose, in JSON.",
+            action="store_true",
+            default=False,
         )
         return pids, PidsCommand
 
@@ -48,12 +47,11 @@ class PidsCommand(Command):
         if response.status == 200:
             processes = json.loads(response.body)
             if isinstance(processes, PROCESSES_TYPE):
-                if self.verbose < 1:
-                    for p in processes:
-                        print(p["pid"])
+                if self.json:
+                    print(json.dumps(processes, indent=2))
                 else:
                     for p in processes:
-                        print(p)
+                        print(p["pid"])
 
             else:
                 print(
