@@ -30,9 +30,9 @@ another program, e.g. a maintenance script.
    :ref:`systemd-multiple-instances`.
 
 When Knot Resolver is started using Systemd (see section
-:ref:`gettingstarted-startup`) it creates a control socket in path
-``/run/knot-resolver/control/$ID``. Connection to the socket can
-be made from command line using e.g. ``socat``:
+`Startup <../gettingstarted-startup.html>`_) it creates a control socket in path
+``/run/knot-resolver/control/$ID``. Connection to the socket can be made from
+command line using e.g. ``socat``:
 
 .. code-block:: bash
 
@@ -389,9 +389,9 @@ see the cqueues documentation for more information. Here is an simple example:
     end
   end)
 
-.. include:: ../daemon/bindings/event.rst
+.. include:: ../../daemon/bindings/event.rst
 
-.. include:: ../modules/etcd/README.rst
+.. include:: ../../modules/etcd/README.rst
 
 .. _closures: https://www.lua.org/pil/6.1.html
 .. _cqueues: https://25thandclement.com/~william/projects/cqueues.html

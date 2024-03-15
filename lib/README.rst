@@ -30,7 +30,11 @@ The resolution process starts with the functions in :ref:`resolve.c <lib_api_rpl
 
 This is the *driver*. The driver is not meant to know *"how"* the query resolves, but rather *"when"* to execute *"what"*.
 
-.. image:: ../doc/resolution.png
+..
+   Paths are resolved relative to the document that includes this, so this is
+   kind of a mess. (This is included in `/doc/dev/lib.rst`)
+
+.. image:: ../resolution.png
    :align: center
 
 On the other side are *layers*. They are responsible for dissecting the packets and informing the driver about the results. For example, a *produce* layer generates query, a *consume* layer validates answer.

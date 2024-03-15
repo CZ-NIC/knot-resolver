@@ -51,9 +51,9 @@ to leave some free space for special files, such as locks.:
 
    cache.size = cache.fssize() - 10*MB
 
-.. note:: The :ref:`garbage-collector` can be used to periodically trim the
-   cache. It is enabled and configured by default when running kresd with
-   systemd integration.
+.. note:: The `cache garbage collector <../deployment-advanced-no-systemd-processes.html#garbage-collector>`_
+   can be used to periodically trim the cache. It is enabled and configured by
+   default when running kresd with systemd integration.
 
 .. _`cache_persistence`:
 

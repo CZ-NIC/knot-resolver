@@ -19,13 +19,12 @@ Forwarding implementation in Knot Resolver has following properties:
   * Answers from *upstream* servers are cached.
   * Answers from *upstream* servers are locally DNSSEC-validated, unless dnssec is disabled.
   * Resolver automatically selects which IP address from given set of IP addresses will be used (based on performance characteristics).
-  * :ref:`Forwarding <config-forward>` can use either encrypted or unencrypted DNS protocol.
+  * Forwarding can use either encrypted or unencrypted DNS protocol.
 
 .. warning::
 
         We strongly discourage use of "fake top-level domains" like ``corp.`` because these made-up domains are indistinguishable from an attack, so DNSSEC validation will prevent such domains from working.
-        If you *really* need a variant of forwarding which does not DNSSEC-validate received data please see chapter :ref:`dns-graft`.
-        In long-term it is better to migrate data into a legitimate, properly delegated domains which do not suffer from these security problems.
+        In the long-term it is better to migrate data into a legitimate, properly delegated domains which do not suffer from these security problems.
 
 .. code-block:: yaml
 

@@ -36,12 +36,13 @@ Welcome to Knot Resolver's documentation for developers and advanced users!
 
 .. toctree::
    :caption: Modules and worker API, Lib
-   :name: configuration-lua-chapter
+   :name: modules-api-lib-chapter
    :maxdepth: 1
 
    lib
    modules_api
    worker_api
+   logging_api
 
 .. toctree::
    :caption: Architecture

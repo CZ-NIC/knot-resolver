@@ -228,7 +228,7 @@ For complete control over the build flags, use ``--buildtype=plain`` and set
 ``CFLAGS``, ``LDFLAGS`` when creating the build directory with ``meson``
 command.
 
-.. include:: ../tests/README.rst
+.. include:: ../../tests/README.rst
 
 .. _build-html-doc:
 
