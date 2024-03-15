@@ -4,6 +4,7 @@ Knot Resolver 6.0.7 (2024-0m-dd)
 Improvements
 ------------
 - manager: clear the cache via management HTTP API (#876,!1491)
+- docs: documentation is now separated into user and developer parts (!1514)
 
 Bugfixes
 --------
