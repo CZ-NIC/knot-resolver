@@ -7,9 +7,9 @@
    involve yourself with the Lua programming language, please see the
    `user documentation <../index.html>`_.
 
-#############
-Knot Resolver
-#############
+#####################################
+Knot Resolver developer documentation
+#####################################
 
 Welcome to Knot Resolver's documentation for developers and advanced users!
 
@@ -35,8 +35,8 @@ Welcome to Knot Resolver's documentation for developers and advanced users!
    modules-http-custom-services
 
 .. toctree::
-   :caption: Modules and worker API, Lib
-   :name: modules-api-lib-chapter
+   :caption: C API
+   :name: c-api-chapter
    :maxdepth: 1
 
    lib
