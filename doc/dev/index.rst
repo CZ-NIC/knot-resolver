@@ -1,5 +1,12 @@
 .. SPDX-License-Identifier: GPL-3.0-or-later
 
+.. warning::
+
+   **This documentation is intended to help with advanced fine-tuning of Knot
+   Resolver!** If you are looking for help with day-to-day use without the need to
+   involve yourself with the Lua programming language, please see the
+   `user documentation <../index.html>`_.
+
 #############
 Knot Resolver
 #############
@@ -11,7 +18,7 @@ Welcome to Knot Resolver's documentation for developers and advanced users!
    :name: build-chapter
    :maxdepth: 1
 
-   build   
+   build
 
 .. toctree::
    :caption: Lua configuration
