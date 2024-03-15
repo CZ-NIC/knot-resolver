@@ -2,9 +2,9 @@
 
 .. _build:
 
-******************
-Cloning repository
-******************
+**********************
+Cloning the repository
+**********************
 
 .. note:: Latest up-to-date packages for various distribution can be obtained
    from web `<https://knot-resolver.cz/download/>`_.
