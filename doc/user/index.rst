@@ -1,8 +1,8 @@
 .. SPDX-License-Identifier: GPL-3.0-or-later
 
-#############
-Knot Resolver
-#############
+###########################
+Knot Resolver documentation
+###########################
 
 Welcome to Knot Resolver's documentation!
 Knot Resolver is an open-source implementation of a caching validating DNS resolver.
