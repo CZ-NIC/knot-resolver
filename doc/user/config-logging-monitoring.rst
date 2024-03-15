@@ -34,7 +34,7 @@ E.g. on distributions using systemd-journald use command ``journalctl -eu knot-r
 
    .. option:: groups: <list of logging groups>
 
-      Use to turn-on ``debug`` logging for the selected `groups <./dev/config-logging-header.html>`_
+      Use to turn-on ``debug`` logging for the selected `groups <./dev/logging_api.html>`_
       regardless of the global log level. Other groups are logged to the log based on the initial level.
 
       .. It is also possible to enable ``debug`` logging level for particular requests,

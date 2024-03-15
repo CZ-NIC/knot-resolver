@@ -32,4 +32,4 @@ Default values should not be changed except for very special cases.
 	4096	-- result # 1
 	1232	-- result # 2
 
-.. include:: ../modules/workarounds/README.rst
+.. include:: ../../modules/workarounds/README.rst

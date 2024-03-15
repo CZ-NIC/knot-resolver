@@ -22,7 +22,7 @@ For debugging purposes it is possible to use the very verbose ``debug`` level,
 but that is generally not usable unless restricted in some way (see below).
 
 In addition to levels, logging is also divided into the
-:ref:`groups <config_log_groups>`. All groups
+:ref:`log groups <config_log_groups>`. All groups
 are logged by default, but you can enable ``debug`` level for selected groups using
 :func:`log_groups` function. Other groups are logged to the log level
 set by :func:`log_level`.
@@ -97,5 +97,3 @@ Additional monitoring and debugging methods are described below. If none of thes
    modules-ta_signal_query
    modules-detect_time_skew
    modules-detect_time_jump
-   config-debugging
-   config-logging-header

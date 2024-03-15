@@ -4,7 +4,7 @@ System architecture
 
 Knot Resolver is split into several components, namely the manager, ``kresd`` and the garbage collector. In addition to these custom components, we also rely on `supervisord <http://supervisord.org/>`_.
 
-.. image:: architecture-supervisor.svg
+.. image:: ../architecture-schema.svg
     :width: 100%
     :alt: Diagram showing process tree and contol relationship between Knot Resolver components. Supervisord is a parent to all processes, namely manager, kresd instances and gc. Manager on the other hand controls every other component and what it does.
 

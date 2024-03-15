@@ -53,7 +53,6 @@ Following chapters describe basic configuration of how resolver retrieves data f
    :maxdepth: 2
 
    daemon-bindings-net_client
-   config-network-forwarding
 
 DNS protocol tweaks
 ===================
