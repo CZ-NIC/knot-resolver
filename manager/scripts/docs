@@ -7,4 +7,9 @@ cd ..
 
 echo Building documentation for Knot Resolver
 meson build_doc -Ddoc=enabled
+
+# install "knot_resolver" python module
+pip install -e build_doc/python
+
+# build documentation
 ninja -C build_doc doc
