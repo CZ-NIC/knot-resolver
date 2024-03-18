@@ -373,6 +373,11 @@ single ``kresctl`` command.
         Use a custom GDB executable. This may be a command on ``PATH``, or an
         absolute path to an executable.
 
+    .. option:: --print-only
+
+        Prints the GDB command line into ``stderr`` as a Python array, does not
+        execute GDB.
+
 
 .. _manager-client-subprocess-types:
 

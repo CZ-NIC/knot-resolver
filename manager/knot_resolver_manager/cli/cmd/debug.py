@@ -19,6 +19,7 @@ class DebugCommand(Command):
         self.proc_type: Optional[str] = namespace.proc_type
         self.sudo: bool = namespace.sudo
         self.gdb: str = namespace.gdb
+        self.print_only: bool = namespace.print_only
         self.gdb_args: List[str] = namespace.extra
         super().__init__(namespace)
 
@@ -42,12 +43,19 @@ class DebugCommand(Command):
             dest="sudo",
             help="Run GDB with sudo",
             action="store_true",
+            default=False,
         )
         debug.add_argument(
             "--gdb",
             help="Custom GDB executable (may be a command on PATH, or an absolute path)",
             type=str,
             default=None,
+        )
+        debug.add_argument(
+            "--print-only",
+            help="Prints the GDB command line into stderr as a Python array, does not execute GDB",
+            action="store_true",
+            default=False,
         )
         return debug, DebugCommand
 
@@ -106,7 +114,7 @@ class DebugCommand(Command):
 
         # Attach GDB to processes - the processes are attached using the `add-inferior` and `attach` GDB
         # commands. This way, we can debug multiple processes.
-        exec_args.extend([gdb_cmd])
+        exec_args.extend([gdb_cmd, "--"])
         exec_args.extend(["-init-eval-command", "set detach-on-fork off"])
         exec_args.extend(["-init-eval-command", "set schedule-multiple on"])
         exec_args.extend(["-init-eval-command", f'attach {procs[0]["pid"]}'])
@@ -131,5 +139,7 @@ class DebugCommand(Command):
             )
         exec_args.extend(self.gdb_args)
 
-        print(f"exec_args = {exec_args}")
-        os.execl(*exec_args)
+        if self.print_only:
+            print(f"{exec_args}")
+        else:
+            os.execl(*exec_args)
