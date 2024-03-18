@@ -109,7 +109,7 @@ class Subprocess(ABC):
         self._id = kresid
         self._config = config
         self._registered_worker: bool = False
-        self._pid: int = None
+        self._pid: Optional[int] = None
 
     async def start(self) -> None:
         # create config file
