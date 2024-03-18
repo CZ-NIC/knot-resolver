@@ -52,6 +52,13 @@ Welcome to Knot Resolver's documentation for developers and advanced users!
    manager-dev
    architecture
 
+.. toctree::
+   :caption: Infrastructure
+   :name: infra-chapter
+   :maxdepth: 1
+
+   infra-pages
+
 Indices and tables
 ==================
 
