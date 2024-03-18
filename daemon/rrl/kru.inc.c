@@ -357,7 +357,8 @@ static inline bool kru_limited_update(struct kru *kru, struct query_ctx *ctx)
 			__m128i l0 = _mm_load_si128(l_v);
 			__m128i l1 = _mm_load_si128(l_v + 1);
 			// We want to avoid the first item in l0, so we maximize it.
-			l0 = _mm_insert_epi16(l0, (1<<16)-1, 0);
+			//  (but this function takes a signed integer, so -1 is the maximum)
+			l0 = _mm_insert_epi16(l0, -1, 0);
 
 			// Only one instruction can find minimum and its position,
 			// and it works on 8x uint16_t.
