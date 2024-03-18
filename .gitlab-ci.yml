@@ -688,6 +688,7 @@ docs:build:
     - pip3 install -U -r doc/requirements.txt
     - pip3 install -U sphinx_rtd_theme
     - meson build_doc -Ddoc=enabled
+    - pip3 install -U build_doc/python  # installl "knot_resolver" module created by meson
     - ninja -C build_doc doc
   artifacts:
     paths:
