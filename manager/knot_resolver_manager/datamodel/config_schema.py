@@ -55,15 +55,24 @@ def _default_max_worker_count() -> int:
 
 
 def kres_config_json_schema() -> Dict[str, Any]:
+    """
+    At this moment, to create any instance of 'ConfigSchema' even with default values, it is necessary to set the global context.
+    In the case of generating a JSON schema, strict validation must be turned off, otherwise it may happen that the creation of the JSON schema fails,
+    It may fail due to non-existence of the directory/file or their rights.
+    This should be fixed in the future. For more info, see 'datamodel/global.py' module.
+    """
+
     context = get_global_validation_context()
     set_global_validation_context(Context(None, False))
 
     schema = KresConfig.json_schema(
-        schema_id=f"https://www.knot-resolver.cz/documentation/{kres_version()}/_static/config.schema.json",
+        # TODO: update this in case that 'schema_id' URL based on 'kres_version()' works
+        schema_id="https://www.knot-resolver.cz/documentation/latest/_static/config.schema.json",
         title="Knot Resolver configuration schema",
         description=f"Version Knot Resolver {kres_version()}",
     )
 
+    # setting back to previous values
     set_global_validation_context(context)
 
     return schema
