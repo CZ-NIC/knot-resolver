@@ -56,7 +56,7 @@ $ kresd
 
 See the documentation at [knot-resolver.cz/documentation/latest][doc] for more options.
 
-[depends]: https://www.knot-resolver.cz/documentation/latest/build.html
+[depends]: https://www.knot-resolver.cz/documentation/latest/dev/build.html
 [doc]: https://www.knot-resolver.cz/documentation/latest/
 [scaling]: https://www.knot-resolver.cz/documentation/latest/config-multiple-workers.html
 [manager]: https://www.knot-resolver.cz/documentation/latest/architecture-manager.html
