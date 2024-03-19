@@ -2,6 +2,7 @@
 # rate limiting code
 
 kresd_src += files([
+  'api.c',
   'kru-generic.c',
   'kru-avx2.c',
   '../../contrib/openbsd/siphash.c',

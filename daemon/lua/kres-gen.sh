@@ -334,6 +334,7 @@ ${CDEFS} ${KRESD} functions <<-EOF
 	worker_resolve_mk_pkt
 	worker_resolve_start
 	zi_zone_import
+	kr_rrl_request_begin
 EOF
 
 echo "struct engine" | ${CDEFS} ${KRESD} types | sed '/module_array_t/,$ d'

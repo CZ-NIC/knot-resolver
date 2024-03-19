@@ -934,8 +934,10 @@ policy.layer = {
 
 		if ffi.C.kr_view_select_action(req, view_action_buf) == 0 then
 			local act_str = ffi.string(view_action_buf[0].data, view_action_buf[0].len)
-			return loadstring('return '..act_str)()(state, req)
+			loadstring('return ' .. act_str)()(state, req)
 		end
+
+		if ffi.C.kr_rrl_request_begin(req) then return end
 
 		local qry = req:initial() -- same as :current() but more descriptive
 		return policy.evaluate(policy.rules, req, qry, state)
