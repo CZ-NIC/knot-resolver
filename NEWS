@@ -10,6 +10,7 @@ Bugfixes
 --------
 - fix listening by interface name containing dashes (#900, !1500)
 - fix kresctl http request timeout (!1505)
+- fix RPZ if it contains apex NS record (!1516)
 
 
 Knot Resolver 6.0.6 (2024-02-13)

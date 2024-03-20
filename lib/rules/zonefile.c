@@ -200,6 +200,20 @@ static void process_record(zs_scanner_t *s)
 	}
 	if (knot_rrtype_is_metatype(s->r_type))
 		goto unsupported_type;
+	// Especially the apex NS record in RPZ needs to be ignored.
+	// That case is clear and silent.  For non-RPZ we assume the NS is desired.
+	if (s->r_type == KNOT_RRTYPE_NS && s_data->c->is_rpz) {
+		if (s->r_owner[0] != '\0') {
+			auto_free char *owner_text = kr_dname_text(s->r_owner);
+			// remove the final dot to hint that the name is relative to apex
+			owner_text[strlen(owner_text) - 1] = '\0';
+			kr_log_warning(RULES, "skipping `%s NS` record\n", owner_text);
+		} else {
+			kr_log_debug(RULES, "skipping apex NS\n");
+		}
+		return;
+	}
+
 	if (s_data->c->is_rpz && s->r_type == KNOT_RRTYPE_CNAME) {
 		cname_scan2rule(s);
 		return;
