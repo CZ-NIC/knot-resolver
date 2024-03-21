@@ -15,8 +15,12 @@ local function merge(t, results, prefix)
 	for _, result in pairs(results) do
 		if type(result) == 'table' then
 			for k, v in pairs(result) do
-				local val = t[prefix..k]
-				t[prefix..k] = (val or 0) + v
+				if type(result) == 'table' then
+					merge(t, result, prefix..k..'.')
+				else
+					local val = t[prefix..k]
+					t[prefix..k] = (val or 0) + v
+				end
 			end
 		end
 	end
