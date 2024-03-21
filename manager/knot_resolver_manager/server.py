@@ -188,7 +188,7 @@ class Server:
             }
         )
 
-    @statistics.async_timing_histogram(statistics.MANAGER_REQUEST_RECONFIGURE_LATENCY)
+    # @statistics.async_timing_histogram(statistics.MANAGER_REQUEST_RECONFIGURE_LATENCY)
     async def _handler_config_query(self, request: web.Request) -> web.Response:
         """
         Route handler for changing resolver configuration
@@ -238,9 +238,21 @@ class Server:
         res.headers.add("ETag", f'"{structural_etag(new_config)}"')
         return res
 
-    async def _handler_metrics(self, _request: web.Request) -> web.Response:
+    async def _handler_metrics(self, request: web.Request) -> web.Response:
+        raise web.HTTPMovedPermanently("/metrics/json")
+
+    async def _handler_metrics_json(self, _request: web.Request) -> web.Response:
         return web.Response(
-            body=await statistics.report_stats(),
+            body=await statistics.report_stats_json(),
+            content_type="application/json",
+            charset="utf8",
+        )
+
+    async def _handler_metrics_prometheus(self, _request: web.Request) -> web.Response:
+        if not statistics.prometheus_support():
+            raise web.HTTPNotFound()
+        return web.Response(
+            body=await statistics.report_stats_prometheus(),
             content_type="text/plain",
             charset="utf8",
         )
@@ -330,6 +342,8 @@ class Server:
                 web.get("/schema", self._handler_schema),
                 web.get("/schema/ui", self._handle_view_schema),
                 web.get("/metrics", self._handler_metrics),
+                web.get("/metrics/json", self._handler_metrics_json),
+                web.get("/metrics/prometheus", self._handler_metrics_prometheus),
                 web.post("/cache/clear", self._handler_cache_clear),
             ]
         )
