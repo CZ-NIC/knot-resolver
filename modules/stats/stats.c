@@ -57,10 +57,18 @@ enum const_metric {
 };
 struct const_metric_elm {
 	const char *key;
+	const char *sup_key;
+	const char *sub_key;
 	size_t val;
 };
 static struct const_metric_elm const_metrics[] = {
-	#define X(a,b) [metric_ ## a ## _ ## b] = { #a "." #b, 0 },
+	#define X(a,b) \
+		[metric_ ## a ## _ ## b] = { \
+			.key = #a "." #b, \
+			.sup_key = #a, \
+			.sub_key = #b, \
+			.val = 0 \
+		},
 	CONST_METRICS(X)
 	#undef X
 };
@@ -376,8 +384,15 @@ static char* stats_list(void *env, struct kr_module *module, const char *args)
 	size_t args_len = args ? strlen(args) : 0;
 	for (unsigned i = 0; i < metric_const_end; ++i) {
 		struct const_metric_elm *elm = &const_metrics[i];
-		if (!args || strncmp(elm->key, args, args_len) == 0) {
-			json_append_member(root, elm->key, json_mknumber(elm->val));
+		if (!args || strcmp(elm->sup_key, args) == 0) {
+			JsonNode *sup = json_find_member(root, elm->sup_key);
+			if (!sup) {
+				sup = json_mkobject();
+				json_append_member(root, elm->sup_key, sup);
+			}
+			if (kr_fails_assert(sup))
+				break;
+			json_append_member(sup, elm->sub_key, json_mknumber(elm->val));
 		}
 	}
 	struct list_entry_context ctx = {
