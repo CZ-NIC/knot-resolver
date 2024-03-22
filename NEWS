@@ -11,6 +11,7 @@ Bugfixes
 - fix listening by interface name containing dashes (#900, !1500)
 - fix kresctl http request timeout (!1505)
 - fix RPZ if it contains apex NS record (!1516)
+- fix on 32-bit systems with 64-bit time_t (!1510)
 
 
 Knot Resolver 6.0.6 (2024-02-13)
@@ -59,6 +60,13 @@ https://knot.pages.nic.cz/knot-resolver/upgrading-to-6.html
 
 5.x branch longterm support
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Knot Resolver 5.7.2 (2024-0m-dd)
+================================
+
+Bugfixes
+--------
+- fix on 32-bit systems with 64-bit time_t (!1510)
 
 
 Knot Resolver 5.7.1 (2024-02-13)

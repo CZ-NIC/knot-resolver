@@ -47,10 +47,23 @@ else
   kres_gen_fname = 'kres-gen-30.lua'
 endif
 
+# Exact types around time_t aren't easy to detect, but at least we need the same size.
+time_t_size = meson.get_compiler('c').sizeof('time_t', prefix: '#include <sys/time.h>')
+kres_gen_config = {}
+foreach t: [ 'long', 'long long' ]
+  if meson.get_compiler('c').sizeof(t) == time_t_size
+    kres_gen_config = { 'time_t': t }
+    break
+  endif
+endforeach
+if kres_gen_config == {}
+  error('Unexpected sizeof(time_t) == @0@'.format(time_t_size))
+endif
+
 kres_gen_lua = configure_file(
   input: kres_gen_fname,
   output: 'kres-gen.lua',
-  copy: true,
+  configuration: kres_gen_config,
 )
 
 run_target(  # run manually to re-generate kres-gen.lua
@@ -72,9 +85,9 @@ if get_option('kres_gen_test') and not meson.is_cross_build()
   ]
   # Construct the lua tester as a meson string.
   kres_gen_test_luastr = '''
-    dofile('@0@')
+    dofile('@0@/../../@1@')
     local ffi = require('ffi')
-  '''.format(meson.current_source_dir() / kres_gen_fname)
+  '''.format(meson.current_build_dir(), kres_gen_lua)
   foreach ttc: types_to_check
     # We're careful with adding just includes; otherwise it's more fragile (e.g. linking flags).
     if 'dep' in ttc
