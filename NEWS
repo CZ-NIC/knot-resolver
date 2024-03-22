@@ -13,6 +13,7 @@ Bugfixes
 - fix kresctl http request timeout (!1505)
 - fix RPZ if it contains apex NS record (!1516)
 - fix on 32-bit systems with 64-bit time_t (!1510)
+- fix paths to knot-dns libs if exec_prefix != prefix (!1503)
 
 
 Knot Resolver 6.0.6 (2024-02-13)
