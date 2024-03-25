@@ -159,10 +159,13 @@ single ``kresctl`` command.
 
 .. option:: metrics
 
-    Reads aggregated metrics data in Prometheus format directly from the running
-    resolver.
+    Get aggregated metrics from the running resolver in JSON format (default) or optionally in Prometheus format.
 
-    Requires a connection to the management API.
+    Requires a connection to the management HTTP API.
+
+    .. option:: --prometheus
+
+        Get metrics in Prometheus format if supported in the resolver.
 
     .. option:: [file]
 
@@ -171,7 +174,8 @@ single ``kresctl`` command.
 
     .. code-block:: bash
 
-        $ kresctl metrics ./metrics/data.txt
+        $ kresctl metrics ./kres-metrics.json
+        $ kresctl metrics --prometheus
 
 .. option:: cache clear
 
