@@ -5,6 +5,8 @@ Improvements
 ------------
 - manager: clear the cache via management HTTP API (#876,!1491)
 - docs: documentation is now separated into user and developer parts (!1514)
+- manager: export metrics to JSON format (default) via management HTTP API ()
+  * export metrics to Prometheus format is optional feature
 
 Bugfixes
 --------
