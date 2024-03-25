@@ -4,6 +4,8 @@ Knot Resolver 6.0.8 (2024-0m-dd)
 Improvements
 ------------
 - TLS (DoT, DoH): respect crypto policy overrides in OS (!1526)
+- manager: export metrics to JSON format (default) via management HTTP API (!1527)
+  * export metrics to Prometheus format is optional feature
 
 
 Knot Resolver 6.0.7 (2024-03-27)
