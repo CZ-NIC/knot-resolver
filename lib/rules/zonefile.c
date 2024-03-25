@@ -144,6 +144,8 @@ static bool owner_relativize(zs_scanner_t *s)
 			apex = d->origin_soa = knot_dname_copy(s->r_owner, d->pool);
 	}
 	d->seen_record = true;
+	if (s->r_type == KNOT_RRTYPE_SOA)
+		return false; // otherwise we'd insert `. SOA` record
 
 	const int labels = knot_dname_in_bailiwick(s->r_owner, apex);
 	if (labels < 0) {
