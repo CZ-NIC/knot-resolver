@@ -118,29 +118,32 @@ static bool owner_relativize(zs_scanner_t *s)
 	if (!d->c->is_rpz)
 		return true;
 
+	// $ORIGIN as fallback if SOA is missing
+	const knot_dname_t *apex = d->origin_soa;
+	if (!apex)
+		apex = s->zone_origin;
+
 	// SOA determines the zone apex, but lots of error/warn cases
 	if (s->r_type == KNOT_RRTYPE_SOA) {
-		if (d->seen_record && !knot_dname_is_equal(s->zone_origin, s->r_owner)) {
+		if (d->seen_record && !knot_dname_is_equal(apex, s->r_owner)) {
 			// We most likely inserted some rules wrong already, so abort.
 			kr_log_error(RULES,
 				"SOA encountered late, with unexpected owner; aborting\n");
 			s->state = ZS_STATE_STOP;
 			return false;
 		}
-		if (!d->warned_soa && (d->seen_record || d->origin_soa)) {
+		if (!d->warned_soa && d->origin_soa) {
+			d->warned_soa = true;
+			kr_log_warning(RULES, "ignoring repeated SOA record in a RPZ\n");
+		} else if (!d->warned_soa && d->seen_record) {
 			d->warned_soa = true;
 			kr_log_warning(RULES,
 				"SOA should come as the first record in a RPZ\n");
 		}
 		if (!d->origin_soa) // sticking with the first encountered SOA
-			d->origin_soa = knot_dname_copy(s->r_owner, d->pool);
+			apex = d->origin_soa = knot_dname_copy(s->r_owner, d->pool);
 	}
 	d->seen_record = true;
-
-	// $ORIGIN as fallback if SOA is missing
-	const knot_dname_t *apex = d->origin_soa;
-	if (!apex)
-		apex = s->zone_origin;
 
 	const int labels = knot_dname_in_bailiwick(s->r_owner, apex);
 	if (labels < 0) {
