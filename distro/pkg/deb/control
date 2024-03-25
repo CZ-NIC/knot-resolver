@@ -37,10 +37,11 @@ Depends:
  python3-aiohttp,
  python3-jinja2,
  python3-yaml,
- python3-prometheus-client,
  supervisor,
  ${misc:Depends},
  ${python3:Depends},
+Recommends:
+ python3-prometheus-client,
 Section: python
 Description: caching, DNSSEC-validating DNS resolver - config manager
  Knot Resolver is a caching full resolver implementation written in C and
