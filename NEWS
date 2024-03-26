@@ -6,7 +6,7 @@ Improvements
 - manager: clear the cache via management HTTP API (#876,!1491)
 - docs: documentation is now separated into user and developer parts (!1514)
 - daemon: ignore UDP requests from ports < 1024 (!1507)
-- manager: increase startup timeout for processes (!1518)
+- manager: increase startup timeout for processes (!1518, !1520)
 - local-data: increase default DB size to 2G on 64-bit platforms (!1518)
 
 Bugfixes

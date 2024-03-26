@@ -8,7 +8,7 @@ Wants=nss-lookup.target
 
 [Service]
 Type=notify
-TimeoutStartSec=10s
+TimeoutStartSec=600s
 ExecStart=@bin_dir@/knot-resolver --config=@etc_dir@/config.yaml
 Environment=KRES_LOGGING_TARGET=syslog
 ExecReload=@bin_dir@/kresctl --config=@etc_dir@/config.yaml reload
