@@ -1,3 +1,18 @@
+/*  Copyright (C) 2024 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 
 #include <math.h>
 
@@ -12,11 +27,13 @@ struct decay_config {
 	uint32_t mult_cache[32];
 };
 
-static inline void decay_initialize(struct decay_config *decay, kru_price_t max_decay) {
+static inline void decay_initialize(struct decay_config *decay, kru_price_t max_decay)
+{
 	decay->shift_bits = log2(KRU_LIMIT - 1) - log2(KRU_LIMIT - 1 - max_decay);
 	decay->max_ticks = 18 / decay->shift_bits;
 
-	for (size_t ticks = 0; ticks < sizeof(decay->mult_cache) / sizeof(*decay->mult_cache); ticks++) {
+	decay->mult_cache[0] = 0;  // not used
+	for (size_t ticks = 1; ticks < sizeof(decay->mult_cache) / sizeof(*decay->mult_cache); ticks++) {
 		decay->mult_cache[ticks] = exp2(32 - decay->shift_bits * ticks) + 0.5;
 	}
 }

@@ -1,3 +1,18 @@
+/*  Copyright (C) 2024 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 
 #pragma once
 
@@ -12,7 +27,6 @@
 	#define ALIGNED_CPU_CACHE
 	#define ALIGNED(_bytes)
 #endif
-
 
 // An unsigned integral type used for prices, blocking occurs when sum of prices overflows.
 // Greater than 16-bit type enables randomized fractional incrementing as the internal counters are still 16-bit.
@@ -59,7 +73,8 @@ struct kru_api {
 
 	/// Multiple queries based on different prefixes of a single key.
 	/// Returns a prefix (value in prefixes) on which the key is blocked, or zero if all queries passed.
-	/// Updates KRU only if no query is blocked.
+	/// Updates KRU only if no query is blocked, unless a race condition occurs --
+	/// in such a case all longer prefixes might have been updated.
 	/// The key of i-th query consists of prefixes[i] bits of key, prefixes[i], and namespace.
 	uint8_t (*limited_multi_prefix_or)(struct kru *kru, uint32_t time_now,
 			uint8_t namespace, uint8_t key[static 16], uint8_t *prefixes, kru_price_t *prices, size_t queries_cnt);

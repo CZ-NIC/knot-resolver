@@ -1,5 +1,20 @@
-/** @file
+/*  Copyright (C) 2024 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
 
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+/*
 KRU estimates recently pricey inputs
 
 Authors of the simple agorithm (without aging, multi-choice, etc.):
@@ -16,7 +31,6 @@ To give more weight to recent usage, we use aging via exponential decay (simple 
 That has applications for garbage collection of cache and various limiting scenario
 (excessive rate, traffic, CPU, maybe RAM).
 
-
 ### Choosing parameters
 
 Size (`loads_bits` = log2 length):
@@ -25,6 +39,7 @@ Size (`loads_bits` = log2 length):
  - The length should probably be at least something like the square of the number of utilized CPUs.
    But this most likely won't be a limiting factor.
 */
+
 #include <stdlib.h>
 #include <assert.h>
 #include <stdatomic.h>
@@ -55,7 +70,6 @@ inline static uint64_t rand_bits(unsigned int bits) {
 
 #include "./kru-decay.inc.c"
 
-
 #include "libdnssec/error.h"
 #include "libdnssec/random.h"
 typedef uint64_t hash_t;
@@ -76,7 +90,6 @@ typedef uint64_t hash_t;
 	#include <immintrin.h>
 	#include <x86intrin.h>
 #endif
-
 
 struct kru {
 #if USE_AES
@@ -122,7 +135,6 @@ static size_t kru_get_size(int capacity_log)
 	return offsetof(struct kru, load_cls)
 		    + sizeof(struct load_cl) * TABLE_COUNT * (1 << loads_bits);
 }
-
 
 static bool kru_initialize(struct kru *kru, int capacity_log, kru_price_t max_decay)
 {
@@ -227,8 +239,8 @@ static inline void kru_limited_prefetch_prefix(struct kru *kru, uint32_t time_no
 
 			// Prefix mask (1...0) -> little endian byte array (0x00 ... 0x00 0xFF ... 0xFF).
 			__m128i mask = _mm_set_epi64x(
-					(p < 64 ? (p == 0 ? 0 : -1ll << (64 - p)) : -1ll),  // higher 64 bits (1...) -> second half of byte array (... 0xFF)
-					(p <= 64 ? 0 : -1ll << (128 - p)));                 // lower  64 bits (...0) ->  first half of byte array (0x00 ...)
+					(p < 64 ? (p == 0 ? 0 : (uint64_t)-1 << (64 - p)) : (uint64_t)-1),  // higher 64 bits (1...) -> second half of byte array (... 0xFF)
+					(p <= 64 ? 0 : (uint64_t)-1 << (128 - p)));                 // lower  64 bits (...0) ->  first half of byte array (0x00 ...)
 
 			// Swap mask endianness (0x11 ... 0x11 0x00 ... 0x00).
 			mask = _mm_shuffle_epi8(mask,
@@ -284,7 +296,7 @@ static inline bool kru_limited_fetch(struct kru *kru, struct query_ctx *ctx)
 		ctx->price16 = price >> fract_bits;
 		ctx->limit16 = -ctx->price16;
 
-		if (fract_bits && fract) {
+		if ((fract_bits > 0) && (fract > 0)) {
 			ctx->price16 += (rand_bits(fract_bits) < fract);
 			ctx->limit16--;
 		}
@@ -310,7 +322,7 @@ static inline bool kru_limited_fetch(struct kru *kru, struct query_ctx *ctx)
 	for (int li = 0; li < TABLE_COUNT; ++li) {
 		static_assert(LOADS_LEN == 15 && sizeof(ctx->l[li]->ids[0]) == 2, "");
 		// unfortunately we can't use aligned load here
-		__m256i ids_v = _mm256_loadu_si256((__m256i *)(ctx->l[li]->ids - 1));
+		__m256i ids_v = _mm256_loadu_si256((__m256i *)((uint16_t *)ctx->l[li]->ids - 1));
 		__m256i match_mask = _mm256_cmpeq_epi16(ids_v, id_v);
 		if (_mm256_testz_si256(match_mask, match_mask))
 			continue; // no match of id
@@ -353,7 +365,7 @@ static inline bool kru_limited_update(struct kru *kru, struct query_ctx *ctx)
 			static_assert((offsetof(struct load_cl, loads) - 2) % 16 == 0,
 					"bad alignment of struct load_cl::loads");
 			static_assert(LOADS_LEN == 15 && sizeof(ctx->l[li]->loads[0]) == 2, "");
-			__m128i *l_v = (__m128i *)(ctx->l[li]->loads - 1);
+			__m128i *l_v = (__m128i *)((uint16_t *)ctx->l[li]->loads - 1);
 			__m128i l0 = _mm_load_si128(l_v);
 			__m128i l1 = _mm_load_si128(l_v + 1);
 			// We want to avoid the first item in l0, so we maximize it.
@@ -445,7 +457,8 @@ static bool kru_limited_multi_or_nobreak(struct kru *kru, uint32_t time_now, uin
 	return ret;
 }
 
-static uint8_t kru_limited_multi_prefix_or(struct kru *kru, uint32_t time_now, uint8_t namespace, uint8_t key[static 16], uint8_t *prefixes, kru_price_t *prices, size_t queries_cnt)
+static uint8_t kru_limited_multi_prefix_or(struct kru *kru, uint32_t time_now, uint8_t namespace,
+                                           uint8_t key[static 16], uint8_t *prefixes, kru_price_t *prices, size_t queries_cnt)
 {
 	struct query_ctx ctx[queries_cnt];
 
@@ -458,13 +471,12 @@ static uint8_t kru_limited_multi_prefix_or(struct kru *kru, uint32_t time_now, u
 			return prefixes[i];
 	}
 
-	bool prefix = 0;
-	for (size_t i = 0; i < queries_cnt; i++) {
-		bool ret = kru_limited_update(kru, ctx + i);
-		prefix = (ret ? prefixes[i] : prefix);
+	for (int i = queries_cnt - 1; i >= 0; i--) {
+		if (kru_limited_update(kru, ctx + i))
+			return prefixes[i];
 	}
 
-	return prefix;
+	return 0;
 }
 
 /// Update limiting and return true iff it hit the limit instead.
