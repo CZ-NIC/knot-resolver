@@ -20,6 +20,7 @@ struct rrl {
 	size_t capacity;
 	uint32_t instant_limit;
 	uint32_t rate_limit;
+	bool using_avx2;
 	kru_price_t v4_prices[RRL_V4_PREFIXES_CNT];
 	kru_price_t v6_prices[RRL_V6_PREFIXES_CNT];
 	uint8_t kru[] ALIGNED(64);
@@ -51,6 +52,8 @@ void kr_rrl_init(char *mmap_path, size_t capacity, uint32_t instant_limit, uint3
 		the_rrl->capacity = capacity;
 		the_rrl->instant_limit = instant_limit;
 		the_rrl->rate_limit = rate_limit;
+		the_rrl->using_avx2 = (KRU.initialize != KRU_GENERIC.initialize);
+		kr_require(!the_rrl->using_avx2 || (KRU.initialize == KRU_AVX2.initialize));
 
 		const kru_price_t base_price = KRU_LIMIT / instant_limit;
 		const kru_price_t max_decay = rate_limit > 1000ll * instant_limit ? base_price :
@@ -70,7 +73,7 @@ void kr_rrl_init(char *mmap_path, size_t capacity, uint32_t instant_limit, uint3
 		fl.l_type = F_RDLCK;
 		succ = (fcntl(fd, F_SETLK, &fl) != -1);
 		kr_require(succ);
-		kr_log_info(SYSTEM, "RRL initialized.\n");
+		kr_log_info(SYSTEM, "RRL initialized (%s).\n", (the_rrl->using_avx2 ? "AVX2" : "generic"));
 
 		return;
 	};
@@ -87,6 +90,7 @@ void kr_rrl_init(char *mmap_path, size_t capacity, uint32_t instant_limit, uint3
 		kr_require(the_rrl != MAP_FAILED);
 		kr_require((the_rrl->capacity == capacity) && (the_rrl->instant_limit == instant_limit) &&
 				(the_rrl->rate_limit == rate_limit));
+		kr_require(KRU.initialize == (the_rrl->using_avx2 ? KRU_AVX2.initialize : KRU_GENERIC.initialize));
 		kr_log_info(SYSTEM, "Using existing RRL data.\n");
 
 		return;
