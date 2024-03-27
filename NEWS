@@ -63,7 +63,7 @@ not generally recommended for production use.
 
 6.0 contains biggest changes in the history of Knot Resolver releases.
 You will have to rewrite your configuration.  See documentation, in particular:
-https://knot.pages.nic.cz/knot-resolver/upgrading-to-6.html
+https://www.knot-resolver.cz/documentation/latest/upgrading-to-6.html
 
 
 
