@@ -3,7 +3,9 @@ Knot Resolver 6.0.7 (2024-0m-dd)
 
 Improvements
 ------------
-- manager: clear the cache via management HTTP API (#876,!1491)
+- manager: clear the cache via management HTTP API (#876, !1491)
+- manager: added support for Python 3.12 and removed for 3.7 (!1502)
+- manager: use build-time install prefix to execute `kresd` instead of PATH (!1511)
 - docs: documentation is now separated into user and developer parts (!1514)
 - daemon: ignore UDP requests from ports < 1024 (!1507)
 - manager: increase startup timeout for processes (!1518, !1520)
@@ -18,6 +20,8 @@ Bugfixes
 - avoid RPZ overriding the root SOA (!1521)
 - fix on 32-bit systems with 64-bit time_t (!1510)
 - fix paths to knot-dns libs if exec_prefix != prefix (!1503)
+- manager: add missing early check that neither a custom port nor TLS is set for
+  authoritative server forwarding (#902, !1505)
 
 
 Knot Resolver 6.0.6 (2024-02-13)
@@ -59,7 +63,7 @@ not generally recommended for production use.
 
 6.0 contains biggest changes in the history of Knot Resolver releases.
 You will have to rewrite your configuration.  See documentation, in particular:
-https://knot.pages.nic.cz/knot-resolver/upgrading-to-6.html
+https://www.knot-resolver.cz/documentation/latest/upgrading-to-6.html
 
 
 
