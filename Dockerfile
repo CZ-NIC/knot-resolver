@@ -30,7 +30,7 @@ ENV OBS_REPO=knot-resolver-latest
 ENV DISTROTEST_REPO=Debian_11
 
 RUN apt-get update -qq && \
-	apt-get update -qq
+	apt-get upgrade -qq
 
 COPY --from=build /source/pkg/pkgs/debian-11 /pkg
 
