@@ -542,6 +542,10 @@ obs:trigger: &obs_trigger
     - condor
   allow_failure: false  # required to make when: manual action blocking
   script:
+    - python3 -m venv ./venv
+    - source ./venv/bin/activate
+    - pip install --upgrade pip
+    - pip install apkg
     - scripts/make-obs.sh
     - echo y | scripts/build-in-obs.sh $OBS_REPO
 
