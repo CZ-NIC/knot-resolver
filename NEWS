@@ -14,6 +14,8 @@ Bugfixes
 - fix listening by interface name containing dashes (#900, !1500)
 - fix kresctl http request timeout (!1505)
 - fix RPZ if it contains apex NS record (!1516)
+- fix RPZ if SOA is repated, as usual in AXFR output (!1521)
+- avoid RPZ overriding the root SOA (!1521)
 - fix on 32-bit systems with 64-bit time_t (!1510)
 - fix paths to knot-dns libs if exec_prefix != prefix (!1503)
 
