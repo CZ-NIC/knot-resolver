@@ -10,6 +10,7 @@
 #include "daemon/network.h"
 #include "daemon/udp_queue.h"
 #include "daemon/worker.h"
+#include "daemon/rrl/api.h"
 
 #ifdef ENABLE_DOH2
 #include "daemon/http.h"
@@ -647,6 +648,7 @@ int main(int argc, char **argv)
 cleanup:/* Cleanup. */
 	network_unregister();
 
+	kr_rrl_deinit();
 	kr_resolver_deinit();
 	worker_deinit();
 	engine_deinit();

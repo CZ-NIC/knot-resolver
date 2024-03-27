@@ -1,0 +1,12 @@
+{% from 'macros/common_macros.lua.j2' import boolean %}
+
+modules = { 'hints > iterate' }
+
+{% if cfg.rate_limiting.rate_limit -%}
+local ffi = require('ffi')
+ffi.C.kr_rrl_init(
+	'{{ cfg.rundir }}/rrl',
+	{{ cfg.rate_limiting.capacity }},
+	{{ cfg.rate_limiting.instant_limit }},
+	{{ cfg.rate_limiting.rate_limit }})
+{%- endif %}

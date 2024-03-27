@@ -21,6 +21,7 @@ from knot_resolver_manager.datamodel.templates import MAIN_TEMPLATE
 from knot_resolver_manager.datamodel.types import Dir, EscapedStr, IntPositive
 from knot_resolver_manager.datamodel.view_schema import ViewSchema
 from knot_resolver_manager.datamodel.webmgmt_schema import WebmgmtSchema
+from knot_resolver_manager.datamodel.rate_limiting_schema import RateLimitingSchema
 from knot_resolver_manager.utils.modeling import ConfigSchema
 from knot_resolver_manager.utils.modeling.base_schema import lazy_default
 
@@ -74,6 +75,7 @@ class KresConfig(ConfigSchema):
         logging: Logging and debugging configuration.
         monitoring: Metrics exposisition configuration (Prometheus, Graphite)
         lua: Custom Lua configuration.
+        rate_limiting: ... TODO
         """
 
         version: int = 1
@@ -94,6 +96,7 @@ class KresConfig(ConfigSchema):
         dns64: Union[bool, Dns64Schema] = False
         logging: LoggingSchema = LoggingSchema()
         monitoring: MonitoringSchema = MonitoringSchema()
+        rate_limiting: Optional[RateLimitingSchema] = None
         lua: LuaSchema = LuaSchema()
 
     _LAYER = Raw
@@ -115,6 +118,7 @@ class KresConfig(ConfigSchema):
     dns64: Union[Literal[False], Dns64Schema]
     logging: LoggingSchema
     monitoring: MonitoringSchema
+    rate_limiting: Optional[RateLimitingSchema]
     lua: LuaSchema
 
     def _hostname(self, obj: Raw) -> Any:

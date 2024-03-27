@@ -26,10 +26,16 @@ struct rrl {
 	uint8_t kru[] ALIGNED(64);
 };
 struct rrl *the_rrl = NULL;
+int the_rrl_fd = -1;
+char *the_rrl_mmap_file = NULL;
 
-void kr_rrl_init(char *mmap_path, size_t capacity, uint32_t instant_limit, uint32_t rate_limit) {
-	int fd = open(mmap_path, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+void kr_rrl_init(const char *mmap_file, size_t capacity, uint32_t instant_limit, uint32_t rate_limit)
+{
+	int fd = the_rrl_fd = open(mmap_file, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
 	kr_require(fd != -1);
+
+	the_rrl_mmap_file = malloc(strlen(mmap_file) + 1);
+	strcpy(the_rrl_mmap_file, mmap_file);
 
 	size_t capacity_log = 0;
 	for (size_t c = capacity - 1; c > 0; c >>= 1) capacity_log++;
@@ -99,11 +105,37 @@ void kr_rrl_init(char *mmap_path, size_t capacity, uint32_t instant_limit, uint3
 	kr_require(false);  // we can get here for example if signal interrupt is received during fcntl
 }
 
+void kr_rrl_deinit(void)
+{
+	if (the_rrl == NULL) return;
+	int fd = the_rrl_fd;
+
+	struct flock fl = {
+		.l_type   = F_UNLCK,
+		.l_whence = SEEK_SET,
+		.l_start  = 0,
+		.l_len    = 0 };
+	fcntl(fd, F_SETLK, &fl);  // unlock
+
+	fl.l_type = F_WRLCK;
+	if (fcntl(fd, F_SETLK, &fl) != -1) {
+
+		/* If the RRL configuration is updated at runtime, manager should remove the file (TODO)
+		 * and keep new processes create it again while old processes are still using the old data.
+		 * Here we keep zero-size file not to accidentally remove the new file instead of the old one.
+		 * Still truncating the file will cause currently starting processes waiting for read lock on the same file to fail,
+		 * but this is not expected to happen. */
+		ftruncate(fd, 0);
+
+		fl.l_type = F_UNLCK;
+		fcntl(fd, F_SETLK, &fl);
+	}
+
+	the_rrl = NULL;
+}
+
 bool kr_rrl_request_begin(struct kr_request *req)
 {
-	if (!the_rrl) {
-		kr_rrl_init("/tmp/kresd-kru", 524288, 20, 5);  // TODO call from elsewhere
-	}
 	if (!req->qsource.addr)
 		return false;  // don't consider internal requests
 	bool limited = false;
