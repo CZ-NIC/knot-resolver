@@ -120,11 +120,11 @@ void kr_rrl_deinit(void)
 	fl.l_type = F_WRLCK;
 	if (fcntl(fd, F_SETLK, &fl) != -1) {
 
-		/* If the RRL configuration is updated at runtime, manager should remove the file (TODO)
-		 * and keep new processes create it again while old processes are still using the old data.
+		/* If the RRL configuration is updated at runtime, manager removes the file
+		 * and the new processes create it again while old processes are still using the old data.
 		 * Here we keep zero-size file not to accidentally remove the new file instead of the old one.
 		 * Still truncating the file will cause currently starting processes waiting for read lock on the same file to fail,
-		 * but this is not expected to happen. */
+		 * but such processes are not expected to exist. */
 		ftruncate(fd, 0);
 
 		fl.l_type = F_UNLCK;
