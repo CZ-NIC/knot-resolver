@@ -1,6 +1,5 @@
-#from typing_extensions import Literal
-
 from knot_resolver_manager.utils.modeling import ConfigSchema
+
 
 class RateLimitingSchema(ConfigSchema):
     """
@@ -17,10 +16,10 @@ class RateLimitingSchema(ConfigSchema):
     instant_limit: int = 50
 
     def _validate(self) -> None:
-        max_instant_limit = int(2 ** 32 / 768 - 1);
+        max_instant_limit = int(2**32 / 768 - 1)
         if not 1 <= self.instant_limit <= max_instant_limit:
             raise ValueError(f"'instant-limit' should be in range 1..{max_instant_limit}")
         if not 1 <= self.rate_limit <= 1000 * self.instant_limit:
-            raise ValueError(f"'rate-limit' should be in range 1..(1000 * instant-limit)")
-        if not 0 < self.capacity:
-            raise ValueError(f"'capacity' should be positive")
+            raise ValueError("'rate-limit' should be in range 1..(1000 * instant-limit)")
+        if self.capacity <= 0:
+            raise ValueError("'capacity' should be positive")
