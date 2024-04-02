@@ -2,6 +2,7 @@ import asyncio
 import logging
 import sys
 import time
+import os
 from subprocess import SubprocessError
 from typing import Callable, List, Optional
 
@@ -166,6 +167,12 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
 
     async def validate_config(self, _old: KresConfig, new: KresConfig) -> Result[NoneType, str]:
         async with self._manager_lock:
+            if _old.rate_limiting != new.rate_limiting:
+                logger.debug("Unlinking shared RRL memory")
+                try:
+                    os.unlink(str(_old.rundir) + "/rrl")
+                except FileNotFoundError:
+                    pass
             logger.debug("Testing the new config with a canary process")
             try:
                 # technically, this has side effects of leaving a new process runnning
