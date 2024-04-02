@@ -44,7 +44,7 @@ optdepends=(
     'lua51-http: http and prefill modules, trust_anchors bootstrap'
     'lua51-psl: policy.slice_randomize_psl() function'
 )
-backup=('etc/knot-resolver/kresd.conf')
+backup=('etc/knot-resolver/config.yaml')
 options=(debug strip)
 source=("knot-resolver-${pkgver}.tar.xz")
 sha256sums=('SKIP')
