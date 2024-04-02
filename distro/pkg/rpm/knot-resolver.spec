@@ -345,7 +345,7 @@ getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysc
 
 %files -n knot-resolver-manager
 %{python3_sitearch}/knot_resolver_manager*
-%{_sysconfdir}/knot-resolver/config.yaml
+%config(noreplace) %{_sysconfdir}/knot-resolver/config.yaml
 %{_unitdir}/knot-resolver.service
 %{_bindir}/kresctl
 %{_bindir}/knot-resolver
