@@ -1,3 +1,11 @@
+Knot Resolver 6.0.8 (2024-0m-dd)
+================================
+
+Improvements
+------------
+- TLS (DoT, DoH): respect crypto policy overrides in OS (!1526)
+
+
 Knot Resolver 6.0.7 (2024-03-27)
 ================================
 
