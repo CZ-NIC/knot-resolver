@@ -599,6 +599,40 @@ struct sockaddr * kr_straddr_socket(const char *addr, int port, knot_mm_t *pool)
 	}
 }
 
+struct sockaddr * kr_straddr_socket_set(struct sockaddr *sa, const char *addr, int port)
+{
+	switch (kr_straddr_family(addr)) {
+	case AF_INET: {
+		struct sockaddr_in *res = (struct sockaddr_in *) sa;
+		if (uv_ip4_addr(addr, port, res) >= 0) {
+			return sa;
+		} else {
+			return NULL;
+		}
+	}
+	case AF_INET6: {
+		struct sockaddr_in6 *res = (struct sockaddr_in6 *) sa;
+		if (uv_ip6_addr(addr, port, res) >= 0) {
+			return sa;
+		} else {
+			return NULL;
+		}
+	}
+	case AF_UNIX: {
+		struct sockaddr_un *res = (struct sockaddr_un *) sa;
+		const size_t alen = strlen(addr) + 1;
+		if (alen > sizeof(res->sun_path)) {
+			return NULL;
+		}
+		res->sun_family = AF_UNIX;
+		memcpy(res->sun_path, addr, alen);
+		return sa;
+	}
+	default:
+		return NULL;
+	}
+}
+
 int kr_straddr_subnet(void *dst, const char *addr)
 {
 	if (!dst || !addr) {

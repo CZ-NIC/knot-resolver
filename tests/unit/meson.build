@@ -20,11 +20,15 @@ foreach unit_test : unit_tests
     unit_test[0],
     unit_test[1],
     dependencies: [
+      kresd_deps,
       contrib_dep,
       libkres_dep,
       libknot,
       cmocka,
       lmdb,
+      libdnssec,
+      # https://mesonbuild.com/howtox.html#add-math-library-lm-portably
+      (meson.get_compiler('c').find_library('m', required : false)),
     ],
   )
   test(
