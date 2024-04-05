@@ -59,6 +59,20 @@ systemd_unit_dir = prefix / 'lib' / 'systemd' / 'system'
 systemd_tmpfiles_dir = prefix / 'lib' / 'tmpfiles.d'
 systemd_sysusers_dir = prefix / 'lib' / 'sysusers.d'
 
+## RPath
+# When installing from sources into a non-standard prefix and the library is
+# shared/dynamic, we need to set the executables' RPATH so that they can find
+# `libkresd`, otherwise running them will fail with dynamic linkage errors
+auto_prefixes = ['/', '/usr', '/usr/local']
+rpath_opt = get_option('install_rpath')
+if (get_option('default_library') == 'static' or
+    rpath_opt == 'disabled' or
+    (rpath_opt == 'auto' and prefix in auto_prefixes))
+  rpath = ''
+else
+  rpath = prefix / get_option('libdir')
+endif
+
 ## Trust anchors
 managed_ta = get_option('managed_ta') == 'enabled'
 keyfile_default = etc_dir / get_option('keyfile_default')

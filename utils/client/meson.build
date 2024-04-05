@@ -33,5 +33,6 @@ if build_client
     ],
     install: true,
     install_dir: get_option('sbindir'),
+    install_rpath: rpath,
   )
 endif
