@@ -21,6 +21,7 @@ if build_utils
     ],
     install: true,
     install_dir: get_option('sbindir'),
+    install_rpath: rpath,
   )
 
 integr_tests += [
