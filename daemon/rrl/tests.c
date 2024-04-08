@@ -120,7 +120,7 @@ static void *rrl_runnable(void *arg)
 	char addr_str[40];
 	struct sockaddr_storage addr;
 
-	uint8_t wire[KNOT_WIRE_MIN_PKTSIZE] = {};
+	uint8_t wire[KNOT_WIRE_MIN_PKTSIZE] = { 0 };
 	knot_pkt_t answer = { .wire = wire };
 	struct kr_request req = {
 		.qsource.addr = (struct sockaddr *) &addr,
