@@ -16,7 +16,7 @@
 #include "lib/defines.h"
 #include "lib/dnssec/nsec.h"
 #include "lib/utils.h"
-#include "resolve.h"
+#include "lib/resolve.h"
 
 int kr_nsec_children_in_zone_check(const uint8_t *bm, uint16_t bm_size)
 {
