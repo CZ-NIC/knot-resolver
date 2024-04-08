@@ -3,6 +3,7 @@
 
 #include "daemon/rrl/api.h"
 #include "daemon/rrl/kru.h"
+#include "lib/utils.h"
 #include "lib/resolve.h"
 
 

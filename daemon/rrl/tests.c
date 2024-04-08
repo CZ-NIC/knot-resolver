@@ -26,11 +26,11 @@
 #include "contrib/openbsd/siphash.h"
 #include "lib/resolve.h"
 
-#include "time.h"
-int fakeclock_gettime(clockid_t clockid, struct timespec *tp);
-#define clock_gettime fakeclock_gettime
+#include "lib/utils.h"
+uint64_t fakeclock_now(void);
+#define kr_now fakeclock_now
 #include "daemon/rrl/api.c"
-#undef clock_gettime
+#undef kr_now
 
 #define RRL_TABLE_SIZE     (1 << 20)
 #define RRL_INSTANT_LIMIT  (1 << 8)
@@ -79,22 +79,17 @@ struct kru_avx2 {
 	// ...
 };
 
-/* Override time in RRL module. */
-struct timespec fakeclock_start;
-uint32_t fakeclock_tick = 0;
+/* Override time. */
+uint64_t fakeclock_tick = 0;
 
 void fakeclock_init(void)
 {
-	clock_gettime(CLOCK_MONOTONIC_COARSE, &fakeclock_start);
-	fakeclock_tick = 0;
+	fakeclock_tick = kr_now();
 }
 
-int fakeclock_gettime(clockid_t clockid, struct timespec *tp)
+uint64_t fakeclock_now(void)
 {
-	uint32_t inc_msec = fakeclock_tick;
-	tp->tv_sec = fakeclock_start.tv_sec + (fakeclock_start.tv_nsec / 1000000 + inc_msec) / 1000;
-	tp->tv_nsec = (fakeclock_start.tv_nsec + (inc_msec % 1000) * 1000000) % 1000000000;
-	return 0;
+	return fakeclock_tick;
 }
 
 struct host {
@@ -124,7 +119,9 @@ static void *rrl_runnable(void *arg)
 
 	char addr_str[40];
 	struct sockaddr_storage addr;
-	knot_pkt_t answer = {};
+
+	uint8_t wire[KNOT_WIRE_MIN_PKTSIZE] = {};
+	knot_pkt_t answer = { .wire = wire };
 	struct kr_request req = {
 		.qsource.addr = (struct sockaddr *) &addr,
 		.answer = &answer
@@ -187,12 +184,22 @@ static void *rrl_runnable(void *arg)
 
 char *impl_name = "";
 
-void count_test(char *desc, int expected_passing, double margin_fract,
-		int addr_family, char *addr_format, uint32_t min_value, uint32_t max_value)
+// defining count_test as macro to let it print usable line number on failure
+#define assert_int_between(VAL, MIN, MAX, ...) \
+	if (((MIN) > (VAL)) || ((VAL) > (MAX))) { \
+		fprintf(stderr, __VA_ARGS__); fprintf(stderr, ": %d <= %d <= %d, ", MIN, VAL, MAX); \
+		assert_true(false); }
+#define count_test(DESC, EXPECTED_PASSING, MARGIN_FRACT, ...) { \
+	int _max_diff = (EXPECTED_PASSING) * (MARGIN_FRACT); \
+	int cnt = _count_test(EXPECTED_PASSING, __VA_ARGS__); \
+	assert_int_between(cnt, (EXPECTED_PASSING) - _max_diff, (EXPECTED_PASSING) + _max_diff, DESC); }
+
+uint32_t _count_test(int expected_passing, int addr_family, char *addr_format, uint32_t min_value, uint32_t max_value)
 {
 	uint32_t max_queries = expected_passing > 0 ? 2 * expected_passing : -expected_passing;
 	struct sockaddr_storage addr;
-	knot_pkt_t answer = {};
+	uint8_t wire[KNOT_WIRE_MIN_PKTSIZE] = { 0 };
+	knot_pkt_t answer = { .wire = wire };
 	struct kr_request req = {
 		.qsource.addr = (struct sockaddr *) &addr,
 		.answer = &answer
@@ -210,14 +217,7 @@ void count_test(char *desc, int expected_passing, double margin_fract,
 			break;
 		}
 	}
-
-	if (expected_passing < 0) expected_passing = -1;
-	if (margin_fract == 0) {
-		assert_int_equal(expected_passing, cnt);
-	} else {
-		int max_diff = expected_passing * margin_fract;
-		assert_true((expected_passing - max_diff <= cnt) && (cnt <= expected_passing + max_diff));
-	}
+	return cnt;
 }
 
 static void test_rrl(void **state)
@@ -369,7 +369,8 @@ static void test_rrl(void **state)
 		struct host * const h = stages[si].hosts;
 		uint32_t ticks = stages[si].last_tick - stages[si].first_tick + 1;
 		for (size_t i = 0; h[i].queries_per_tick; i++) {
-			assert_true(h[i].min_passed * ticks <= h[i].passed && h[i].passed <= h[i].max_passed * ticks);
+			assert_int_between(h[i].passed, ticks * h[i].min_passed, ticks * h[i].max_passed,
+				"parallel stage %d, addr %-25s", si, h[i].addr_format);
 		}
 	} while (stages[++si].first_tick);
 
