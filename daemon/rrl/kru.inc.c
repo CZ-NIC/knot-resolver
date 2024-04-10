@@ -70,6 +70,7 @@ inline static uint64_t rand_bits(unsigned int bits) {
 
 #include "./kru-decay.inc.c"
 
+#include "contrib/ucw/lib.h"
 #include "libdnssec/error.h"
 #include "libdnssec/random.h"
 typedef uint64_t hash_t;
@@ -167,6 +168,7 @@ struct query_ctx {
 	uint16_t price16, limit16;
 	uint16_t id;
 	uint16_t *load;
+	uint16_t final_load_value;  // set by kru_limited_update if not blocked
 };
 
 /// Phase 1/3 of a query -- hash, prefetch, ctx init. Based on one 16-byte key.
@@ -412,6 +414,8 @@ static inline bool kru_limited_update(struct kru *kru, struct query_ctx *ctx)
 		if (load_orig >= limit)
 			return true;
 	} while (!atomic_compare_exchange_weak_explicit(load_at, &load_orig, load_orig + price, memory_order_relaxed, memory_order_relaxed));
+
+	ctx->final_load_value = load_orig + price;
 	return false;
 }
 
@@ -458,7 +462,7 @@ static bool kru_limited_multi_or_nobreak(struct kru *kru, uint32_t time_now, uin
 }
 
 static uint8_t kru_limited_multi_prefix_or(struct kru *kru, uint32_t time_now, uint8_t namespace,
-                                           uint8_t key[static 16], uint8_t *prefixes, kru_price_t *prices, size_t queries_cnt)
+                                           uint8_t key[static 16], uint8_t *prefixes, kru_price_t *prices, size_t queries_cnt, uint16_t *max_load_out)
 {
 	struct query_ctx ctx[queries_cnt];
 
@@ -474,6 +478,12 @@ static uint8_t kru_limited_multi_prefix_or(struct kru *kru, uint32_t time_now, u
 	for (int i = queries_cnt - 1; i >= 0; i--) {
 		if (kru_limited_update(kru, ctx + i))
 			return prefixes[i];
+	}
+
+	if (max_load_out) {
+		for (size_t i = 0; i < queries_cnt; i++) {
+			*max_load_out = MAX(*max_load_out, ctx[i].final_load_value);
+		}
 	}
 
 	return 0;

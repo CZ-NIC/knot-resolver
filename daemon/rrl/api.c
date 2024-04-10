@@ -153,18 +153,19 @@ bool kr_rrl_request_begin(struct kr_request *req)
 	if (the_rrl) {
 		uint8_t key[16] ALIGNED(16) = {0, };
 		uint8_t limited_prefix;
+		// uint16_t max_final_load = 0;  // TODO use for query ordering and/or soft limit with TC=1
 		if (req->qsource.addr->sa_family == AF_INET6) {
 			struct sockaddr_in6 *ipv6 = (struct sockaddr_in6 *)req->qsource.addr;
 			memcpy(key, &ipv6->sin6_addr, 16);
 
 			limited_prefix = KRU.limited_multi_prefix_or((struct kru *)the_rrl->kru, kr_now(),
-					1, key, RRL_V6_PREFIXES, the_rrl->v6_prices, RRL_V6_PREFIXES_CNT);
+					1, key, RRL_V6_PREFIXES, the_rrl->v6_prices, RRL_V6_PREFIXES_CNT, /* &max_final_load */ NULL);
 		} else {
 			struct sockaddr_in *ipv4 = (struct sockaddr_in *)req->qsource.addr;
 			memcpy(key, &ipv4->sin_addr, 4);  // TODO append port?
 
 			limited_prefix = KRU.limited_multi_prefix_or((struct kru *)the_rrl->kru, kr_now(),
-					0, key, RRL_V4_PREFIXES, the_rrl->v4_prices, RRL_V4_PREFIXES_CNT);
+					0, key, RRL_V4_PREFIXES, the_rrl->v4_prices, RRL_V4_PREFIXES_CNT, /* &max_final_load */ NULL);
 		}
 		limited = limited_prefix;
 	}
