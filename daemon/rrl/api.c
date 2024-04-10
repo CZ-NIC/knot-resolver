@@ -33,7 +33,10 @@ char *the_rrl_mmap_file = NULL;
 void kr_rrl_init(const char *mmap_file, size_t capacity, uint32_t instant_limit, uint32_t rate_limit)
 {
 	int fd = the_rrl_fd = open(mmap_file, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
-	kr_require(fd != -1);
+	if (fd == -1) {
+		kr_log_crit(SYSTEM, "Cannot open file %s containing shared rate-limiting data.", mmap_file);
+		abort();
+	}
 
 	the_rrl_mmap_file = malloc(strlen(mmap_file) + 1);
 	strcpy(the_rrl_mmap_file, mmap_file);
@@ -50,9 +53,12 @@ void kr_rrl_init(const char *mmap_file, size_t capacity, uint32_t instant_limit,
 		.l_start  = 0,
 		.l_len    = 0 };
 	if (fcntl(fd, F_SETLK, &fl) != -1) {
-		kr_log_info(SYSTEM, "Initializing RRL...\n");
+		kr_log_info(SYSTEM, "Initializing rate-limiting...\n");
 		ftruncate(fd, 0);
-		ftruncate(fd, size);  // get all zeroed
+		if (ftruncate(fd, size) == -1) {  // get all zeroed
+			kr_log_crit(SYSTEM, "Cannot increase size of file %s containing shared rate-limiting data.", mmap_file);
+			abort();
+		}
 		the_rrl = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 		kr_require(the_rrl != MAP_FAILED);
 
@@ -80,10 +86,10 @@ void kr_rrl_init(const char *mmap_file, size_t capacity, uint32_t instant_limit,
 		fl.l_type = F_RDLCK;
 		succ = (fcntl(fd, F_SETLK, &fl) != -1);
 		kr_require(succ);
-		kr_log_info(SYSTEM, "RRL initialized (%s).\n", (the_rrl->using_avx2 ? "AVX2" : "generic"));
+		kr_log_info(SYSTEM, "Rate-limiting initialized (%s).\n", (the_rrl->using_avx2 ? "AVX2" : "generic"));
 
 		return;
-	};
+	}
 
 	// wait for acquiring shared lock; check KRU parameters on success
 	fl.l_type = F_RDLCK;
@@ -92,18 +98,22 @@ void kr_rrl_init(const char *mmap_file, size_t capacity, uint32_t instant_limit,
 		struct stat s;
 		bool succ = (fstat(fd, &s) == 0);
 		kr_require(succ);
-		kr_require(s.st_size == size);
+		if (s.st_size != size) goto check_fail;
 		the_rrl = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 		kr_require(the_rrl != MAP_FAILED);
-		kr_require((the_rrl->capacity == capacity) && (the_rrl->instant_limit == instant_limit) &&
-				(the_rrl->rate_limit == rate_limit));
-		kr_require(KRU.initialize == (the_rrl->using_avx2 ? KRU_AVX2.initialize : KRU_GENERIC.initialize));
+		if ((the_rrl->capacity != capacity) || (the_rrl->instant_limit != instant_limit) ||
+				(the_rrl->rate_limit != rate_limit)) goto check_fail;
+		if (KRU.initialize != (the_rrl->using_avx2 ? KRU_AVX2.initialize : KRU_GENERIC.initialize)) goto check_fail;
 		kr_log_info(SYSTEM, "Using existing RRL data.\n");
 
 		return;
 	}
 
 	kr_require(false);  // we can get here for example if signal interrupt is received during fcntl
+
+check_fail:
+	kr_log_crit(SYSTEM, "Another instance of kresd uses rate-limiting with different configuration, cannot share data in %s.", mmap_file);
+	abort();
 }
 
 void kr_rrl_deinit(void)
