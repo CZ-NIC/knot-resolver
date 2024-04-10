@@ -174,7 +174,8 @@ c_src_lint = files()
 # These lists are added to from subdir() and finally used in tests/*
 
 unit_tests = [
-  # [test_name, files(test)]
+  # [name, files(test)]
+  # [name, files(test), [extra_suites]]
 ]
 
 config_tests = [
