@@ -106,7 +106,7 @@ archive:
 build:
   <<: *build
   script:
-    - meson build_ci --default-library=static --prefix=$PREFIX -Dmalloc=disabled -Dwerror=true -Dextra_tests=enabled
+    - meson build_ci --prefix=$PREFIX -Dmalloc=disabled -Dwerror=true -Dextra_tests=enabled
     - ninja -C build_ci
     - ninja -C build_ci install >/dev/null
     - ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite snowflake
@@ -115,7 +115,7 @@ build-knot32:
   <<: *build
   image: $CI_REGISTRY/knot/knot-resolver/ci/debian-11:knot-3.2
   script:
-    - meson build_ci_knot32 --default-library=static --prefix=$PREFIX -Dmalloc=disabled -Dwerror=true -Dextra_tests=enabled
+    - meson build_ci_knot32 --prefix=$PREFIX -Dmalloc=disabled -Dwerror=true -Dextra_tests=enabled
     - ninja -C build_ci_knot32
     - ninja -C build_ci_knot32 install >/dev/null
     - ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite snowflake
@@ -123,7 +123,9 @@ build-knot32:
 build-asan:
   <<: *build
   script:
-      # "undefined" sanitizer causes C++ issues when loading ahocorasick.so in CI
+      # issues with UBSan and ASan in CI:
+      #  - `ahocorasick.so` causes C++ problems
+      #  - `--default-library=shared` causes link problems
     - CC=clang CXX=clang++ CFLAGS=-fno-sanitize-recover=all CXXFLAGS=-fno-sanitize=undefined meson build_ci_asan --default-library=static --prefix=$PREFIX -Dmalloc=jemalloc -Db_sanitize=address,undefined -Dextra_tests=enabled
     - ninja -C build_ci_asan
     - ninja -C build_ci_asan install >/dev/null
@@ -170,7 +172,7 @@ sonarcloud:
     - tags
     - master@knot/knot-resolver
   script:
-    - meson build_sonarcloud --default-library=static --prefix=$PREFIX -Dmalloc=disabled
+    - meson build_sonarcloud --prefix=$PREFIX -Dmalloc=disabled
     - build-wrapper-linux-x86-64 --out-dir bw-output ninja -C build_sonarcloud
     - >
         sonar-scanner
@@ -539,6 +541,10 @@ obs:trigger: &obs_trigger
     - condor
   allow_failure: false  # required to make when: manual action blocking
   script:
+    - python3 -m venv ./venv
+    - source ./venv/bin/activate
+    - pip install --upgrade pip
+    - pip install apkg
     - scripts/make-obs.sh
     - echo y | scripts/build-in-obs.sh $OBS_REPO
 

@@ -22,7 +22,7 @@ TEMP_FILE="$(mktemp AUTHORS.XXXXXXXXXX)"
 # drop all names from the current file
 sed '/^People who contributed commits to our Git repo are/q' "${AUTHORS_FILE}" > "${TEMP_FILE}"
 # append to the new file
-git log --format="%aN <%aE>" | sort -u | git check-mailmap --stdin | sort -u >> "${TEMP_FILE}"
+git log --no-show-signature --format="%aN <%aE>" | sort -u | git check-mailmap --stdin | sort -u >> "${TEMP_FILE}"
 
 echo '' >> "${TEMP_FILE}"
 echo 'Knot Resolver source tree also bundles code and content published by:' >> "${TEMP_FILE}"
