@@ -19,14 +19,11 @@ RUN apt-get install -y -qqq git make cmake pkg-config meson \
 	libelf-dev libmnl-dev libidn11-dev libuv1-dev libjemalloc-dev \
 	libluajit-5.1-dev lua-http libssl-dev libnghttp2-dev
 
-# Build and testing deps for Resolver's dnstap module (go stuff is just for testing)
+# Build and testing deps for Resolver's dnstap module
 RUN apt-get install -y -qqq \
 	protobuf-c-compiler libprotobuf-c-dev libfstrm-dev \
 	golang-any
 COPY ./tests/dnstap /root/tests/dnstap
-WORKDIR /root/tests/dnstap/src/dnstap-test
-RUN go get .
-WORKDIR /root
 
 # documentation dependencies
 RUN apt-get install -y -qqq doxygen python3-sphinx python3-breathe python3-sphinx-rtd-theme
@@ -62,7 +59,7 @@ RUN git clone --depth=1 --branch=$KNOT_BRANCH https://gitlab.nic.cz/knot/knot-dn
 WORKDIR /tmp/knot
 RUN pwd
 RUN autoreconf -if
-RUN ./configure --prefix=/usr --enable-xdp=yes
+RUN ./configure --prefix=/usr --enable-xdp=yes --disable-documentation
 RUN CFLAGS="-g" make
 RUN make install
 RUN ldconfig
