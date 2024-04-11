@@ -8,6 +8,8 @@ echo "$GOPATH"
 cd "$(dirname $0)"
 DNSTAP_TEST=dnstap-test
 
+go mod tidy
+
 if [ -z "$GITLAB_CI" ]; then
 	type -P go >/dev/null || exit 77
 	echo "Building the dnstap test and its dependencies..."
