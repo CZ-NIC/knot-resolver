@@ -63,6 +63,7 @@
 /self.key
 /stamp-h1
 /tags
+/tests/dnstap/src/dnstap-test/go.sum
 /tests/pytests/*/tcproxy
 /tests/pytests/*/tlsproxy
 /tests/pytests/pytests.*.html

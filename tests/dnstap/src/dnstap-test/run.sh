@@ -8,16 +8,13 @@ echo "$GOPATH"
 cd "$(dirname $0)"
 DNSTAP_TEST=dnstap-test
 
-if [ -z "$GITLAB_CI" ]; then
-	type -P go >/dev/null || exit 77
-	echo "Building the dnstap test and its dependencies..."
-	# some packages may be missing on the system right now
-	go get .
-else
-	# In CI we've prebuilt dependencies into the default GOPATH.
-	# We're in a scratch container, so we just add the dnstap test inside.
-	export GOPATH=/root/go
-fi
+go mod tidy
+
+type -P go >/dev/null || exit 77
+echo "Building the dnstap test and its dependencies..."
+# some packages may be missing on the system right now
+go get .
+
 DTAP_DIR="$GOPATH/src"
 DTAP="$DTAP_DIR/$DNSTAP_TEST"
 mkdir -p "$DTAP_DIR"
