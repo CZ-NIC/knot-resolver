@@ -62,4 +62,6 @@ class MetricsCommand(Command):
                 print(metrics)
         else:
             print(response, file=sys.stderr)
+            if self.prometheus and response.status == 404:
+                print("Prometheus is unavailable due to missing optional dependencies", file=sys.stderr)
             sys.exit(1)
