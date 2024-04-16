@@ -159,19 +159,24 @@ single ``kresctl`` command.
 
 .. option:: metrics
 
-    Reads aggregated metrics data in Prometheus format directly from the running
-    resolver.
+    Get aggregated metrics from the running resolver in JSON format (default) or optionally in Prometheus format.
+    The ``prometheus-client`` Python package needs to be installed if you wish to use the Prometheus format.
 
-    Requires a connection to the management API.
+    Requires a connection to the management HTTP API.
+
+    .. option:: --prometheus
+
+        Get metrics in Prometheus format if dependencies are met in the resolver.
 
     .. option:: [file]
 
-        Optional. The file into which Prometheus metrics will be exported.
+        Optional. The file into which metrics will be exported.
         If not specified, the metrics are printed into ``stdout``.
 
     .. code-block:: bash
 
-        $ kresctl metrics ./metrics/data.txt
+        $ kresctl metrics ./kres-metrics.json
+        $ kresctl metrics --prometheus
 
 .. option:: cache clear
 

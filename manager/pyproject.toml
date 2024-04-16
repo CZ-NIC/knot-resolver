@@ -1,10 +1,11 @@
 [tool.poetry]
 name = "knot-resolver-manager"
-version = "0.1.0"
-description = "A central management tool for multiple instances of Knot Resolver"
+version = "6.0.7"
+description = "A central tool for managing individual parts of Knot Resolver"
+
 authors = [
-    "Václav Šraier <vaclav.sraier@nic.cz>",
-    "Aleš Mrázek <ales.mrazek@nic.cz>"
+    "Aleš Mrázek <ales.mrazek@nic.cz>",
+    "Václav Šraier <vaclav.sraier@nic.cz>"
 ]
 
 # See currently open issue about building C extensions here:
@@ -20,7 +21,10 @@ jinja2 = "*"
 pyyaml = "*"
 supervisor = "*"
 typing-extensions = "*"
-prometheus-client = "*"
+prometheus-client = { version = "*", optional = true }
+
+[tool.poetry.extras]
+prometheus = ["prometheus-client"]
 
 [tool.poetry.group.dev.dependencies]
 poetry = "^1.7.1"

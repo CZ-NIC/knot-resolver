@@ -4,6 +4,11 @@ Knot Resolver 6.0.8 (2024-0m-dd)
 Improvements
 ------------
 - TLS (DoT, DoH): respect crypto policy overrides in OS (!1526)
+- manager: export metrics to JSON via management HTTP API (!1527)
+
+  * JSON is the new default metrics output format
+  * the ``prometheus-client`` Python package is now an optional dependency,
+    required only for Prometheus export to work
 
 
 Knot Resolver 6.0.7 (2024-03-27)
@@ -38,6 +43,7 @@ Knot Resolver 6.0.6 (2024-02-13)
 Security
 --------
 - CVE-2023-50868: NSEC3 closest encloser proof can exhaust CPU
+
   * validator: lower the NSEC3 iteration limit (150 -> 50)
   * validator: similarly also limit excessive NSEC3 salt length
   * cache: limit the amount of work on SHA1 in NSEC3 aggressive cache

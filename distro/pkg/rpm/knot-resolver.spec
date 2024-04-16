@@ -143,22 +143,17 @@ native C implementation, which doesn't require this package.
 Summary:        Configuration tool for Knot Resolver
 Provides:       knot-resolver6 = %{version}-%{release}
 Requires:       %{name}-core = %{version}-%{release}
-%if 0%{?rhel} == 8
 Requires:       python3
-Requires:       python3-pyyaml
 Requires:       python3-aiohttp
-Requires:       python3-typing-extensions
-Requires:       python3-prometheus_client
 Requires:       supervisor
-%endif
 %if 0%{?suse_version}
-Requires:		python3
-Requires:		python3-PyYAML
-Requires:		python3-aiohttp
-Requires:		python3-typing_extensions
-Requires:		python3-prometheus_client
-Requires:		supervisor
+Requires:       python3-PyYAML
+Requires:       python3-typing_extensions
+%else
+Requires:       python3-pyyaml
+Requires:       python3-typing-extensions
 %endif
+Recommends:     python3-prometheus_client
 
 %description -n knot-resolver-manager
 Knot Resolver Manager is a configuration tool for Knot Resolver. The Manager
