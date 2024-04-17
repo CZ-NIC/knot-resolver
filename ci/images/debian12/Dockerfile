@@ -9,44 +9,45 @@ ENV DEBIAN_FRONTEND=noninteractive
 WORKDIR /root
 CMD ["/bin/bash"]
 
-# generic cleanup
-RUN apt-get update -qq
+# dependencies (mounts and rm to force cache utilization)
+RUN \
+	--mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
+	--mount=target=/var/cache/apt,type=cache,sharing=locked \
+	\
+	rm -f /etc/apt/apt.conf.d/docker-clean && \
+	\
+	apt-get update -qq && \
+	apt-get install --no-install-suggests --no-install-recommends -y -qqq \
+		\
+		`# Knot DNS and Knot Resolver` \
+		git make cmake pkg-config meson build-essential bsdmainutils \
+		libtool autoconf automake libcmocka-dev liburcu-dev \
+		libgnutls28-dev libedit-dev liblmdb-dev libcap-ng-dev \
+		libsystemd-dev libelf-dev libmnl-dev libidn11-dev libuv1-dev \
+		libjemalloc-dev libluajit-5.1-dev lua-http libssl-dev \
+		libnghttp2-dev libbpf-dev libxdp-dev luajit \
+		\
+		`# dnstap module` \
+		protobuf-c-compiler libprotobuf-c-dev libfstrm-dev \
+		\
+		`# dnstap testing` \
+		golang-any \
+		\
+		`# documentation` \
+		doxygen texinfo python3-sphinx python3-breathe \
+		python3-sphinx-rtd-theme \
+		\
+		`# Deckard` \
+		python3-pip python3-venv wget augeas-tools faketime \
+		libaugeas-dev libffi-dev tcpdump wireshark-common dnsdist \
+		\
+		`# respdiff` \
+		lmdb-utils unbound unbound-anchor bind9 pdns-recursor \
+		\
+		`# Misc` \
+		valgrind luarocks lcov clang clang-tools clang-tidy osc curl \
+		locales
 
-RUN apt-get install --no-install-suggests --no-install-recommends -y -qqq \
-	\
-	`# Knot DNS and Knot Resolver` \
-	git make cmake pkg-config meson \
-	build-essential bsdmainutils libtool autoconf automake libcmocka-dev \
-	liburcu-dev libgnutls28-dev libedit-dev liblmdb-dev libcap-ng-dev libsystemd-dev \
-	libelf-dev libmnl-dev libidn11-dev libuv1-dev libjemalloc-dev \
-	libluajit-5.1-dev lua-http libssl-dev libnghttp2-dev libbpf-dev libxdp-dev \
-	luajit \
-	\
-	`# dnstap module` \
-	protobuf-c-compiler libprotobuf-c-dev libfstrm-dev \
-	\
-	`# dnstap testing` \
-	golang-any \
-	\
-	`# documentation` \
-	doxygen texinfo python3-sphinx python3-breathe python3-sphinx-rtd-theme \
-	\
-	`# Deckard` \
-	python3-pip python3-venv wget augeas-tools faketime libaugeas-dev \
-	libffi-dev tcpdump wireshark-common dnsdist \
-	\
-	`# respdiff` \
-	lmdb-utils unbound unbound-anchor bind9 pdns-recursor \
-	\
-	`# Misc` \
-	valgrind luarocks lcov clang clang-tools clang-tidy osc curl locales
-
-
-# Testing deps for Resolver's dnstap module
-COPY ./tests/dnstap /root/tests/dnstap
-WORKDIR /root/tests/dnstap/src/dnstap-test
-RUN go get .
-WORKDIR /root
 
 # build and install latest version of Knot DNS
 RUN git clone --depth=1 --branch=$KNOT_BRANCH https://gitlab.nic.cz/knot/knot-dns.git /tmp/knot
@@ -57,6 +58,12 @@ RUN ./configure --prefix=/usr --enable-xdp=yes --disable-documentation
 RUN CFLAGS="-g" make
 RUN make install
 RUN ldconfig
+
+# Testing deps for Resolver's dnstap module
+COPY ./tests/dnstap /root/tests/dnstap
+WORKDIR /root/tests/dnstap/src/dnstap-test
+RUN go get .
+WORKDIR /root
 
 # Python packages required for Deckard CI
 # Python: grab latest versions from PyPi
