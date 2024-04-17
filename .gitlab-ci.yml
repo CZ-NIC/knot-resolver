@@ -768,7 +768,7 @@ docs:build:
     - apkg build-dep -y
     - dnf install -y python3-sphinx texinfo doxygen
     - pip3 install -U -r doc/requirements.txt
-    - pip3 install -U sphinx_rtd_theme
+    - pip3 install -U sphinx_rtd_theme breathe
     - meson build_doc -Ddoc=enabled
     - ninja -C build_doc doc
   artifacts:
