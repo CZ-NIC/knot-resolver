@@ -25,10 +25,7 @@ RUN \
 		libgnutls28-dev libedit-dev liblmdb-dev libcap-ng-dev \
 		libsystemd-dev libelf-dev libmnl-dev libidn11-dev libuv1-dev \
 		libjemalloc-dev libluajit-5.1-dev lua-http libssl-dev \
-		libnghttp2-dev libbpf-dev libxdp-dev luajit \
-		\
-		`# Coverity tools and uploading logs` \
-		curl tar
+		libnghttp2-dev libbpf-dev luajit
 
 # build and install latest version of Knot DNS
 RUN git clone --depth=1 --branch=$KNOT_BRANCH https://gitlab.nic.cz/knot/knot-dns.git /tmp/knot
