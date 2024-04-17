@@ -9,6 +9,20 @@ Improvements
   * JSON is the new default metrics output format
   * the ``prometheus-client`` Python package is now an optional dependency,
     required only for Prometheus export to work
+- cache: prefetching records
+
+  * predict module: prefetching expiring records moved to prefetch module
+  * prefetch module: new module to prefetch expiring records
+
+.. TODO: Change the link below to a versioned one when releasing.
+
+Incompatible changes
+--------------------
+- cache: the ``cache.prediction`` configuration property has been reorganized
+  into ``cache.prefetch.expiring`` and ``cache.prefetch.prediction``, changing
+  the default behaviour as well. See the `relevant documentation section
+  <https://www.knot-resolver.cz/documentation/latest/config-cache-predict.html>`_
+  for more.
 
 
 Knot Resolver 6.0.7 (2024-03-27)
