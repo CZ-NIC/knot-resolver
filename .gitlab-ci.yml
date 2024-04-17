@@ -132,6 +132,8 @@ kres-image:
       - pkg
     reports:
       junit: build_ci*/meson-logs/testlog.junit.xml
+  before_script:
+    - "export PATH=\"$VENV:$PATH\""
   after_script:
     - ci/fix-meson-junit.sh build_ci*/meson-logs/testlog.junit.xml
 
@@ -147,6 +149,15 @@ build:
     - meson build_ci --prefix=$PREFIX -Dmalloc=disabled -Dwerror=true -Dextra_tests=enabled
     - ninja -C build_ci
     - ninja -C build_ci install >/dev/null
+    - ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite snowflake
+
+build-knot31:
+  <<: *build
+  image: $AUTO_IMAGE_PREFIX/debian11-knot_3_1:$IMAGE_TAG
+  script:
+    - meson build_ci_knot31 --prefix=$PREFIX -Dmalloc=disabled -Dwerror=true -Dextra_tests=enabled
+    - ninja -C build_ci_knot31
+    - ninja -C build_ci_knot31 install >/dev/null
     - ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite snowflake
 
 build-knot32:
