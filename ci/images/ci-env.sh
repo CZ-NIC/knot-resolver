@@ -54,14 +54,16 @@ declare -A special_arg=()  # Special arguments appended to the Docker command
 #  - [...]
 add_image ()
 {
-	local repo="$1"; shift
+	local repo="$1"
+	local name="$image_prefix/$repo"
+
 	repos+=("$repo")
 
-	local name="$image_prefix/$repo"
 	image_name["$repo"]="$name"
 	image_tag["$repo"]="$name:$commit_ref"
+	dockerfile_dir["$repo"]="$2"
 
-	dockerfile_dir["$repo"]=("$1"); shift
+	shift 2
 
 	while [ -n "$1" ]; do
 		local key="$1"
