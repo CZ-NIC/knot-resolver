@@ -65,7 +65,7 @@ add_image ()
 
 	shift 2
 
-	while [ -n "$1" ]; do
+	while [ -n "${1:-}" ]; do
 		local key="$1"
 		local value="$2"
 		shift 2
