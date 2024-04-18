@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-MAINTAINER Knot Resolver <knot-resolver@labs.nic.cz>
 ARG KRES_BASE_IMG
 
 FROM ${KRES_BASE_IMG}
+MAINTAINER Knot Resolver <knot-resolver@labs.nic.cz>
 
 WORKDIR /root
 CMD ["/bin/bash"]
