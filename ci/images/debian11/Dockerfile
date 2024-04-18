@@ -25,14 +25,11 @@ RUN \
 		libgnutls28-dev libedit-dev liblmdb-dev libcap-ng-dev \
 		libsystemd-dev libelf-dev libmnl-dev libidn11-dev libuv1-dev \
 		libjemalloc-dev libluajit-5.1-dev lua-http libssl-dev \
-		libnghttp2-dev libbpf-dev luajit
+		libnghttp2-dev libbpf-dev luajit \
+		\
+		`# Python (for Manager, Deckard, etc.)` \
+		python3-dev python3-pip python3-venv
 
-# build and install latest version of Knot DNS
-RUN git clone --depth=1 --branch=$KNOT_BRANCH https://gitlab.nic.cz/knot/knot-dns.git /tmp/knot
-WORKDIR /tmp/knot
-RUN pwd
-RUN autoreconf -if
-RUN ./configure --prefix=/usr --enable-xdp=yes --disable-documentation
-RUN CFLAGS="-g" make
-RUN make install
-RUN ldconfig
+# Root virtualenv
+ENV VENV="/root/venv"
+RUN python3 -m venv "$VENV"

@@ -4,6 +4,14 @@ set -o errexit -o nounset
 cd "$(dirname "${0}")/../.."
 
 
+### Utils ######################################################################
+
+ci_log ()
+{
+	echo "[[[ $0 ]]] $@" >&2
+}
+
+
 ### Registry config ############################################################
 
 docker_cmd="${DOCKER_CMD:-docker}"
@@ -14,36 +22,100 @@ commit_branch="${CI_COMMIT_BRANCH:-}"
 commit_ref="$commit_tag$commit_branch" # Tag and branch are exclusive
 
 if [ -n "$commit_tag" -a -n "$commit_branch" ]; then
-	echo "CI_COMMIT_TAG and CI_COMMIT_BRANCH are exclusive - declare only one!" >&2
+	ci_log "CI_COMMIT_TAG and CI_COMMIT_BRANCH are exclusive - declare only one!"
 	exit 1
 fi
 if [ -z "$commit_ref" ]; then
-	echo "One of CI_COMMIT_TAG or CI_COMMIT_BRANCH must be declared" >&2
+	ci_log "One of CI_COMMIT_TAG or CI_COMMIT_BRANCH must be declared"
 	exit 1
 fi
 
 
-### CI image config ############################################################
+### CI image structure definition ##############################################
 
-dockerfiles="debian11 debian12 debian12_coverity"
+declare -a repos=()  # Array of OCI repository names (image keys)
 
-declare -A knot_branches=()
-knot_branches["debian11"]="3.2 3.1"
-knot_branches["debian12"]="master 3.3 3.2"
-knot_branches["debian12_coverity"]="3.3"
+## OCI repository attributes - associative arrays keyed by repository names.
+declare -A image_name=()  # The full repository/image name
+declare -A image_tag=()   # Repository name with "version" tag appended
+declare -A dockerfile_dir=()  # Directory containing the Dockerfile (relative to ci/images)
 
-declare -A special_args=()
-special_args["debian12_coverity"]="--secret id=coverity-token,env=COVERITY_SCAN_TOKEN"
+declare -A base_image=()  # KRES_BASE_IMAGE value (if applicable)
+declare -A knot_branch=()  # KNOT_BRANCH value (if applicable)
+declare -A special_arg=()  # Special arguments appended to the Docker command
 
-prepare_img_strings ()
+# Simple "constructor". Parameters are as follows:
+#  - OCI repository name
+#  - Dockerfile directory name
+#  - [Optional attribute key 1]
+#  - [Optional attribute value 1]
+#  - [Optional attribute key 2]
+#  - [Optional attribute value 2]
+#  - [...]
+add_image ()
 {
-	knot_branch_us="$(sed -r 's/\./_/g' <<< "$knot_branch")"
-	image_name="$image_prefix/$dockerfile-knot_$knot_branch_us"
-	image_tag="$image_name:$commit_ref"
+	local repo="$1"; shift
+	repos+=("$repo")
+
+	local image_name="$image_prefix/$repo"
+	image_name["$repo"]="$image_name"
+	image_tag["$repo"]="$image_name:$commit_ref"
+
+	dockerfile_dir["$repo"]=("$1"); shift
+
+	while [ -n "$1" ]; do
+		local key="$1"
+		local value="$2"
+		shift 2
+
+		if [ "$key" == 'base_image' ]; then
+			base_image["$repo"]="$value"
+		elif [ "$key" = 'knot_branch' ]; then
+			knot_branch["$repo"]="$value"
+		elif [ "$key" = 'special_arg' ]; then
+			special_arg["$repo"]="$value"
+		fi
+	done
 }
 
+
+### CI images ##################################################################
+
+# These images are built in the declared order. The order is mostly just
+# important for the images that have each other in the 'base_image' attribute,
+# otherwise, it should not matter.
+
+add_image 'debian11-base' 'debian11'
+add_image 'debian12-base' 'debian12'
+
+add_image 'debian11-knot_3_2' 'knot' \
+	'base_image' "${image_tag['debian11-base']}" \
+	'knot_branch' '3.2'
+add_image 'debian11-knot_3_1' 'knot' \
+	'base_image' "${image_tag['debian11-base']}" \
+	'knot_branch' '3.1'
+add_image 'debian12-knot_master' 'knot' \
+	'base_image' "${image_tag['debian12-base']}" \
+	'knot_branch' 'master'
+add_image 'debian12-knot_3_3' 'knot' \
+	'base_image' "${image_tag['debian12-base']}" \
+	'knot_branch' '3.3'
+add_image 'debian12-knot_3_2' 'knot' \
+	'base_image' "${image_tag['debian12-base']}" \
+	'knot_branch' '3.2'
+
+add_image 'main' 'debian-testutils' \
+	'base_image' "${image_tag['debian12-knot_3_3']}"
+add_image 'coverity' 'debian-coverity' \
+	'base_image' "${image_tag['debian12-knot_3_3']}" \
+	'special_arg' '--secret id=coverity-token,env=COVERITY_SCAN_TOKEN'
+
+
+### Misc. preparations #########################################################
+
+# Check for Coverity token existence
 if [ -z "${COVERITY_SCAN_TOKEN:-}" ]; then
-	echo "COVERITY_SCAN_TOKEN is not set" >&2
+	ci_log "COVERITY_SCAN_TOKEN is not set"
 	exit 1
 fi
 
