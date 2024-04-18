@@ -57,9 +57,9 @@ add_image ()
 	local repo="$1"; shift
 	repos+=("$repo")
 
-	local image_name="$image_prefix/$repo"
-	image_name["$repo"]="$image_name"
-	image_tag["$repo"]="$image_name:$commit_ref"
+	local name="$image_prefix/$repo"
+	image_name["$repo"]="$name"
+	image_tag["$repo"]="$name:$commit_ref"
 
 	dockerfile_dir["$repo"]=("$1"); shift
 

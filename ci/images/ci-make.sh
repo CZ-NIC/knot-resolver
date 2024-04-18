@@ -9,41 +9,41 @@ exit_code=0
 for repo in "${repos[@]}"; do
 	err=0
 
-	ci_log "Retrieving possible cached data for '${image_tag[$repo]}'"
-	"$docker_cmd" pull "${image_name[$repo]}:6.0" || true
-	"$docker_cmd" pull "${image_name[$repo]}:master" || true
-	"$docker_cmd" pull "${image_tag[$repo]}" || true
+	ci_log "Retrieving possible cached data for '${image_tag["$repo"]}'"
+	"$docker_cmd" pull "${image_name["$repo"]}:6.0" || true
+	"$docker_cmd" pull "${image_name["$repo"]}:master" || true
+	"$docker_cmd" pull "${image_tag["$repo"]}" || true
 
-	ci_log "Building '${image_tag[$repo]}'"
+	ci_log "Building '${image_tag["$repo"]}'"
 	build_args=()
-	if [ -n "${base_image[$repo]}" ]; then
-		build_args+=("--build-arg" "KRES_BASE_IMAGE=${base_image[$repo]}")
+	if [ -n "${base_image["$repo"]}" ]; then
+		build_args+=("--build-arg" "KRES_BASE_IMAGE=${base_image["$repo"]}")
 	fi
-	if [ -n "${knot_branch[$repo]}" ]; then
-		build_args+=("--build-arg" "KNOT_BRANCH=${knot_branch[$repo]}")
+	if [ -n "${knot_branch["$repo"]}" ]; then
+		build_args+=("--build-arg" "KNOT_BRANCH=${knot_branch["$repo"]}")
 	fi
 
 	set +e
 	"$docker_cmd" build \
 		"${build_args[@]}" \
-		--tag "${image_tag[$repo]}" \
-		--file "ci/images/${dockerfile_dir[$repo]}/Dockerfile" \
-		${special_arg[$repo]:-} \
+		--tag "${image_tag["$repo"]}" \
+		--file "ci/images/${dockerfile_dir["$repo"]}/Dockerfile" \
+		${special_arg["$repo"]:-} \
 		.
 	if [ "$?" -ne "0" ]; then
-		failed_images+=("$image_tag[$repo]")
+		failed_images+=("${image_tag["$repo"]}")
 		exit_code=16
 		set -e
 		continue
 	fi
 	set -e
 
-	"$docker_cmd" push "$image_tag"
+	"$docker_cmd" push "${image_tag["$repo"]}"
 
 	if [ "$err" -eq "0" ]; then
-		ci_log "Finished '${image_tag[$repo]}' - [OK]"
+		ci_log "Finished '${image_tag["$repo"]}' - [OK]"
 	else
-		ci_log "Finished '${image_tag[$repo]}' - [ERROR]"
+		ci_log "Finished '${image_tag["$repo"]}' - [ERROR]"
 	fi
 done
 
