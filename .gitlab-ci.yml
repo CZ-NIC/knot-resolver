@@ -18,7 +18,7 @@ variables:
   EMAIL: 'ci@nic'
   IMAGE_TAG: ${CI_COMMIT_TAG}${CI_COMMIT_BRANCH}
   AUTO_IMAGE_PREFIX: $CI_REGISTRY/knot/knot-resolver/ci-auto
-  DEFAULT_IMAGE: $AUTO_IMAGE_PREFIX/debian12-knot_3_3:$IMAGE_TAG
+  DEFAULT_IMAGE: $AUTO_IMAGE_PREFIX/main:$IMAGE_TAG
 
 default:
   interruptible: true
