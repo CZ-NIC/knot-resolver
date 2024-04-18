@@ -16,10 +16,10 @@ for repo in "${repos[@]}"; do
 
 	ci_log "Building '${image_tag["$repo"]}'"
 	build_args=()
-	if [ -n "${base_image["$repo"]}" ]; then
+	if [ -n "${base_image["$repo"]:-}" ]; then
 		build_args+=("--build-arg" "KRES_BASE_IMAGE=${base_image["$repo"]}")
 	fi
-	if [ -n "${knot_branch["$repo"]}" ]; then
+	if [ -n "${knot_branch["$repo"]:-}" ]; then
 		build_args+=("--build-arg" "KNOT_BRANCH=${knot_branch["$repo"]}")
 	fi
 
