@@ -16,6 +16,7 @@ for repo in "${repos[@]}"; do
 
 	ci_log "Building '${image_tag["$repo"]}'"
 	build_args=()
+	build_args+=(${special_arg["$repo"]:-})
 	if [ -n "${base_image["$repo"]:-}" ]; then
 		build_args+=("--build-arg" "KRES_BASE_IMAGE=${base_image["$repo"]}")
 	fi
@@ -23,12 +24,13 @@ for repo in "${repos[@]}"; do
 		build_args+=("--build-arg" "KNOT_BRANCH=${knot_branch["$repo"]}")
 	fi
 
+	ci_log "Build args: ${build_args[*]}"
+
 	set +e
 	"$docker_cmd" build \
 		"${build_args[@]}" \
 		--tag "${image_tag["$repo"]}" \
 		--file "ci/images/${dockerfile_dir["$repo"]}/Dockerfile" \
-		${special_arg["$repo"]:-} \
 		.
 	if [ "$?" -ne "0" ]; then
 		failed_images+=("${image_tag["$repo"]}")
