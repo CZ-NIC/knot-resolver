@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-ARG KRES_BASE_IMG
+ARG KRES_BASE_IMAGE
 
-FROM ${KRES_BASE_IMG}
+FROM ${KRES_BASE_IMAGE}
 MAINTAINER Knot Resolver <knot-resolver@labs.nic.cz>
 
 RUN \

@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-ARG KRES_BASE_IMG
+ARG KRES_BASE_IMAGE
 ARG KNOT_BRANCH=3.1
 
-FROM ${KRES_BASE_IMG}
+FROM ${KRES_BASE_IMAGE}
 MAINTAINER Knot Resolver <knot-resolver@labs.nic.cz>
 
 # build and install latest version of Knot DNS
