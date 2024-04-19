@@ -4,6 +4,8 @@ ARG KRES_BASE_IMAGE
 FROM ${KRES_BASE_IMAGE}
 MAINTAINER Knot Resolver <knot-resolver@labs.nic.cz>
 
+ARG COVERITY_SCAN_PROJECT_NAME
+
 RUN \
 	--mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
 	--mount=target=/var/cache/apt,type=cache,sharing=locked \

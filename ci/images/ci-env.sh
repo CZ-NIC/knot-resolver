@@ -42,6 +42,7 @@ declare -A dockerfile_dir=()  # Directory containing the Dockerfile (relative to
 
 declare -A base_image=()  # KRES_BASE_IMAGE value (if applicable)
 declare -A knot_branch=()  # KNOT_BRANCH value (if applicable)
+declare -A coverity_scan_project_name=() # COVERITY_SCAN_PROJECT_NAME value (if applicable)
 declare -A special_arg=()  # Special arguments appended to the Docker command
 
 # Simple "constructor". Parameters are as follows:
@@ -76,6 +77,8 @@ add_image ()
 			knot_branch["$repo"]="$value"
 		elif [ "$key" = 'special_arg' ]; then
 			special_arg["$repo"]="$value"
+		elif [ "$key" = 'coverity_scan_project_name' ]; then
+			coverity_scan_project_name["$repo"]="$value"
 		fi
 	done
 }
@@ -90,6 +93,7 @@ dump_image_info ()
 	ci_log "base_image = ${base_image["$repo"]:-<none>}"
 	ci_log "knot_branch = ${knot_branch["$repo"]:-<none>}"
 	ci_log "special_arg = ${special_arg["$repo"]:-<none>}"
+	ci_log "coverity_scan_project_name = ${coverity_scan_project_name["$repo"]:-<none>}"
 	ci_log "===== $repo info end ====="
 }
 
@@ -123,7 +127,8 @@ add_image 'main' 'debian-testutils' \
 	'base_image' "${image_tag['debian12-knot_3_3']}"
 add_image 'coverity' 'debian-coverity' \
 	'base_image' "${image_tag['debian12-knot_3_3']}" \
-	'special_arg' '--secret id=coverity-token,env=COVERITY_SCAN_TOKEN'
+	'special_arg' '--secret id=coverity-token,env=COVERITY_SCAN_TOKEN' \
+	'coverity_scan_project_name' "$COVERITY_SCAN_PROJECT_NAME"
 
 
 ### Misc. preparations #########################################################

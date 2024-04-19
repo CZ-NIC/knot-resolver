@@ -18,6 +18,9 @@ for repo in "${repos[@]}"; do
 	if [ -n "${knot_branch["$repo"]:-}" ]; then
 		build_args+=("--build-arg" "KNOT_BRANCH=${knot_branch["$repo"]}")
 	fi
+	if [ -n "${coverity_scan_project_name["$repo"]:-}" ]; then
+		build_args+=("--build-arg" "COVERITY_SCAN_PROJECT_NAME=${coverity_scan_project_name["$repo"]}")
+	fi
 
 	dump_image_info "$repo"
 	ci_log "Build args: ${build_args[*]}"
