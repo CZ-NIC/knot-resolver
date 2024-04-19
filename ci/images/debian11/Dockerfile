@@ -26,7 +26,7 @@ RUN \
 		libnghttp2-dev libbpf-dev luajit \
 		\
 		`# Python (for Manager, Deckard, etc.)` \
-		python3-dev python3-pip python3-venv
+		python3-dev python3-pip python3-venv python3-dnspython
 
 # Root virtualenv
 ENV VENV="/root/venv"
