@@ -9,11 +9,6 @@ exit_code=0
 for repo in "${repos[@]}"; do
 	err=0
 
-	ci_log "Retrieving possible cached data for '${image_tag["$repo"]}'"
-	"$docker_cmd" pull "${image_name["$repo"]}:6.0" || true
-	"$docker_cmd" pull "${image_name["$repo"]}:master" || true
-	"$docker_cmd" pull "${image_tag["$repo"]}" || true
-
 	ci_log "Building '${image_tag["$repo"]}'"
 	build_args=()
 	build_args+=(${special_arg["$repo"]:-})
@@ -24,13 +19,17 @@ for repo in "${repos[@]}"; do
 		build_args+=("--build-arg" "KNOT_BRANCH=${knot_branch["$repo"]}")
 	fi
 
+	dump_image_info "$repo"
 	ci_log "Build args: ${build_args[*]}"
 
 	set +e
 	"$docker_cmd" build \
 		"${build_args[@]}" \
-		--tag "${image_tag["$repo"]}" \
+		--cache-from "${image_name["$repo"]}:6.0" \
+		--cache-from "${image_name["$repo"]}:master" \
+		--cache-from "${image_tag["$repo"]}" \
 		--file "ci/images/${dockerfile_dir["$repo"]}/Dockerfile" \
+		--tag "${image_tag["$repo"]}" \
 		.
 	if [ "$?" -ne "0" ]; then
 		failed_images+=("${image_tag["$repo"]}")

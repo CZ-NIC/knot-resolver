@@ -80,6 +80,19 @@ add_image ()
 	done
 }
 
+dump_image_info ()
+{
+	local repo="$1"
+	ci_log "===== $repo info begin ====="
+	ci_log "image_name = ${image_name["$repo"]:-<none>}"
+	ci_log "image_tag = ${image_tag["$repo"]:-<none>}"
+	ci_log "dockerfile_dir = ${dockerfile_dir["$repo"]:-<none>}"
+	ci_log "base_image = ${base_image["$repo"]:-<none>}"
+	ci_log "knot_branch = ${knot_branch["$repo"]:-<none>}"
+	ci_log "special_arg = ${special_arg["$repo"]:-<none>}"
+	ci_log "===== $repo info end ====="
+}
+
 
 ### CI images ##################################################################
 
