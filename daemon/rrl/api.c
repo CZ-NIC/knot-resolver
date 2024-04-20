@@ -34,7 +34,8 @@ void kr_rrl_init(const char *mmap_file, size_t capacity, uint32_t instant_limit,
 {
 	int fd = the_rrl_fd = open(mmap_file, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
 	if (fd == -1) {
-		kr_log_crit(SYSTEM, "Cannot open file %s containing shared rate-limiting data.", mmap_file);
+		kr_log_crit(SYSTEM, "Cannot open file %s containing shared rate-limiting data: %s\n",
+				mmap_file, strerror(errno));
 		abort();
 	}
 
@@ -54,9 +55,9 @@ void kr_rrl_init(const char *mmap_file, size_t capacity, uint32_t instant_limit,
 		.l_len    = 0 };
 	if (fcntl(fd, F_SETLK, &fl) != -1) {
 		kr_log_info(SYSTEM, "Initializing rate-limiting...\n");
-		ftruncate(fd, 0);
-		if (ftruncate(fd, size) == -1) {  // get all zeroed
-			kr_log_crit(SYSTEM, "Cannot increase size of file %s containing shared rate-limiting data.", mmap_file);
+		if (ftruncate(fd, 0) == -1 || ftruncate(fd, size) == -1) {  // get all zeroed
+			kr_log_crit(SYSTEM, "Cannot change size of file %s containing shared rate-limiting data: %s\n",
+					mmap_file, strerror(errno));
 			abort();
 		}
 		the_rrl = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
