@@ -30,6 +30,14 @@ struct rrl *the_rrl = NULL;
 int the_rrl_fd = -1;
 char *the_rrl_mmap_file = NULL;
 
+/// return whether we're using optimized variant right now
+static bool using_avx2(void)
+{
+	bool result = (KRU.initialize == KRU_AVX2.initialize);
+	kr_require(result || KRU.initialize == KRU_GENERIC.initialize);
+	return result;
+}
+
 void kr_rrl_init(const char *mmap_file, size_t capacity, uint32_t instant_limit, uint32_t rate_limit)
 {
 	int fd = the_rrl_fd = open(mmap_file, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
@@ -66,8 +74,7 @@ void kr_rrl_init(const char *mmap_file, size_t capacity, uint32_t instant_limit,
 		the_rrl->capacity = capacity;
 		the_rrl->instant_limit = instant_limit;
 		the_rrl->rate_limit = rate_limit;
-		the_rrl->using_avx2 = (KRU.initialize != KRU_GENERIC.initialize);
-		kr_require(!the_rrl->using_avx2 || (KRU.initialize == KRU_AVX2.initialize));
+		the_rrl->using_avx2 = using_avx2();
 
 		const kru_price_t base_price = KRU_LIMIT / instant_limit;
 		const kru_price_t max_decay = rate_limit > 1000ll * instant_limit ? base_price :
@@ -104,7 +111,7 @@ void kr_rrl_init(const char *mmap_file, size_t capacity, uint32_t instant_limit,
 		kr_require(the_rrl != MAP_FAILED);
 		if ((the_rrl->capacity != capacity) || (the_rrl->instant_limit != instant_limit) ||
 				(the_rrl->rate_limit != rate_limit)) goto check_fail;
-		if (KRU.initialize != (the_rrl->using_avx2 ? KRU_AVX2.initialize : KRU_GENERIC.initialize)) goto check_fail;
+		if (using_avx2() != the_rrl->using_avx2) goto check_fail;
 		kr_log_info(SYSTEM, "Using existing RRL data.\n");
 
 		return;
