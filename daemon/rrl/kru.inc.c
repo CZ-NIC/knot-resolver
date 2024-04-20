@@ -167,8 +167,8 @@ struct query_ctx {
 	kru_price_t price;
 	uint16_t price16, limit16;
 	uint16_t id;
-	uint16_t *load;
 	uint16_t final_load_value;  // set by kru_limited_update if not blocked
+	uint16_t *load;
 };
 
 /// Phase 1/3 of a query -- hash, prefetch, ctx init. Based on one 16-byte key.
@@ -481,6 +481,7 @@ static uint8_t kru_limited_multi_prefix_or(struct kru *kru, uint32_t time_now, u
 	}
 
 	if (max_load_out) {
+		*max_load_out = 0;
 		for (size_t i = 0; i < queries_cnt; i++) {
 			*max_load_out = MAX(*max_load_out, ctx[i].final_load_value);
 		}
