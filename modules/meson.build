@@ -7,6 +7,7 @@ lua_mod_src = [  # add lua modules without separate meson.build
   files('dns64/dns64.lua'),
   files('etcd/etcd.lua'),
   files('graphite/graphite.lua'),
+  files('prefetch/prefetch.lua'),
   files('predict/predict.lua'),
   files('prefill/prefill.lua'),
   files('priming/priming.lua'),

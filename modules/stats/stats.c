@@ -367,8 +367,31 @@ static int list_entry(const char *key, uint32_t key_len, trie_val_t *val, void *
 	if (!key_matches_prefix(key, key_len, ctx->key_prefix, ctx->key_prefix_len))
 		return 0;
 	size_t number = (size_t) *val;
-	auto_free char *key_nt = strndup(key, key_len);
-	json_append_member(ctx->root, key_nt, json_mknumber(number));
+
+	uint32_t dot_index = 0;
+	for (uint32_t i = 0; i < key_len; i++) {
+		if (!key[i])
+			break;
+		if (key[i] == '.') {
+			dot_index = i;
+		}
+	}
+
+	if (dot_index) {
+		auto_free char *sup_key_nt = strndup(key, dot_index);
+		auto_free char *sub_key_nt = strndup(key + dot_index + 1, key_len - dot_index - 1);
+		JsonNode *sup = json_find_member(ctx->root, sup_key_nt);
+		if (!sup) {
+			sup = json_mkobject();
+			json_append_member(ctx->root, sup_key_nt, sup);
+		}
+		if (kr_fails_assert(sup))
+			return 0;
+		json_append_member(sup, sub_key_nt, json_mknumber(number));
+	} else {
+		auto_free char *key_nt = strndup(key, key_len);
+		json_append_member(ctx->root, key_nt, json_mknumber(number));
+	}
 	return 0;
 }
 

@@ -299,6 +299,7 @@ getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysc
 %{_libdir}/knot-resolver/kres_modules/graphite.lua
 %{_libdir}/knot-resolver/kres_modules/policy.lua
 %{_libdir}/knot-resolver/kres_modules/predict.lua
+%{_libdir}/knot-resolver/kres_modules/prefetch.lua
 %{_libdir}/knot-resolver/kres_modules/prefill.lua
 %{_libdir}/knot-resolver/kres_modules/priming.lua
 %{_libdir}/knot-resolver/kres_modules/rebinding.lua

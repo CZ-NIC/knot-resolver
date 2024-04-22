@@ -204,6 +204,27 @@ if _prometheus_support:
             value=metrics["query"]["dnssec"],
         )
 
+        if "predict" in metrics:
+            if "epoch" in metrics["predict"]:
+                yield _counter(
+                    "resolver_predict_epoch",
+                    "current prediction epoch (based on time of day and sampling window)",
+                    label=("instance_id", sid),
+                    value=metrics["predict"]["epoch"],
+                )
+            yield _counter(
+                "resolver_predict_queue",
+                "number of queued queries in current window",
+                label=("instance_id", sid),
+                value=metrics["predict"]["queue"],
+            )
+            yield _counter(
+                "resolver_predict_learned",
+                "number of learned queries in current window",
+                label=("instance_id", sid),
+                value=metrics["predict"]["learned"],
+            )
+
     def _create_resolver_metrics_loaded_gauge(kresid: "KresID", loaded: bool) -> GaugeMetricFamily:
         return _gauge(
             "resolver_metrics_loaded",
