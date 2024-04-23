@@ -17,7 +17,13 @@ variables:
   PREFIX: $CI_PROJECT_DIR/.local
   EMAIL: 'ci@nic'
 
-image: $CI_REGISTRY/knot/knot-resolver/ci/debian-11:knot-$KNOT_VERSION
+  # IMAGE_TAG is a Git branch/tag name from https://gitlab.nic.cz/knot/knot-resolver-ci
+  # In general, keep it pointing to a tag - use a branch only for development.
+  # More info in the knot-resolver-ci repository.
+  IMAGE_TAG: 'main'
+  IMAGE_PREFIX: '$CI_REGISTRY/knot/knot-resolver-ci'
+
+image: $IMAGE_PREFIX/main:$IMAGE_TAG
 default:
   interruptible: true
   tags:
@@ -94,6 +100,9 @@ stages:
       - pkg
     reports:
       junit: build_ci*/meson-logs/testlog.junit.xml
+  before_script:
+    - "echo \"PATH: $PATH\""
+    - "echo \"Using Python at: $(which python)\""
   after_script:
     - ci/fix-meson-junit.sh build_ci*/meson-logs/testlog.junit.xml
 
@@ -111,9 +120,18 @@ build:
     - ninja -C build_ci install >/dev/null
     - ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite snowflake
 
+build-knot31:
+  <<: *build
+  image: $IMAGE_PREFIX/debian11-knot_3_1:$IMAGE_TAG
+  script:
+    - meson build_ci_knot31 --prefix=$PREFIX -Dmalloc=disabled -Dwerror=true -Dextra_tests=enabled
+    - ninja -C build_ci_knot31
+    - ninja -C build_ci_knot31 install >/dev/null
+    - ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite snowflake
+
 build-knot32:
   <<: *build
-  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-11:knot-3.2
+  image: $IMAGE_PREFIX/debian11-knot_3_2:$IMAGE_TAG
   script:
     - meson build_ci_knot32 --prefix=$PREFIX -Dmalloc=disabled -Dwerror=true -Dextra_tests=enabled
     - ninja -C build_ci_knot32
@@ -232,10 +250,6 @@ lint:pedantic:
 
 lint:scan-build:
   <<: *after_build
-  # TODO migrate lint to debian-11
-  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-buster:knot-$KNOT_VERSION
-  before_script:
-  # -- end TODO
   stage: sanity
   artifacts:
     when: on_failure
@@ -249,10 +263,6 @@ lint:scan-build:
 
 lint:tidy:
   <<: *after_build
-  # TODO migrate lint to debian-11
-  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-buster:knot-$KNOT_VERSION
-  before_script:
-  # -- end TODO
   stage: sanity
   script:
     - ninja -C build_ci* tidy
@@ -260,7 +270,7 @@ lint:tidy:
 # Coverity reference: https://www.synopsys.com/blogs/software-security/integrating-coverity-scan-with-gitlab-ci/
 lint:coverity:
   <<: *sanity
-  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-11-coverity:knot-$KNOT_VERSION
+  image: $IMAGE_PREFIX/coverity:$IMAGE_TAG
   only:
     refs:
       - nightly@knot/knot-resolver
@@ -281,15 +291,12 @@ lint:coverity:
     - ninja -C build_ci_lib daemon/kresd
     - ninja -C build_ci_lib kres-gen
     - git diff --quiet || (git diff; exit 1)
-kres-gen-30:
-  <<: *kres-gen
-  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-11:knot-3.0
 kres-gen-31:
   <<: *kres-gen
-  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-11:knot-3.1
+  image: $IMAGE_PREFIX/debian11-knot_3_1:$IMAGE_TAG
 kres-gen-32:
   <<: *kres-gen
-  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-11:knot-3.2
+  image: $IMAGE_PREFIX/debian12-knot_3_2:$IMAGE_TAG
 
 root.hints:
   <<: *sanity
