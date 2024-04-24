@@ -305,6 +305,21 @@ root.hints:
       - /^release.*$/
   script:
     - scripts/update-root-hints.sh
+
+ci-image-is-tag:
+  <<: *sanity
+  image: alpine:3
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - apk add git
+    - (
+        git ls-remote --tags --exit-code
+        https://gitlab.nic.cz/knot/knot-resolver-ci.git
+        refs/tags/$IMAGE_TAG
+        && echo "Everything is OK!"
+      )
+      || (echo "'$IMAGE_TAG' is not a tag (probably a branch). Make sure to set it to a tag in production!"; exit 2)
 # }}}
 
 # test {{{
