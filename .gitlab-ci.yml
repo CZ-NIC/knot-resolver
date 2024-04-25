@@ -23,7 +23,7 @@ variables:
   IMAGE_TAG: 'main'
   IMAGE_PREFIX: '$CI_REGISTRY/knot/knot-resolver-ci'
 
-image: $IMAGE_PREFIX/main:$IMAGE_TAG
+image: $IMAGE_PREFIX/debian12-knot_3_3:$IMAGE_TAG
 default:
   interruptible: true
   tags:
