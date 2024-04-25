@@ -172,6 +172,7 @@ build-stable-asan:
 
 build:macOS:
   <<: *nodep
+  image: python:3-alpine
   only:
     refs:
       - branches@knot/knot-resolver
@@ -179,7 +180,8 @@ build:macOS:
   when: delayed
   start_in: 3 minutes  # allow some time for mirroring, job creation
   script:
-    - ci/gh_actions.py ${CI_COMMIT_REF_NAME} ${CI_COMMIT_SHA}
+    - pip3 install -U requests
+    - python3 ./ci/gh_actions.py ${CI_COMMIT_REF_NAME} ${CI_COMMIT_SHA}
 
 docker:
   <<: *nodep
