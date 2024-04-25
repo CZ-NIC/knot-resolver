@@ -69,7 +69,7 @@ stages:
 .after_build: &after_build
   <<: *common
   needs:
-    - build
+    - build-stable
   before_script:
     # meson detects changes and performs useless rebuild; hide the log
     - ninja -C build_ci* &>/dev/null
@@ -112,7 +112,7 @@ archive:
   script:
     - apkg make-archive
 
-build:
+build-stable:
   <<: *build
   script:
     - meson build_ci --prefix=$PREFIX -Dmalloc=disabled -Dwerror=true -Dextra_tests=enabled
@@ -120,7 +120,7 @@ build:
     - ninja -C build_ci install >/dev/null
     - ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite snowflake
 
-build-knot31:
+build-deb11-knot31:
   <<: *build
   image: $IMAGE_PREFIX/debian11-knot_3_1:$IMAGE_TAG
   script:
@@ -129,7 +129,7 @@ build-knot31:
     - ninja -C build_ci_knot31 install >/dev/null
     - ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite snowflake
 
-build-knot32:
+build-deb11-knot32:
   <<: *build
   image: $IMAGE_PREFIX/debian11-knot_3_2:$IMAGE_TAG
   script:
@@ -138,16 +138,25 @@ build-knot32:
     - ninja -C build_ci_knot32 install >/dev/null
     - ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite snowflake
 
-build-knot-master:
+build-deb12-knot32:
   <<: *build
-  image: $IMAGE_PREFIX/debian11-knot_master:$IMAGE_TAG
+  image: $IMAGE_PREFIX/debian12-knot_3_2:$IMAGE_TAG
+  script:
+    - meson build_ci_knot32 --prefix=$PREFIX -Dmalloc=disabled -Dwerror=true -Dextra_tests=enabled
+    - ninja -C build_ci_knot32
+    - ninja -C build_ci_knot32 install >/dev/null
+    - ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite snowflake
+
+build-deb12-knot-master:
+  <<: *build
+  image: $IMAGE_PREFIX/debian12-knot_master:$IMAGE_TAG
   script:
     - meson build_ci_knot_master --prefix=$PREFIX -Dmalloc=disabled -Dwerror=true -Dextra_tests=enabled
     - ninja -C build_ci_knot_master
     - ninja -C build_ci_knot_master install >/dev/null
     - ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite snowflake
 
-build-asan:
+build-stable-asan:
   <<: *build
   script:
       # issues with UBSan and ASan in CI:
