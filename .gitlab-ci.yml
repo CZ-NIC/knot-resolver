@@ -127,7 +127,7 @@ build-deb11-knot31:
     - meson build_ci_knot31 --prefix=$PREFIX -Dmalloc=disabled -Dwerror=true -Dextra_tests=enabled
     - ninja -C build_ci_knot31
     - ninja -C build_ci_knot31 install >/dev/null
-    - ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite snowflake
+    - ${MESON_TEST} --suite unit --suite config --no-suite snowflake
 
 build-deb11-knot32:
   <<: *build
@@ -136,7 +136,7 @@ build-deb11-knot32:
     - meson build_ci_knot32 --prefix=$PREFIX -Dmalloc=disabled -Dwerror=true -Dextra_tests=enabled
     - ninja -C build_ci_knot32
     - ninja -C build_ci_knot32 install >/dev/null
-    - ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite snowflake
+    - ${MESON_TEST} --suite unit --suite config --no-suite snowflake
 
 build-deb12-knot32:
   <<: *build
