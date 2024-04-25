@@ -368,7 +368,7 @@ respdiff:basic:
   <<: *after_build
   stage: test
   needs:
-    - build-asan
+    - build-stable-asan
   script:
     - ulimit -n "$(ulimit -Hn)" # applies only for kresd ATM
     - ./ci/respdiff/start-resolvers.sh
@@ -400,7 +400,7 @@ pkgtest:
     include: ci/pkgtest.yaml
     strategy: depend
   needs:
-    - build
+    - build-stable
   variables: # https://gitlab.nic.cz/help/ci/yaml/README.md#artifact-downloads-to-child-pipelines
     PARENT_PIPELINE_ID: $CI_PIPELINE_ID
   except:
@@ -414,7 +414,7 @@ pkgtest:
 pytests:
   <<: *test_flaky
   needs:
-    - build-asan
+    - build-stable-asan
   artifacts:
     when: always
     paths:
@@ -800,13 +800,10 @@ packaging:fedora_32:
 # docs: {{{
 
 docs:build:
-  image: $CI_REGISTRY/packaging/apkg/lxc/fedora-36
   stage: deploy
   needs: []
   script:
     - git submodule update --init --recursive
-    - apkg build-dep -y
-    - dnf install -y python3-sphinx texinfo doxygen
     - pip3 install -U -r doc/requirements.txt
     - pip3 install -U sphinx_rtd_theme
     - meson build_doc -Ddoc=enabled
