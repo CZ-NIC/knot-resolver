@@ -155,6 +155,7 @@ build-deb12-knot-master:
     - ninja -C build_ci_knot_master
     - ninja -C build_ci_knot_master install >/dev/null
     - ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite snowflake
+  allow_failure: true
 
 build-stable-asan:
   <<: *build
