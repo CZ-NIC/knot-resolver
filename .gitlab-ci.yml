@@ -138,6 +138,15 @@ build-knot32:
     - ninja -C build_ci_knot32 install >/dev/null
     - ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite snowflake
 
+build-knot-master:
+  <<: *build
+  image: $IMAGE_PREFIX/debian11-knot_master:$IMAGE_TAG
+  script:
+    - meson build_ci_knot_master --prefix=$PREFIX -Dmalloc=disabled -Dwerror=true -Dextra_tests=enabled
+    - ninja -C build_ci_knot_master
+    - ninja -C build_ci_knot_master install >/dev/null
+    - ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite snowflake
+
 build-asan:
   <<: *build
   script:
