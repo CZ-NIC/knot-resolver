@@ -73,8 +73,8 @@ class LocalDataSchema(ConfigSchema):
     ---
     ttl: Default TTL value used for added local data/records.
     nodata: Use NODATA synthesis. NODATA will be synthesised for matching name, but mismatching type(e.g. AAAA query when only A exists).
-    root_fallback_addresses: Direct replace of root hints.
-    root_fallback_addresses_files: Direct replace of root hints from a zonefile.
+    root_fallback_addresses: Replace root server fallback addresses as a name-addresses mapping directly in configuration.
+    root_fallback_addresses_file: Replace root server fallback addresses from a zonefile.
     addresses: Direct addition of hostname and IP addresses pairs.
     addresses_files: Direct addition of hostname and IP addresses pairs from files in '/etc/hosts' like format.
     records: Direct addition of records in DNS zone file format.
@@ -85,9 +85,13 @@ class LocalDataSchema(ConfigSchema):
     ttl: Optional[TimeUnit] = None
     nodata: bool = True
     root_fallback_addresses: Optional[Dict[DomainName, ListOrItem[IPAddress]]] = None
-    root_fallback_addresses_files: Optional[List[ReadableFile]] = None
+    root_fallback_addresses_file: Optional[ReadableFile] = None
     addresses: Optional[Dict[DomainName, ListOrItem[IPAddress]]] = None
     addresses_files: Optional[List[ReadableFile]] = None
     records: Optional[EscapedStr] = None
     rules: Optional[List[RuleSchema]] = None
     rpz: Optional[List[RPZSchema]] = None
+
+    def _validate(self) -> None:
+        if self.root_fallback_addresses is not None and self.root_fallback_addresses_file is not None:
+            raise ValueError("only one of 'root_fallback_addresses' or 'root_fallback_addresses_file' can be configured")

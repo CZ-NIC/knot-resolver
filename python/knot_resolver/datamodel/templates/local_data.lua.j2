@@ -1,4 +1,4 @@
-{% from 'macros/local_data_macros.lua.j2' import local_data_rules, local_data_records, local_data_root_fallback_addresses, local_data_root_fallback_addresses_files, local_data_addresses, local_data_addresses_files %}
+{% from 'macros/local_data_macros.lua.j2' import local_data_rules, local_data_records, local_data_root_fallback_addresses, local_data_root_fallback_addresses_file, local_data_addresses, local_data_addresses_files %}
 {% from 'macros/common_macros.lua.j2' import boolean %}
 
 modules = { 'hints > iterate' }
@@ -8,9 +8,9 @@ modules = { 'hints > iterate' }
 {{ local_data_root_fallback_addresses(cfg.local_data.root_fallback_addresses) }}
 {%- endif %}
 
-{# root-fallback-addresses-files #}
-{% if cfg.local_data.root_fallback_addresses_files -%}
-{{ local_data_root_fallback_addresses_files(cfg.local_data.root_fallback_addresses_files) }}
+{# root-fallback-addresses-file #}
+{% if cfg.local_data.root_fallback_addresses_file -%}
+{{ local_data_root_fallback_addresses_file(cfg.local_data.root_fallback_addresses_file) }}
 {%- endif %}
 
 {# addresses #}

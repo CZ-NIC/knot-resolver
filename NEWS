@@ -5,6 +5,16 @@ Bugfixes
 --------
 - /management/unix-socket: revert to absolute path (#926, !1664)
 
+Incompatible changes
+--------------------
+- cache: the ``/cache/prediction`` configuration property has been reorganized
+  into ``/cache/prefetch/expiring`` and ``/cache/prefetch/prediction``, changing
+  the default behaviour as well. See the `relevant documentation section
+  <https://www.knot-resolver.cz/documentation/latest/config-cache-predict.html>`_
+  for more.
+- /local-data/root-fallback-addresses-file: only allow one file (and call it singular)
+  Using multiple sets of fallback addresses does not work anyway (!1534).
+
 
 Knot Resolver 6.0.11 (2025-02-26)
 =================================
