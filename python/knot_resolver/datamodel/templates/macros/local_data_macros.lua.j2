@@ -11,10 +11,10 @@ hints.root({
 {%- endmacro %}
 
 
-{% macro local_data_root_fallback_addresses_files(files) -%}
-{% for file in files %}
+{% macro local_data_root_fallback_addresses_file(file) -%}
+{% if file %}
 hints.root_file('{{ file }}')
-{% endfor %}
+{% endif %}
 {%- endmacro %}
 
 {%- macro local_data_ttl(ttl) -%}
