@@ -220,3 +220,26 @@ It provides various input formats described in following subsections.
       .. option:: refresh: <time ms|s|m|h|d>
 
          Refresh time to update data from :option:`roots-file <roots-file: <path>>` or :option:`roots-url <roots-url: <url>>`.
+
+
+   Root server hints (fallback addresses)
+   --------------------------------------
+
+   When not forwarding, any resolver needs some way of finding the root servers.
+   A list of root server addresses serves as a fallback.  :rfc:`1034` calls this SBELT.
+
+   .. seealso:: :ref:`config-priming`
+
+   Knot Resolver distributes an up to date list as the default for this fallback
+   (it's relatively rare that some of the 2*13 addresses change).
+   This default can be overridden during configure time (``root_hints`` meson option),
+   e.g. some Linux distributions maintain it inside a separate package,
+   and you can additionally override it via configuration in the following two ways:
+
+   .. option:: root-fallback-addresses
+
+         Replace the root server fallback addresses as a name-addresses mapping directly in configuration.
+
+   .. option:: root-fallback-addresses-file
+
+         Replace root server fallback addresses from a zonefile.
