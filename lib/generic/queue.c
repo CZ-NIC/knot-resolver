@@ -62,7 +62,7 @@ void * queue_push_impl(struct queue *q)
 		if (t->begin * 2 >= t->cap) {
 			/* Utilization is below 50%, so let's shift (no overlap).
 			 * (size_t cast is to avoid unintended sign-extension) */
-			memcpy(t->data, t->data + t->begin * q->item_size,
+			memcpy(t->data, t->data + t->begin * (size_t)q->item_size,
 				(size_t) (t->end - t->begin) * (size_t) q->item_size);
 			t->end -= t->begin;
 			t->begin = 0;
@@ -76,7 +76,7 @@ void * queue_push_impl(struct queue *q)
 	kr_require(t->end < t->cap);
 	++(q->len);
 	++(t->end);
-	return t->data + q->item_size * (t->end - 1);
+	return t->data + (size_t)q->item_size * (t->end - 1);
 }
 
 /* Return pointer to the space for the new element. */
@@ -98,8 +98,8 @@ void * queue_push_head_impl(struct queue *q)
 			 * Computations here are simplified due to h->begin == 0.
 			 * (size_t cast is to avoid unintended sign-extension) */
 			const int cnt = h->end;
-			memcpy(h->data + (h->cap - cnt) * q->item_size, h->data,
-				(size_t) cnt * (size_t) q->item_size);
+			memcpy(h->data + ((size_t)h->cap - cnt) * q->item_size, h->data,
+				(size_t)cnt * (size_t)q->item_size);
 			h->begin = h->cap - cnt;
 			h->end = h->cap;
 		} else {
@@ -113,7 +113,7 @@ void * queue_push_head_impl(struct queue *q)
 	kr_require(h->begin > 0);
 	--(h->begin);
 	++(q->len);
-	return h->data + q->item_size * h->begin;
+	return h->data + (size_t)q->item_size * h->begin;
 }
 
 void queue_pop_impl(struct queue *q)

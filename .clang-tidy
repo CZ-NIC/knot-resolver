@@ -1,6 +1,42 @@
 ---
-Checks: 'bugprone-*,cert-*,-cert-dcl03-c,-clang-analyzer-unix.Malloc,-clang-analyzer-deadcode.DeadStores,-clang-analyzer-valist.Uninitialized,readability-*,-readability-braces-*,-readability-else-after-return,-readability-redundant-declaration,-readability-non-const-parameter,google-readability-casting,misc-*,-misc-static-assert,-misc-macro-parentheses,-misc-unused-parameters'
-WarningsAsErrors: 'cert-*,misc-*,readability-*,clang-analyzer-*,-readability-non-const-parameter'
+Checks:
+  - bugprone-*
+  - cert-*
+  - google-readability-casting
+  - misc-*
+  - readability-*
+
+  - -bugprone-assignment-in-if-condition  # we explicitly put assignments into parentheses so they are very visible
+  - -bugprone-branch-clone
+  - -bugprone-easily-swappable-parameters
+  - -bugprone-inc-dec-in-conditions
+  - -bugprone-multi-level-implicit-pointer-conversion
+  - -bugprone-narrowing-conversions
+  - -bugprone-sizeof-expression  # may be useful, but it's utterly broken
+  - -bugprone-suspicious-string-compare
+  - -cert-dcl03-c
+  - -clang-analyzer-deadcode.DeadStores
+  - -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
+  - -clang-analyzer-unix.Malloc
+  - -clang-analyzer-valist.Uninitialized
+  - -clang-analyzer-optin.core.EnumCastOutOfRange  # libknot uses enums as flags
+  - -misc-include-cleaner
+  - -misc-macro-parentheses
+  - -misc-no-recursion
+  - -misc-static-assert
+  - -misc-unused-parameters
+  - -readability-avoid-nested-conditional-operator
+  - -readability-avoid-unconditional-preprocessor-if
+  - -readability-braces-*
+  - -readability-cognitive-complexity
+  - -readability-else-after-return
+  - -readability-function-cognitive-complexity
+  - -readability-identifier-length
+  - -readability-isolate-declaration
+  - -readability-magic-numbers
+  - -readability-non-const-parameter
+  - -readability-redundant-declaration
+WarningsAsErrors: 'cert-*,clang-analyzer-*,misc-*,readability-*,-readability-non-const-parameter'
 HeaderFilterRegex: 'contrib/ucw/*.h'
 CheckOptions:
   - key:             readability-identifier-naming

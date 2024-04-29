@@ -194,9 +194,11 @@ static const knot_dname_t * raw_addr2reverse(const uint8_t *raw_addr, int family
 	#undef REV_MAXLEN
 
 	if (family == AF_INET) {
-		snprintf(reverse_addr, sizeof(reverse_addr),
-			 "%d.%d.%d.%d.in-addr.arpa.",
-		         raw_addr[3], raw_addr[2], raw_addr[1], raw_addr[0]);
+		int ret = snprintf(reverse_addr, sizeof(reverse_addr),
+				"%d.%d.%d.%d.in-addr.arpa.",
+				raw_addr[3], raw_addr[2], raw_addr[1], raw_addr[0]);
+		if (kr_fails_assert(ret > 0 && ret <= sizeof(reverse_addr)))
+			return NULL;
 	} else if (family == AF_INET6) {
 		char *ra_it = reverse_addr;
 		for (int i = 15; i >= 0; --i) {
@@ -262,7 +264,10 @@ static int add_reverse_pair(struct kr_zonecut *hints, const char *name, const ch
 		return kr_error(EINVAL);
 	}
 
-	return kr_zonecut_add(hints, key, ptr_name, knot_dname_size(ptr_name));
+	size_t dname_size = knot_dname_size(ptr_name);
+	if (kr_fails_assert(dname_size < INT_MAX))
+		return kr_error(EINVAL);
+	return kr_zonecut_add(hints, key, ptr_name, (int)dname_size);
 }
 
 /** For a given name, remove either one address or all of them (if == NULL).
@@ -276,7 +281,9 @@ static int del_pair(struct hints_data *data, const char *name, const char *addr)
 	if (!knot_dname_from_str(key, name, sizeof(key))) {
 		return kr_error(EINVAL);
 	}
-	int key_len = knot_dname_size(key);
+	size_t key_len = knot_dname_size(key);
+	if (kr_fails_assert(key_len <= INT_MAX))
+		return kr_error(EINVAL);
 
         if (addr) {
 		/* Remove the pair. */
@@ -286,7 +293,7 @@ static int del_pair(struct hints_data *data, const char *name, const char *addr)
 		}
 
 		const knot_dname_t *reverse_key = addr2reverse(addr);
-		kr_zonecut_del(&data->reverse_hints, reverse_key, key, key_len);
+		kr_zonecut_del(&data->reverse_hints, reverse_key, key, (int)key_len);
 		return kr_zonecut_del(&data->hints, key,
 					kr_inaddr(&ia.ip), kr_inaddr_len(&ia.ip));
 	}
@@ -306,7 +313,7 @@ static int del_pair(struct hints_data *data, const char *name, const char *addr)
 				? AF_INET : AF_INET6;
 		const knot_dname_t *reverse_key = raw_addr2reverse(addr_val, family);
 		if (reverse_key != NULL) {
-			kr_zonecut_del(&data->reverse_hints, reverse_key, key, key_len);
+			kr_zonecut_del(&data->reverse_hints, reverse_key, key, (int)key_len);
 		}
 	}
 

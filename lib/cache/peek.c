@@ -174,6 +174,7 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 					knot_db_val_bound(v), new_ttl);
 		return ret == kr_ok() ? KR_STATE_DONE : ctx->state;
 		}
+	default:; // Continue below
 	}
 
 	/* We have to try proving from NSEC*. */

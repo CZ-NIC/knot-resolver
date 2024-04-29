@@ -149,7 +149,7 @@ struct rtt_state get_rtt_state(const uint8_t *ip, size_t len,
 
 	knot_db_val_t key = cache_key(ip, len);
 
-	if (cache->api->read(db, stats, &key, &value, 1)) {
+	if (cache->api->read(db, stats, &key, &value, 1)) { // NOLINT(bugprone-branch-clone)
 		state = default_rtt_state;
 	} else if (kr_fails_assert(value.len == sizeof(struct rtt_state))) {
 		// shouldn't happen but let's be more robust

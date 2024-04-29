@@ -188,7 +188,7 @@ static void tst_key_check(uv_timer_t *timer, bool force_update)
 	const uint64_t remain_ms = (tv_sec_next - now.tv_sec - 1) * (uint64_t)1000
 				 + ms_until_second + 1;
 	/* ^ +1 because we don't want to wake up half a millisecond before the epoch! */
-	if (kr_fails_assert(remain_ms < (TST_KEY_LIFETIME + 1 /*rounding tolerance*/) * 1000))
+	if (kr_fails_assert(remain_ms < ((uint64_t)TST_KEY_LIFETIME + 1 /*rounding tolerance*/) * 1000))
 		return;
 	kr_log_debug(TLS, "session ticket: epoch %"PRIu64
 			", scheduling rotation check in %"PRIu64" ms\n",

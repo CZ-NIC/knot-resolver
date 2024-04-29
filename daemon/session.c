@@ -13,7 +13,7 @@
 #include "daemon/proxyv2.h"
 #include "lib/generic/queue.h"
 
-#define TLS_CHUNK_SIZE (16 * 1024)
+#define TLS_CHUNK_SIZE ((size_t)16 * 1024)
 
 /* Initial max frame size: https://tools.ietf.org/html/rfc7540#section-6.5.2 */
 #define HTTP_MAX_FRAME_SIZE 16384

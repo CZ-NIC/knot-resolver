@@ -23,7 +23,7 @@
 #include "daemon/worker.h"
 #include "daemon/session.h"
 
-#define EPHEMERAL_CERT_EXPIRATION_SECONDS_RENEW_BEFORE (60*60*24*7)
+#define EPHEMERAL_CERT_EXPIRATION_SECONDS_RENEW_BEFORE ((time_t)60*60*24*7)
 #define GNUTLS_PIN_MIN_VERSION  0x030400
 
 #define VERBOSE_MSG(cl_side, ...)\
@@ -659,7 +659,7 @@ static int str_replace(char **where_ptr, const char *with)
 	return kr_ok();
 }
 
-static time_t _get_end_entity_expiration(gnutls_certificate_credentials_t creds)
+static time_t get_end_entity_expiration(gnutls_certificate_credentials_t creds)
 {
 	gnutls_datum_t data;
 	gnutls_x509_crt_t cert = NULL;
@@ -731,7 +731,7 @@ int tls_certificate_set(struct network *net, const char *tls_cert, const char *t
 		return kr_error(EINVAL);
 	}
 	/* record the expiration date: */
-	tls_credentials->valid_until = _get_end_entity_expiration(tls_credentials->credentials);
+	tls_credentials->valid_until = get_end_entity_expiration(tls_credentials->credentials);
 
 	/* Exchange the x509 credentials */
 	struct tls_credentials *old_credentials = net->tls_credentials;
