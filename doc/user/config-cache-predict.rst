@@ -59,6 +59,6 @@ Exported metrics
 
 To visualize the efficiency of the predictions, following statistics are exported.
 
-* ``predict.epoch`` - current prediction epoch (based on time of day and sampling window)
-* ``predict.queue`` - number of queued queries in current window
-* ``predict.learned`` - number of learned queries in current window
+* ``/predict/epoch`` - current prediction epoch (based on time of day and sampling window)
+* ``/predict/queue`` - number of queued queries in current window
+* ``/predict/learned`` - number of learned queries in current window
