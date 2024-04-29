@@ -195,7 +195,7 @@ static inline struct mempool *pool_borrow(struct worker_ctx *worker)
 {
 	/* The implementation used to have extra caching layer,
 	 * but it didn't work well.  Now it's very simple. */
-	return mp_new(16 * 1024);
+	return mp_new((size_t)16 * 1024);
 }
 /** Return a mempool. */
 static inline void pool_release(struct worker_ctx *worker, struct mempool *mp)

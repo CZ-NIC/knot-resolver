@@ -279,6 +279,7 @@ ssize_t proxy_process_header(struct proxy_result *out, struct session *s,
 				&addr->ipv6_addr.dst_addr,
 				sizeof(out->dst_addr.ip6.sin6_addr.s6_addr));
 		break;
+	default:; /* Keep zero from initializer. */
 	}
 
 	/* Process additional information */
@@ -287,7 +288,7 @@ ssize_t proxy_process_header(struct proxy_result *out, struct session *s,
 		case TLV_TYPE_SSL:
 			out->has_tls = true;
 			break;
-		/* TODO: add more TLV types if needed */
+		default:; /* Ignore others - add more if needed */
 		}
 	}
 

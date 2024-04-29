@@ -18,7 +18,7 @@ static bool rrtype_is_infrastructure(uint16_t r)
 	}
 }
 
-static int get_random(int to)
+static unsigned int get_random(int to)
 {
 	// We don't need these to be really unpredictable,
 	// but this should be cheap enough not to be noticeable.

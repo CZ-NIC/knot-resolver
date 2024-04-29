@@ -194,12 +194,12 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 	// Mixing ^^ page usage and entry sizes (key+value lengths) didn't work
 	// too well, probably due to internal fragmentation after some GC cycles.
 	// Therefore let's scale this by the ratio of these two sums.
-	ssize_t cats_sumsize = 0;
+	size_t cats_sumsize = 0;
 	for (int i = 0; i < CATEGORIES; ++i) {
 		cats_sumsize += cats.categories_sizes[i];
 	}
 	/* use less precise variant to avoid 32-bit overflow */
-	ssize_t amount_tofree = cats_sumsize / 100 * cfg->cache_to_be_freed;
+	size_t amount_tofree = cats_sumsize / 100 * cfg->cache_to_be_freed;
 
 	kr_log_debug(CACHE, "tofree: %zd / %zd\n", amount_tofree, cats_sumsize);
 	if (VERBOSE_STATUS) {
@@ -212,8 +212,11 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 	}
 
 	category_t limit_category = CATEGORIES;
-	while (limit_category > 0 && amount_tofree > 0) {
-		amount_tofree -= cats.categories_sizes[--limit_category];
+	while (limit_category > 0) {
+		size_t cat_size = cats.categories_sizes[--limit_category];
+		if (cat_size > amount_tofree)
+			break;
+		amount_tofree -= cat_size;
 	}
 
 	printf("Cache analyzed in %.0lf msecs, %zu records, limit category is %d.\n",

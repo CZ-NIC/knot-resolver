@@ -52,9 +52,6 @@
 #define TCP_BACKLOG_DEFAULT 128
 #endif
 
-/* Cleanup engine state every 5 minutes */
-const size_t CLEANUP_TIMER = 5*60*1000;
-
 /* Execute byte code */
 #define l_dobytecode(L, arr, len, name) \
 	(luaL_loadbuffer((L), (arr), (len), (name)) || lua_pcall((L), 0, LUA_MULTRET, 0))
@@ -609,7 +606,7 @@ int init_lua(struct engine *engine) {
 	#pragma GCC diagnostic push
 	#pragma GCC diagnostic ignored "-Wformat" /* %1$ is not in C standard */
 	/* Save original package.path to package._path */
-	snprintf(l_paths, MAXPATHLEN - 1,
+	(void)snprintf(l_paths, MAXPATHLEN - 1,
 		 "if package._path == nil then package._path = package.path end\n"
 		 "package.path = '%1$s/?.lua;%1$s/?/init.lua;'..package._path\n"
 		 "if package._cpath == nil then package._cpath = package.cpath end\n"

@@ -116,7 +116,7 @@ static inline int collect_key(char *key, const knot_dname_t *name, uint16_t type
 	if (key_len < 0) {
 		return kr_error(key_len);
 	}
-	return key_len + sizeof(type);
+	return key_len + (int)sizeof(type);
 }
 
 static void collect_sample(struct stat_data *data, struct kr_rplan *rplan)
@@ -313,26 +313,26 @@ static char* stats_get(void *env, struct kr_module *module, const char *args)
 	struct stat_data *data = module->data;
 
 	/* Expecting CHAR_BIT to be 8, this is a safe bet */
-	char *ret = malloc(3 * sizeof(size_t) + 2);
-	if (!ret) {
-		return NULL;
-	}
+	char *str_value = NULL;
+	int ret = 0;
 
 	/* Check if it exists in const map. */
 	for (unsigned i = 0; i < metric_const_end; ++i) {
 		if (strcmp(const_metrics[i].key, args) == 0) {
-			sprintf(ret, "%zu", const_metrics[i].val);
-			return ret;
+			ret = asprintf(&str_value, "%zu", const_metrics[i].val);
+			if (ret < 0)
+				return NULL;
+			return str_value;
 		}
 	}
 	/* Check in variable map */
 	trie_val_t *val = trie_get_try(data->trie, args, strlen(args));
-	if (!val) {
-		free(ret);
+	if (!val)
 		return NULL;
-	}
-	sprintf(ret, "%zu", (size_t) *val);
-	return ret;
+	ret = asprintf(&str_value, "%zu", (size_t) *val);
+	if (ret < 0)
+		return NULL;
+	return str_value;
 }
 
 /** Checks whether:
@@ -356,9 +356,9 @@ static int list_entry(const char *key, uint32_t key_len, trie_val_t *val, void *
 	struct list_entry_context *ctx = baton;
 	if (!key_matches_prefix(key, key_len, ctx->key_prefix, ctx->key_prefix_len))
 		return 0;
-	size_t number = (size_t) *val;
+	size_t number = (size_t)*val;
 	auto_free char *key_nt = strndup(key, key_len);
-	json_append_member(ctx->root, key_nt, json_mknumber(number));
+	json_append_member(ctx->root, key_nt, json_mknumber((double)number));
 	return 0;
 }
 
@@ -375,7 +375,7 @@ static char* stats_list(void *env, struct kr_module *module, const char *args)
 	for (unsigned i = 0; i < metric_const_end; ++i) {
 		struct const_metric_elm *elm = &const_metrics[i];
 		if (!args || strncmp(elm->key, args, args_len) == 0) {
-			json_append_member(root, elm->key, json_mknumber(elm->val));
+			json_append_member(root, elm->key, json_mknumber((double)elm->val));
 		}
 	}
 	struct list_entry_context ctx = {
