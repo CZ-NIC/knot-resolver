@@ -24,9 +24,8 @@ depends=(
     'python'
     'python-yaml'
     'python-aiohttp'
-    'python-typing-extensions'
+    'python-typing_extensions'
     'python-prometheus_client'
-    'python-typing-extensions'
     'python-jinja'
     'supervisor'
 )
