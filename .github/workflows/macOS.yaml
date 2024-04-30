@@ -27,12 +27,13 @@ jobs:
           git clone -b ${KNOT_DNS_VERSION} https://gitlab.nic.cz/knot/knot-dns.git
           cd knot-dns
           autoreconf -fi
-          ./configure --disable-static --disable-fastparser --disable-documentation --disable-daemon --disable-utilities --with-lmdb=no
+          ./configure --prefix=${HOME}/.local/usr --disable-static --disable-fastparser --disable-documentation --disable-daemon --disable-utilities --with-lmdb=no
           make -j2 install
           cd ..
 
       - name: Build resolver
         run: |
+          export PKG_CONFIG_PATH="${PKG_CONFIG_PATH}:${HOME}/.local/usr/lib/pkgconfig"
           meson build_darwin --default-library=static --buildtype=debugoptimized --prefix=${HOME}/.local/usr -Dc_args='-fno-omit-frame-pointer'
           ninja -C build_darwin -v install
 
