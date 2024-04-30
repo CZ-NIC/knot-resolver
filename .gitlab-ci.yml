@@ -157,18 +157,31 @@ build-deb12-knot-master:
     - ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite snowflake
   allow_failure: true
 
-build-stable-asan:
+build-stable-asan-gcc:
   <<: *build
   script:
-      # issues with UBSan and ASan in CI:
-      #  - `ahocorasick.so` causes C++ problems
-      #  - `--default-library=shared` causes link problems
-    - CC=clang CXX=clang++ CFLAGS=-fno-sanitize-recover=all CXXFLAGS=-fno-sanitize=undefined meson build_ci_asan --default-library=static --prefix=$PREFIX -Dmalloc=jemalloc -Db_sanitize=address,undefined -Dextra_tests=enabled
+    - CFLAGS=-fno-sanitize-recover=all meson build_ci_asan --prefix=$PREFIX -Dmalloc=jemalloc -Db_sanitize=address,undefined -Dextra_tests=enabled
     - ninja -C build_ci_asan
     - ninja -C build_ci_asan install >/dev/null
-      # TODO _leaks: not sure what exactly is wrong in leak detection on config tests
-      # TODO skip_asan: all three of these disappear locally when using gcc 9.1 (except some leaks)
-    - MESON_TESTTHREADS=1 ASAN_OPTIONS=detect_leaks=0 ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite skip_asan --no-suite snowflake
+    - MESON_TESTTHREADS=1 ${MESON_TEST} --suite unit --suite dnstap --no-suite skip_asan --no-suite snowflake
+    - MESON_TESTTHREADS=1 ASAN_OPTIONS=detect_leaks=0 ${MESON_TEST} --suite config --no-suite skip_asan --no-suite snowflake
+
+
+# TODO: Clang sanitizer seems to be broken in the current version of Debian. Use
+# GCC above and maybe re-enable the Clang one once we update at some point.
+
+#build-stable-asan-clang:
+#  <<: *build
+#  script:
+#      # issues with UBSan and ASan in CI:
+#      #  - `ahocorasick.so` causes C++ problems
+#      #  - `--default-library=shared` causes link problems
+#    - CC=clang CXX=clang++ CFLAGS=-fno-sanitize-recover=all CXXFLAGS=-fno-sanitize=undefined meson build_ci_asan --default-library=static --prefix=$PREFIX -Dmalloc=jemalloc -Db_sanitize=address,undefined -Dextra_tests=enabled
+#    - ninja -C build_ci_asan
+#    - ninja -C build_ci_asan install >/dev/null
+#      # TODO _leaks: not sure what exactly is wrong in leak detection on config tests
+#      # TODO skip_asan: all three of these disappear locally when using gcc 9.1 (except some leaks)
+#    - MESON_TESTTHREADS=1 ASAN_OPTIONS=detect_leaks=0 ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite skip_asan --no-suite snowflake
 
 build:macOS:
   <<: *nodep
@@ -371,7 +384,7 @@ respdiff:basic:
   <<: *after_build
   stage: test
   needs:
-    - build-stable-asan
+    - build-stable-asan-gcc
   script:
     - ulimit -n "$(ulimit -Hn)" # applies only for kresd ATM
     - ./ci/respdiff/start-resolvers.sh
@@ -417,7 +430,7 @@ pkgtest:
 pytests:
   <<: *test_flaky
   needs:
-    - build-stable-asan
+    - build-stable-asan-gcc
   artifacts:
     when: always
     paths:
