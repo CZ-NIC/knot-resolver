@@ -287,7 +287,6 @@ class IPv4Address(BaseValueType):
     _value: ipaddress.IPv4Address
 
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
-        super().__init__(source_value)
         if isinstance(source_value, str):
             try:
                 self._value: ipaddress.IPv4Address = ipaddress.IPv4Address(source_value)
@@ -332,7 +331,6 @@ class IPv6Address(BaseValueType):
     _value: ipaddress.IPv6Address
 
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
-        super().__init__(source_value)
         if isinstance(source_value, str):
             try:
                 self._value: ipaddress.IPv6Address = ipaddress.IPv6Address(source_value)
@@ -385,7 +383,6 @@ class IPAddressEM(BaseValueType):
     _addr: Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
 
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
-        super().__init__(source_value)
         if isinstance(source_value, str):
             if source_value.endswith("!"):
                 addr, suff = source_value.split("!", 1)
@@ -437,7 +434,6 @@ class IPNetwork(BaseValueType):
     _value: Union[ipaddress.IPv4Network, ipaddress.IPv6Network]
 
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
-        super().__init__(source_value)
         if isinstance(source_value, str):
             try:
                 self._value: Union[ipaddress.IPv4Network, ipaddress.IPv6Network] = ipaddress.ip_network(source_value)
@@ -475,7 +471,6 @@ class IPv6Network(BaseValueType):
     _value: ipaddress.IPv6Network
 
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
-        super().__init__(source_value)
         if isinstance(source_value, str):
             try:
                 self._value: ipaddress.IPv6Network = ipaddress.IPv6Network(source_value)

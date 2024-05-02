@@ -13,7 +13,6 @@ class IntBase(BaseValueType):
     _value: int
 
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
-        super().__init__(source_value, object_path)
         if isinstance(source_value, int) and not isinstance(source_value, bool):
             self._orig_value = source_value
             self._value = source_value
@@ -53,7 +52,6 @@ class StrBase(BaseValueType):
     _value: str
 
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
-        super().__init__(source_value, object_path)
         if isinstance(source_value, (str, int)) and not isinstance(source_value, bool):
             self._orig_value = str(source_value)
             self._value = str(source_value)
