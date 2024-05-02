@@ -35,6 +35,13 @@ integr_tests += [
 mod_inc_dir = include_directories('..', '../contrib',
   luajit.get_pkgconfig_variable('includedir'))
 
+mod_deps = [
+  contrib_dep,
+  libknot,
+  libuv,
+  luajit,
+]
+
 # handle more complex C/LUA modules separately
 subdir('bogus_log')
 # cookies module is not currently used
