@@ -14,9 +14,7 @@ integr_tests += [
 stats_mod = shared_module(
   'stats',
   stats_src,
-  dependencies: [
-    libknot,
-  ],
+  dependencies: mod_deps,
   include_directories: mod_inc_dir,
   name_prefix: '',
   install: true,
