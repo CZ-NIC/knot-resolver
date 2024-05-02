@@ -9,10 +9,7 @@ c_src_lint += hints_src
 hints_mod = shared_module(
   'hints',
   hints_src,
-  dependencies: [
-    libknot,
-    luajit,
-  ],
+  dependencies: mod_deps,
   include_directories: mod_inc_dir,
   name_prefix: '',
   install: true,
