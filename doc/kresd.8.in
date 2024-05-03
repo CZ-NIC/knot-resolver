@@ -29,8 +29,11 @@
 .RB [ \-h | \-\-help ]
 .IR [rundir]
 .SH "DESCRIPTION"
-.B Knot Resolver is a DNSSEC-enabled full caching resolver.
+.B Beware: you most likely don't want to use the kresd process directly.
+Instead the knot-resolver command will manage the processes for you.
 .P
+Knot Resolver is a DNSSEC-enabled full caching resolver.
+
 Default mode of operation: when it receives a DNS query it iteratively
 asks authoritative nameservers starting from root zone (.) and ending
 with a nameservers authoritative for queried name. Automatic DNSSEC means
