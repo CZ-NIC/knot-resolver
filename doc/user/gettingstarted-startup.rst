@@ -13,7 +13,6 @@ The main way to run Knot Resolver is to use provided integration with ``systemd`
    $ sudo systemctl start knot-resolver.service
 
 See logs and status of running instance with ``systemctl status knot-resolver.service`` command.
-For more information about systemd integration see ``man knot-resolver.systemd``.
 
 .. warning::
 
