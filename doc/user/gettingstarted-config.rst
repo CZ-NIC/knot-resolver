@@ -15,7 +15,7 @@ You can start exploring the configuration by reading further in this chapter, or
    :local:
 
 Complete example configuration files can be found `in Knot Resolver's source repository <https://gitlab.nic.cz/knot/knot-resolver/tree/master/etc/config>`_.
-Examples are also installed as documentation files, typically in the ``/usr/share/doc/knot-resolver/examples/`` directory (the location may differ based on your Linux distribution).
+Examples are also installed as documentation files, typically in the ``/usr/share/doc/knot-resolver*/examples/`` directory (the location may differ based on your Linux distribution).
 
 .. tip::
 

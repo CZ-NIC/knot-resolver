@@ -37,7 +37,7 @@ HTTP request methods               Operation
 
 .. note::
 
-    Managemnet API has other useful endpoints (metrics, schema, ...), see the detailed :ref:`API documentation <manager-api>`.
+    Management API has other useful endpoints (metrics, schema, ...), see the detailed :ref:`API documentation <manager-api>`.
 
 **path:**
     Determines specific configuration option or configuration subtree on that path.
@@ -48,7 +48,7 @@ HTTP request methods               Operation
 
 .. note::
 
-    Some configuration options cannot be configured via the API for stability and security reasons(e.g. API configuration itself).
+    Some configuration options cannot be configured via the API for stability and security reasons (e.g. API configuration itself).
     In the case of an attempt to configure such an option, the operation is rejected.
 
 
@@ -61,7 +61,7 @@ HTTP request methods               Operation
 Dynamically changing configuration
 ===================================
 
-Knot Resolver Manager is capable of dynamically changing its configuration via an HTTP API or by reloading its config file. Both methods are equivalent in terms of its capabilities. The ``kresctl`` utility uses the HTTP API and provides a convinient command line interface.
+Knot Resolver Manager is capable of dynamically changing its configuration via an HTTP API or by reloading its config file. Both methods are equivalent in terms of its capabilities. The ``kresctl`` utility uses the HTTP API and provides a convenient command line interface.
 
 Reloading configuration file
 ============================
