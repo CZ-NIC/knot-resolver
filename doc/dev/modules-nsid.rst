@@ -1,1 +1,0 @@
-../../modules/nsid/README.rst

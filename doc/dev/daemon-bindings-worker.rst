@@ -1,1 +1,0 @@
-../../daemon/bindings/worker.rst

@@ -5,12 +5,8 @@ build:
   tools:
     python: "3.11"
 
-sphinx:
-  configuration: doc/conf.py
-
-python:
-  install:
-    - requirements: doc/requirements.txt
+mkdocs:
+  configuration: mkdocs.yml
 
 formats:
   - pdf

@@ -1,9 +1,0 @@
-#!/bin/bash
-
-# ensure consistent behaviour
-src_dir="$(dirname "$(realpath "$0")")"
-source $src_dir/_env.sh
-
-build_kresd
-
-man -l .install_kresd/share/man/man8/$1*

@@ -1,1 +1,0 @@
-../../modules/http/README.rst

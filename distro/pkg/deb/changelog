@@ -1,6 +1,0 @@
-knot-resolver ({{ version }}-cznic.{{ release }}) unstable; urgency=medium
-
-  * upstream package
-  * see NEWS or https://knot-resolver.cz
-
- -- Jakub Ružička <jakub.ruzicka@nic.cz>  {{ now }}

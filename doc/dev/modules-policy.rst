@@ -1,1 +1,0 @@
-../../modules/policy/README.rst
