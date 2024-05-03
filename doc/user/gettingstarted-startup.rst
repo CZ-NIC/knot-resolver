@@ -16,7 +16,7 @@ See logs and status of running instance with ``systemctl status knot-resolver.se
 
 .. warning::
 
-    ``knot-resolver.service`` is not enabled by default, thus Knot Resolver won't start automatically after reboot.
+    ``knot-resolver.service`` may not be enabled by default after installation, thus Knot Resolver might not start automatically after reboot.
     To start and enable service in one command use ``systemctl enable --now knot-resolver.service``
 
 Unfortunately, for some cases (typically Docker and minimalistic systems), ``systemd`` is not available, therefore it is not possible to use ``knot-resolver.service``.
