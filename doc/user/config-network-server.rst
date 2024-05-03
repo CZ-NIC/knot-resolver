@@ -23,7 +23,7 @@ address + port combination.
    :header: "Protocol/service", :option:`kind <kind: dns|xdp|dot|doh2|doh-legacy>`
 
    "DNS (unencrypted UDP+TCP, :rfc:`1034`)","``dns``"
-   "DNS (unencrypted UDP, `using XDP Linux API <./dev/daemon-bindings-net_server.html#dns-over-xdp>`_)","``xdp``"
+   "DNS (unencrypted UDP, `using XDP Linux API <./dev/daemon-bindings-net_xdpsrv.html#dns-over-xdp>`_)","``xdp``"
    ":ref:`dns-over-tls`","``dot``"
    ":ref:`dns-over-https`","``doh2``"
    "`Legacy DNS-over-HTTPS (DoH) <./dev/modules-http.html#mod-http-doh>`_","``doh-legacy``"

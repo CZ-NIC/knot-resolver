@@ -38,7 +38,7 @@ You can use :ref:`kresctl validate <manager-client>` to check your configuration
                 [/management/interface] invalid port number 66000
                 [/logging/level] 'noticed' does not match any of the expected values ('crit', 'err', 'warning', 'notice', 'info', 'debug')
 
-    If you happen to find a rejected configuration with unhelpful or confusing error message, please report it as a bug.
+    If you happen to find a rejected configuration with an unhelpful or confusing error message, please report it as a bug.
 
 
 JSON Schema
