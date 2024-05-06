@@ -70,7 +70,6 @@ int main(int argc, char *argv[])
 	};
 	sigemptyset(&act.sa_mask);
 	kr_assert(!sigaction(SIGTERM, &act, NULL));
-	kr_assert(!sigaction(SIGKILL, &act, NULL));
 	kr_assert(!sigaction(SIGPIPE, &act, NULL));
 	kr_assert(!sigaction(SIGCHLD, &act, NULL));
 	kr_assert(!sigaction(SIGINT, &act, NULL));
