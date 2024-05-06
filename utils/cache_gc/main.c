@@ -64,10 +64,11 @@ int main(int argc, char *argv[])
 		(void)fflush(stderr);
 	}
 
-	static const struct sigaction act = {
+	struct sigaction act = {
 		.sa_handler = got_killed,
+		.sa_flags = SA_RESETHAND,
 	};
-
+	sigemptyset(&act.sa_mask);
 	kr_assert(!sigaction(SIGTERM, &act, NULL));
 	kr_assert(!sigaction(SIGKILL, &act, NULL));
 	kr_assert(!sigaction(SIGPIPE, &act, NULL));
