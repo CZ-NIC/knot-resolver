@@ -5,5 +5,6 @@ C.kr_rrl_init(
 	'{{ cfg.rundir }}/rrl',
 	{{ cfg.rate_limiting.capacity }},
 	{{ cfg.rate_limiting.instant_limit }},
-	{{ cfg.rate_limiting.rate_limit }})
+	{{ cfg.rate_limiting.rate_limit }},
+	{{ cfg.rate_limiting.tc_limit_perc }})
 {%- endif %}

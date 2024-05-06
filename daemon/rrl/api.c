@@ -21,6 +21,7 @@ struct rrl {
 	size_t capacity;
 	uint32_t instant_limit;
 	uint32_t rate_limit;
+	uint16_t tc_limit;
 	bool using_avx2;
 	kru_price_t v4_prices[RRL_V4_PREFIXES_CNT];
 	kru_price_t v6_prices[RRL_V6_PREFIXES_CNT];
@@ -38,7 +39,7 @@ static bool using_avx2(void)
 	return result;
 }
 
-void kr_rrl_init(const char *mmap_file, size_t capacity, uint32_t instant_limit, uint32_t rate_limit)
+void kr_rrl_init(const char *mmap_file, size_t capacity, uint32_t instant_limit, uint32_t rate_limit, int tc_limit_perc)
 {
 	int fd = the_rrl_fd = open(mmap_file, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
 	if (fd == -1) {
@@ -54,6 +55,8 @@ void kr_rrl_init(const char *mmap_file, size_t capacity, uint32_t instant_limit,
 	for (size_t c = capacity - 1; c > 0; c >>= 1) capacity_log++;
 
 	size_t size = offsetof(struct rrl, kru) + KRU.get_size(capacity_log);
+
+	uint16_t tc_limit = (tc_limit_perc == 100 ? -1 : ((uint32_t)tc_limit_perc << 16) / 100);
 
 	// try to acquire write lock; initialize KRU on success
 	struct flock fl = {
@@ -74,6 +77,7 @@ void kr_rrl_init(const char *mmap_file, size_t capacity, uint32_t instant_limit,
 		the_rrl->capacity = capacity;
 		the_rrl->instant_limit = instant_limit;
 		the_rrl->rate_limit = rate_limit;
+		the_rrl->tc_limit = tc_limit;
 		the_rrl->using_avx2 = using_avx2();
 
 		const kru_price_t base_price = KRU_LIMIT / instant_limit;
@@ -110,7 +114,7 @@ void kr_rrl_init(const char *mmap_file, size_t capacity, uint32_t instant_limit,
 		the_rrl = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 		kr_require(the_rrl != MAP_FAILED);
 		if ((the_rrl->capacity != capacity) || (the_rrl->instant_limit != instant_limit) ||
-				(the_rrl->rate_limit != rate_limit)) goto check_fail;
+				(the_rrl->rate_limit != rate_limit) || (the_rrl->tc_limit != tc_limit)) goto check_fail;
 		if (using_avx2() != the_rrl->using_avx2) goto check_fail;
 		kr_log_info(SYSTEM, "Using existing RRL data.\n");
 
@@ -157,40 +161,52 @@ bool kr_rrl_request_begin(struct kr_request *req)
 {
 	if (!req->qsource.addr)
 		return false;  // don't consider internal requests
-	bool limited = false;
+	uint8_t limited = 0;  // 0: not limited, 1: truncated, 2: no answer
+	uint16_t max_final_load = 0;
 	if (the_rrl) {
 		uint8_t key[16] ALIGNED(16) = {0, };
 		uint8_t limited_prefix;
-		// uint16_t max_final_load = 0;  // TODO use for query ordering and/or soft limit with TC=1
 		if (req->qsource.addr->sa_family == AF_INET6) {
 			struct sockaddr_in6 *ipv6 = (struct sockaddr_in6 *)req->qsource.addr;
 			memcpy(key, &ipv6->sin6_addr, 16);
 
 			limited_prefix = KRU.limited_multi_prefix_or((struct kru *)the_rrl->kru, kr_now(),
-					1, key, RRL_V6_PREFIXES, the_rrl->v6_prices, RRL_V6_PREFIXES_CNT, /* &max_final_load */ NULL);
+					1, key, RRL_V6_PREFIXES, the_rrl->v6_prices, RRL_V6_PREFIXES_CNT, &max_final_load);
 		} else {
 			struct sockaddr_in *ipv4 = (struct sockaddr_in *)req->qsource.addr;
 			memcpy(key, &ipv4->sin_addr, 4);  // TODO append port?
 
 			limited_prefix = KRU.limited_multi_prefix_or((struct kru *)the_rrl->kru, kr_now(),
-					0, key, RRL_V4_PREFIXES, the_rrl->v4_prices, RRL_V4_PREFIXES_CNT, /* &max_final_load */ NULL);
+					0, key, RRL_V4_PREFIXES, the_rrl->v4_prices, RRL_V4_PREFIXES_CNT, &max_final_load);
 		}
-		limited = limited_prefix;
+		limited = (limited_prefix ? 2 : (max_final_load > the_rrl->tc_limit ? 1 : 0));
 	}
-	if (!limited) return limited;
+	if (!limited) return false;
 
 	knot_pkt_t *answer = kr_request_ensure_answer(req);
 	if (!answer) { // something bad; TODO: perhaps improve recovery from this
 		kr_assert(false);
-		return limited;
+		return true;
 	}
 	// at this point the packet should be pretty clear
 
-	// Example limiting: REFUSED.
-	knot_wire_set_rcode(answer->wire, KNOT_RCODE_REFUSED);
-	kr_request_set_extended_error(req, KNOT_EDNS_EDE_OTHER, "YRAA: rate-limited");
+	if (limited == 1) {
+		// TC=1.
+		knot_wire_set_tc(answer->wire);
+		knot_wire_clear_ad(answer->wire);
+		req->state = KR_STATE_DONE;
+	} else {
+		/*
+		// Example limiting: REFUSED.
+		knot_wire_set_rcode(answer->wire, KNOT_RCODE_REFUSED);
+		kr_request_set_extended_error(req, KNOT_EDNS_EDE_OTHER, "YRAA: rate-limited");
+		req->state = KR_STATE_DONE;
+		*/
 
-	req->state = KR_STATE_DONE;
+		// no answer
+		req->options.NO_ANSWER = true;
+		req->state = KR_STATE_FAIL;
+	}
 
-	return limited;
+	return true;
 }

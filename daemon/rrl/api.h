@@ -7,7 +7,7 @@ struct kr_request;
  * The existing data are used if another instance is already using the file
  * and it was initialized with the same parameters; it fails on mismatch. */
 KR_EXPORT
-void kr_rrl_init(const char *mmap_file, size_t capacity, uint32_t instant_limit, uint32_t rate_limit);
+void kr_rrl_init(const char *mmap_file, size_t capacity, uint32_t instant_limit, uint32_t rate_limit, int tc_limit_perc);
 
 /** Do rate-limiting, during knot_layer_api::begin. */
 KR_EXPORT

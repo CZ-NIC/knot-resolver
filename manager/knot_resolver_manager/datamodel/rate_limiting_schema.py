@@ -1,4 +1,5 @@
 from knot_resolver_manager.utils.modeling import ConfigSchema
+from knot_resolver_manager.datamodel.types import Percent
 
 
 class RateLimitingSchema(ConfigSchema):
@@ -9,11 +10,13 @@ class RateLimitingSchema(ConfigSchema):
     capacity: Expected maximal number of blocked networks/hosts at the same time.
     rate_limit: Number of allowed queries per second from a single host.
     instant_limit: Number of allowed queries at a single point in time from a single host.
+    tc_limit_perc: Percent of rate/instant limit from which responses are sent as truncated.
     """
 
     capacity: int = 524288
     rate_limit: int
     instant_limit: int = 50
+    tc_limit_perc: Percent = Percent(90);
 
     def _validate(self) -> None:
         max_instant_limit = int(2**32 / 768 - 1)

@@ -95,7 +95,7 @@ static void test_rrl(void **state) {
 	const char *tmpdir = test_tmpdir_create();
 	char mmap_file[64];
 	stpcpy(stpcpy(mmap_file, tmpdir), "/rrl");
-	kr_rrl_init(mmap_file, RRL_TABLE_SIZE, RRL_INSTANT_LIMIT, RRL_RATE_LIMIT);
+	kr_rrl_init(mmap_file, RRL_TABLE_SIZE, RRL_INSTANT_LIMIT, RRL_RATE_LIMIT, 100);
 
 	if (KRU.initialize == KRU_GENERIC.initialize) {
 		struct kru_generic *kru = (struct kru_generic *) the_rrl->kru;

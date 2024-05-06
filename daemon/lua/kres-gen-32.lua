@@ -581,7 +581,7 @@ knot_pkt_t *worker_resolve_mk_pkt(const char *, uint16_t, uint16_t, const struct
 struct qr_task *worker_resolve_start(knot_pkt_t *, struct kr_qflags);
 int zi_zone_import(const zi_config_t);
 _Bool kr_rrl_request_begin(struct kr_request *);
-void kr_rrl_init(const char *, size_t, uint32_t, uint32_t);
+void kr_rrl_init(const char *, size_t, uint32_t, uint32_t, int);
 struct engine {
 	char _stub[];
 };
