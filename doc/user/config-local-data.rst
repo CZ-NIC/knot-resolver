@@ -83,6 +83,7 @@ It provides various input formats described in following subsections.
       they won't work exactly as in real zones on authoritative servers.
       For example, wildcards won't get expanded and DNAMEs won't cause occlusion.
 
+   .. _config-local-data-rpz:
 
    Response Policy Zones (RPZ)
    ---------------------------

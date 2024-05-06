@@ -164,7 +164,8 @@ Mandatory domain blocking
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Some jurisdictions mandate blocking access to certain domains.
-This can be achieved using by using :option:`rules <rules: <list>>`.
+This can be achieved e.g. by using :option:`rules <rules: <list>>`.
+(Or you might use a :ref:`RPZ file <config-local-data-rpz>`, as many resolver implementations accept that format.)
 
 .. code-block:: yaml
 
