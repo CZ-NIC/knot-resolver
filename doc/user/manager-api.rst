@@ -29,7 +29,7 @@ What can the API do?
 - ``GET /metrics/prometheus`` provides metrics in Prometheus format
     The ``prometheus-client`` Python package needs to be installed. If not installed, it returns 404 (Not Found).
 
-- ``POST /cache/clear`` purges cache records matching the specified criteria, see :ref:`cache clearing <config-cache-clear>`
+- ``POST /cache/clear`` purges cache records matching the specified criteria, see :ref:`manager-api-cache-clear`
 
 
 Configuring the API socket
@@ -82,3 +82,64 @@ Some configuration options cannot be changed dynamically for stability or securi
 In the case of an attempt to configure such an option, the operation is rejected.
 
 
+.. _manager-api-cache-clear:
+
+Cache clearing API
+------------------
+``POST /cache/clear`` purges cache records matching the specified criteria.
+Some general properties of cache-clearance are also described at :ref:`config-cache-clear`.
+
+Parameters
+``````````
+Parameters are in JSON and sent with the HTTP request as its body.
+
+.. option:: "name": "<name>"
+
+   Optional, subtree to purge; if the name isn't provided, whole cache is purged (and any other parameters are disregarded).
+
+.. option:: "exact-name": true|false
+
+   :default: false
+
+   If set to ``true``, only records with *the same* name are removed.
+
+.. option:: "rr-type": "<rr-type>"
+
+   Optional, you may additionally specify the type to remove, but that is only supported with :option:`exact-name <"exact-name": true|false>` enabled.
+
+.. option:: "chunk-size": <integer>
+
+   :default: 100
+
+   The number of records to remove in a single round. The purpose is not to block the resolver for too long.
+   By default, the resolver repeats the command after at least one millisecond until all the matching data is cleared.
+
+Return value
+````````````
+
+The return value is an object with the following fields. The ``count`` field is
+always present.
+
+.. option:: "count": integer
+
+   The number of items removed from the cache by this call (may be 0 if no entry matched criteria).
+
+   Always present.
+
+.. option:: "not_apex": true|false
+
+   Cleared subtree is not cached as zone apex; proofs of non-existence were probably not removed.
+
+   Optional. Considered ``false`` when not present.
+
+.. option:: "subtree": "<zone_apex>"
+
+   Hint where zone apex lies (this is an estimation based on the cache contents and may not always be accurate).
+
+   Optional.
+
+.. option:: "chunk_limit": true|false
+
+   More than :option:`chunk-size <"chunk-size": <integer>>` items needs to be cleared, clearing will continue asynchronously.
+
+   Optional. Considered ``false`` when not present.

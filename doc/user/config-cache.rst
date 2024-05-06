@@ -53,6 +53,16 @@ Now you can configure cache size to be 90% of the free memory 14 928 MB, i.e. 13
 Clearing
 --------
 
+You can use :ref:`kresctl <manager-client-commands>` to clear (parts of) the cache, e.g.:
+
+.. code-block:: none
+
+   $ kresctl cache clear example.com.
+
+   $ kresctl cache clear --help
+
+It is also possible to use HTTP API directly: :ref:`manager-api-cache-clear`.
+
 There are two specifics to purging cache records matching specified criteria:
 
 * To reliably remove negative cache entries, you need to clear the subtree with the whole zone. E.g. to clear negative cache entries for the (formerly non-existent)
@@ -60,71 +70,7 @@ There are two specifics to purging cache records matching specified criteria:
 * This operation is asynchronous and might not yet be finished when the call to the ``/cache/clear`` API endpoint returns.
   The return value indicates if clearing continues asynchronously or not.
 
-.. tip::
-
-   Use :ref:`manager-client` to clear the cache.
-
-   .. code-block:: none
-
-      $ kresctl cache clear example.com.
-
 .. [#] This is a consequence of DNSSEC negative cache which relies on proofs of non-existence on various owner nodes. It is impossible to efficiently flush part of DNS zones signed with NSEC3.
-
-
-Parameters
-``````````
-Parameters for cache clearance are in JSON and are sent with the HTTP request as its body.
-
-.. option:: "name": "<name>"
-
-   Optional, subtree to purge; if the name isn't provided, whole cache is purged (and any other parameters are disregarded).
-
-.. option:: "exact-name": true|false
-
-   :default: false
-
-   If set to ``true``, only records with *the same* name are removed.
-
-.. option:: "rr-type": "<rr-type>"
-
-   Optional, you may additionally specify the type to remove, but that is only supported with :option:`exact-name <"exact-name": true|false>` enabled.
-
-.. option:: "chunk-size": <integer>
-
-   :default: 100
-
-   The number of records to remove in a single round. The purpose is not to block the resolver for too long.
-   By default, the resolver repeats the command after at least one millisecond until all the matching data is cleared.
-
-Return value
-````````````
-
-The return value is an object with the following fields. The ``count`` field is
-always present.
-
-.. option:: "count": integer
-
-   The number of items removed from the cache by this call (may be 0 if no entry matched criteria).
-
-   Always present.
-
-.. option:: "not_apex": true|false
-
-   Cleared subtree is not cached as zone apex; proofs of non-existence were probably not removed.
-
-   Optional. Considered ``false`` when not present.
-
-.. option:: "subtree": "<zone_apex>"
-
-   Hint where zone apex lies (this is an estimation based on the cache contents and may not always be accurate).
-
-   Optional.
-
-.. option:: "chunk_limit": true|false
-
-   More than :option:`chunk-size <"chunk-size": <integer>>` items needs to be cleared, clearing will continue asynchronously.
-
-   Optional. Considered ``false`` when not present.
 
 
 .. _config-cache-persistence:
