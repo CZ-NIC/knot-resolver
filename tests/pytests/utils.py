@@ -110,17 +110,12 @@ def expect_kresd_close(rst_ok=False):
         pytest.fail("kresd didn't close the connection")
 
 
-def make_ssl_context(insecure=False, verify_location=None, extra_options=None):
-    # set TLS v1.2+
-    context = ssl.SSLContext(ssl.PROTOCOL_TLS)
-    context.options |= ssl.OP_NO_SSLv2
-    context.options |= ssl.OP_NO_SSLv3
-    context.options |= ssl.OP_NO_TLSv1
-    context.options |= ssl.OP_NO_TLSv1_1
-
-    if extra_options is not None:
-        for option in extra_options:
-            context.options |= option
+def make_ssl_context(insecure=False, verify_location=None,
+                     minimum_tls=ssl.TLSVersion.TLSv1_2,
+                     maximum_tls=ssl.TLSVersion.MAXIMUM_SUPPORTED):
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    context.minimum_version = minimum_tls
+    context.maximum_version = maximum_tls
 
     if insecure:
         # turn off certificate verification
