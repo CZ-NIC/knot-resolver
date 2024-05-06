@@ -81,15 +81,13 @@ static int dname_cmp(const knot_dname_t *d1, const knot_dname_t *d2)
 	dname_reverse(d1, d1_len, d1_rev_arr);
 	dname_reverse(d2, d2_len, d2_rev_arr);
 
-	int res = 0;
-	while (res == 0 && d1_rev != NULL) {
-		res = lf_cmp(d1_rev, d2_rev);
-		d1_rev = knot_wire_next_label(d1_rev, NULL);
-		d2_rev = knot_wire_next_label(d2_rev, NULL);
-	}
-
-	kr_require(res != 0 || d2_rev == NULL);
-	return res;
+	do {
+		int res = lf_cmp(d1_rev, d2_rev);
+		if (res != 0 || d1_rev[0] == '\0')
+			return res;
+		d1_rev = knot_dname_next_label(d1_rev);
+		d2_rev = knot_dname_next_label(d2_rev);
+	} while (true);
 }
 
 
@@ -251,7 +249,7 @@ int kr_nsec_negative(const ranked_rr_array_t *rrrs, uint32_t qry_uid,
 	ssynth[1] = '*';
 	const knot_dname_t *clencl = sname;
 	for (int l = sname_labels; l > clencl_labels; --l)
-		clencl = knot_wire_next_label(clencl, NULL);
+		clencl = knot_dname_next_label(clencl);
 	(void)!!knot_dname_store(&ssynth[2], clencl);
 
 	// Try to (dis)prove the source of synthesis by a covering or matching NSEC.
