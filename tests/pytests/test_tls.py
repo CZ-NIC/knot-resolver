@@ -73,7 +73,7 @@ def test_tls_session_resumption(tmpdir, sf1, sf2, sf3):
 
     with make_kresd(workdir, 'tt') as kresd:
         ctx = utils.make_ssl_context(
-            verify_location=kresd.tls_cert_path, extra_options=[ssl.OP_NO_TLSv1_3])
+            verify_location=kresd.tls_cert_path, maximum_tls=ssl.TLSVersion.TLSv1_2)
         session = connect(kresd, ctx, sf1)  # initial conn
         connect(kresd, ctx, sf2, session)  # resume session on the same instance
 
