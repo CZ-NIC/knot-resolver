@@ -25,7 +25,8 @@ You can use :ref:`kresctl validate <manager-client>` to check your configuration
 
 .. warning::
 
-    Some validation steps are however dynamic (for example resolving of interface names) and can not be premodeled for validation and even completed without running the resolver.
+    Validation can't fully guarantee successful startup.
+    Some conditions are checked at runtime, such as the resolution of interface names.
 
 .. tip::
 
