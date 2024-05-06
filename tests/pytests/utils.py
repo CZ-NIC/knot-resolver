@@ -112,11 +112,8 @@ def expect_kresd_close(rst_ok=False):
 
 def make_ssl_context(insecure=False, verify_location=None, extra_options=None):
     # set TLS v1.2+
-    context = ssl.SSLContext(ssl.PROTOCOL_TLS)
-    context.options |= ssl.OP_NO_SSLv2
-    context.options |= ssl.OP_NO_SSLv3
-    context.options |= ssl.OP_NO_TLSv1
-    context.options |= ssl.OP_NO_TLSv1_1
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
 
     if extra_options is not None:
         for option in extra_options:
