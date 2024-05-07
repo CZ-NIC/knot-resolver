@@ -1,5 +1,5 @@
-from knot_resolver_manager.utils.modeling import ConfigSchema
 from knot_resolver_manager.datamodel.types import Percent
+from knot_resolver_manager.utils.modeling import ConfigSchema
 
 
 class RateLimitingSchema(ConfigSchema):
@@ -16,7 +16,7 @@ class RateLimitingSchema(ConfigSchema):
     capacity: int = 524288
     rate_limit: int
     instant_limit: int = 50
-    tc_limit_perc: Percent = Percent(90);
+    tc_limit_perc: Percent = Percent(90)
 
     def _validate(self) -> None:
         max_instant_limit = int(2**32 / 768 - 1)
