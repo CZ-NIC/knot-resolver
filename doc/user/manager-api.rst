@@ -85,7 +85,10 @@ List of API endpoints
 
 - ``GET /schema`` returns JSON schema of the configuration data model
 - ``GET /schema/ui`` redirect to an external website with the JSON schema visualization
-- ``GET /metrics`` provides Prometheus metrics
+- ``GET /metrics`` returns 301 (Moved Permanently) and redirects to ``/metrics/json``
+- ``GET /metrics/json`` provides aggregated metrics in JSON format 
+- ``GET /metrics/prometheus`` provides metrics in Prometheus format
+    The ``prometheus-client`` Python package needs to be installed. If not installed, it returns 404 (Not Found).
 - ``GET /`` static response that could be used to determine, whether the Manager is running
 - ``POST /stop`` gracefully stops the Manager, empty request body
 - ``POST /cache/clear`` purges cache records matching the specified criteria, see :ref:`cache clearing <config-cache-clear>`

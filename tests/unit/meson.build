@@ -10,7 +10,7 @@ mock_cmodule_mod = shared_module(
   'mock_cmodule',
   mock_cmodule_src,
   name_prefix: '',
-  dependencies: libknot,
+  dependencies: mod_deps,
   include_directories: mod_inc_dir,
 )
 
@@ -21,10 +21,11 @@ foreach unit_test : unit_tests
     unit_test[1],
     dependencies: [
       kresd_deps,
-      contrib_dep,
-      libkres_dep,
-      libknot,
       cmocka,
+      contrib_dep,
+      libknot,
+      libkres_dep,
+      libuv,
       lmdb,
       libdnssec,
       # https://mesonbuild.com/howtox.html#add-math-library-lm-portably

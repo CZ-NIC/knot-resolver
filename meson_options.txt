@@ -227,3 +227,15 @@ option(
   value: 'auto',
   description: 'cmocka unit tests',
 )
+
+option(
+  'install_rpath',
+  type: 'combo',
+  choices: [
+    'auto',
+    'enabled',
+    'disabled',
+  ],
+  value: 'auto',
+  description: 'add rpath to the knot resolver executables',
+)

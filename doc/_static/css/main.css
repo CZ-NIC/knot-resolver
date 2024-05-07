@@ -1,2 +1,6 @@
-@import "custom.css";
-@import "logo_colors.css";
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+@import "theme.css";
+
+table.docutils blockquote {
+    margin-left: 0;
+}

@@ -24,6 +24,10 @@ extensions = [
     'sphinx_tabs.tabs',
 ]
 
+theme_major = sphinx_rtd_theme.__version__.partition('.')[0]
+if theme_major == '2':
+    extensions.append('sphinxcontrib.jquery')
+
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 exclude_patterns = ['_build']

@@ -18,6 +18,7 @@ usr/lib/knot-resolver/kres_modules/experimental_dot_auth.lua
 usr/lib/knot-resolver/kres_modules/graphite.lua
 usr/lib/knot-resolver/kres_modules/policy.lua
 usr/lib/knot-resolver/kres_modules/predict.lua
+usr/lib/knot-resolver/kres_modules/prefetch.lua
 usr/lib/knot-resolver/kres_modules/prefill.lua
 usr/lib/knot-resolver/kres_modules/priming.lua
 usr/lib/knot-resolver/kres_modules/rebinding.lua

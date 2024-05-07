@@ -9,9 +9,7 @@ c_src_lint += extended_error_src
 extended_error_mod = shared_module(
   'extended_error',
   extended_error_src,
-  dependencies: [
-    libknot,
-  ],
+  dependencies: mod_deps,
   include_directories: mod_inc_dir,
   name_prefix: '',
   install: true,

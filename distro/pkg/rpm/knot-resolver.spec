@@ -143,22 +143,17 @@ native C implementation, which doesn't require this package.
 Summary:        Configuration tool for Knot Resolver
 Provides:       knot-resolver6 = %{version}-%{release}
 Requires:       %{name}-core = %{version}-%{release}
-%if 0%{?rhel} == 8
 Requires:       python3
-Requires:       python3-pyyaml
 Requires:       python3-aiohttp
-Requires:       python3-typing-extensions
-Requires:       python3-prometheus_client
 Requires:       supervisor
-%endif
 %if 0%{?suse_version}
-Requires:		python3
-Requires:		python3-PyYAML
-Requires:		python3-aiohttp
-Requires:		python3-typing_extensions
-Requires:		python3-prometheus_client
-Requires:		supervisor
+Requires:       python3-PyYAML
+Requires:       python3-typing_extensions
+%else
+Requires:       python3-pyyaml
+Requires:       python3-typing-extensions
 %endif
+Recommends:     python3-prometheus_client
 
 %description -n knot-resolver-manager
 Knot Resolver Manager is a configuration tool for Knot Resolver. The Manager
@@ -304,6 +299,7 @@ getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysc
 %{_libdir}/knot-resolver/kres_modules/graphite.lua
 %{_libdir}/knot-resolver/kres_modules/policy.lua
 %{_libdir}/knot-resolver/kres_modules/predict.lua
+%{_libdir}/knot-resolver/kres_modules/prefetch.lua
 %{_libdir}/knot-resolver/kres_modules/prefill.lua
 %{_libdir}/knot-resolver/kres_modules/priming.lua
 %{_libdir}/knot-resolver/kres_modules/rebinding.lua
@@ -345,7 +341,7 @@ getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysc
 
 %files -n knot-resolver-manager
 %{python3_sitearch}/knot_resolver_manager*
-%{_sysconfdir}/knot-resolver/config.yaml
+%config(noreplace) %{_sysconfdir}/knot-resolver/config.yaml
 %{_unitdir}/knot-resolver.service
 %{_bindir}/kresctl
 %{_bindir}/knot-resolver

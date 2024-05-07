@@ -16,4 +16,8 @@ network:
 cache:
   size-max: 100M
   # prefetch expiring/frequent records
-  prediction: true
+  prefetch:
+    expiring: true
+    prediction:
+      period: 24
+      window: 15m

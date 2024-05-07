@@ -6,7 +6,6 @@
 
 #include <stdint.h>
 
-#include "daemon/session2.h"
 #include "lib/utils.h"
 
 extern const char PROXY2_SIGNATURE[12];
@@ -20,14 +19,20 @@ enum proxy2_command {
 
 /** Parsed result of the PROXY protocol */
 struct proxy_result {
-	enum proxy2_command command;  /**< Proxy command - PROXY or LOCAL. */
-	int family;                   /**< Address family from netinet library (e.g. AF_INET6). */
-	int protocol;                 /**< Protocol type from socket library (e.g. SOCK_STREAM). */
-	union kr_sockaddr src_addr;   /**< Parsed source address and port. */
-	union kr_sockaddr dst_addr;   /**< Parsed destination address and port. */
-	bool has_tls : 1;             /**< `true` = client has used TLS with the proxy.
-	                                   If TLS padding is enabled, it will be used even if
-	                                   the proxy did not use TLS with kresd. */
+	/** Proxy command - PROXY or LOCAL. */
+	enum proxy2_command command;
+	/** Address family from netinet library (e.g. AF_INET6). */
+	int family;
+	/** Protocol type from socket library (e.g. SOCK_STREAM). */
+	int protocol;
+	/** Parsed source address and port. */
+	union kr_sockaddr src_addr;
+	/** Parsed destination address and port. */
+	union kr_sockaddr dst_addr;
+	/** `true` = client has used TLS with the proxy. If TLS padding is
+	 * enabled, it will be used even if the communication between kresd and
+	 * the proxy is unencrypted. */
+	bool has_tls : 1;
 };
 
 /** Checks for a PROXY protocol version 2 signature in the specified buffer. */

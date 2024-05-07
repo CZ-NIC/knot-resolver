@@ -57,10 +57,18 @@ enum const_metric {
 };
 struct const_metric_elm {
 	const char *key;
+	const char *sup_key;
+	const char *sub_key;
 	size_t val;
 };
 static struct const_metric_elm const_metrics[] = {
-	#define X(a,b) [metric_ ## a ## _ ## b] = { #a "." #b, 0 },
+	#define X(a,b) \
+		[metric_ ## a ## _ ## b] = { \
+			.key = #a "." #b, \
+			.sup_key = #a, \
+			.sub_key = #b, \
+			.val = 0 \
+		},
 	CONST_METRICS(X)
 	#undef X
 };
@@ -359,8 +367,31 @@ static int list_entry(const char *key, uint32_t key_len, trie_val_t *val, void *
 	if (!key_matches_prefix(key, key_len, ctx->key_prefix, ctx->key_prefix_len))
 		return 0;
 	size_t number = (size_t) *val;
-	auto_free char *key_nt = strndup(key, key_len);
-	json_append_member(ctx->root, key_nt, json_mknumber(number));
+
+	uint32_t dot_index = 0;
+	for (uint32_t i = 0; i < key_len; i++) {
+		if (!key[i])
+			break;
+		if (key[i] == '.') {
+			dot_index = i;
+		}
+	}
+
+	if (dot_index) {
+		auto_free char *sup_key_nt = strndup(key, dot_index);
+		auto_free char *sub_key_nt = strndup(key + dot_index + 1, key_len - dot_index - 1);
+		JsonNode *sup = json_find_member(ctx->root, sup_key_nt);
+		if (!sup) {
+			sup = json_mkobject();
+			json_append_member(ctx->root, sup_key_nt, sup);
+		}
+		if (kr_fails_assert(sup))
+			return 0;
+		json_append_member(sup, sub_key_nt, json_mknumber(number));
+	} else {
+		auto_free char *key_nt = strndup(key, key_len);
+		json_append_member(ctx->root, key_nt, json_mknumber(number));
+	}
 	return 0;
 }
 
@@ -376,8 +407,15 @@ static char* stats_list(void *env, struct kr_module *module, const char *args)
 	size_t args_len = args ? strlen(args) : 0;
 	for (unsigned i = 0; i < metric_const_end; ++i) {
 		struct const_metric_elm *elm = &const_metrics[i];
-		if (!args || strncmp(elm->key, args, args_len) == 0) {
-			json_append_member(root, elm->key, json_mknumber(elm->val));
+		if (!args || strcmp(elm->sup_key, args) == 0) {
+			JsonNode *sup = json_find_member(root, elm->sup_key);
+			if (!sup) {
+				sup = json_mkobject();
+				json_append_member(root, elm->sup_key, sup);
+			}
+			if (kr_fails_assert(sup))
+				break;
+			json_append_member(sup, elm->sub_key, json_mknumber(elm->val));
 		}
 	}
 	struct list_entry_context ctx = {

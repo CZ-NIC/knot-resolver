@@ -19,12 +19,10 @@ package_data = \
 {'': ['*'], 'knot_resolver_manager.datamodel.templates': ['macros/*']}
 
 install_requires = \
-['aiohttp',
- 'jinja2',
- 'prometheus-client',
- 'pyyaml',
- 'supervisor',
- 'typing-extensions']
+['aiohttp', 'jinja2', 'pyyaml', 'supervisor', 'typing-extensions']
+
+extras_require = \
+{'prometheus': ['prometheus-client']}
 
 entry_points = \
 {'console_scripts': ['knot-resolver = knot_resolver_manager.__main__:run',
@@ -32,17 +30,18 @@ entry_points = \
 
 setup_kwargs = {
     'name': 'knot-resolver-manager',
-    'version': '0.1.0',
-    'description': 'A central management tool for multiple instances of Knot Resolver',
+    'version': '6.0.7',
+    'description': 'A central tool for managing individual parts of Knot Resolver',
     'long_description': 'None',
-    'author': 'Václav Šraier',
-    'author_email': 'vaclav.sraier@nic.cz',
+    'author': 'Aleš Mrázek',
+    'author_email': 'ales.mrazek@nic.cz',
     'maintainer': 'None',
     'maintainer_email': 'None',
     'url': 'None',
     'packages': packages,
     'package_data': package_data,
     'install_requires': install_requires,
+    'extras_require': extras_require,
     'entry_points': entry_points,
     'python_requires': '>=3.8,<4.0',
 }

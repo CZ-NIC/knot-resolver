@@ -39,7 +39,7 @@
 
 
 /** Cache version */
-static const uint16_t CACHE_VERSION = 6;
+static const uint16_t CACHE_VERSION = 7;
 /** Key size */
 #define KEY_HSIZE (sizeof(uint8_t) + sizeof(uint16_t))
 #define KEY_SIZE (KEY_HSIZE + KNOT_DNAME_MAXLEN)

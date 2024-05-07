@@ -92,12 +92,12 @@ static inline enum proxy2_family proxy2_header_protocol(const struct proxy2_head
 
 static inline union proxy2_address *proxy2_get_address(const struct proxy2_header *h)
 {
-	return (union proxy2_address *) ((uint8_t *) h + sizeof(struct proxy2_header));
+	return (union proxy2_address *)((uint8_t *)h + sizeof(struct proxy2_header));
 }
 
 static inline struct proxy2_tlv *get_tlvs(const struct proxy2_header *h, size_t addr_len)
 {
-	return (struct proxy2_tlv *) ((uint8_t *) proxy2_get_address(h) + addr_len);
+	return (struct proxy2_tlv *)((uint8_t *)proxy2_get_address(h) + addr_len);
 }
 
 /** Gets the length of the TLV's `value` attribute. */
@@ -112,20 +112,20 @@ static inline bool has_tlv(const struct proxy2_header *h,
 	uint64_t addr_length = ntohs(h->length);
 	ptrdiff_t hdr_len = sizeof(struct proxy2_header) + addr_length;
 
-	uint8_t *tlv_hdr_end = (uint8_t *) tlv + sizeof(struct proxy2_tlv);
-	ptrdiff_t distance = tlv_hdr_end - (uint8_t *) h;
+	uint8_t *tlv_hdr_end = (uint8_t *)tlv + sizeof(struct proxy2_tlv);
+	ptrdiff_t distance = tlv_hdr_end - (uint8_t *)h;
 	if (hdr_len < distance)
 		return false;
 
 	uint8_t *tlv_end = tlv_hdr_end + proxy2_tlv_length(tlv);
-	distance = tlv_end - (uint8_t *) h;
+	distance = tlv_end - (uint8_t *)h;
 	return hdr_len >= distance;
 }
 
 static inline void next_tlv(struct proxy2_tlv **tlv)
 {
-	uint8_t *next = ((uint8_t *) *tlv + sizeof(struct proxy2_tlv) + proxy2_tlv_length(*tlv));
-	*tlv = (struct proxy2_tlv *) next;
+	uint8_t *next = ((uint8_t *)*tlv + sizeof(struct proxy2_tlv) + proxy2_tlv_length(*tlv));
+	*tlv = (struct proxy2_tlv *)next;
 }
 
 
@@ -141,7 +141,7 @@ bool proxy_allowed(const struct sockaddr *saddr)
 
 		trie = the_network->proxy_addrs4;
 		addr_size = sizeof(addr.ip4);
-		addr.ip4 = ((struct sockaddr_in *) saddr)->sin_addr;
+		addr.ip4 = ((struct sockaddr_in *)saddr)->sin_addr;
 		break;
 	case AF_INET6:
 		if (the_network->proxy_all6)
@@ -149,7 +149,7 @@ bool proxy_allowed(const struct sockaddr *saddr)
 
 		trie = the_network->proxy_addrs6;
 		addr_size = sizeof(addr.ip6);
-		addr.ip6 = ((struct sockaddr_in6 *) saddr)->sin6_addr;
+		addr.ip6 = ((struct sockaddr_in6 *)saddr)->sin6_addr;
 		break;
 	default:
 		kr_assert(false); // Only IPv4 and IPv6 proxy addresses supported
@@ -157,14 +157,14 @@ bool proxy_allowed(const struct sockaddr *saddr)
 	}
 
 	trie_val_t *val;
-	int ret = trie_get_leq(trie, (char *) &addr, addr_size, &val);
+	int ret = trie_get_leq(trie, (char *)&addr, addr_size, &val);
 	if (ret != kr_ok() && ret != 1)
 		return false;
 
 	kr_assert(val);
 	const struct net_proxy_data *found = *val;
 	kr_assert(found);
-	return kr_bitcmp((char *) &addr, (char *) &found->addr, found->netmask) == 0;
+	return kr_bitcmp((char *)&addr, (char *)&found->addr, found->netmask) == 0;
 }
 
 ssize_t proxy_process_header(struct proxy_result *out,
@@ -173,7 +173,7 @@ ssize_t proxy_process_header(struct proxy_result *out,
 	if (!buf)
 		return kr_error(EINVAL);
 
-	const struct proxy2_header *hdr = (struct proxy2_header *) buf;
+	const struct proxy2_header *hdr = (struct proxy2_header *)buf;
 
 	uint64_t content_length = ntohs(hdr->length);
 	ssize_t hdr_len = sizeof(struct proxy2_header) + content_length;
@@ -192,7 +192,7 @@ ssize_t proxy_process_header(struct proxy_result *out,
 	enum proxy2_command command = proxy2_header_command(hdr);
 	if (command == PROXY2_CMD_LOCAL) {
 		/* Addresses for LOCAL are to be discarded */
-		*out = (struct proxy_result) { .command = PROXY2_CMD_LOCAL };
+		*out = (struct proxy_result){ .command = PROXY2_CMD_LOCAL };
 		goto fill_wirebuf;
 	}
 
@@ -201,13 +201,14 @@ ssize_t proxy_process_header(struct proxy_result *out,
 		return kr_error(KNOT_EMALF);
 	}
 
-	*out = (struct proxy_result) { .command = PROXY2_CMD_PROXY };
+	*out = (struct proxy_result){ .command = PROXY2_CMD_PROXY };
 
 	/* Parse flags */
 	enum proxy2_family family = proxy2_header_family(hdr);
 	switch(family) {
 	case PROXY2_AF_UNSPEC:
-	case PROXY2_AF_UNIX: /* UNIX is unsupported, fall back to UNSPEC */
+	case PROXY2_AF_UNIX:
+		/* UNIX is unsupported, fall back to UNSPEC */
 		out->family = AF_UNSPEC;
 		break;
 	case PROXY2_AF_INET:
@@ -216,7 +217,8 @@ ssize_t proxy_process_header(struct proxy_result *out,
 	case PROXY2_AF_INET6:
 		out->family = AF_INET6;
 		break;
-	default: /* PROXYv2 prohibits other values */
+	default:
+		/* PROXYv2 prohibits other values */
 		return kr_error(KNOT_EMALF);
 	}
 
@@ -228,7 +230,8 @@ ssize_t proxy_process_header(struct proxy_result *out,
 	case PROXY2_PROTOCOL_STREAM:
 		out->protocol = SOCK_STREAM;
 		break;
-	default: /* PROXYv2 prohibits other values */
+	default:
+		/* PROXYv2 prohibits other values */
 		return kr_error(KNOT_EMALF);
 	}
 
@@ -241,12 +244,12 @@ ssize_t proxy_process_header(struct proxy_result *out,
 		if (content_length < addr_length)
 			return kr_error(KNOT_EMALF);
 
-		out->src_addr.ip4 = (struct sockaddr_in) {
+		out->src_addr.ip4 = (struct sockaddr_in){
 			.sin_family = AF_INET,
 			.sin_addr = { .s_addr = addr->ipv4_addr.src_addr },
 			.sin_port = addr->ipv4_addr.src_port,
 		};
-		out->dst_addr.ip4 = (struct sockaddr_in) {
+		out->dst_addr.ip4 = (struct sockaddr_in){
 			.sin_family = AF_INET,
 			.sin_addr = { .s_addr = addr->ipv4_addr.dst_addr },
 			.sin_port = addr->ipv4_addr.dst_port,
@@ -257,7 +260,7 @@ ssize_t proxy_process_header(struct proxy_result *out,
 		if (content_length < addr_length)
 			return kr_error(KNOT_EMALF);
 
-		out->src_addr.ip6 = (struct sockaddr_in6) {
+		out->src_addr.ip6 = (struct sockaddr_in6){
 			.sin6_family = AF_INET6,
 			.sin6_port = addr->ipv6_addr.src_port
 		};
@@ -265,7 +268,7 @@ ssize_t proxy_process_header(struct proxy_result *out,
 				&out->src_addr.ip6.sin6_addr.s6_addr,
 				&addr->ipv6_addr.src_addr,
 				sizeof(out->src_addr.ip6.sin6_addr.s6_addr));
-		out->dst_addr.ip6 = (struct sockaddr_in6) {
+		out->dst_addr.ip6 = (struct sockaddr_in6){
 			.sin6_family = AF_INET6,
 			.sin6_port = addr->ipv6_addr.dst_port
 		};

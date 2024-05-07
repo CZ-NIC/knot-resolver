@@ -203,7 +203,6 @@ static int l_log_groups(lua_State *L)
 			goto bad_call;
 		kr_log_group_reset();
 
-		int idx = 1;
 		lua_pushnil(L);
 		while (lua_next(L, 1) != 0) {
 			const char *grp_str = lua_tostring(L, -1);
@@ -217,7 +216,6 @@ static int l_log_groups(lua_State *L)
 				kr_log_warning(SYSTEM, "WARNING: unknown log group '%s'\n", lua_tostring(L, -1));
 			}
 
-			++idx;
 			lua_pop(L, 1);
 		}
 	}

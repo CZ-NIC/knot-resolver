@@ -18,9 +18,12 @@ if build_utils
       contrib_dep,
       libkres_dep,
       libknot,
+      libuv,
+      lmdb,
     ],
     install: true,
     install_dir: get_option('sbindir'),
+    install_rpath: rpath,
   )
 
 integr_tests += [

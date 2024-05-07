@@ -10,7 +10,6 @@ class ListOrItem(BaseGenericTypeWrapper[Union[List[T], T]]):
     _list: List[T]
 
     def __init__(self, source_value: Any, object_path: str = "/") -> None:  # pylint: disable=unused-argument
-        super().__init__(source_value)
         self._value_orig: Union[List[T], T] = source_value
 
         self._list: List[T] = source_value if isinstance(source_value, list) else [source_value]

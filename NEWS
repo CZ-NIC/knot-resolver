@@ -1,15 +1,55 @@
-Knot Resolver 6.0.7 (2024-0m-dd)
+Knot Resolver 6.0.8 (2024-0m-dd)
 ================================
 
 Improvements
 ------------
-- manager: clear the cache via management HTTP API (#876,!1491)
+- TLS (DoT, DoH): respect crypto policy overrides in OS (!1526)
+- arch package: fix after they renamed a dependency (!1536)
+- manager: export metrics to JSON via management HTTP API (!1527)
+
+  * JSON is the new default metrics output format
+  * the ``prometheus-client`` Python package is now an optional dependency,
+    required only for Prometheus export to work
+- cache: prefetching records
+
+  * predict module: prefetching expiring records moved to prefetch module
+  * prefetch module: new module to prefetch expiring records
+
+.. TODO: Change the link below to a versioned one when releasing.
+
+Incompatible changes
+--------------------
+- cache: the ``/cache/prediction`` configuration property has been reorganized
+  into ``/cache/prefetch/expiring`` and ``/cache/prefetch/prediction``, changing
+  the default behaviour as well. See the `relevant documentation section
+  <https://www.knot-resolver.cz/documentation/latest/config-cache-predict.html>`_
+  for more.
+
+
+Knot Resolver 6.0.7 (2024-03-27)
+================================
+
+Improvements
+------------
+- manager: clear the cache via management HTTP API (#876, !1491)
+- manager: added support for Python 3.12 and removed for 3.7 (!1502)
+- manager: use build-time install prefix to execute `kresd` instead of PATH (!1511)
 - docs: documentation is now separated into user and developer parts (!1514)
+- daemon: ignore UDP requests from ports < 1024 (!1507)
+- manager: increase startup timeout for processes (!1518, !1520)
+- local-data: increase default DB size to 2G on 64-bit platforms (!1518)
 
 Bugfixes
 --------
 - fix listening by interface name containing dashes (#900, !1500)
 - fix kresctl http request timeout (!1505)
+- fix RPZ if it contains apex NS record (!1516)
+- fix RPZ if SOA is repated, as usual in AXFR output (!1521)
+- avoid RPZ overriding the root SOA (!1521)
+- fix on 32-bit systems with 64-bit time_t (!1510)
+- fix paths to knot-dns libs if exec_prefix != prefix (!1503)
+- manager: add missing early check that neither a custom port nor TLS is set for
+  authoritative server forwarding (#902, !1505)
 
 
 Knot Resolver 6.0.6 (2024-02-13)
@@ -18,6 +58,7 @@ Knot Resolver 6.0.6 (2024-02-13)
 Security
 --------
 - CVE-2023-50868: NSEC3 closest encloser proof can exhaust CPU
+
   * validator: lower the NSEC3 iteration limit (150 -> 50)
   * validator: similarly also limit excessive NSEC3 salt length
   * cache: limit the amount of work on SHA1 in NSEC3 aggressive cache
@@ -51,13 +92,20 @@ not generally recommended for production use.
 
 6.0 contains biggest changes in the history of Knot Resolver releases.
 You will have to rewrite your configuration.  See documentation, in particular:
-https://knot.pages.nic.cz/knot-resolver/upgrading-to-6.html
+https://www.knot-resolver.cz/documentation/latest/upgrading-to-6.html
 
 
 
 
 5.x branch longterm support
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Knot Resolver 5.7.2 (2024-03-27)
+================================
+
+Bugfixes
+--------
+- fix on 32-bit systems with 64-bit time_t (!1510)
 
 
 Knot Resolver 5.7.1 (2024-02-13)

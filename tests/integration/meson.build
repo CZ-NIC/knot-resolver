@@ -9,7 +9,7 @@ augeas = dependency('augeas')
 
 # python3 dependencies
 py3_deps += [
-  ['augeas', 'augeas (for deckard)'],
+  ['augeas', 'python-augeas (for deckard)'],
   ['dns', 'dnspython (for deckard)'],
   ['dpkt', 'dpkt (for deckard)'],
   ['jinja2', 'jinja2 (for deckard)'],

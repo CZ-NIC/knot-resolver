@@ -9,32 +9,36 @@ FWD_TARGET = policy.FORWARD('192.0.2.1')
 function check_stats(got)
 	log_info(ffi.C.LOG_GRP_TESTS, 'checking if stat values match expected values:')
 	local expected = {
-		['answer.cd'] = 2,
-		['answer.cached'] = 1,
-		['answer.nodata'] = 1,
-		['answer.noerror'] = 2,
-		['answer.nxdomain'] = 1,
-		['answer.servfail'] = 2,
-		['answer.edns0'] = 6,
-		['answer.ra'] = 6,
-		['answer.rd'] = 5,
-		['answer.do'] = 1,
-		['answer.ad'] = 0,
-		['answer.tc'] = 0,
-		['answer.aa'] = 0,
-		['answer.total'] = 6
+		['answer'] = {
+			['cd'] = 2,
+			['cached'] = 1,
+			['nodata'] = 1,
+			['noerror'] = 2,
+			['nxdomain'] = 1,
+			['servfail'] = 2,
+			['edns0'] = 6,
+			['ra'] = 6,
+			['rd'] = 5,
+			['do'] = 1,
+			['ad'] = 0,
+			['tc'] = 0,
+			['aa'] = 0,
+			['total'] = 6
+		}
 	}
 	print(table_print(expected))
 
 	local ok = true
-	for key, expval in pairs(expected) do
-		if got[key] ~= expval then
-			log_info(ffi.C.LOG_GRP_TESTS,
-			    'ERROR: stats key ' .. key
-			    .. ' has unexpected value'
-			    .. ' (expected ' .. tostring(expval)
-			    .. ' got ' .. tostring(got[key] .. ')'))
-			ok = false
+	for sup_key, sup in pairs(expected) do
+		for sub_key, expval in pairs(sup) do
+			if got[sup_key][sub_key] ~= expval then
+				log_info(ffi.C.LOG_GRP_TESTS,
+				    'ERROR: stats key ' .. key
+				    .. ' has unexpected value'
+				    .. ' (expected ' .. tostring(expval)
+				    .. ' got ' .. tostring(got[key] .. ')'))
+				ok = false
+			end
 		end
 	end
 	if ok then

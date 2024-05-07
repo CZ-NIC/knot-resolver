@@ -71,22 +71,24 @@ static int client_verify_certificate(gnutls_session_t tls_session);
 static struct tls_credentials *tls_credentials_reserve(struct tls_credentials *tls_credentials);
 
 /**
- * Set mandatory security settings from
- * https://tools.ietf.org/html/draft-ietf-dprive-dtls-and-tls-profiles-11#section-9
+ * Set restrictions on TLS features, in particular ciphers.
+ *
+ * We explicitly disable features according to:
+ * https://datatracker.ietf.org/doc/html/rfc8310#section-9
+ * in case the gnutls+OS defaults allow them.
  * Performance optimizations are not implemented at the moment.
+ *
+ * OS defaults are taken into account, e.g. on Red Hat family there's
+ * /etc/crypto-policies/back-ends/gnutls.config and update-crypto-policies tool.
  */
 static int kres_gnutls_set_priority(gnutls_session_t session) {
-	static const char * const priorities =
-		"NORMAL:" /* GnuTLS defaults */
-		"-VERS-TLS1.0:-VERS-TLS1.1:" /* TLS 1.2 and higher */
-		 /* Some distros by default allow features that are considered
-		  * too insecure nowadays, so let's disable them explicitly. */
-		"-VERS-SSL3.0:-ARCFOUR-128:-COMP-ALL:+COMP-NULL";
+	static const char * const extra_prio =
+		"-VERS-TLS1.0:-VERS-TLS1.1:-VERS-SSL3.0:-ARCFOUR-128:-COMP-ALL:+COMP-NULL";
 	const char *errpos = NULL;
-	int err = gnutls_priority_set_direct(session, priorities, &errpos);
+	int err = gnutls_set_default_priority_append(session, extra_prio, &errpos, 0);
 	if (err != GNUTLS_E_SUCCESS) {
 		kr_log_error(TLS, "setting priority '%s' failed at character %zd (...'%s') with %s (%d)\n",
-			     priorities, errpos - priorities, errpos, gnutls_strerror_name(err), err);
+			     extra_prio, errpos - extra_prio, errpos, gnutls_strerror_name(err), err);
 	}
 	return err;
 }

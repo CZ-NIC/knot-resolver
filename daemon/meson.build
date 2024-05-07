@@ -67,4 +67,5 @@ kresd = executable(
   export_dynamic: true,
   install: true,
   install_dir: get_option('sbindir'),
+  install_rpath: rpath,
 )

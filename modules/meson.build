@@ -7,6 +7,7 @@ lua_mod_src = [  # add lua modules without separate meson.build
   files('dns64/dns64.lua'),
   files('etcd/etcd.lua'),
   files('graphite/graphite.lua'),
+  files('prefetch/prefetch.lua'),
   files('predict/predict.lua'),
   files('prefill/prefill.lua'),
   files('priming/priming.lua'),
@@ -34,6 +35,13 @@ integr_tests += [
 
 mod_inc_dir = include_directories('..', '../contrib',
   luajit.get_pkgconfig_variable('includedir'))
+
+mod_deps = [
+  contrib_dep,
+  libknot,
+  libuv,
+  luajit,
+]
 
 # handle more complex C/LUA modules separately
 subdir('bogus_log')

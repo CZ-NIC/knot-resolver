@@ -4,7 +4,7 @@ project(
   'knot-resolver',
   ['c', 'cpp'],
   license: 'GPLv3+',
-  version: '6.0.6',
+  version: '6.0.7',
   default_options: ['c_std=gnu11', 'b_ndebug=true'],
   meson_version: '>=0.49',
 )
@@ -66,6 +66,20 @@ systemd_unit_dir = prefix / 'lib' / 'systemd' / 'system'
 systemd_tmpfiles_dir = prefix / 'lib' / 'tmpfiles.d'
 systemd_sysusers_dir = prefix / 'lib' / 'sysusers.d'
 completion_dir = prefix / 'share'
+
+## RPath
+# When installing from sources into a non-standard prefix and the library is
+# shared/dynamic, we need to set the executables' RPATH so that they can find
+# `libkresd`, otherwise running them will fail with dynamic linkage errors
+auto_prefixes = ['/', '/usr', '/usr/local']
+rpath_opt = get_option('install_rpath')
+if (get_option('default_library') == 'static' or
+    rpath_opt == 'disabled' or
+    (rpath_opt == 'auto' and prefix in auto_prefixes))
+  rpath = ''
+else
+  rpath = prefix / get_option('libdir')
+endif
 
 ## Trust anchors
 managed_ta = get_option('managed_ta') == 'enabled'
@@ -195,10 +209,6 @@ conf_data.set_quoted('LIBDIR', lib_dir)
 conf_data.set_quoted('ROOTHINTS', root_hints)
 conf_data.set_quoted('LIBEXT', libext)
 conf_data.set_quoted('OPERATING_SYSTEM', host_machine.system())
-conf_data.set_quoted('libzscanner_SONAME',
-  libzscanner.get_pkgconfig_variable('libdir') / libzscanner.get_pkgconfig_variable('soname'))
-conf_data.set_quoted('libknot_SONAME',
-  libknot.get_pkgconfig_variable('libdir') / libknot.get_pkgconfig_variable('soname'))
 conf_data.set('ENABLE_LIBSYSTEMD', libsystemd.found().to_int())
 conf_data.set('ENABLE_SENDMMSG', sendmmsg.to_int())
 conf_data.set('ENABLE_XDP', xdp.to_int())
@@ -211,6 +221,20 @@ if get_option('debug')
 else
   conf_data.set('DBG_ASSERTION_FORK', '(5 * 60 * 1000) /* five minutes */')
 endif
+
+# Getting *runtime* path to knot-dns libs is surprisingly difficult.
+# Partially it's because meson isn't meant for general-purpose programming.
+foreach libname, lib: { 'libknot': libknot, 'libzscanner': libzscanner }
+  l = lib.get_pkgconfig_variable('libdir')
+  p = lib.get_pkgconfig_variable('prefix')
+  ep = lib.get_pkgconfig_variable('exec_prefix')
+  if ep != p # replace `p` with `ep` at the start of `l`
+    assert(l.startswith(p))
+    p_len = run_command('sh', '-c', 'echo "' + p + '" | wc -c', check: true).stdout().to_int()
+    l = ep / l.substring(p_len)
+  endif
+  conf_data.set_quoted(libname + '_SONAME', l / lib.get_pkgconfig_variable('soname'))
+endforeach
 
 kresconfig = configure_file(
   output: 'kresconfig.h',

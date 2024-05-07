@@ -2,34 +2,19 @@
 
 .. _mod-predict:
 
-Prefetching records
-===================
-
-The ``predict`` module helps to keep the cache hot by prefetching records.
-It can utilize two independent mechanisms to select the records which should be refreshed:
-expiring records and prediction.
-
-Expiring records
-----------------
-
-This mechanism is always active when the predict module is loaded and it is not configurable.
-
-Any time the resolver answers with records that are about to expire,
-they get refreshed. (see :c:func:`is_expiring`)
-That improves latency for records which get frequently queried, relatively to their TTL.
-
 Prediction
 ----------
 
-The predict module can also learn usage patterns and repetitive queries,
+``predict`` is an experimental module that tries to help keep the cache hot by prefetching records using a prediction mechanism to select records which should be refreshed.
+
+The module can learn usage patterns and repetitive queries,
 though this mechanism is a prototype and **not recommended** for use in production or with high traffic.
 
 For example, if it makes a query every day at 18:00,
 the resolver expects that it is needed by that time and prefetches it ahead of time.
 This is helpful to minimize the perceived latency and keeps the cache hot.
 
-You can disable prediction by configuring ``period = 0``.
-Otherwise it will load the required :ref:`stats <mod-stats>` module if not present,
+It will load the required :ref:`stats <mod-stats>` module if not present,
 and it will use its :func:`stats.frequent` table and clear it periodically.
 
 .. tip:: The tracking window and period length determine memory requirements. If you have a server with relatively fast query turnover, keep the period low (hour for start) and shorter tracking window (5 minutes). For personal slower resolver, keep the tracking window longer (i.e. 30 minutes) and period longer (a day), as the habitual queries occur daily. Experiment to get the best results.
