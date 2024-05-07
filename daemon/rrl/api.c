@@ -31,6 +31,11 @@ struct rrl *the_rrl = NULL;
 int the_rrl_fd = -1;
 char *the_rrl_mmap_file = NULL;
 
+kr_rrl_sample_state_t kr_rrl_sample_state = {
+	.do_sample = true, // FIXME: start with false, set to true based on config when opening KRU
+	.is_accounting = 0,
+};
+
 /// return whether we're using optimized variant right now
 static bool using_avx2(void)
 {
