@@ -100,8 +100,6 @@ class LocalDataSchema(ConfigSchema):
     ---
     ttl: Default TTL value used for added local data/records.
     nodata: Use NODATA synthesis. NODATA will be synthesised for matching name, but mismatching type(e.g. AAAA query when only A exists).
-    root_fallback_addresses: Direct replace of root hints.
-    root_fallback_addresses_files: Direct replace of root hints from a zonefile.
     addresses: Direct addition of hostname and IP addresses pairs.
     addresses_files: Direct addition of hostname and IP addresses pairs from files in '/etc/hosts' like format.
     records: Direct addition of records in DNS zone file format.
@@ -111,10 +109,9 @@ class LocalDataSchema(ConfigSchema):
 
     ttl: Optional[TimeUnit] = None
     nodata: bool = True
-    root_fallback_addresses: Optional[Dict[DomainName, ListOrItem[IPAddress]]] = None
-    root_fallback_addresses_files: Optional[List[ReadableFile]] = None
     addresses: Optional[Dict[DomainName, ListOrItem[IPAddress]]] = None
     addresses_files: Optional[List[ReadableFile]] = None
     records: Optional[EscapedStr] = None
     rules: Optional[List[RuleSchema]] = None
     rpz: Optional[List[RPZSchema]] = None
+    # root_fallback_addresses*: removed, rarely useful
