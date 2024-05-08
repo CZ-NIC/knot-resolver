@@ -621,48 +621,6 @@
                     "description": "Use NODATA synthesis. NODATA will be synthesised for matching name, but mismatching type(e.g. AAAA query when only A exists).",
                     "default": true
                 },
-                "root-fallback-addresses": {
-                    "type": [
-                        "object",
-                        "null"
-                    ],
-                    "additionalProperties": {
-                        "anyOf": [
-                            {
-                                "type": "array",
-                                "items": {
-                                    "anyOf": [
-                                        {
-                                            "type": "string"
-                                        },
-                                        {
-                                            "type": "string"
-                                        }
-                                    ]
-                                }
-                            },
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "string"
-                            }
-                        ]
-                    },
-                    "description": "Direct replace of root hints.",
-                    "default": null
-                },
-                "root-fallback-addresses-files": {
-                    "type": [
-                        "array",
-                        "null"
-                    ],
-                    "items": {
-                        "type": "string"
-                    },
-                    "description": "Direct replace of root hints from a zonefile.",
-                    "default": null
-                },
                 "addresses": {
                     "type": [
                         "object",
@@ -919,8 +877,6 @@
             "default": {
                 "ttl": null,
                 "nodata": true,
-                "root_fallback_addresses": null,
-                "root_fallback_addresses_files": null,
                 "addresses": null,
                 "addresses_files": null,
                 "records": null,
