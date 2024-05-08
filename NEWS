@@ -16,6 +16,7 @@ Incompatible changes
   These are mostly experimental and debugging/testing options that are not useful for general users (remain in Lua):
   - /dnssec/refresh-time
   - /dnssec/hold-down-time
+  - /local-data/root-fallback-addresses*
   - /logging/debugging
   - /network/tls/auto-discovery
   - /webmgmt
