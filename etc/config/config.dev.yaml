@@ -21,11 +21,6 @@ views:
 local-data:
   ttl: 60m
   nodata: false
-  root-fallback-addresses:
-    j.root-servers.net.: ["2001:503:c27::2:30", "192.58.128.30"]
-    l.root-servers.net.: '199.7.83.42'
-    m.root-servers.net.: '202.12.27.33'
-  # root-fallback-addresses-file: root.custom
   addresses:
     foo.bar: 127.0.0.1
   addresses-files:
