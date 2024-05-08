@@ -25,6 +25,7 @@ Incompatible changes
   - /dnssec/refresh-time
   - /dnssec/hold-down-time
   - /dnssec/time-skew-detection
+  - /local-data/root-fallback-addresses*
   - /logging/debugging
   - /network/tls/auto-discovery
   - /webmgmt
