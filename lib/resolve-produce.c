@@ -72,7 +72,7 @@ static void check_empty_nonterms(struct kr_query *qry, knot_pkt_t *pkt, struct k
 	 *        otherwise this would risk leaking information to parent if the NODATA TTD > zone cut TTD. */
 	int labels = knot_dname_labels(target, NULL) - knot_dname_labels(cut_name, NULL);
 	while (target[0] && labels > 2) {
-		target = knot_wire_next_label(target, NULL);
+		target = knot_dname_next_label(target);
 		--labels;
 	}
 	for (int i = 0; i < labels; ++i) {
@@ -84,7 +84,7 @@ static void check_empty_nonterms(struct kr_query *qry, knot_pkt_t *pkt, struct k
 			break;
 		}
 		kr_assert(target[0]);
-		target = knot_wire_next_label(target, NULL);
+		target = knot_dname_next_label(target);
 	}
 	kr_cache_commit(cache);
 #endif
@@ -277,7 +277,7 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 		int cut_labels = knot_dname_labels(qry->zone_cut.name, NULL);
 		int wanted_name_labels = knot_dname_labels(wanted_name, NULL);
 		while (wanted_name[0] && wanted_name_labels > cut_labels + name_offset) {
-			wanted_name = knot_wire_next_label(wanted_name, NULL);
+			wanted_name = knot_dname_next_label(wanted_name);
 			wanted_name_labels -= 1;
 		}
 		minimized = (wanted_name != qry->sname);
@@ -508,11 +508,11 @@ static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot
 		const knot_dname_t *parent = qry->parent->zone_cut.name;
 		if (parent[0] != '\0'
 		    && knot_dname_in_bailiwick(qry->sname, parent) >= 0) {
-			requested_name = knot_wire_next_label(parent, NULL);
+			requested_name = knot_dname_next_label(parent);
 		}
-	} else if ((qry->stype == KNOT_RRTYPE_DS) && (qry->sname[0] != '\0')) {
+	} else if ((qry->stype == KNOT_RRTYPE_DS) && (requested_name[0] != '\0')) {
 		/* If this is explicit DS query, start from encloser too. */
-		requested_name = knot_wire_next_label(requested_name, NULL);
+		requested_name = knot_dname_next_label(requested_name);
 	}
 
 	int state = KR_STATE_FAIL;
@@ -521,7 +521,8 @@ static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot
 		if (state == KR_STATE_DONE || (state & KR_STATE_FAIL)) {
 			return state;
 		} else if (state == KR_STATE_CONSUME) {
-			requested_name = knot_wire_next_label(requested_name, NULL);
+			kr_require(requested_name[0] != '\0');
+			requested_name = knot_dname_next_label(requested_name);
 		}
 	} while (state == KR_STATE_CONSUME);
 

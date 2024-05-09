@@ -616,4 +616,10 @@ static inline size_t kr_dname_prefixlen(const uint8_t *name, unsigned nlabels)
 		#endif
 	);
 }
+#if KNOT_VERSION_HEX < 0x030400
+static inline const  knot_dname_t * knot_dname_next_label(const knot_dname_t *dname)
+{
+	return knot_wire_next_label(dname, NULL);
+}
+#endif
 
