@@ -231,6 +231,7 @@ class Subprocess(ABC):
 class SubprocessStatus(Enum):
     RUNNING = auto()
     FAILED = auto()
+    EXITED = auto()
     UNKNOWN = auto()
 
 

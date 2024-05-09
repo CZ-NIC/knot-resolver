@@ -150,7 +150,7 @@ def _list_running_subprocesses(config: KresConfig) -> Dict[SupervisordKresID, Su
             "RUNNING": SubprocessStatus.RUNNING,
             "BACKOFF": SubprocessStatus.RUNNING,
             "STOPPING": SubprocessStatus.RUNNING,
-            "EXITED": SubprocessStatus.FAILED,
+            "EXITED": SubprocessStatus.EXITED,
             "FATAL": SubprocessStatus.FAILED,
             "UNKNOWN": SubprocessStatus.UNKNOWN,
         }
