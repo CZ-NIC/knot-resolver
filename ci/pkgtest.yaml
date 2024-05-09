@@ -119,7 +119,8 @@ nixos-unstable:pkgbuild:
     - docker
     - linux
     - ${PLATFORM}
-  image: nixos/nix
+  # https://github.com/NixOS/nix/issues/10648#issuecomment-2101993746
+  image: docker.io/nixos/nix:latest-${PLATFORM}
 
   variables:
     NIX_PATH: nixpkgs=https://github.com/nixos/nixpkgs/archive/nixos-unstable.tar.gz
