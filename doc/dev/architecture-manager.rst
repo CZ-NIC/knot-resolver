@@ -1,6 +1,6 @@
-****************
-``kres-manager``
-****************
+*******
+manager
+*******
 
 The manager is a component written in Python and a bit of C used for native extension modules. The main goal of the manager is to ensure the system is set up according to a given configuration, provide a user-friendly interface. Performance is only secondary to correctness.
 
