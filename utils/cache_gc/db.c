@@ -9,11 +9,13 @@
 #include <time.h>
 #include <sys/stat.h>
 
+#define MDB_FILE "/data.mdb"
+
 int kr_gc_cache_open(const char *cache_path, struct kr_cache *kres_db,
 		     knot_db_t ** libknot_db)
 {
-	char cache_data[strlen(cache_path) + 10];
-	snprintf(cache_data, sizeof(cache_data), "%s/data.mdb", cache_path);
+	char cache_data[strlen(cache_path) + sizeof(MDB_FILE)];
+	(void)snprintf(cache_data, sizeof(cache_data), "%s" MDB_FILE, cache_path);
 
 	struct stat st = { 0 };
 	if (stat(cache_path, &st) || !(st.st_mode & S_IFDIR)

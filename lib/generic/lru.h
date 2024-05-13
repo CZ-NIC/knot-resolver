@@ -130,7 +130,10 @@
 #define lru_get_new(table, key_, len_, is_new) \
 	(__typeof__((table)->pdata_t)) \
 		lru_get_impl(&(table)->lru, (key_), (len_), \
-		sizeof(*(table)->pdata_t), true, is_new)
+		lru_member_size((table)), true, is_new)
+
+#define lru_member_size(table) \
+	(sizeof(*(table)->pdata_t)) // NOLINT(bugprone-sizeof-expression): usually a false-positive
 
 /**
  * @brief Apply a function to every item in LRU.

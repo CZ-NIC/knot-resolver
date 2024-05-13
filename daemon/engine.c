@@ -29,8 +29,6 @@
 #include "lib/dnssec/ta.h"
 #include "lib/log.h"
 
-/* Cleanup engine state every 5 minutes */
-const size_t CLEANUP_TIMER = 5*60*1000;
 
 /* Execute byte code */
 #define l_dobytecode(L, arr, len, name) \
@@ -544,7 +542,7 @@ int init_lua(void) {
 	#pragma GCC diagnostic push
 	#pragma GCC diagnostic ignored "-Wformat" /* %1$ is not in C standard */
 	/* Save original package.path to package._path */
-	snprintf(l_paths, MAXPATHLEN - 1,
+	(void)snprintf(l_paths, MAXPATHLEN - 1,
 		 "if package._path == nil then package._path = package.path end\n"
 		 "package.path = '%1$s/?.lua;%1$s/?/init.lua;'..package._path\n"
 		 "if package._cpath == nil then package._cpath = package.cpath end\n"

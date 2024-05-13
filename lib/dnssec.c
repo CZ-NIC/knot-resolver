@@ -362,7 +362,7 @@ static int kr_rrset_validate_with_key(kr_rrset_validation_ctx_t *vctx,
 	const int covered_labels = knot_dname_labels(covered->owner, NULL)
 				- knot_dname_is_wildcard(covered->owner);
 
-	for (uint16_t i = 0; i < vctx->rrs->len; ++i) {
+	for (size_t i = 0; i < vctx->rrs->len; ++i) {
 		/* Consider every RRSIG that matches and comes from the same query. */
 		const knot_rrset_t *rrsig = vctx->rrs->at[i]->rr;
 		const bool ok = vctx->rrs->at[i]->qry_uid == vctx->qry_uid

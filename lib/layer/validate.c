@@ -709,7 +709,7 @@ static int check_validation_result(kr_layer_t *ctx, const knot_pkt_t *pkt, ranke
 			invalid_entry = entry;
 			break;
 		} else if (kr_rank_test(entry->rank, KR_RANK_MISSING) &&
-			   !invalid_entry) {
+			   !invalid_entry) { // NOLINT(bugprone-branch-clone)
 			invalid_entry = entry;
 		} else if (kr_rank_test(entry->rank, KR_RANK_OMIT)) {
 			continue;

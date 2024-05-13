@@ -755,8 +755,9 @@ int wire_buf_reserve(struct wire_buf *wb, size_t size)
 	if (wb->buf && wb->size >= size)
 		return kr_ok();
 
-	wb->buf = realloc(wb->buf, size);
-	kr_require(wb->buf);
+	char *new_buf = realloc(wb->buf, size);
+	kr_require(new_buf);
+	wb->buf = new_buf;
 	wb->size = size;
 	return kr_ok();
 }

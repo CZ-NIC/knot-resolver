@@ -517,7 +517,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 			NULL, NULL, NULL);
 }
 
-static void _tcp_accept(uv_stream_t *master, int status, enum protolayer_grp grp)
+static void tcp_accept_internal(uv_stream_t *master, int status, enum protolayer_grp grp)
 {
  	if (status != 0) {
 		return;
@@ -578,18 +578,18 @@ static void _tcp_accept(uv_stream_t *master, int status, enum protolayer_grp grp
 
 static void tcp_accept(uv_stream_t *master, int status)
 {
-	_tcp_accept(master, status, PROTOLAYER_GRP_DOTCP);
+	tcp_accept_internal(master, status, PROTOLAYER_GRP_DOTCP);
 }
 
 static void tls_accept(uv_stream_t *master, int status)
 {
-	_tcp_accept(master, status, PROTOLAYER_GRP_DOTLS);
+	tcp_accept_internal(master, status, PROTOLAYER_GRP_DOTLS);
 }
 
 #if ENABLE_DOH2
 static void https_accept(uv_stream_t *master, int status)
 {
-	_tcp_accept(master, status, PROTOLAYER_GRP_DOHTTPS);
+	tcp_accept_internal(master, status, PROTOLAYER_GRP_DOHTTPS);
 }
 #endif
 
@@ -790,18 +790,27 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 				len_s = 0;
 			}
 			uint32_t len_n = htonl(len_s);
-			fwrite(&len_n, sizeof(len_n), 1, out);
-			if (len_s > 0)
-				fwrite(message, len_s, 1, out);
+			if (fwrite(&len_n, sizeof(len_n), 1, out) != 1)
+				goto finish;
+			if (len_s > 0) {
+				if (fwrite(message, len_s, 1, out) != 1)
+					goto finish;
+			}
 			break;
 		case IO_MODE_TEXT:
 			/* Human-readable and console-printable mode */
-			if (message)
-				fprintf(out, "%s", message);
-			if (message || !args->quiet)
-				fprintf(out, "\n");
-			if (!args->quiet)
-				fprintf(out, "> ");
+			if (message) {
+				if (fprintf(out, "%s", message) < 0)
+					goto finish;
+			}
+			if (message || !args->quiet) {
+				if (fprintf(out, "\n") < 0)
+					goto finish;
+			}
+			if (!args->quiet) {
+				if (fprintf(out, "> ") < 0)
+					goto finish;
+			}
 			break;
 		}
 
@@ -824,7 +833,7 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 finish:
 	/* Close if redirected */
 	if (stream_fd != STDIN_FILENO) {
-		fclose(out);
+		(void)fclose(out);
 	}
 	/* If a LMDB transaction got open, we can't leave it hanging.
 	 * We accept the changes, if any. */

@@ -197,11 +197,11 @@ static void process_record(zs_scanner_t *s)
 	case KNOT_RRTYPE_NSEC3:
 	case KNOT_RRTYPE_DNSKEY:
 	case KNOT_RRTYPE_DS:
-	unsupported_type:
-		(void)0; // C can't have a variable definition following a label
+	unsupported_type:;
 		KR_RRTYPE_GET_STR(type_str, s->r_type);
 		kr_log_warning(RULES, "skipping unsupported RR type %s\n", type_str);
 		return;
+	default:; // Continue below
 	}
 	if (knot_rrtype_is_metatype(s->r_type))
 		goto unsupported_type;
@@ -244,7 +244,7 @@ int kr_rule_zonefile(const struct kr_rule_zonefile_config *c)
 
 	s_data_t s_data = { 0 };
 	s_data.c = c;
-	s_data.pool = mm_ctx_mempool2(64 * 1024);
+	s_data.pool = mm_ctx_mempool2((size_t)64 * 1024);
 	s_data.rrs = trie_create(s_data.pool);
 	ret = zs_set_processing(s, process_record, NULL, &s_data);
 	if (kr_fails_assert(ret == 0))

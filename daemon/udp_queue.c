@@ -112,11 +112,11 @@ void udp_queue_push(int fd, const struct sockaddr *sa, char *buf, size_t buf_len
 	/* Get a valid correct queue. */
 	if (fd >= state.udp_queues_len) {
 		const int new_len = fd + 1;
-		state.udp_queues = realloc(state.udp_queues,
-					sizeof(state.udp_queues[0]) * new_len);
+		state.udp_queues = realloc(state.udp_queues, // NOLINT(bugprone-suspicious-realloc-usage): we just abort() below, so it's fine
+					sizeof(state.udp_queues[0]) * new_len); // NOLINT(bugprone-sizeof-expression): false-positive
 		if (!state.udp_queues) abort();
 		memset(state.udp_queues + state.udp_queues_len, 0,
-			sizeof(state.udp_queues[0]) * (new_len - state.udp_queues_len));
+			sizeof(state.udp_queues[0]) * (new_len - state.udp_queues_len)); // NOLINT(bugprone-sizeof-expression): false-positive
 		state.udp_queues_len = new_len;
 	}
 	if (unlikely(state.udp_queues[fd] == NULL))
