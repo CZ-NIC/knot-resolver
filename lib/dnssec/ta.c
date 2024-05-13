@@ -28,9 +28,9 @@ const knot_dname_t * kr_ta_closest(const struct kr_context *ctx, const knot_dnam
 	kr_require(ctx && name);
 	if (type == KNOT_RRTYPE_DS && name[0] != '\0') {
 		/* DS is parent-side record, so the parent name needs to be covered. */
-		name = knot_wire_next_label(name, NULL);
+		name = knot_dname_next_label(name);
 	}
-	while (name) {
+	do {
 		struct kr_context *ctx_nc = (struct kr_context *)/*const-cast*/ctx;
 		if (kr_ta_get(ctx_nc->trust_anchors, name)) {
 			return name;
@@ -38,9 +38,12 @@ const knot_dname_t * kr_ta_closest(const struct kr_context *ctx, const knot_dnam
 		if (kr_ta_get(ctx_nc->negative_anchors, name)) {
 			return NULL;
 		}
-		name = knot_wire_next_label(name, NULL);
-	}
-	return NULL;
+		if (name[0] == '\0') {
+			return NULL;
+		} else {
+			name = knot_dname_next_label(name);
+		}
+	} while (true);
 }
 
 /* @internal Create DS from DNSKEY, caller MUST free dst if successful. */
