@@ -193,6 +193,7 @@ static int dnstap_log(kr_layer_t *ctx, enum dnstap_log_phase phase) {
 				m.socket_family = DNSTAP__SOCKET_FAMILY__INET6;
 				m.has_socket_family = true;
 				break;
+			default:;
 		}
 	}
 

@@ -98,7 +98,7 @@ static int key_get(char buf[KEY_LEN], const knot_dname_t *name,
 	char *lf = (char *)knot_dname_lf(name, (uint8_t *)buf);
 	if (kr_fails_assert(lf && key_p))
 		return kr_error(EINVAL);
-	int len = lf[0];
+	int len = (unsigned char)lf[0];
 	lf++;  // point to start of data
 	*key_p = lf;
 	// Check that LF is right-aligned to KNOT_DNAME_MAXLEN in buf.
@@ -282,7 +282,7 @@ do_digest:
 		// hexdump the hash for logging
 		char hash_str[digs[i].size * 2 + 1];
 		for (ssize_t j = 0; j < digs[i].size; ++j)
-			sprintf(hash_str + 2*j, "%02x", digs[i].data[j]);
+			(void)sprintf(hash_str + 2*j, "%02x", digs[i].data[j]);
 
 		if (!z_import->digests[i].expected) {
 			kr_log_error(PREFILL, "no ZONEMD found; computed hash: %s\n",
@@ -560,7 +560,7 @@ int zi_zone_import(const zi_config_t config)
 	if (kr_fails_assert(c && c->zone_file))
 		return kr_error(EINVAL);
 
-	knot_mm_t *pool = mm_ctx_mempool2(1024 * 1024);
+	knot_mm_t *pool = mm_ctx_mempool2((size_t)1024 * 1024);
 	zone_import_ctx_t *z_import = mm_calloc(pool, 1, sizeof(*z_import));
 	if (!z_import) return kr_error(ENOMEM);
 	z_import->pool = pool;

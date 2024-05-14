@@ -17,7 +17,13 @@ variables:
   PREFIX: $CI_PROJECT_DIR/.local
   EMAIL: 'ci@nic'
 
-image: $CI_REGISTRY/knot/knot-resolver/ci/debian-11:knot-$KNOT_VERSION
+  # IMAGE_TAG is a Git branch/tag name from https://gitlab.nic.cz/knot/knot-resolver-ci
+  # In general, keep it pointing to a tag - use a branch only for development.
+  # More info in the knot-resolver-ci repository.
+  IMAGE_TAG: 'v20240506'
+  IMAGE_PREFIX: '$CI_REGISTRY/knot/knot-resolver-ci'
+
+image: $IMAGE_PREFIX/debian12-knot_3_3:$IMAGE_TAG
 default:
   interruptible: true
   tags:
@@ -63,7 +69,7 @@ stages:
 .after_build: &after_build
   <<: *common
   needs:
-    - build
+    - build-stable
   before_script:
     # meson detects changes and performs useless rebuild; hide the log
     - ninja -C build_ci* &>/dev/null
@@ -94,6 +100,9 @@ stages:
       - pkg
     reports:
       junit: build_ci*/meson-logs/testlog.junit.xml
+  before_script:
+    - "echo \"PATH: $PATH\""
+    - "echo \"Using Python at: $(which python)\""
   after_script:
     - ci/fix-meson-junit.sh build_ci*/meson-logs/testlog.junit.xml
 
@@ -103,38 +112,80 @@ archive:
   script:
     - apkg make-archive
 
-build:
+build-stable:
   <<: *build
   script:
-    - meson build_ci --prefix=$PREFIX -Dmalloc=disabled -Dwerror=true -Dextra_tests=enabled
-    - ninja -C build_ci
-    - ninja -C build_ci install >/dev/null
+    - meson build_ci_stable --prefix=$PREFIX -Dmalloc=disabled -Dwerror=true -Dextra_tests=enabled
+    - ninja -C build_ci_stable
+    - ninja -C build_ci_stable install >/dev/null
     - ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite snowflake
 
-build-knot32:
+build-deb11-knot31:
   <<: *build
-  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-11:knot-3.2
+  image: $IMAGE_PREFIX/debian11-knot_3_1:$IMAGE_TAG
   script:
-    - meson build_ci_knot32 --prefix=$PREFIX -Dmalloc=disabled -Dwerror=true -Dextra_tests=enabled
-    - ninja -C build_ci_knot32
-    - ninja -C build_ci_knot32 install >/dev/null
+    - meson build_ci_deb11_knot31 --prefix=$PREFIX -Dmalloc=disabled -Dwerror=true -Dextra_tests=enabled
+    - ninja -C build_ci_deb11_knot31
+    - ninja -C build_ci_deb11_knot31 install >/dev/null
     - ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite snowflake
 
-build-asan:
+build-deb11-knot32:
+  <<: *build
+  image: $IMAGE_PREFIX/debian11-knot_3_2:$IMAGE_TAG
+  script:
+    - meson build_ci_deb11_knot32 --prefix=$PREFIX -Dmalloc=disabled -Dwerror=true -Dextra_tests=enabled
+    - ninja -C build_ci_deb11_knot32
+    - ninja -C build_ci_deb11_knot32 install >/dev/null
+    - ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite snowflake
+
+build-deb12-knot32:
+  <<: *build
+  image: $IMAGE_PREFIX/debian12-knot_3_2:$IMAGE_TAG
+  script:
+    - meson build_ci_deb12_knot32 --prefix=$PREFIX -Dmalloc=disabled -Dwerror=true -Dextra_tests=enabled
+    - ninja -C build_ci_deb12_knot32
+    - ninja -C build_ci_deb12_knot32 install >/dev/null
+    - ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite snowflake
+
+build-deb12-knot-master:
+  <<: *build
+  image: $IMAGE_PREFIX/debian12-knot_master:$IMAGE_TAG
+  script:
+    - meson build_ci_deb12_knot_master --prefix=$PREFIX -Dmalloc=disabled -Dwerror=true -Dextra_tests=enabled
+    - ninja -C build_ci_deb12_knot_master
+    - ninja -C build_ci_deb12_knot_master install >/dev/null
+    - ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite snowflake
+  allow_failure: true
+
+build-stable-asan-gcc:
   <<: *build
   script:
-      # issues with UBSan and ASan in CI:
-      #  - `ahocorasick.so` causes C++ problems
-      #  - `--default-library=shared` causes link problems
-    - CC=clang CXX=clang++ CFLAGS=-fno-sanitize-recover=all CXXFLAGS=-fno-sanitize=undefined meson build_ci_asan --default-library=static --prefix=$PREFIX -Dmalloc=jemalloc -Db_sanitize=address,undefined -Dextra_tests=enabled
-    - ninja -C build_ci_asan
-    - ninja -C build_ci_asan install >/dev/null
-      # TODO _leaks: not sure what exactly is wrong in leak detection on config tests
-      # TODO skip_asan: all three of these disappear locally when using gcc 9.1 (except some leaks)
-    - MESON_TESTTHREADS=1 ASAN_OPTIONS=detect_leaks=0 ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite skip_asan --no-suite snowflake
+    - CFLAGS=-fno-sanitize-recover=all meson build_ci_asan_gcc --prefix=$PREFIX -Dmalloc=jemalloc -Db_sanitize=address,undefined -Dextra_tests=enabled
+    - ninja -C build_ci_asan_gcc
+    - ninja -C build_ci_asan_gcc install >/dev/null
+    - MESON_TESTTHREADS=1 ${MESON_TEST} --suite unit --suite dnstap --no-suite skip_asan --no-suite snowflake
+    - MESON_TESTTHREADS=1 ASAN_OPTIONS=detect_leaks=0 ${MESON_TEST} --suite config --no-suite skip_asan --no-suite snowflake
+
+
+# TODO: Clang sanitizer seems to be broken in the current version of Debian. Use
+# GCC above and maybe re-enable the Clang one once we update at some point.
+
+#build-stable-asan-clang:
+#  <<: *build
+#  script:
+#      # issues with UBSan and ASan in CI:
+#      #  - `ahocorasick.so` causes C++ problems
+#      #  - `--default-library=shared` causes link problems
+#    - CC=clang CXX=clang++ CFLAGS=-fno-sanitize-recover=all CXXFLAGS=-fno-sanitize=undefined meson build_ci_asan_clang --default-library=static --prefix=$PREFIX -Dmalloc=jemalloc -Db_sanitize=address,undefined -Dextra_tests=enabled
+#    - ninja -C build_ci_asan_clang
+#    - ninja -C build_ci_asan_clang install >/dev/null
+#      # TODO _leaks: not sure what exactly is wrong in leak detection on config tests
+#      # TODO skip_asan: all three of these disappear locally when using gcc 9.1 (except some leaks)
+#    - MESON_TESTTHREADS=1 ASAN_OPTIONS=detect_leaks=0 ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite skip_asan --no-suite snowflake
 
 build:macOS:
   <<: *nodep
+  image: python:3-alpine
   only:
     refs:
       - branches@knot/knot-resolver
@@ -142,7 +193,8 @@ build:macOS:
   when: delayed
   start_in: 3 minutes  # allow some time for mirroring, job creation
   script:
-    - ci/gh_actions.py ${CI_COMMIT_REF_NAME} ${CI_COMMIT_SHA}
+    - pip3 install -U requests
+    - python3 ./ci/gh_actions.py ${CI_COMMIT_REF_NAME} ${CI_COMMIT_SHA}
 
 docker:
   <<: *nodep
@@ -163,25 +215,6 @@ docker:
   after_script:  # remove dangling images to avoid running out of disk space
     - docker rmi ${DOCKER_IMAGE_NAME}
     - docker rmi $(docker images -f "dangling=true" -q)
-
-sonarcloud:
-  <<: *nodep
-  stage: build
-  except: null
-  only:
-    - tags
-    - master@knot/knot-resolver
-  script:
-    - meson build_sonarcloud --prefix=$PREFIX -Dmalloc=disabled
-    - build-wrapper-linux-x86-64 --out-dir bw-output ninja -C build_sonarcloud
-    - >
-        sonar-scanner
-        -Dsonar.organization=cz-nic
-        -Dsonar.projectKey=CZ-NIC_knot-resolver
-        -Dsonar.sources=.
-        -Dsonar.cfamily.build-wrapper-output=bw-output
-        -Dsonar.host.url=https://sonarcloud.io
-        -Dsonar.projectVersion="$(git describe)"
 # }}}
 
 # sanity {{{
@@ -230,29 +263,8 @@ lint:pedantic:
       -Wpedantic -Wno-newline-eof -Wno-gnu-zero-variadic-macro-arguments -Wno-gnu-folding-constant'
     - ninja -C build_pedantic_clang
 
-lint:scan-build:
-  <<: *after_build
-  # TODO migrate lint to debian-11
-  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-buster:knot-$KNOT_VERSION
-  before_script:
-  # -- end TODO
-  stage: sanity
-  artifacts:
-    when: on_failure
-    expire_in: '1 day'
-    paths:
-      - build_ci*/meson-logs/scanbuild
-  script:
-    - export SCANBUILD="$(realpath ./scripts/run-scanbuild-with-args.sh)"
-    - ninja -C build_ci* scan-build || true
-    - test "$(ls build_ci*/meson-logs/scanbuild/*/report-*.html | wc -l)" = 23 # we have this many errors ATM :-)
-
 lint:tidy:
   <<: *after_build
-  # TODO migrate lint to debian-11
-  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-buster:knot-$KNOT_VERSION
-  before_script:
-  # -- end TODO
   stage: sanity
   script:
     - ninja -C build_ci* tidy
@@ -260,7 +272,7 @@ lint:tidy:
 # Coverity reference: https://www.synopsys.com/blogs/software-security/integrating-coverity-scan-with-gitlab-ci/
 lint:coverity:
   <<: *sanity
-  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-11-coverity:knot-$KNOT_VERSION
+  image: $IMAGE_PREFIX/coverity:$IMAGE_TAG
   only:
     refs:
       - nightly@knot/knot-resolver
@@ -281,15 +293,12 @@ lint:coverity:
     - ninja -C build_ci_lib daemon/kresd
     - ninja -C build_ci_lib kres-gen
     - git diff --quiet || (git diff; exit 1)
-kres-gen-30:
-  <<: *kres-gen
-  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-11:knot-3.0
 kres-gen-31:
   <<: *kres-gen
-  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-11:knot-3.1
+  image: $IMAGE_PREFIX/debian11-knot_3_1:$IMAGE_TAG
 kres-gen-32:
   <<: *kres-gen
-  image: $CI_REGISTRY/knot/knot-resolver/ci/debian-11:knot-3.2
+  image: $IMAGE_PREFIX/debian12-knot_3_2:$IMAGE_TAG
 
 root.hints:
   <<: *sanity
@@ -298,6 +307,21 @@ root.hints:
       - /^release.*$/
   script:
     - scripts/update-root-hints.sh
+
+ci-image-is-tag:
+  <<: *sanity
+  image: alpine:3
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - apk add git
+    - (
+        git ls-remote --tags --exit-code
+        https://gitlab.nic.cz/knot/knot-resolver-ci.git
+        refs/tags/$IMAGE_TAG
+        && echo "Everything is OK!"
+      )
+      || (echo "'$IMAGE_TAG' is not a tag (probably a branch). Make sure to set it to a tag in production!"; exit 2)
 # }}}
 
 # test {{{
@@ -328,7 +352,7 @@ respdiff:basic:
   <<: *after_build
   stage: test
   needs:
-    - build-asan
+    - build-stable-asan-gcc
   script:
     - ulimit -n "$(ulimit -Hn)" # applies only for kresd ATM
     - ./ci/respdiff/start-resolvers.sh
@@ -371,7 +395,7 @@ manager:
 pytests:
   <<: *test_flaky
   needs:
-    - build-asan
+    - build-stable-asan-gcc
   artifacts:
     when: always
     paths:
@@ -678,13 +702,10 @@ pkg:arch:
 # docs: {{{
 
 docs:build:
-  image: $CI_REGISTRY/packaging/apkg/lxc/fedora-36
   stage: deploy
   needs: []
   script:
     - git submodule update --init --recursive
-    - apkg build-dep -y
-    - dnf install -y python3-sphinx texinfo doxygen
     - pip3 install -U -r doc/requirements.txt
     - pip3 install -U sphinx_rtd_theme
     - meson build_doc -Ddoc=enabled

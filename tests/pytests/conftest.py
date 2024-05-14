@@ -86,7 +86,7 @@ def query_before(request):  # whether to send an initial query
     return request.param
 
 
-@pytest.mark.optionalhook
+@pytest.hookimpl(optionalhook=True)
 def pytest_metadata(metadata):  # filter potentially sensitive data from GitLab CI
     keys_to_delete = []
     for key in metadata.keys():

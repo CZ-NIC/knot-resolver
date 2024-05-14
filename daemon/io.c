@@ -107,7 +107,7 @@ static int family_to_freebind_option(sa_family_t sa_family, int *level, int *nam
 #define LOG_NO_FB kr_log_error(NETWORK, "your system does not support 'freebind', " \
 				"please remove it from your configuration\n")
 	switch (sa_family) {
-	case AF_INET:
+	case AF_INET:  // NOLINT(bugprone-branch-clone): The branches are only cloned for specific macro configs
 		*level = IPPROTO_IP;
 #if defined(IP_FREEBIND)
 		*name = IP_FREEBIND;
@@ -790,18 +790,27 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 				len_s = 0;
 			}
 			uint32_t len_n = htonl(len_s);
-			fwrite(&len_n, sizeof(len_n), 1, out);
-			if (len_s > 0)
-				fwrite(message, len_s, 1, out);
+			if (fwrite(&len_n, sizeof(len_n), 1, out) != 1)
+				goto finish;
+			if (len_s > 0) {
+				if (fwrite(message, len_s, 1, out) != 1)
+					goto finish;
+			}
 			break;
 		case IO_MODE_TEXT:
 			/* Human-readable and console-printable mode */
-			if (message)
-				fprintf(out, "%s", message);
-			if (message || !args->quiet)
-				fprintf(out, "\n");
-			if (!args->quiet)
-				fprintf(out, "> ");
+			if (message) {
+				if (fprintf(out, "%s", message) < 0)
+					goto finish;
+			}
+			if (message || !args->quiet) {
+				if (fprintf(out, "\n") < 0)
+					goto finish;
+			}
+			if (!args->quiet) {
+				if (fprintf(out, "> ") < 0)
+					goto finish;
+			}
 			break;
 		}
 
@@ -824,7 +833,7 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 finish:
 	/* Close if redirected */
 	if (stream_fd != STDIN_FILENO) {
-		fclose(out);
+		(void)fclose(out);
 	}
 	/* If a LMDB transaction got open, we can't leave it hanging.
 	 * We accept the changes, if any. */
