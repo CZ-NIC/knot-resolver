@@ -1,6 +1,6 @@
 module gitlab.nic.cz/knot/knot-resolver/tests/dnstap-test
 
-go 1.17
+go 1.15
 
 require (
 	github.com/cloudflare/dns v0.0.0-20151007113418-e20ffa3da443

@@ -17,19 +17,19 @@
 
 #define EPHEMERAL_PRIVKEY_FILENAME "ephemeral_key.pem"
 #define INVALID_HOSTNAME "dns-over-tls.invalid"
-#define EPHEMERAL_CERT_EXPIRATION_SECONDS (60*60*24*90)
+#define EPHEMERAL_CERT_EXPIRATION_SECONDS ((time_t)60*60*24*90)
 
 /* This is an attempt to grab an exclusive, advisory, non-blocking
  * lock based on a filename.  At the moment it's POSIX-only, but it
  * should be abstract enough of an interface to make an implementation
  * for non-posix systems if anyone cares. */
 typedef int lock_t;
-static bool _lock_is_invalid(lock_t lock)
+static bool lock_is_invalid(lock_t lock)
 {
 	return lock == -1;
 }
 /* a blocking lock on a given filename */
-static lock_t _lock_filename(const char *fname)
+static lock_t lock_filename(const char *fname)
 {
 	lock_t lockfd = open(fname, O_RDONLY|O_CREAT, 0400);
 	if (lockfd == -1)
@@ -41,9 +41,9 @@ static lock_t _lock_filename(const char *fname)
 	}
 	return lockfd; /* for cleanup later */
 }
-static void _lock_unlock(lock_t *lock, const char *fname)
+static void lock_unlock(lock_t *lock, const char *fname)
 {
-	if (lock && !_lock_is_invalid(*lock)) {
+	if (lock && !lock_is_invalid(*lock)) {
 		flock(*lock, LOCK_UN);
 		close(*lock);
 		*lock = -1;
@@ -61,8 +61,8 @@ static gnutls_x509_privkey_t get_ephemeral_privkey (void)
 
 	/* Take a lock to ensure that two daemons started concurrently
 	 * with a shared cache don't both create the same privkey: */
-	lock = _lock_filename(EPHEMERAL_PRIVKEY_FILENAME ".lock");
-	if (_lock_is_invalid(lock)) {
+	lock = lock_filename(EPHEMERAL_PRIVKEY_FILENAME ".lock");
+	if (lock_is_invalid(lock)) {
 		kr_log_error(TLS, "unable to lock lockfile " EPHEMERAL_PRIVKEY_FILENAME ".lock\n");
 		goto done;
 	}
@@ -141,7 +141,7 @@ static gnutls_x509_privkey_t get_ephemeral_privkey (void)
 		}
 	}
  done:
-	_lock_unlock(&lock, EPHEMERAL_PRIVKEY_FILENAME ".lock");
+	lock_unlock(&lock, EPHEMERAL_PRIVKEY_FILENAME ".lock");
 	if (datafd != -1) {
 		close(datafd);
 	}
@@ -219,7 +219,7 @@ struct tls_credentials * tls_get_ephemeral_credentials(struct engine *engine)
 	if ((privkey = get_ephemeral_privkey()) == NULL) {
 		goto failure;
 	}
-	if ((cert = get_ephemeral_cert(privkey, creds->ephemeral_servicename, now - 60*15, creds->valid_until)) == NULL) {
+	if ((cert = get_ephemeral_cert(privkey, creds->ephemeral_servicename, now - ((time_t)60 * 15), creds->valid_until)) == NULL) {
 		goto failure;
 	}
 	if ((err = gnutls_certificate_set_x509_key(creds->credentials, &cert, 1, privkey)) < 0) {

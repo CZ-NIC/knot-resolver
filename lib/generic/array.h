@@ -113,7 +113,7 @@ static inline void array_std_free(void *baton, void *p)
  * Mempool usage: pass kr_memreserve and a knot_mm_t* .
  * @return 0 if success, <0 on failure */
 #define array_reserve_mm(array, n, reserve, baton) \
-	(reserve)((baton), (void **) &(array).at, sizeof((array).at[0]), (n), &(array).cap)
+	(reserve)((baton), (void **) &(array).at, array_member_size((array)), (n), &(array).cap)
 
 /**
  * Push value at the end of the array, resize it if necessary.
@@ -122,9 +122,9 @@ static inline void array_std_free(void *baton, void *p)
  * @return element index on success, <0 on failure
  */
 #define array_push_mm(array, val, reserve, baton) \
-	(int)((array).len < (array).cap ? ((array).at[(array).len] = val, (array).len++) \
+	(int)((array).len < (array).cap ? ((array).at[(array).len] = (val), (array).len++) \
 		: (array_reserve_mm(array, ((array).cap + 1), reserve, baton) < 0 ? -1 \
-			: ((array).at[(array).len] = val, (array).len++)))
+			: ((array).at[(array).len] = (val), (array).len++)))
 
 /**
  * Push value at the end of the array, resize it if necessary (plain malloc/free).
@@ -152,6 +152,12 @@ static inline void array_std_free(void *baton, void *p)
  * @warning Undefined if the array is empty.
  */
 #define array_tail(array) \
-    (array).at[(array).len - 1]
+	(array).at[(array).len - 1]
+
+/**
+ * Return the size of a singular member in the array.
+ */
+#define array_member_size(array) \
+	(sizeof((array).at[0])) // NOLINT(bugprone-sizeof-expression): usually a false-positive
 
 /** @} */

@@ -151,7 +151,7 @@ static int family_to_freebind_option(sa_family_t sa_family, int *level, int *nam
 #define LOG_NO_FB kr_log_error(NETWORK, "your system does not support 'freebind', " \
 				"please remove it from your configuration\n")
 	switch (sa_family) {
-	case AF_INET:
+	case AF_INET:  // NOLINT(bugprone-branch-clone): The branches are only cloned for specific macro configs
 		*level = IPPROTO_IP;
 #if defined(IP_FREEBIND)
 		*name = IP_FREEBIND;
@@ -510,7 +510,7 @@ static ssize_t tls_send(const uint8_t *buf, const size_t len, struct session *se
 }
 #endif
 
-static void _tcp_accept(uv_stream_t *master, int status, bool tls, bool http)
+static void tcp_accept_internal(uv_stream_t *master, int status, bool tls, bool http)
 {
  	if (status != 0) {
 		return;
@@ -631,18 +631,18 @@ static void _tcp_accept(uv_stream_t *master, int status, bool tls, bool http)
 
 static void tcp_accept(uv_stream_t *master, int status)
 {
-	_tcp_accept(master, status, false, false);
+	tcp_accept_internal(master, status, false, false);
 }
 
 static void tls_accept(uv_stream_t *master, int status)
 {
-	_tcp_accept(master, status, true, false);
+	tcp_accept_internal(master, status, true, false);
 }
 
 #if ENABLE_DOH2
 static void https_accept(uv_stream_t *master, int status)
 {
-	_tcp_accept(master, status, true, true);
+	tcp_accept_internal(master, status, true, true);
 }
 #endif
 
@@ -834,16 +834,25 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 				len_s = 0;
 			}
 			uint32_t len_n = htonl(len_s);
-			fwrite(&len_n, sizeof(len_n), 1, out);
-			if (len_s > 0)
-				fwrite(message, len_s, 1, out);
+			if (fwrite(&len_n, sizeof(len_n), 1, out) != 1)
+				goto finish;
+			if (len_s > 0) {
+				if (fwrite(message, len_s, 1, out) != 1)
+					goto finish;
+			}
 		} else {
-			if (message)
-				fprintf(out, "%s", message);
-			if (message || !args->quiet)
-				fprintf(out, "\n");
-			if (!args->quiet)
-				fprintf(out, "> ");
+			if (message) {
+				if (fprintf(out, "%s", message) < 0)
+					goto finish;
+			}
+			if (message || !args->quiet) {
+				if (fprintf(out, "\n") < 0)
+					goto finish;
+			}
+			if (!args->quiet) {
+				if (fprintf(out, "> ") < 0)
+					goto finish;
+			}
 		}
 
 		/* Duplicate command and output to logs */
@@ -865,7 +874,7 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 finish:
 	/* Close if redirected */
 	if (stream_fd != STDIN_FILENO) {
-		fclose(out);
+		(void)fclose(out);
 	}
 }
 
