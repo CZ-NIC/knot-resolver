@@ -200,7 +200,13 @@ void kr_rules_deinit(void)
 int kr_rules_commit(bool accept)
 {
 	if (!the_rules) return kr_error(EINVAL);
-	return ruledb_op(commit, accept);
+	return ruledb_op(commit, accept, false);
+}
+
+int kr_rules_reset(void)
+{
+	if (!the_rules) return kr_error(EINVAL);
+	return ruledb_op(commit, false, true);
 }
 
 static bool kr_rule_consume_tags(knot_db_val_t *val, const struct kr_request *req)
