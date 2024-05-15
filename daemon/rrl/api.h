@@ -33,25 +33,9 @@ extern kr_rrl_sample_state_t kr_rrl_sample_state;
 #include <time.h>
 static inline uint64_t get_stamp(void)
 {
-	/* TODO:
-	    * think of strategies for non-Linux
-	      - for platforms without _COARSE this might be expensive
-	        (~2 syscalls per incoming packet)
-	      - FreeBSD defines _COARSE (see their man clock_gettime.2)
-	        that looks like it has the same semantics, but they look like all their timers
-	        are syscall-free
-	    * the design will probably break on Linux kernel if started as tickless/realtime
-	*/
-#ifndef CLOCK_MONOTONIC_COARSE
-	const clockid_t CLOCK_MONOTONIC_COARSE = CLOCK_MONOTONIC;
-#endif
-
 	struct timespec now_ts = {0};
-	clock_gettime(CLOCK_MONOTONIC_COARSE, &now_ts);
+	clock_gettime(CLOCK_THREAD_CPUTIME_ID, &now_ts);
 	return now_ts.tv_nsec + 1000*1000*1000 * (uint64_t)now_ts.tv_sec;
-	/* Note: kr_now() call would be similarly cheap and typically more precise,
-	 * but it gets updated exactly in moments when we don't want,
-	 * so the _COARSE stamp is be much better in this case. */
 }
 
 /// Start accounting work, if not doing it already.
@@ -98,11 +82,10 @@ static inline void kr_rrl_sample_stop(void)
 	if (--kr_rrl_sample_state.is_accounting) return;
 
 	const uint64_t elapsed = get_stamp() - kr_rrl_sample_state.stamp;
-	if (!elapsed) return;
 
 	// we accounted something
 	// FIXME: drop the log, add KRU, etc.
-	kr_log_notice(DEVEL, "%5.1f ms for %s\n", elapsed / 1000000.0,
+	kr_log_notice(DEVEL, "%8.3f ms for %s\n", elapsed / 1000000.0,
 			kr_straddr(&kr_rrl_sample_state.addr.ip));
 	// TODO: some queries of internal origin have suspicioiusly high numbers.
 	// We won't be really accounting those, but it might suggest some other issue.
