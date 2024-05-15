@@ -279,7 +279,10 @@ lint:coverity:
       - coverity@knot/knot-resolver
   script:
     - meson build_ci_cov --prefix=$PREFIX
-    - /opt/cov-analysis/bin/cov-build --dir cov-int ninja -C build_ci_cov
+    - /opt/cov-analysis/bin/cov-build
+      --dir cov-int
+      --fs-capture-search ./manager
+      ninja -C build_ci_cov
     - tar cfz cov-int.tar.gz cov-int
     - curl https://scan.coverity.com/builds?project=$COVERITY_SCAN_PROJECT_NAME
       --form token=$COVERITY_SCAN_TOKEN --form email="knot-resolver@labs.nic.cz"
