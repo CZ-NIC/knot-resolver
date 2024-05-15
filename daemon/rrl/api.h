@@ -21,16 +21,18 @@ void kr_rrl_deinit(void);
 
 // TODO: reconsider `static inline` cases below
 
-#define USE_RDTSC  // TODO: determine somehow, probably on runtime
-#ifdef USE_RDTSC
+
+// XXX set time measurement method here XXX
+#define USED_CLOCK CLOCK_MONOTONIC_COARSE
+//#define USED_CLOCK CLOCK_THREAD_CPUTIME_ID
+#define USE_RDTSC  // to improve precision of _COARSE
+
+
 #include "x86intrin.h"
-#endif
 
 typedef struct {
 	uint64_t ns; /// monotonic nanoseconds, probably won't wrap
-#ifdef USE_RDTSC
 	uint64_t ticks; // TSC ticks, may be desynchronized on different cpus
-#endif
 } kr_rrl_stamp_t;
 
 typedef struct {
@@ -42,6 +44,7 @@ typedef struct {
 	kr_rrl_stamp_t total; /// sum of all accounted timediffs
 	uint64_t ns_res; // resolution of ns stamp
 #endif
+	uint64_t stat_ticks, stat_cnt;
 } kr_rrl_sample_state_t;
 extern kr_rrl_sample_state_t kr_rrl_sample_state;
 
@@ -60,9 +63,14 @@ static inline void get_stamp(kr_rrl_stamp_t *stamp)
 #ifndef CLOCK_MONOTONIC_COARSE
 	const clockid_t CLOCK_MONOTONIC_COARSE = CLOCK_MONOTONIC;
 #endif
-
 	struct timespec now_ts = {0};
-	clock_gettime(CLOCK_MONOTONIC_COARSE, &now_ts);
+	//clock_gettime(CLOCK_THREAD_CPUTIME_ID, &now_ts);  // XXX use to avoid cache misses in measured code
+
+	__sync_synchronize();
+	uint64_t stat_ts = _rdtsc();
+	__sync_synchronize();
+
+	clock_gettime(USED_CLOCK, &now_ts);
 
 	/* Note: kr_now() call would be similarly cheap and typically more precise,
 	 * but it gets updated exactly in moments when we don't want,
@@ -71,28 +79,42 @@ static inline void get_stamp(kr_rrl_stamp_t *stamp)
 #ifdef USE_RDTSC
 	stamp->ticks = _rdtsc();
 #endif
+	__sync_synchronize();
+	kr_rrl_sample_state.stat_ticks += _rdtsc() - stat_ts;
+	__sync_synchronize();
+	kr_rrl_sample_state.stat_cnt++;
+	if (kr_rrl_sample_state.stat_cnt % (1 << 10) == 0) {
+		kr_log_notice(DEVEL, "%5.3f ticks per 2 stamps + diff, cnt %lu\n",
+				2.0 * kr_rrl_sample_state.stat_ticks / kr_rrl_sample_state.stat_cnt,
+				kr_rrl_sample_state.stat_cnt);
+	}
 }
 static inline uint64_t get_stamp_diff_ns(kr_rrl_stamp_t *stamp_end, kr_rrl_stamp_t *stamp_begin) {
+	__sync_synchronize();
+	uint64_t stat_ts = _rdtsc();
+	__sync_synchronize();
 	uint64_t ns = stamp_end->ns - stamp_begin->ns;
 #ifdef USE_RDTSC
-	if (stamp_end->ticks <= stamp_begin->ticks) {
-		return ns;
-	}
-	uint64_t ticks = stamp_end->ticks - stamp_begin->ticks;
-	kr_rrl_sample_state.total.ns += ns;
-	kr_rrl_sample_state.total.ticks += ticks;
-	uint64_t ticks_ns = ticks * ((double)kr_rrl_sample_state.total.ns / kr_rrl_sample_state.total.ticks);
+	if (stamp_end->ticks > stamp_begin->ticks) {
+		uint64_t ticks = stamp_end->ticks - stamp_begin->ticks;
+		kr_rrl_sample_state.total.ns += ns;
+		kr_rrl_sample_state.total.ticks += ticks;
+		uint64_t ticks_ns = ticks * ((double)kr_rrl_sample_state.total.ns / kr_rrl_sample_state.total.ticks);
 
-	if (kr_rrl_sample_state.ns_res == 0) {
-		struct timespec res = {0};
-		clock_getres(CLOCK_MONOTONIC_COARSE, &res);
-		kr_rrl_sample_state.ns_res = res.tv_nsec;
-		kr_log_notice(DEVEL, "%5.3f ms res\n", kr_rrl_sample_state.ns_res / 1000000.0); // TODO drop
-	}
-	if ((ns + kr_rrl_sample_state.ns_res >= ticks_ns) && (ticks_ns + kr_rrl_sample_state.ns_res >= ns)) {
-		return ticks_ns;
+		if (kr_rrl_sample_state.ns_res == 0) {
+			struct timespec res = {0};
+			clock_getres(USED_CLOCK, &res);
+			kr_rrl_sample_state.ns_res = res.tv_nsec;
+			kr_log_notice(DEVEL, "%5.3f ms res\n", kr_rrl_sample_state.ns_res / 1000000.0); // TODO drop
+		}
+		if ((ns + kr_rrl_sample_state.ns_res >= ticks_ns) && (ticks_ns + kr_rrl_sample_state.ns_res >= ns)) {
+			ns = ticks_ns;
+		}
 	}
 #endif
+	__sync_synchronize();
+	kr_rrl_sample_state.stat_ticks += _rdtsc() - stat_ts;  // add this time to ~every even get_stamp
+	__sync_synchronize();
 	return ns;
 }
 
@@ -143,11 +165,15 @@ static inline void kr_rrl_sample_stop(void)
 	get_stamp(&stamp);
 	const uint64_t elapsed = get_stamp_diff_ns(&stamp, &kr_rrl_sample_state.stamp);
 	const uint64_t elapsed_coarse = stamp.ns - kr_rrl_sample_state.stamp.ns;  // TODO drop
-	if ((elapsed < 1000) && !elapsed_coarse) return;
+	const uint64_t elapsed_ticks = stamp.ticks - kr_rrl_sample_state.stamp.ticks;  // TODO drop
+	if (kr_rrl_sample_state.stat_cnt % (1<<7) > 0) return;
+	//if (elapsed < 100000) return;
+	//if ((elapsed < 1000) && !elapsed_coarse) return;
 
 	// we accounted something
 	// FIXME: drop the log, add KRU, etc.
-	kr_log_notice(DEVEL, "%5.3f ms (%5.3f ms _COARSE) for %s\n", elapsed / 1000000.0, elapsed_coarse / 1000000.0,
+	kr_log_notice(DEVEL, "%5.3f ms (%5.3f ms _COARSE, %lu ticks, %5.3f ticks/ns) for %s\n",
+			elapsed / 1000000.0, elapsed_coarse / 1000000.0, elapsed_ticks, (double)elapsed_ticks / elapsed,
 			kr_straddr(&kr_rrl_sample_state.addr.ip));
 	// TODO: some queries of internal origin have suspicioiusly high numbers.
 	// We won't be really accounting those, but it might suggest some other issue.
