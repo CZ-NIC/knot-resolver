@@ -91,7 +91,7 @@ int kr_rule_tag_add(const char *tag, kr_rule_tags_t *tagset)
 			kr_log_error(RULES, "ERROR: invalid length: %d\n", (int)val.len);
 			return kr_error(EILSEQ);
 		}
-		*tagset |= (1 << *tindex_p);
+		*tagset |= ((kr_rule_tags_t)1 << *tindex_p);
 		return kr_ok();
 	} else if (ret != kr_error(ENOENT)) {
 		return ret;
@@ -114,7 +114,7 @@ int kr_rule_tag_add(const char *tag, kr_rule_tags_t *tagset)
 	int ix = ffsll(~bmp) - 1;
 	if (ix < 0 || ix >= 8 * sizeof(bmp))
 		return kr_error(E2BIG);
-	const kr_rule_tags_t tag_new = 1 << ix;
+	const kr_rule_tags_t tag_new = (kr_rule_tags_t)1 << ix;
 	kr_require((tag_new & bmp) == 0);
 
 	// Update the bitmap.  ATM ruledb does not overwrite, so we `remove` before `write`.

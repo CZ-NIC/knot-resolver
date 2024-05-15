@@ -40,7 +40,7 @@ static void check_bufsize(uv_handle_t* handle)
 	 * This is magic presuming we can pull in a whole recvmmsg width in one wave.
 	 * Linux will double this the bufsize wanted.
 	 */
-	const int BUF_SIZE = 2 * sizeof(RECVMMSG_BATCH * KNOT_WIRE_MAX_PKTSIZE);
+	const int BUF_SIZE = 2 * RECVMMSG_BATCH * KNOT_WIRE_MAX_PKTSIZE;
 	negotiate_bufsize(uv_recv_buffer_size, handle, BUF_SIZE);
 	negotiate_bufsize(uv_send_buffer_size, handle, BUF_SIZE);
 }
