@@ -1400,27 +1400,30 @@ static int session2_transport_pushv(struct session2 *s,
 		.baton = baton,
 		.comm = comm
 	};
+	int err_ret = kr_ok();
 
 	switch (s->transport.type) {
 	case SESSION2_TRANSPORT_IO:;
 		uv_handle_t *handle = s->transport.io.handle;
 		if (kr_fails_assert(handle)) {
-			if (cb)
-				cb(kr_error(EINVAL), s, comm, baton);
-			free(ctx);
-			return kr_error(EINVAL);
+			err_ret = kr_error(EINVAL);
+			goto exit_err;
 		}
 
 		if (handle->type == UV_UDP) {
 			if (ENABLE_SENDMMSG && !s->outgoing) {
 				int fd;
 				int ret = uv_fileno(handle, &fd);
-				if (kr_fails_assert(!ret))
-					return kr_error(EIO);
+				if (kr_fails_assert(!ret)) {
+					err_ret = kr_error(EIO);
+					goto exit_err;
+				}
 
 				/* TODO: support multiple iovecs properly? */
-				if (kr_fails_assert(iovcnt == 1))
-					return kr_error(EINVAL);
+				if (kr_fails_assert(iovcnt == 1)) {
+					err_ret = kr_error(EINVAL);
+					goto exit_err;
+				}
 
 				session2_transport_pushv_ensure_long_lived(
 						&iov, &iovcnt, iov_short_lived,
@@ -1467,12 +1470,16 @@ static int session2_transport_pushv(struct session2 *s,
 #if ENABLE_XDP
 		} else if (handle->type == UV_POLL) {
 			xdp_handle_data_t *xhd = handle->data;
-			if (kr_fails_assert(xhd && xhd->socket))
-				return kr_error(EIO);
+			if (kr_fails_assert(xhd && xhd->socket)) {
+				err_ret = kr_error(EIO);
+				goto exit_err;
+			}
 
 			/* TODO: support multiple iovecs properly? */
-			if (kr_fails_assert(iovcnt == 1))
-				return kr_error(EINVAL);
+			if (kr_fails_assert(iovcnt == 1)) {
+				err_ret = kr_error(EINVAL);
+				goto exit_err;
+			}
 
 			session2_transport_pushv_ensure_long_lived(
 					&iov, &iovcnt, iov_short_lived,
@@ -1505,17 +1512,15 @@ static int session2_transport_pushv(struct session2 *s,
 #endif
 		} else {
 			kr_assert(false && "Unsupported handle");
-			if (cb)
-				cb(kr_error(EINVAL), s, comm, baton);
-			free(ctx);
-			return kr_error(EINVAL);
+			err_ret = kr_error(EINVAL);
+			goto exit_err;
 		}
 
 	case SESSION2_TRANSPORT_PARENT:;
 		struct session2 *parent = s->transport.parent;
 		if (kr_fails_assert(parent)) {
-			free(ctx);
-			return kr_error(EINVAL);
+			err_ret = kr_error(EINVAL);
+			goto exit_err;
 		}
 		int ret = session2_wrap(parent,
 				protolayer_iovec(iov, iovcnt, iov_short_lived),
@@ -1525,9 +1530,13 @@ static int session2_transport_pushv(struct session2 *s,
 
 	default:
 		kr_assert(false && "Invalid transport");
-		free(ctx);
-		return kr_error(EINVAL);
+		err_ret = kr_error(EINVAL);
+		goto exit_err;
 	}
+
+exit_err:
+	session2_transport_pushv_finished(err_ret, ctx);
+	return err_ret;
 }
 
 struct push_ctx {

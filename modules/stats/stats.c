@@ -383,6 +383,8 @@ static int list_entry(const char *key, uint32_t key_len, trie_val_t *val, void *
 		JsonNode *sup = json_find_member(ctx->root, sup_key_nt);
 		if (!sup) {
 			sup = json_mkobject();
+			if (kr_fails_assert(sup))
+				return 0;
 			json_append_member(ctx->root, sup_key_nt, sup);
 		}
 		if (kr_fails_assert(sup))
@@ -411,6 +413,8 @@ static char* stats_list(void *env, struct kr_module *module, const char *args)
 			JsonNode *sup = json_find_member(root, elm->sup_key);
 			if (!sup) {
 				sup = json_mkobject();
+				if (kr_fails_assert(sup))
+					break;
 				json_append_member(root, elm->sup_key, sup);
 			}
 			if (kr_fails_assert(sup))

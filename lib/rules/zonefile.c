@@ -50,7 +50,8 @@ static void rr_scan2trie(zs_scanner_t *s)
 		knot_rrset_init(rr, NULL, s->r_type, KNOT_CLASS_IN, s->r_ttl);
 			// we don't ^^ need owner so save allocation
 	}
-	knot_rrset_add_rdata(rr, s->r_data, s->r_data_length, s_data->pool);
+	int ret = knot_rrset_add_rdata(rr, s->r_data, s->r_data_length, s_data->pool);
+	kr_assert(!ret);
 }
 /// Process an RRset of other types into a rule
 static int rr_trie2rule(const char *key_data, uint32_t key_len, trie_val_t *rr_p, void *config)
