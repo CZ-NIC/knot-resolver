@@ -125,6 +125,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                     config.webmgmt,
                     config.options,
                     config.network,
+                    config.forward,
                     config.cache,
                     config.dnssec,
                     config.dns64,
