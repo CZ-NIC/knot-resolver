@@ -168,7 +168,7 @@ You can also configure some :ref:`build-options`, in this case enable ``manager`
 
 .. code-block:: bash
 
-   $ meson build_dir --prefix=/tmp/kr --default-library=static -Dmanager=enabled
+   $ meson build_dir --prefix=/tmp/kr
 
 After that it is possible to build and install Knot Resolver.
 
@@ -275,7 +275,6 @@ Recommended build options for packagers:
 * ``-Dsystemd_files=enabled`` for systemd unit files
 * ``-Ddoc=enabled`` for offline documentation (see :ref:`build-html-doc`)
 * ``-Dinstall_kresd_conf=enabled`` to install default config file
-* ``-Dmanager=enabled`` to force build of the manager and its features
 * ``-Dunit_tests=enabled`` to force build of unit tests
 
 Systemd

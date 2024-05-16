@@ -32,9 +32,10 @@ Please note that Python's development files are also required, since the Manager
 
 ### Common tasks and interactions with the project
 
-After setting up the environment, you should be able to interract with the project by using `./poe` script. Common actions are:
+After setting up the environment, you should be able to interact with the project by using the `./poe` script. Common actions are:
 
-* `poe run` - runs the manager from the source
+* `poe configure` - configures Knot Resolver daemon for use with the manager
+* `poe run` - runs the manager from the source (requires the daemon to be configured)
 * `poe docs` - creates HTML documentation
 * `poe test` - unit tests
 * `poe tox` - unit tests in all supported Python versions (must not be run outside of virtualenv, otherwise it fails to find multiple versions of Python)

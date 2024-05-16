@@ -36,17 +36,23 @@ set -o nounset
 
 
 function build_kresd {
-	echo
-	echo Building Knot Resolver
-	echo ----------------------
-	echo -e "${blue}In case of an compilation error, run this command to try to fix it:${reset}"
-	echo -e "\t${blue}rm -r $(realpath .install_kresd) $(realpath .build_kresd)${reset}"
-	echo
 	pushd ..
-	mkdir -p manager/.build_kresd manager/.install_kresd
-	meson manager/.build_kresd --prefix=$(realpath manager/.install_kresd) --default-library=static --buildtype=debug
-	ninja -C manager/.build_kresd
-	ninja install -C manager/.build_kresd
-	export PYTHONPATH="$(realpath manager/.build_kresd/python):${PYTHONPATH:-}"
+	if [ -d manager/.build_kresd ]; then
+		echo
+		echo Building Knot Resolver
+		echo ----------------------
+		echo -e "${blue}In case of an compilation error, run this command to try to fix it:${reset}"
+		echo -e "\t${blue}rm -r $(realpath .install_kresd) $(realpath .build_kresd)${reset}"
+		echo
+		ninja -C manager/.build_kresd
+		ninja install -C manager/.build_kresd
+		export PYTHONPATH="$(realpath manager/.build_kresd/python):${PYTHONPATH:-}"
+	else
+		echo
+		echo Knot Resolver daemon is not configured.
+		echo "Please run './poe configure' (optionally with additional Meson arguments)"
+		echo
+		exit 2
+	fi
 	popd
 }

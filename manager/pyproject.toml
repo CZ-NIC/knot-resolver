@@ -58,6 +58,7 @@ kresctl = 'knot_resolver_manager.cli.main:main'
 knot-resolver = 'knot_resolver_manager.__main__:run'
 
 [tool.poe.tasks]
+configure = { cmd = "scripts/meson-configure", help = "Configure Knot Resolver daemon" }
 run = { cmd = "scripts/run", help = "Run the manager" }
 run-debug = { cmd = "scripts/run-debug", help = "Run the manager under debugger" }
 docs = { cmd = "scripts/docs", help = "Create HTML documentation" }

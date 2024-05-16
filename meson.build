@@ -254,7 +254,6 @@ subdir('lib')
 ## Remaining code
 subdir('daemon')
 subdir('modules')
-subdir('manager')
 subdir('python')
 subdir('utils')
 if get_option('bench') == 'enabled'
@@ -340,7 +339,6 @@ run_target(
 # https://github.com/mesonbuild/meson/issues/2404
 s_managed_ta = managed_ta ? 'enabled' : 'disabled'
 s_install_root_keys = install_root_keys ? 'enabled' : 'disabled'
-s_build_manager = build_manager ? 'enabled' : 'disabled'
 s_build_utils = build_utils ? 'enabled' : 'disabled'
 s_build_dnstap = build_dnstap ? 'enabled' : 'disabled'
 s_build_unit_tests = build_unit_tests ? 'enabled' : 'disabled'
@@ -375,7 +373,6 @@ message('''
     cache_dir:          @0@'''.format(systemd_cache_dir) + '''
 
   optional components
-    manager:            @0@'''.format(s_build_manager) + '''
     utils:              @0@'''.format(s_build_utils) + '''
     dnstap:             @0@'''.format(s_build_dnstap) + '''
     unit_tests:         @0@'''.format(s_build_unit_tests) + '''
