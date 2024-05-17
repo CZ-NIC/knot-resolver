@@ -344,13 +344,13 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                         invoke_callback = True
                         continue
 
-                    if detected_subprocesses[eid] is SubprocessStatus.FAILED:
-                        logger.error("Subprocess '%s' is failed.", eid)
+                    if detected_subprocesses[eid] is SubprocessStatus.FATAL:
+                        logger.error("Subprocess '%s' is in FATAL state!", eid)
                         invoke_callback = True
                         continue
 
                     if detected_subprocesses[eid] is SubprocessStatus.UNKNOWN:
-                        logger.warning("Subprocess '%s' is in unknown state!", eid)
+                        logger.warning("Subprocess '%s' is in UNKNOWN state!", eid)
 
                 non_registered_ids = detected_subprocesses.keys() - set(expected_ids)
                 if len(non_registered_ids) != 0:
