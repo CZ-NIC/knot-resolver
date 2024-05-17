@@ -113,7 +113,9 @@ class Subprocess(ABC):
         self._config = config
         self._registered_worker: bool = False
 
-    async def start(self) -> None:
+    async def start(self, new_config: Optional[KresConfig] = None) -> None:
+        if new_config:
+            self._config = new_config
 
         config_file: Optional[Path] = None
         if self.type is SubprocessType.KRESD:
