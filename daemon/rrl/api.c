@@ -162,10 +162,10 @@ bool kr_rrl_request_begin(struct kr_request *req)
 	if (!req->qsource.addr)
 		return false;  // don't consider internal requests
 	uint8_t limited = 0;  // 0: not limited, 1: truncated, 2: no answer
-	uint16_t max_final_load = 0;
 	if (the_rrl) {
 		uint8_t key[16] ALIGNED(16) = {0, };
 		uint8_t limited_prefix;
+		uint16_t max_final_load = 0;
 		if (req->qsource.addr->sa_family == AF_INET6) {
 			struct sockaddr_in6 *ipv6 = (struct sockaddr_in6 *)req->qsource.addr;
 			memcpy(key, &ipv6->sin6_addr, 16);
