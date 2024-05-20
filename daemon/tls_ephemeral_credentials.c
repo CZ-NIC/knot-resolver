@@ -91,7 +91,7 @@ static gnutls_x509_privkey_t get_ephemeral_privkey (void)
 		}
 		data.size = stat.st_size;
 		bytes_read = read(datafd, data.data, stat.st_size);
-		if (bytes_read != stat.st_size) {
+		if (bytes_read < 0 || bytes_read != stat.st_size) {
 			kr_log_error(TLS, "unable to read ephemeral private key\n");
 			goto bad_data;
 		}

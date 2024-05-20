@@ -282,7 +282,7 @@ static int del_pair(struct hints_data *data, const char *name, const char *addr)
 		return kr_error(EINVAL);
 	}
 	size_t key_len = knot_dname_size(key);
-	if (kr_fails_assert(key_len <= INT_MAX))
+	if (kr_fails_assert(key_len <= KNOT_DNAME_MAXLEN))
 		return kr_error(EINVAL);
 
         if (addr) {
