@@ -46,8 +46,9 @@
 	X(answer,aa) X(answer,tc) X(answer,rd) X(answer,ra) X(answer, ad) X(answer,cd) \
 	X(answer,edns0) X(answer,do) \
 	X(query,edns) X(query,dnssec) \
-	X(request,total) X(request,udp) X(request,tcp) X(request,xdp) \
-	X(request,dot) X(request,doh) X(request,internal) \
+	X(request,total) X(request,total4) X(request,total6) X(request,internal) \
+	X(request,udp4) X(request,tcp4) X(request,xdp4) X(request,dot4) X(request,doh4) \
+	X(request,udp6) X(request,tcp6) X(request,xdp6) X(request,dot6) X(request,doh6) \
 	X(const,end)
 
 enum const_metric {
@@ -185,19 +186,26 @@ static int collect_transport(kr_layer_t *ctx)
 	}
 
 	/**
-	 * Count each transport only once,
+	 * Apart from the "total" stats, count each transport only once,
 	 * i.e. DoT does not count as TCP and XDP does not count as UDP.
+	 * We have two counts for each - IPv6 and IPv4 separately.
 	 */
+	const bool isIPv6 = req->qsource.addr->sa_family == AF_INET6;
+	#define INC_PROTO(proto) \
+		stat_const_add(data, isIPv6 ? metric_request_ ## proto ## 6 \
+					    : metric_request_ ## proto ## 4, 1)
+	INC_PROTO(total);
 	if (req->qsource.flags.http)
-		stat_const_add(data, metric_request_doh, 1);
+		INC_PROTO(doh);
 	else if (req->qsource.flags.tls)
-		stat_const_add(data, metric_request_dot, 1);
+		INC_PROTO(dot);
 	else if (req->qsource.flags.tcp)
-		stat_const_add(data, metric_request_tcp, 1);
+		INC_PROTO(tcp);
 	else if (req->qsource.flags.xdp)
-		stat_const_add(data, metric_request_xdp, 1);
+		INC_PROTO(xdp);
 	else
-		stat_const_add(data, metric_request_udp, 1);
+		INC_PROTO(udp);
+	#undef INC_PROTO
 	return ctx->state;
 }
 
