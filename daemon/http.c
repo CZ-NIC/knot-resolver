@@ -969,7 +969,7 @@ static enum protolayer_iter_cb_result pl_http_unwrap(
 	if (ret < 0) {
 		kr_log_debug(DOH, "[%p] nghttp2_session_send failed: %s (%zd)\n",
 			     (void *)http->h2, nghttp2_strerror(ret), ret);
-		return kr_error(EIO);
+		return protolayer_break(ctx, kr_error(EIO));
 	}
 
 	if (!http_status_has_category(http->status, 2)) {
