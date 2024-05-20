@@ -183,7 +183,11 @@ bool kr_rrl_request_begin(struct kr_request *req)
 	}
 	if (!limited) return false;
 
-	if (limited == 1) {
+	if (limited == 1) { // TC=1: return truncated reply to force source IP validation
+		// We only do this on pure UDP.  (also TODO if cookies get implemented)
+		const bool ip_validated = req->qsource.flags.tcp || req->qsource.flags.tls;
+		if (ip_validated) return false;
+
 		knot_pkt_t *answer = kr_request_ensure_answer(req);
 		if (!answer) { // something bad; TODO: perhaps improve recovery from this
 			kr_assert(false);
@@ -191,7 +195,8 @@ bool kr_rrl_request_begin(struct kr_request *req)
 		}
 		// at this point the packet should be pretty clear
 
-		// TC=1.
+		// The TC=1 answer is not perfect, as the right RCODE might differ
+		// in some cases, but @vcunat thinks that NOERROR isn't really risky here.
 		knot_wire_set_tc(answer->wire);
 		knot_wire_clear_ad(answer->wire);
 		req->state = KR_STATE_DONE;
