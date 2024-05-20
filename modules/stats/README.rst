@@ -89,6 +89,8 @@ Built-in counters keep track of number of queries and answers matching specific 
 +-----------------+----------------------------------+
 | answer.slow     | completed in more than 1500ms    |
 +-----------------+----------------------------------+
+| answer.sum_ms   | sum of all latencies in ms       |
++-----------------+----------------------------------+
 
 +-----------------+----------------------------------+
 | **Answer flags**                                   |
