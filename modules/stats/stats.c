@@ -65,6 +65,28 @@ static struct const_metric_elm const_metrics[] = {
 	CONST_METRICS(X)
 	#undef X
 };
+
+/// These metrics are read-only views, each simply summing a pair of const_metrics items.
+struct sum_metric {
+	const char *key;
+	const size_t *val1, *val2;
+};
+static const struct sum_metric sum_metrics[] = {
+	// We're using this to aggregate v4 + v6 pairs.
+	#define DEF(proto) { \
+		.key = "request." #proto, \
+		.val1 = &const_metrics[metric_request_ ## proto ## 4].val, \
+		.val2 = &const_metrics[metric_request_ ## proto ## 6].val, \
+	}
+	DEF(udp),
+	DEF(tcp),
+	DEF(xdp),
+	DEF(dot),
+	DEF(doh),
+	#undef DEF
+};
+static const size_t sum_metrics_len = sizeof(sum_metrics) / sizeof(sum_metrics[0]);
+
 /** @endcond */
 
 /** @internal LRU hash of most frequent names. */
@@ -282,6 +304,7 @@ static int collect(kr_layer_t *ctx)
  * Set nominal value of a key.
  *
  * Input:  { key, val }
+ * Aggregate metrics can't be set.
  *
  */
 static char* stats_set(void *env, struct kr_module *module, const char *args)
@@ -330,6 +353,16 @@ static char* stats_get(void *env, struct kr_module *module, const char *args)
 	for (unsigned i = 0; i < metric_const_end; ++i) {
 		if (strcmp(const_metrics[i].key, args) == 0) {
 			ret = asprintf(&str_value, "%zu", const_metrics[i].val);
+			if (ret < 0)
+				return NULL;
+			return str_value;
+		}
+	}
+	/* Check if it exists in aggregate metrics. */
+	for (int i = 0; i < sum_metrics_len; ++i) {
+		const struct sum_metric *smi = &sum_metrics[i];
+		if (strcmp(smi->key, args) == 0) {
+			ret = asprintf(&str_value, "%zu", *smi->val1 + *smi->val2);
 			if (ret < 0)
 				return NULL;
 			return str_value;
@@ -386,6 +419,13 @@ static char* stats_list(void *env, struct kr_module *module, const char *args)
 		struct const_metric_elm *elm = &const_metrics[i];
 		if (!args || strncmp(elm->key, args, args_len) == 0) {
 			json_append_member(root, elm->key, json_mknumber((double)elm->val));
+		}
+	}
+	for (int i = 0; i < sum_metrics_len; ++i) {
+		const struct sum_metric *elm = &sum_metrics[i];
+		if (!args || strncmp(elm->key, args, args_len) == 0) {
+			size_t val = *elm->val1 + *elm->val2;
+			json_append_member(root, elm->key, json_mknumber(val));
 		}
 	}
 	struct list_entry_context ctx = {
