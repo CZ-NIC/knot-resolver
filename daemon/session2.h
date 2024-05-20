@@ -2,8 +2,9 @@
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-/* HINT: If you are looking to implement a new protocol, start with the doc
- * comment of the `PROTOLAYER_PROTOCOL_MAP` macro and continue from there. */
+/* HINT: If you are looking to implement support for a new transport protocol,
+ * start with the doc comment of the `PROTOLAYER_PROTOCOL_MAP` macro and
+ * continue from there. */
 
 /* GLOSSARY:
  *
@@ -29,25 +30,26 @@
  *   is retrieved.
  *
  * Protocol layer:
- *   - An implementation of a particular protocol. A layer transforms payloads
- *   to conform to a particular protocol, e.g. UDP, TCP, TLS, HTTP, QUIC, etc.
- *   While transforming a payload, a layer may also modify metadata - e.g. the
- *   UDP and TCP layers in the Unwrap direction implement the PROXYv2 protocol,
- *   using which they retrieve the IP address of the actual originating client
- *   and store it in the appropriate struct.
+ *   - Not to be confused with `struct kr_layer_api`. An implementation of a
+ *   particular protocol. A protocol layer transforms payloads to conform to a
+ *   particular protocol, e.g. UDP, TCP, TLS, HTTP, QUIC, etc. While
+ *   transforming a payload, a layer may also modify metadata - e.g. the UDP and
+ *   TCP layers in the Unwrap direction implement the PROXYv2 protocol, using
+ *   which they retrieve the IP address of the actual originating client and
+ *   store it in the appropriate struct.
  *
  * Protolayer:
- *   - Same as 'Protocol layer'.
+ *   - Short for 'protocol layer'.
  *
  * Unwrap:
- *   - The direction of data transformation, starting with the transport (e.g.
- *   data that came from the network), ending with an internal subsystem (e.g.
- *   DNS query resolution).
+ *   - The direction of data transformation, which starts with the transport
+ *   (e.g. bytes that came from the network) and ends with an internal subsystem
+ *   (e.g. DNS query resolution).
  *
  * Wrap:
- *   - The direction of data transformation, starting with an internal
- *   subsystem (e.g. an answer to a resolved DNS query), ending with the
- *   transport (e.g. data that is going to be sent to the client). */
+ *   - The direction of data transformation, which starts with an internal
+ *   subsystem (e.g. an answer to a resolved DNS query) and ends with the
+ *   transport (e.g. bytes that are going to be sent to the client). */
 
 #pragma once
 
@@ -103,16 +105,17 @@ struct comm_info {
 };
 
 
-/** A buffer, with indices marking the chunk containing as of yet unprocessed
- * data - this chunk is called "valid". The contents may be manipulated using
- * `wire_buf_` functions, which ensure the struct's validity.
+/** A buffer control struct, with indices marking a chunk containing received
+ * but as of yet unprocessed data - the data in this chunk is called "valid
+ * data". The struct may be manipulated using `wire_buf_` functions, which
+ * contain bounds checks to ensure correct behaviour.
  *
- * The struct may be used to retrieve data piecewise, e.g. from a stream-based
- * transport like TCP, by writing data to the buffer's free space, then
+ * The struct may be used to retrieve data piecewise (e.g. from a stream-based
+ * transport like TCP) by writing data to the buffer's free space, then
  * "consuming" that space with `wire_buf_consume`. It can also be handy for
  * processing message headers, then trimming the beginning of the buffer (using
- * `wire_buf_trim`) so that the next part of the data may be processed by a
- * next part of a common pipeline.
+ * `wire_buf_trim`) so that the next part of the data may be processed by
+ * another part of a pipeline.
  *
  * May be initialized in two possible ways:
  *  - via `wire_buf_init`
@@ -155,7 +158,7 @@ int wire_buf_trim(struct wire_buf *wb, size_t length);
 /** Moves the valid bytes of the buffer to the buffer's beginning. */
 int wire_buf_movestart(struct wire_buf *wb);
 
-/** Resets the valid bytes of the buffer to zero. */
+/** Marks the wire buffer as empty. */
 int wire_buf_reset(struct wire_buf *wb);
 
 /** Gets a pointer to the data marked as valid in the wire buffer. */
@@ -243,7 +246,7 @@ const char *protolayer_protocol_name(enum protolayer_protocol p);
  *
  * For defining new groups, see the docs of `protolayer_grps[]` in
  * `daemon/session2.h`.
- * 
+ *
  * TODO: probably unify enum protolayer_grp with enum kr_proto.
  *
  * Parameters for XX are:
