@@ -269,12 +269,10 @@ static enum protolayer_iter_cb_result pl_tcp_unwrap(
 				return protolayer_break(ctx, ret);
 		}
 
-		/* Try to make space */
-		while (len > wire_buf_free_space_length(&tcp->wire_buf)) {
-			if (wire_buf_data_length(&tcp->wire_buf) > 0 ||
-					tcp->wire_buf.start == 0)
+		/* Check if space can be made */
+		if (len > wire_buf_free_space_length(&tcp->wire_buf)) {
+			if (len > tcp->wire_buf.size - wire_buf_data_length(&tcp->wire_buf))
 				return protolayer_break(ctx, kr_error(EMSGSIZE));
-
 			wire_buf_movestart(&tcp->wire_buf);
 		}
 
