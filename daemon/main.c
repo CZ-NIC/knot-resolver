@@ -7,6 +7,7 @@
 #include "contrib/ucw/mempool.h"
 #include "daemon/engine.h"
 #include "daemon/io.h"
+#include "daemon/proxyv2.h"
 #include "daemon/network.h"
 #include "daemon/udp_queue.h"
 #include "daemon/worker.h"
@@ -585,6 +586,7 @@ int main(int argc, char **argv)
 
 	io_protolayers_init();
 	tls_protolayers_init();
+	proxy_protolayers_init();
 #ifdef ENABLE_DOH2
 	http_protolayers_init();
 #endif

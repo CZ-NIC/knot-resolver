@@ -212,6 +212,10 @@ static inline size_t wire_buf_free_space_length(const struct wire_buf *wb)
 	XX(TLS)\
 	XX(HTTP)\
 	\
+	/* PROXYv2 */\
+	XX(PROXYV2_DGRAM)\
+	XX(PROXYV2_STREAM)\
+	\
 	/* DNS (`worker`) */\
 	XX(DNS_DGRAM) /**< Packets WITHOUT prepended size, one per (un)wrap,
 	               * limited to UDP sizes, multiple sources (single
