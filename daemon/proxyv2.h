@@ -8,10 +8,6 @@
 
 #include "lib/utils.h"
 
-extern const char PROXY2_SIGNATURE[12];
-
-#define PROXY2_MIN_SIZE 16
-
 enum proxy2_command {
 	PROXY2_CMD_LOCAL = 0x0,
 	PROXY2_CMD_PROXY = 0x1
@@ -35,19 +31,5 @@ struct proxy_result {
 	bool has_tls : 1;
 };
 
-/** Checks for a PROXY protocol version 2 signature in the specified buffer. */
-static inline bool proxy_header_present(const void* buf, const ssize_t nread)
-{
-	return nread >= PROXY2_MIN_SIZE &&
-		memcmp(buf, PROXY2_SIGNATURE, sizeof(PROXY2_SIGNATURE)) == 0;
-}
-
-/** Checks whether the use of PROXYv2 protocol is allowed for the specified
- * address. */
-bool proxy_allowed(const struct sockaddr *saddr);
-
-/** Parses the PROXYv2 header from buf of size nread and writes the result into
- * out. The function assumes that the PROXYv2 signature is present
- * and has been already checked by the caller (like `udp_recv` or `tcp_recv`). */
-ssize_t proxy_process_header(struct proxy_result *out,
-                             const void *buf, ssize_t nread);
+/** Initializes the protocol layers managed by the PROXYv2 "module". */
+void proxy_protolayers_init(void);
