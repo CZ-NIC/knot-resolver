@@ -298,7 +298,7 @@ static int http_send_response(struct pl_http_sess_data *http, int32_t stream_id,
 		max_age_len = asprintf(&max_age, "%s%" PRIu32, directive_max_age, ctx->payload.ttl);
 		kr_require(max_age_len >= 0);
 
-		/* TODO: add a per-protolayer_grp option for content-type if we
+		/* TODO: add a per-kr_proto option for content-type if we
 		 * need to support protocols other than DNS here */
 		push_nv(&hdrs, MAKE_STATIC_NV("content-type", "application/dns-message"));
 		push_nv(&hdrs, MAKE_STATIC_KEY_NV("content-length", size, size_len));
@@ -389,7 +389,7 @@ static ssize_t send_callback(nghttp2_session *h2, const uint8_t *data, size_t le
 	memcpy(send_ctx->data, data, length);
 
 	kr_log_debug(DOH, "[%p] send_callback: %p\n", (void *)h2, (void *)send_ctx->data);
-	session2_wrap_after(http->h.session, PROTOLAYER_PROTOCOL_HTTP,
+	session2_wrap_after(http->h.session, PROTOLAYER_TYPE_HTTP,
 			protolayer_buffer(send_ctx->data, length, false), NULL,
 			callback_finished_free_baton, send_ctx);
 
@@ -505,7 +505,7 @@ static int send_data_callback(nghttp2_session *h2, nghttp2_frame *frame, const u
 		dest_iov[cur++] = (struct iovec){ (void *)padding, padlen - 1 };
 
 	kr_assert(cur == iovcnt);
-	int ret = session2_wrap_after(http->h.session, PROTOLAYER_PROTOCOL_HTTP,
+	int ret = session2_wrap_after(http->h.session, PROTOLAYER_TYPE_HTTP,
 			protolayer_iovec(dest_iov, cur, false),
 			NULL, callback_finished_free_baton, sdctx);
 
@@ -732,7 +732,7 @@ static int submit_to_wirebuffer(struct pl_http_sess_data *ctx)
 	}
 
 	ret = 0;
-	session2_unwrap_after(ctx->h.session, PROTOLAYER_PROTOCOL_HTTP,
+	session2_unwrap_after(ctx->h.session, PROTOLAYER_TYPE_HTTP,
 			protolayer_wire_buf(wb, false), NULL, NULL, NULL);
 cleanup:
 	http_cleanup_stream(ctx);
@@ -1032,7 +1032,7 @@ static void pl_http_request_init(struct protolayer_manager *manager,
 
 void http_protolayers_init(void)
 {
-	protolayer_globals[PROTOLAYER_PROTOCOL_HTTP] = (struct protolayer_globals) {
+	protolayer_globals[PROTOLAYER_TYPE_HTTP] = (struct protolayer_globals) {
 		.sess_size = sizeof(struct pl_http_sess_data),
 		.sess_deinit = pl_http_sess_deinit,
 		.wire_buf_overhead = HTTP_MAX_FRAME_SIZE,

@@ -357,13 +357,13 @@ static enum protolayer_event_cb_result pl_tcp_event_wrap(
 
 void io_protolayers_init(void)
 {
-	protolayer_globals[PROTOLAYER_PROTOCOL_UDP] = (struct protolayer_globals){
+	protolayer_globals[PROTOLAYER_TYPE_UDP] = (struct protolayer_globals){
 		.iter_size = sizeof(struct pl_udp_iter_data),
 		.unwrap = pl_udp_unwrap,
 		.event_wrap = pl_udp_event_wrap,
 	};
 
-	protolayer_globals[PROTOLAYER_PROTOCOL_TCP] = (struct protolayer_globals){
+	protolayer_globals[PROTOLAYER_TYPE_TCP] = (struct protolayer_globals){
 		.sess_size = sizeof(struct pl_tcp_sess_data),
 		.sess_init = pl_tcp_sess_init,
 		.sess_deinit = pl_tcp_sess_deinit,
@@ -458,7 +458,7 @@ int io_listen_udp(uv_loop_t *loop, uv_udp_t *handle, int fd)
 	uv_handle_t *h = (uv_handle_t *)handle;
 	check_bufsize(h);
 	/* Handle is already created, just create context. */
-	struct session2 *s = session2_new_io(h, PROTOLAYER_GRP_DOUDP, NULL, 0, false);
+	struct session2 *s = session2_new_io(h, KR_PROTO_UDP53, NULL, 0, false);
 	kr_require(s);
 
 	int socklen = sizeof(union kr_sockaddr);
@@ -515,7 +515,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 			NULL, NULL, NULL);
 }
 
-static void _tcp_accept(uv_stream_t *master, int status, enum protolayer_grp grp)
+static void tcp_accept_internal(uv_stream_t *master, int status, enum kr_proto grp)
 {
  	if (status != 0) {
 		return;
@@ -576,18 +576,18 @@ static void _tcp_accept(uv_stream_t *master, int status, enum protolayer_grp grp
 
 static void tcp_accept(uv_stream_t *master, int status)
 {
-	_tcp_accept(master, status, PROTOLAYER_GRP_DOTCP);
+	tcp_accept_internal(master, status, KR_PROTO_TCP53);
 }
 
 static void tls_accept(uv_stream_t *master, int status)
 {
-	_tcp_accept(master, status, PROTOLAYER_GRP_DOTLS);
+	tcp_accept_internal(master, status, KR_PROTO_DOT);
 }
 
 #if ENABLE_DOH2
 static void https_accept(uv_stream_t *master, int status)
 {
-	_tcp_accept(master, status, PROTOLAYER_GRP_DOHTTPS);
+	tcp_accept_internal(master, status, KR_PROTO_DOH);
 }
 #endif
 
@@ -1041,7 +1041,7 @@ int io_listen_xdp(uv_loop_t *loop, struct endpoint *ep, const char *ifname)
 		return kr_error(ret);
 	}
 
-	xhd->session = session2_new_io(ep->handle, PROTOLAYER_GRP_DOUDP,
+	xhd->session = session2_new_io(ep->handle, KR_PROTO_UDP53,
 			NULL, 0, false);
 	kr_require(xhd->session);
 	session2_get_sockname(xhd->session)->sa_family = AF_XDP; // to have something in there
@@ -1053,7 +1053,7 @@ int io_listen_xdp(uv_loop_t *loop, struct endpoint *ep, const char *ifname)
 #endif
 
 int io_create(uv_loop_t *loop, struct session2 **out_session, int type,
-              unsigned family, enum protolayer_grp grp,
+              unsigned family, enum kr_proto grp,
               struct protolayer_data_param *layer_param,
               size_t layer_param_count, bool outgoing)
 {
