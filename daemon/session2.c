@@ -30,73 +30,69 @@
 
 static uint32_t next_log_id = 1;
 
-struct protolayer_globals protolayer_globals[PROTOLAYER_PROTOCOL_COUNT] = {{0}};
+struct protolayer_globals protolayer_globals[PROTOLAYER_TYPE_COUNT] = {{0}};
 
 
-static const enum protolayer_protocol protolayer_grp_doudp[] = {
-	PROTOLAYER_PROTOCOL_UDP,
-	PROTOLAYER_PROTOCOL_DNS_DGRAM,
-	PROTOLAYER_PROTOCOL_NULL
+static const enum protolayer_type protolayer_grp_udp53[] = {
+	PROTOLAYER_TYPE_UDP,
+	PROTOLAYER_TYPE_DNS_DGRAM,
+	PROTOLAYER_TYPE_NULL
 };
 
-static const enum protolayer_protocol protolayer_grp_dotcp[] = {
-	PROTOLAYER_PROTOCOL_TCP,
-	PROTOLAYER_PROTOCOL_DNS_MULTI_STREAM,
-	PROTOLAYER_PROTOCOL_NULL
+static const enum protolayer_type protolayer_grp_tcp53[] = {
+	PROTOLAYER_TYPE_TCP,
+	PROTOLAYER_TYPE_DNS_MULTI_STREAM,
+	PROTOLAYER_TYPE_NULL
 };
 
-static const enum protolayer_protocol protolayer_grp_dot[] = {
-	PROTOLAYER_PROTOCOL_TCP,
-	PROTOLAYER_PROTOCOL_TLS,
-	PROTOLAYER_PROTOCOL_DNS_MULTI_STREAM,
-	PROTOLAYER_PROTOCOL_NULL
+static const enum protolayer_type protolayer_grp_dot[] = {
+	PROTOLAYER_TYPE_TCP,
+	PROTOLAYER_TYPE_TLS,
+	PROTOLAYER_TYPE_DNS_MULTI_STREAM,
+	PROTOLAYER_TYPE_NULL
 };
 
-static const enum protolayer_protocol protolayer_grp_doh[] = {
-	PROTOLAYER_PROTOCOL_TCP,
-	PROTOLAYER_PROTOCOL_TLS,
-	PROTOLAYER_PROTOCOL_HTTP,
-	PROTOLAYER_PROTOCOL_DNS_UNSIZED_STREAM,
-	PROTOLAYER_PROTOCOL_NULL
+static const enum protolayer_type protolayer_grp_doh[] = {
+	PROTOLAYER_TYPE_TCP,
+	PROTOLAYER_TYPE_TLS,
+	PROTOLAYER_TYPE_HTTP,
+	PROTOLAYER_TYPE_DNS_UNSIZED_STREAM,
+	PROTOLAYER_TYPE_NULL
 };
 
-/** Sequences of layers, mapped by `enum protolayer_grp`.
+static const enum protolayer_type protolayer_grp_doq[] = {
+	// not yet used
+	PROTOLAYER_TYPE_NULL
+};
+
+/** Sequences of layers, or groups, mapped by `enum kr_proto`.
  *
- * To define a new group, add a new entry in the `PROTOLAYER_GRP_MAP` macro and
+ * Each group represents a sequence of layers in the unwrap direction (wrap
+ * direction being the opposite). The sequence dictates the order in which
+ * individual layers are processed. This macro is used to generate global data
+ * about groups.
+ *
+ * To define a new group, add a new entry in the `KR_PROTO_MAP()` macro and
  * create a new static `protolayer_grp_*` array above, similarly to the already
- * existing ones. Each array must end with `PROTOLAYER_GRP_NULL`, to indicate
- * the end of the list of protocol layers. The array name's suffix must be the
- * one defined as *Variable name* (2nd parameter) in the `PROTOLAYER_GRP_MAP`
- * macro. */
-static const enum protolayer_protocol *protolayer_grps[PROTOLAYER_GRP_COUNT] = {
-#define XX(cid, vid, name) [PROTOLAYER_GRP_ ## cid] = protolayer_grp_ ## vid,
-	PROTOLAYER_GRP_MAP(XX)
+ * existing ones. Each array must end with `PROTOLAYER_TYPE_NULL`, to
+ * indicate the end of the list of protocol layers. The array name's suffix must
+ * be the one defined as *Variable name* (2nd parameter) in the
+ * `KR_PROTO_MAP` macro. */
+static const enum protolayer_type *protolayer_grps[KR_PROTO_COUNT] = {
+#define XX(cid, vid, name) [KR_PROTO_##cid] = protolayer_grp_##vid,
+	KR_PROTO_MAP(XX)
 #undef XX
 };
 
 
-const char *protolayer_protocol_name(enum protolayer_protocol p)
+const char *protolayer_layer_name(enum protolayer_type p)
 {
 	switch (p) {
-	case PROTOLAYER_PROTOCOL_NULL:
+	case PROTOLAYER_TYPE_NULL:
 		return "(null)";
-#define XX(cid) case PROTOLAYER_PROTOCOL_ ## cid: \
+#define XX(cid) case PROTOLAYER_TYPE_ ## cid: \
 			return #cid;
-	PROTOLAYER_PROTOCOL_MAP(XX)
-#undef XX
-	default:
-		return "(invalid)";
-	}
-}
-
-const char *protolayer_grp_name(enum protolayer_grp g)
-{
-	switch (g) {
-	case PROTOLAYER_GRP_NULL:
-		return "(null)";
-#define XX(cid, vid, name) case PROTOLAYER_GRP_ ## cid: \
-		return (name);
-	PROTOLAYER_GRP_MAP(XX)
+	PROTOLAYER_TYPE_MAP(XX)
 #undef XX
 	default:
 		return "(invalid)";
@@ -334,10 +330,10 @@ static inline struct protolayer_data *protolayer_iter_data_get(
 }
 
 static inline ssize_t protolayer_manager_get_protocol(
-		struct protolayer_manager *m, enum protolayer_protocol protocol)
+		struct protolayer_manager *m, enum protolayer_type protocol)
 {
 	for (ssize_t i = 0; i < m->num_layers; i++) {
-		enum protolayer_protocol found = protolayer_grps[m->grp][i];
+		enum protolayer_type found = protolayer_grps[m->grp][i];
 		if (protocol == found)
 			return i;
 	}
@@ -361,12 +357,12 @@ static inline void protolayer_iter_ctx_next(struct protolayer_iter_ctx *ctx)
 		ctx->layer_ix--;
 }
 
-static inline const char *layer_name(enum protolayer_grp grp, ssize_t layer_ix)
+static inline const char *layer_name(enum kr_proto grp, ssize_t layer_ix)
 {
-	if (grp >= PROTOLAYER_GRP_COUNT)
+	if (grp >= KR_PROTO_COUNT)
 		return "(invalid)";
-	enum protolayer_protocol p = protolayer_grps[grp][layer_ix];
-	return protolayer_protocol_name(p);
+	enum protolayer_type p = protolayer_grps[grp][layer_ix];
+	return protolayer_layer_name(p);
 }
 
 static inline const char *layer_name_ctx(struct protolayer_iter_ctx *ctx)
@@ -388,12 +384,12 @@ static int protolayer_iter_ctx_finish(struct protolayer_iter_ctx *ctx, int ret)
 
 	if (ret)
 		VERBOSE_LOG(session, "layer context of group '%s' (on %u: %s) ended with return code %d\n",
-				protolayer_grp_name(ctx->manager->grp),
+				kr_proto_name(ctx->manager->grp),
 				ctx->layer_ix, layer_name_ctx(ctx), ret);
 
 	if (ctx->status)
 		VERBOSE_LOG(session, "iteration of group '%s' (on %u: %s) ended with status %d\n",
-				protolayer_grp_name(ctx->manager->grp),
+				kr_proto_name(ctx->manager->grp),
 				ctx->layer_ix, layer_name_ctx(ctx), ctx->status);
 
 	if (ctx->finished_cb)
@@ -470,10 +466,10 @@ static void protolayer_ensure_long_lived(struct protolayer_iter_ctx *ctx)
 static int protolayer_step(struct protolayer_iter_ctx *ctx)
 {
 	while (true) {
-		if (kr_fails_assert(ctx->manager->grp < PROTOLAYER_GRP_COUNT))
+		if (kr_fails_assert(ctx->manager->grp < KR_PROTO_COUNT))
 			return kr_error(EFAULT);
 
-		enum protolayer_protocol protocol = protolayer_grps[ctx->manager->grp][ctx->layer_ix];
+		enum protolayer_type protocol = protolayer_grps[ctx->manager->grp][ctx->layer_ix];
 		struct protolayer_globals *globals = &protolayer_globals[protocol];
 
 		ctx->async_mode = false;
@@ -561,7 +557,7 @@ static int protolayer_manager_submit(
 	VERBOSE_LOG(manager->session,
 			"%s submitted to grp '%s' in %s direction (%zu: %s)\n",
 			protolayer_payload_name(payload.type),
-			protolayer_grp_name(manager->grp),
+			kr_proto_name(manager->grp),
 			(direction == PROTOLAYER_UNWRAP) ? "unwrap" : "wrap",
 			layer_ix, layer_name(manager->grp, layer_ix));
 
@@ -576,10 +572,10 @@ static int protolayer_manager_submit(
 	};
 
 	for (size_t i = 0; i < manager->num_layers; i++) {
-		if (kr_fails_assert(ctx->manager->grp < PROTOLAYER_GRP_COUNT))
+		if (kr_fails_assert(ctx->manager->grp < KR_PROTO_COUNT))
 			return kr_error(EFAULT);
 
-		enum protolayer_protocol p = protolayer_grps[manager->grp][i];
+		enum protolayer_type p = protolayer_grps[manager->grp][i];
 		struct protolayer_globals *globals = &protolayer_globals[p];
 		struct protolayer_data *iter_data = protolayer_iter_data_get(ctx, i);
 		if (iter_data) {
@@ -594,7 +590,7 @@ static int protolayer_manager_submit(
 	return protolayer_step(ctx);
 }
 
-static void *get_init_param(enum protolayer_protocol p,
+static void *get_init_param(enum protolayer_type p,
                             struct protolayer_data_param *layer_param,
                             size_t layer_param_count)
 {
@@ -610,7 +606,7 @@ static void *get_init_param(enum protolayer_protocol p,
 /** Allocates and initializes a new manager. */
 static struct protolayer_manager *protolayer_manager_new(
 		struct session2 *s,
-		enum protolayer_grp grp,
+		enum kr_proto grp,
 		struct protolayer_data_param *layer_param,
 		size_t layer_param_count)
 {
@@ -621,10 +617,10 @@ static struct protolayer_manager *protolayer_manager_new(
 	size_t manager_size = sizeof(struct protolayer_manager);
 	size_t cb_ctx_size = sizeof(struct protolayer_iter_ctx);
 
-	const enum protolayer_protocol *protocols = protolayer_grps[grp];
+	const enum protolayer_type *protocols = protolayer_grps[grp];
 	if (kr_fails_assert(protocols))
 		return NULL;
-	const enum protolayer_protocol *p = protocols;
+	const enum protolayer_type *p = protocols;
 
 	/* Space for offset index */
 	for (; *p; p++)
@@ -697,7 +693,7 @@ static void protolayer_manager_free(struct protolayer_manager *m)
 	if (!m) return;
 
 	for (size_t i = 0; i < m->num_layers; i++) {
-		enum protolayer_protocol p = protolayer_grps[m->grp][i];
+		enum protolayer_type p = protolayer_grps[m->grp][i];
 		struct protolayer_globals *globals = &protolayer_globals[p];
 		if (globals->sess_deinit) {
 			struct protolayer_data *sess_data = protolayer_sess_data_get(m, i);
@@ -809,7 +805,7 @@ int wire_buf_reset(struct wire_buf *wb)
 
 
 struct session2 *session2_new(enum session2_transport_type transport_type,
-                              enum protolayer_grp layer_grp,
+                              enum kr_proto layer_grp,
                               struct protolayer_data_param *layer_param,
                               size_t layer_param_count,
                               bool outgoing)
@@ -1181,7 +1177,7 @@ int session2_unwrap(struct session2 *s, struct protolayer_payload payload,
 			payload, comm, cb, baton);
 }
 
-int session2_unwrap_after(struct session2 *s, enum protolayer_protocol protocol,
+int session2_unwrap_after(struct session2 *s, enum protolayer_type protocol,
                           struct protolayer_payload payload,
                           const struct comm_info *comm,
                           protolayer_finished_cb cb, void *baton)
@@ -1202,7 +1198,7 @@ int session2_wrap(struct session2 *s, struct protolayer_payload payload,
 			payload, comm, cb, baton);
 }
 
-int session2_wrap_after(struct session2 *s, enum protolayer_protocol protocol,
+int session2_wrap_after(struct session2 *s, enum protolayer_type protocol,
                         struct protolayer_payload payload,
                         const struct comm_info *comm,
                         protolayer_finished_cb cb, void *baton)
@@ -1219,7 +1215,7 @@ static void session2_event_wrap(struct session2 *s, enum protolayer_event_type e
 	bool cont;
 	struct protolayer_manager *m = s->layers;
 	for (ssize_t i = m->num_layers - 1; i >= 0; i--) {
-		enum protolayer_protocol p = protolayer_grps[s->layers->grp][i];
+		enum protolayer_type p = protolayer_grps[s->layers->grp][i];
 		struct protolayer_globals *globals = &protolayer_globals[p];
 		if (globals->event_wrap) {
 			struct protolayer_data *sess_data = protolayer_sess_data_get(m, i);
@@ -1240,7 +1236,7 @@ void session2_event_unwrap(struct session2 *s, ssize_t start_ix, enum protolayer
 	bool cont;
 	struct protolayer_manager *m = s->layers;
 	for (ssize_t i = start_ix; i < m->num_layers; i++) {
-		enum protolayer_protocol p = protolayer_grps[s->layers->grp][i];
+		enum protolayer_type p = protolayer_grps[s->layers->grp][i];
 		struct protolayer_globals *globals = &protolayer_globals[p];
 		if (globals->event_unwrap) {
 			struct protolayer_data *sess_data = protolayer_sess_data_get(m, i);
@@ -1267,7 +1263,7 @@ void session2_event(struct session2 *s, enum protolayer_event_type event, void *
 	session2_event_unwrap(s, 0, event, baton);
 }
 
-void session2_event_after(struct session2 *s, enum protolayer_protocol protocol,
+void session2_event_after(struct session2 *s, enum protolayer_type protocol,
                           enum protolayer_event_type event, void *baton)
 {
 	ssize_t start_ix = protolayer_manager_get_protocol(s->layers, protocol);
@@ -1280,7 +1276,7 @@ void session2_init_request(struct session2 *s, struct kr_request *req)
 {
 	struct protolayer_manager *m = s->layers;
 	for (ssize_t i = 0; i < m->num_layers; i++) {
-		enum protolayer_protocol p = protolayer_grps[s->layers->grp][i];
+		enum protolayer_type p = protolayer_grps[s->layers->grp][i];
 		struct protolayer_globals *globals = &protolayer_globals[p];
 		if (globals->request_init) {
 			struct protolayer_data *sess_data = protolayer_sess_data_get(m, i);
