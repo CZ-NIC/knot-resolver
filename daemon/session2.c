@@ -35,22 +35,26 @@ struct protolayer_globals protolayer_globals[PROTOLAYER_TYPE_COUNT] = {{0}};
 
 static const enum protolayer_type protolayer_grp_udp53[] = {
 	PROTOLAYER_TYPE_UDP,
+	PROTOLAYER_TYPE_PROXYV2_DGRAM,
 	PROTOLAYER_TYPE_DNS_DGRAM,
 };
 
 static const enum protolayer_type protolayer_grp_tcp53[] = {
 	PROTOLAYER_TYPE_TCP,
+	PROTOLAYER_TYPE_PROXYV2_STREAM,
 	PROTOLAYER_TYPE_DNS_MULTI_STREAM,
 };
 
 static const enum protolayer_type protolayer_grp_dot[] = {
 	PROTOLAYER_TYPE_TCP,
+	PROTOLAYER_TYPE_PROXYV2_STREAM,
 	PROTOLAYER_TYPE_TLS,
 	PROTOLAYER_TYPE_DNS_MULTI_STREAM,
 };
 
 static const enum protolayer_type protolayer_grp_doh[] = {
 	PROTOLAYER_TYPE_TCP,
+	PROTOLAYER_TYPE_PROXYV2_STREAM,
 	PROTOLAYER_TYPE_TLS,
 	PROTOLAYER_TYPE_HTTP,
 	PROTOLAYER_TYPE_DNS_UNSIZED_STREAM,

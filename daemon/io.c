@@ -17,7 +17,6 @@
 #endif
 
 #include "daemon/network.h"
-#include "daemon/proxyv2.h"
 #include "daemon/worker.h"
 #include "daemon/tls.h"
 #include "daemon/http.h"
@@ -137,73 +136,6 @@ static int family_to_freebind_option(sa_family_t sa_family, int *level, int *nam
 }
 
 
-struct pl_udp_iter_data {
-	struct protolayer_data h;
-	struct proxy_result proxy;
-	bool has_proxy;
-};
-
-static enum protolayer_iter_cb_result pl_udp_unwrap(
-		void *sess_data, void *iter_data, struct protolayer_iter_ctx *ctx)
-{
-	ctx->payload = protolayer_payload_as_buffer(&ctx->payload);
-	if (kr_fails_assert(ctx->payload.type == PROTOLAYER_PAYLOAD_BUFFER)) {
-		/* unsupported payload */
-		return protolayer_break(ctx, kr_error(EINVAL));
-	}
-
-	struct session2 *s = ctx->manager->session;
-	struct pl_udp_iter_data *udp = iter_data;
-
-	char *data = ctx->payload.buffer.buf;
-	ssize_t data_len = ctx->payload.buffer.len;
-	struct comm_info *comm = &ctx->comm;
-	if (!s->outgoing && proxy_header_present(data, data_len)) {
-		if (!proxy_allowed(comm->comm_addr)) {
-			kr_log_debug(IO, "<= ignoring PROXYv2 UDP from disallowed address '%s'\n",
-					kr_straddr(comm->comm_addr));
-			return protolayer_break(ctx, kr_error(EPERM));
-		}
-
-		ssize_t trimmed = proxy_process_header(&udp->proxy, data, data_len);
-		if (trimmed == KNOT_EMALF) {
-			if (kr_log_is_debug(IO, NULL)) {
-				kr_log_debug(IO, "<= ignoring malformed PROXYv2 UDP "
-						"from address '%s'\n",
-						kr_straddr(comm->comm_addr));
-			}
-			return protolayer_break(ctx, kr_error(EINVAL));
-		} else if (trimmed < 0) {
-			if (kr_log_is_debug(IO, NULL)) {
-				kr_log_debug(IO, "<= error processing PROXYv2 UDP "
-						"from address '%s', ignoring\n",
-						kr_straddr(comm->comm_addr));
-			}
-			return protolayer_break(ctx, kr_error(EINVAL));
-		}
-
-		if (udp->proxy.command == PROXY2_CMD_PROXY && udp->proxy.family != AF_UNSPEC) {
-			udp->has_proxy = true;
-
-			comm->src_addr = &udp->proxy.src_addr.ip;
-			comm->dst_addr = &udp->proxy.dst_addr.ip;
-			comm->proxy = &udp->proxy;
-
-			if (kr_log_is_debug(IO, NULL)) {
-				kr_log_debug(IO, "<= UDP query from '%s'\n",
-						kr_straddr(comm->src_addr));
-				kr_log_debug(IO, "<= proxied through '%s'\n",
-						kr_straddr(comm->comm_addr));
-			}
-		}
-
-		ctx->payload = protolayer_payload_buffer(
-				data + trimmed, data_len - trimmed, false);
-	}
-
-	return protolayer_continue(ctx);
-}
-
 static enum protolayer_event_cb_result pl_udp_event_wrap(
 		enum protolayer_event_type event, void **baton,
 		struct protolayer_manager *manager, void *sess_data)
@@ -217,127 +149,6 @@ static enum protolayer_event_cb_result pl_udp_event_wrap(
 	}
 
 	return PROTOLAYER_EVENT_PROPAGATE;
-}
-
-
-struct pl_tcp_sess_data {
-	struct protolayer_data h;
-	struct proxy_result proxy;
-	struct wire_buf wire_buf;
-	bool had_data : 1;
-	bool has_proxy : 1;
-};
-
-static int pl_tcp_sess_init(struct protolayer_manager *manager,
-                            void *data,
-                            void *param)
-{
-	struct sockaddr *peer = session2_get_peer(manager->session);
-	manager->session->comm = (struct comm_info) {
-		.comm_addr = peer,
-		.src_addr = peer
-	};
-	return 0;
-}
-
-static int pl_tcp_sess_deinit(struct protolayer_manager *manager, void *sess_data)
-{
-	struct pl_tcp_sess_data *tcp = sess_data;
-	wire_buf_deinit(&tcp->wire_buf);
-	return 0;
-}
-
-static enum protolayer_iter_cb_result pl_tcp_unwrap(
-		void *sess_data, void *iter_data, struct protolayer_iter_ctx *ctx)
-{
-	struct session2 *s = ctx->manager->session;
-	struct pl_tcp_sess_data *tcp = sess_data;
-	struct sockaddr *peer = session2_get_peer(s);
-
-	if (ctx->payload.type == PROTOLAYER_PAYLOAD_BUFFER) {
-		const char *buf = ctx->payload.buffer.buf;
-		const size_t len = ctx->payload.buffer.len;
-
-		/* Copy a simple buffer into internal wirebuffer. */
-		if (len > KNOT_WIRE_MAX_PKTSIZE)
-			return protolayer_break(ctx, kr_error(EMSGSIZE));
-
-		if (!tcp->wire_buf.buf) {
-			int ret = wire_buf_reserve(&tcp->wire_buf,
-					KNOT_WIRE_MAX_PKTSIZE);
-			if (ret)
-				return protolayer_break(ctx, ret);
-		}
-
-		/* Check if space can be made */
-		if (len > wire_buf_free_space_length(&tcp->wire_buf)) {
-			if (len > tcp->wire_buf.size - wire_buf_data_length(&tcp->wire_buf))
-				return protolayer_break(ctx, kr_error(EMSGSIZE));
-			wire_buf_movestart(&tcp->wire_buf);
-		}
-
-		memcpy(wire_buf_free_space(&tcp->wire_buf), buf, len);
-		wire_buf_consume(&tcp->wire_buf, ctx->payload.buffer.len);
-		ctx->payload = protolayer_payload_wire_buf(&tcp->wire_buf, false);
-	}
-
-	if (kr_fails_assert(ctx->payload.type == PROTOLAYER_PAYLOAD_WIRE_BUF)) {
-		/* TODO: iovec support unimplemented */
-		return protolayer_break(ctx, kr_error(EINVAL));
-	}
-
-	char *data = wire_buf_data(ctx->payload.wire_buf); /* layer's or session's wirebuf */
-	ssize_t data_len = wire_buf_data_length(ctx->payload.wire_buf);
-	struct comm_info *comm = &ctx->manager->session->comm;
-	if (!s->outgoing && !tcp->had_data && proxy_header_present(data, data_len)) {
-		if (!proxy_allowed(comm->src_addr)) {
-			if (kr_log_is_debug(IO, NULL)) {
-				kr_log_debug(IO, "<= connection to '%s': PROXYv2 not allowed "
-						"for this peer, close\n",
-						kr_straddr(peer));
-			}
-			worker_end_tcp(s);
-			return protolayer_break(ctx, kr_error(ECONNRESET));
-		}
-
-		ssize_t trimmed = proxy_process_header(&tcp->proxy, data, data_len);
-		if (trimmed < 0) {
-			if (kr_log_is_debug(IO, NULL)) {
-				if (trimmed == KNOT_EMALF) {
-					kr_log_debug(IO, "<= connection to '%s': "
-							"malformed PROXYv2 header, close\n",
-							kr_straddr(comm->src_addr));
-				} else {
-					kr_log_debug(IO, "<= connection to '%s': "
-							"error processing PROXYv2 header, close\n",
-							kr_straddr(comm->src_addr));
-				}
-			}
-			worker_end_tcp(s);
-			return protolayer_break(ctx, kr_error(ECONNRESET));
-		} else if (trimmed == 0) {
-			session2_close(s);
-			return protolayer_break(ctx, kr_error(ECONNRESET));
-		}
-
-		if (tcp->proxy.command != PROXY2_CMD_LOCAL && tcp->proxy.family != AF_UNSPEC) {
-			comm->src_addr = &tcp->proxy.src_addr.ip;
-			comm->dst_addr = &tcp->proxy.dst_addr.ip;
-
-			if (kr_log_is_debug(IO, NULL)) {
-				kr_log_debug(IO, "<= TCP stream from '%s'\n",
-						kr_straddr(comm->src_addr));
-				kr_log_debug(IO, "<= proxied through '%s'\n",
-						kr_straddr(comm->comm_addr));
-			}
-		}
-
-		wire_buf_trim(ctx->payload.wire_buf, trimmed);
-	}
-
-	tcp->had_data = true;
-	ctx->comm = ctx->manager->session->comm;
-	return protolayer_continue(ctx);
 }
 
 static enum protolayer_event_cb_result pl_tcp_event_wrap(
@@ -358,16 +169,10 @@ static enum protolayer_event_cb_result pl_tcp_event_wrap(
 void io_protolayers_init(void)
 {
 	protolayer_globals[PROTOLAYER_TYPE_UDP] = (struct protolayer_globals){
-		.iter_size = sizeof(struct pl_udp_iter_data),
-		.unwrap = pl_udp_unwrap,
 		.event_wrap = pl_udp_event_wrap,
 	};
 
 	protolayer_globals[PROTOLAYER_TYPE_TCP] = (struct protolayer_globals){
-		.sess_size = sizeof(struct pl_tcp_sess_data),
-		.sess_init = pl_tcp_sess_init,
-		.sess_deinit = pl_tcp_sess_deinit,
-		.unwrap = pl_tcp_unwrap,
 		.event_wrap = pl_tcp_event_wrap,
 	};
 }
