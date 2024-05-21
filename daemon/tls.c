@@ -229,8 +229,8 @@ static ssize_t kres_gnutls_vec_push(gnutls_transport_ptr_t h, const giovec_t * i
 	memcpy(push_ctx->iov, iov, sizeof(struct iovec[iovcnt]));
 
 	session2_wrap_after(tls->h.session, PROTOLAYER_TYPE_TLS,
-			protolayer_iovec(push_ctx->iov, iovcnt, true), NULL,
-			kres_gnutls_push_finished, push_ctx);
+			protolayer_payload_iovec(push_ctx->iov, iovcnt, true),
+			NULL, kres_gnutls_push_finished, push_ctx);
 
 	return total_len;
 }
@@ -967,7 +967,7 @@ static int pl_tls_sess_server_init(struct protolayer_manager *manager,
 					  tls->tls_session);
 	}
 
-	const gnutls_datum_t *alpn = &tls_grp_alpn[manager->grp];
+	const gnutls_datum_t *alpn = &tls_grp_alpn[manager->proto];
 	if (alpn->size) { /* ALPN is a non-empty string */
 		flags = 0;
 #if GNUTLS_VERSION_NUMBER >= 0x030500
@@ -1160,7 +1160,7 @@ static enum protolayer_iter_cb_result pl_tls_unwrap(void *sess_data, void *iter_
 	struct protolayer_iter_ctx *ctx_head = queue_head(tls->unwrap_queue);
 	if (!kr_fails_assert(ctx == ctx_head))
 		queue_pop(tls->unwrap_queue);
-	ctx->payload = protolayer_wire_buf(&tls->unwrap_buf, false);
+	ctx->payload = protolayer_payload_wire_buf(&tls->unwrap_buf, false);
 	return protolayer_continue(ctx);
 
 exit_break:
@@ -1174,7 +1174,7 @@ static ssize_t pl_tls_submit(gnutls_session_t tls_session,
                              struct protolayer_payload payload)
 {
 	if (payload.type == PROTOLAYER_PAYLOAD_WIRE_BUF)
-		payload = protolayer_as_buffer(&payload);
+		payload = protolayer_payload_as_buffer(&payload);
 
 	if (payload.type == PROTOLAYER_PAYLOAD_BUFFER) {
 		ssize_t count = gnutls_record_send(tls_session,

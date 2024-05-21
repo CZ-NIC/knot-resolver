@@ -662,7 +662,7 @@ static int qr_task_send(struct qr_task *task, struct session2 *session,
 
 	/* Pending '_finished' callback on current task */
 	qr_task_ref(task);
-	struct protolayer_payload payload = protolayer_buffer(
+	struct protolayer_payload payload = protolayer_payload_buffer(
 			(char *)pkt->wire, pkt->size, false);
 	payload.ttl = packet_ttl(pkt);
 	ret = session2_wrap(session, payload, comm, qr_task_wrap_finished, task);
@@ -2262,7 +2262,7 @@ static enum protolayer_iter_cb_result pl_dns_stream_wrap(
 		stream->sent.mem = siov;
 		stream->sent.pool = &s->pool;
 
-		ctx->payload = protolayer_iovec(siov->iovs, iovcnt, false);
+		ctx->payload = protolayer_payload_iovec(siov->iovs, iovcnt, false);
 		return protolayer_continue(ctx);
 	} else if (ctx->payload.type == PROTOLAYER_PAYLOAD_IOVEC) {
 		const int iovcnt = 1 + ctx->payload.iovec.cnt;
@@ -2288,7 +2288,7 @@ static enum protolayer_iter_cb_result pl_dns_stream_wrap(
 		stream->sent.mem = siov;
 		stream->sent.pool = &s->pool;
 
-		ctx->payload = protolayer_iovec(siov->iovs, iovcnt, false);
+		ctx->payload = protolayer_payload_iovec(siov->iovs, iovcnt, false);
 		return protolayer_continue(ctx);
 	} else {
 		kr_assert(false && "Invalid payload");
