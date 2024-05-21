@@ -98,7 +98,7 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 		.comm_addr = comm_addr,
 		.src_addr = comm_addr
 	};
-	session2_unwrap(s, protolayer_wire_buf(&s->layers->wire_buf, false),
+	session2_unwrap(s, protolayer_payload_wire_buf(&s->layers->wire_buf, false),
 			&in_comm, udp_on_unwrapped, NULL);
 }
 
@@ -146,7 +146,7 @@ struct pl_udp_iter_data {
 static enum protolayer_iter_cb_result pl_udp_unwrap(
 		void *sess_data, void *iter_data, struct protolayer_iter_ctx *ctx)
 {
-	ctx->payload = protolayer_as_buffer(&ctx->payload);
+	ctx->payload = protolayer_payload_as_buffer(&ctx->payload);
 	if (kr_fails_assert(ctx->payload.type == PROTOLAYER_PAYLOAD_BUFFER)) {
 		/* unsupported payload */
 		return protolayer_break(ctx, kr_error(EINVAL));
@@ -197,7 +197,7 @@ static enum protolayer_iter_cb_result pl_udp_unwrap(
 			}
 		}
 
-		ctx->payload = protolayer_buffer(
+		ctx->payload = protolayer_payload_buffer(
 				data + trimmed, data_len - trimmed, false);
 	}
 
@@ -278,7 +278,7 @@ static enum protolayer_iter_cb_result pl_tcp_unwrap(
 
 		memcpy(wire_buf_free_space(&tcp->wire_buf), buf, len);
 		wire_buf_consume(&tcp->wire_buf, ctx->payload.buffer.len);
-		ctx->payload = protolayer_wire_buf(&tcp->wire_buf, false);
+		ctx->payload = protolayer_payload_wire_buf(&tcp->wire_buf, false);
 	}
 
 	if (kr_fails_assert(ctx->payload.type == PROTOLAYER_PAYLOAD_WIRE_BUF)) {
@@ -511,7 +511,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 		return;
 	}
 
-	session2_unwrap(s, protolayer_wire_buf(&s->layers->wire_buf, false),
+	session2_unwrap(s, protolayer_payload_wire_buf(&s->layers->wire_buf, false),
 			NULL, NULL, NULL);
 }
 
@@ -950,7 +950,7 @@ static void xdp_rx(uv_poll_t* handle, int status, int events)
 		memcpy(comm.eth_from, msg->eth_from, sizeof(comm.eth_from));
 		memcpy(comm.eth_to, msg->eth_to, sizeof(comm.eth_to));
 		session2_unwrap(xhd->session,
-				protolayer_buffer(
+				protolayer_payload_buffer(
 					msg->payload.iov_base,
 					msg->payload.iov_len, false),
 				&comm, NULL, NULL);
