@@ -338,7 +338,7 @@ const char *protolayer_event_name(enum protolayer_event_type e);
  * valid. */
 enum protolayer_payload_type {
 	PROTOLAYER_PAYLOAD_NULL = 0,
-#define XX(cid, name) PROTOLAYER_PAYLOAD_ ## cid,
+#define XX(cid, name) PROTOLAYER_PAYLOAD_##cid,
 	PROTOLAYER_PAYLOAD_MAP(XX)
 #undef XX
 	PROTOLAYER_PAYLOAD_COUNT
@@ -357,9 +357,17 @@ struct protolayer_payload {
 	/** Time-to-live hint (e.g. for HTTP Cache-Control) */
 	unsigned int ttl;
 
-	/** If `true`, the payload's memory may be freed early as kresd does not
-	 * completely control its lifetime. When going asynchronous, it needs to
-	 * be copied. */
+	/** If `true`, signifies that the memory this payload points to may
+	 * become invalid when we return from one of the functions in the
+	 * current stack. That is fine as long as all the protocol layer
+	 * processing for this payload takes place in a single `session2_wrap()`
+	 * or `session2_unwrap()` call, but may become a problem, when a layer
+	 * goes asynchronous (via `protolayer_async()`).
+	 *
+	 * Setting this to `true` will ensure that the payload will get copied
+	 * into a separate memory buffer if and only if a layer goes
+	 * asynchronous. It makes sure that if all processing for the payload is
+	 * synchronous, no copies or reallocations for the payload are done. */
 	bool short_lived;
 
 	union {
@@ -421,8 +429,8 @@ size_t protolayer_payload_copy(void *dest,
                                size_t max_len);
 
 /** Convenience function to get a buffer-type payload. */
-static inline struct protolayer_payload protolayer_buffer(void *buf, size_t len,
-                                                          bool short_lived)
+static inline struct protolayer_payload protolayer_payload_buffer(
+		void *buf, size_t len, bool short_lived)
 {
 	return (struct protolayer_payload){
 		.type = PROTOLAYER_PAYLOAD_BUFFER,
@@ -435,7 +443,7 @@ static inline struct protolayer_payload protolayer_buffer(void *buf, size_t len,
 }
 
 /** Convenience function to get an iovec-type payload. */
-static inline struct protolayer_payload protolayer_iovec(
+static inline struct protolayer_payload protolayer_payload_iovec(
 		struct iovec *iov, int iovcnt, bool short_lived)
 {
 	return (struct protolayer_payload){
@@ -449,7 +457,7 @@ static inline struct protolayer_payload protolayer_iovec(
 }
 
 /** Convenience function to get a wire-buf-type payload. */
-static inline struct protolayer_payload protolayer_wire_buf(
+static inline struct protolayer_payload protolayer_payload_wire_buf(
 		struct wire_buf *wire_buf, bool short_lived)
 {
 	return (struct protolayer_payload){
@@ -466,7 +474,8 @@ static inline struct protolayer_payload protolayer_wire_buf(
  * If the input payload is `_WIRE_BUF`, the pointed-to wire buffer is reset to
  * indicate that all of its contents have been used up, and the buffer is ready
  * to be reused. */
-struct protolayer_payload protolayer_as_buffer(const struct protolayer_payload *payload);
+struct protolayer_payload protolayer_payload_as_buffer(
+		const struct protolayer_payload *payload);
 
 /** A predefined queue type for iteration context. */
 typedef queue_t(struct protolayer_iter_ctx *) protolayer_iter_ctx_queue_t;
@@ -580,11 +589,10 @@ typedef void (*protolayer_request_cb)(struct protolayer_manager *manager,
  * `grp`), which define how the data processed by the session is to be
  * interpreted. */
 struct protolayer_manager {
-	enum kr_proto grp;
+	enum kr_proto proto;
 	struct wire_buf wire_buf;
 	size_t wire_buf_max_length;
 	struct session2 *session;
-	size_t num_layers;
 	size_t cb_ctx_size; /**< Size of a single callback context, including
 	                     * layer-specific per-iteration data. */
 
