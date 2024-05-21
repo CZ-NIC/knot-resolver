@@ -27,7 +27,7 @@
 #define EPHEMERAL_CERT_EXPIRATION_SECONDS_RENEW_BEFORE ((time_t)60*60*24*7)
 #define GNUTLS_PIN_MIN_VERSION  0x030400
 #define UNWRAP_BUF_SIZE 131072
-#define TLS_CHUNK_SIZE (16 * 1024)
+#define TLS_CHUNK_SIZE ((size_t)16 * 1024)
 
 #define VERBOSE_MSG(cl_side, ...)\
 	if (cl_side) \
@@ -35,9 +35,9 @@
 	else \
 		kr_log_debug(TLS, __VA_ARGS__);
 
-static const gnutls_datum_t tls_grp_alpn[PROTOLAYER_GRP_COUNT] = {
-	[PROTOLAYER_GRP_DOTLS] = { (uint8_t *)"dot", 3 },
-	[PROTOLAYER_GRP_DOHTTPS] = { (uint8_t *)"h2", 2 },
+static const gnutls_datum_t tls_grp_alpn[KR_PROTO_COUNT] = {
+	[KR_PROTO_DOT] = { (uint8_t *)"dot", 3 },
+	[KR_PROTO_DOH] = { (uint8_t *)"h2", 2 },
 };
 
 typedef enum tls_client_hs_state {
@@ -228,7 +228,7 @@ static ssize_t kres_gnutls_vec_push(gnutls_transport_ptr_t h, const giovec_t * i
 	push_ctx->sess_data = tls;
 	memcpy(push_ctx->iov, iov, sizeof(struct iovec[iovcnt]));
 
-	session2_wrap_after(tls->h.session, PROTOLAYER_PROTOCOL_TLS,
+	session2_wrap_after(tls->h.session, PROTOLAYER_TYPE_TLS,
 			protolayer_iovec(push_ctx->iov, iovcnt, true), NULL,
 			kres_gnutls_push_finished, push_ctx);
 
@@ -260,7 +260,7 @@ static void tls_handshake_success(struct pl_tls_sess_data *tls,
 		}
 	}
 	if (!tls->first_handshake_done) {
-		session2_event_after(session, PROTOLAYER_PROTOCOL_TLS,
+		session2_event_after(session, PROTOLAYER_TYPE_TLS,
 				PROTOLAYER_EVENT_CONNECT, NULL);
 		tls->first_handshake_done = true;
 	}
@@ -1330,7 +1330,7 @@ static void pl_tls_request_init(struct protolayer_manager *manager,
 
 void tls_protolayers_init(void)
 {
-	protolayer_globals[PROTOLAYER_PROTOCOL_TLS] = (struct protolayer_globals){
+	protolayer_globals[PROTOLAYER_TYPE_TLS] = (struct protolayer_globals){
 		.sess_size = sizeof(struct pl_tls_sess_data),
 		.sess_deinit = pl_tls_sess_deinit,
 		.wire_buf_overhead = TLS_CHUNK_SIZE,

@@ -4,6 +4,7 @@
 #pragma once
 
 #include "lib/defines.h"
+#include "lib/proto.h"
 struct kr_query;
 struct kr_request;
 struct knot_pkt;
@@ -15,27 +16,6 @@ typedef uint64_t kr_rule_tags_t;
 #define KR_RULE_TAGS_ALL ((kr_rule_tags_t)0)
 /// Tags "capacity", i.e. numbered from 0 to _CAP - 1.
 #define KR_RULE_TAGS_CAP (sizeof(kr_rule_tags_t) * 8)
-
-/** DNS protocol set - mutually exclusive options, contrary to kr_request_qsource_flags
- *
- * The XDP flag is not discerned here, as it could apply to any protocol.
- *  (not right now, but libknot does support it for TCP, so that would complete everything)
- *
- * TODO: probably unify with enum protolayer_grp.
- */
-enum kr_proto {
-	KR_PROTO_INTERNAL = 0, /// no protocol, e.g. useful to mark internal requests
-	KR_PROTO_UDP53,
-	KR_PROTO_TCP53,
-	KR_PROTO_DOT,
-	KR_PROTO_DOH,
-	KR_PROTO_DOQ, /// unused for now
-	KR_PROTO_COUNT,
-};
-/** Bitmap of enum kr_proto options. */
-typedef uint8_t kr_proto_set;
-static_assert(sizeof(kr_proto_set) * 8 >= KR_PROTO_COUNT, "bad combination of type sizes");
-
 
 /** Open the rule DB.
  *

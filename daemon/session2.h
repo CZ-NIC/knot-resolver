@@ -3,7 +3,7 @@
  */
 
 /* HINT: If you are looking to implement support for a new transport protocol,
- * start with the doc comment of the `PROTOLAYER_PROTOCOL_MAP` macro and
+ * start with the doc comment of the `PROTOLAYER_TYPE_MAP` macro and
  * continue from there. */
 
 /* GLOSSARY:
@@ -61,6 +61,7 @@
 #include "contrib/mempattern.h"
 #include "lib/generic/queue.h"
 #include "lib/generic/trie.h"
+#include "lib/proto.h"
 #include "lib/utils.h"
 
 /* Forward declarations */
@@ -191,7 +192,7 @@ static inline size_t wire_buf_free_space_length(const struct wire_buf *wb)
 /** Protocol layer types map - an enumeration of individual protocol layer
  * implementations
  *
- * This macro is used to generate `enum protolayer_protocol` as well as other
+ * This macro is used to generate `enum protolayer_type` as well as other
  * additional data on protocols, e.g. name string constants.
  *
  * To define a new protocol, add a new identifier to this macro, and, within
@@ -203,8 +204,8 @@ static inline size_t wire_buf_free_space_length(const struct wire_buf *wb)
  *
  * To use protocols within sessions, protocol layer groups also need to be
  * defined, to indicate the order in which individual protocols are to be
- * processed. See `PROTOLAYER_GRP_MAP` below for more details. */
-#define PROTOLAYER_PROTOCOL_MAP(XX) \
+ * processed. See `KR_PROTO_MAP` below for more details. */
+#define PROTOLAYER_TYPE_MAP(XX) \
 	/* General transport protocols */\
 	XX(UDP)\
 	XX(TCP)\
@@ -223,54 +224,16 @@ static inline size_t wire_buf_free_space_length(const struct wire_buf *wb)
 	                       * stream (may span multiple (un)wraps). */
 
 /** The identifiers of protocol layer types. */
-enum protolayer_protocol {
-	PROTOLAYER_PROTOCOL_NULL = 0,
-#define XX(cid) PROTOLAYER_PROTOCOL_ ## cid,
-	PROTOLAYER_PROTOCOL_MAP(XX)
+enum protolayer_type {
+	PROTOLAYER_TYPE_NULL = 0,
+#define XX(cid) PROTOLAYER_TYPE_ ## cid,
+	PROTOLAYER_TYPE_MAP(XX)
 #undef XX
-	PROTOLAYER_PROTOCOL_COUNT /* must be the last! */
+	PROTOLAYER_TYPE_COUNT /* must be the last! */
 };
 
 /** Gets the constant string name of the specified protocol. */
-const char *protolayer_protocol_name(enum protolayer_protocol p);
-
-/** Protocol layer group map
- *
- * This macro is used to generate `enum protolayer_grp` as well as other
- * additional data on protocol layer groups, e.g. name string constants.
- *
- * Each group represents a sequence of layers in the unwrap direction (wrap
- * direction being the opposite). The sequence dictates the order in which
- * individual layers are processed. This macro is used to generate global data
- * about groups.
- *
- * For defining new groups, see the docs of `protolayer_grps[]` in
- * `daemon/session2.h`.
- *
- * TODO: probably unify enum protolayer_grp with enum kr_proto.
- *
- * Parameters for XX are:
- *   1. Constant name (for e.g. PROTOLAYER_GRP_* enum value identifiers)
- *   2. Variable name (for e.g. protolayer_grp_* array identifiers - defined in
- *      `session2.c`)
- *   3. Human-readable name for logging */
-#define PROTOLAYER_GRP_MAP(XX) \
-	XX(DOUDP, doudp, "DNS UDP") \
-	XX(DOTCP, dotcp, "DNS TCP") \
-	XX(DOTLS, dot, "DNS-over-TLS") \
-	XX(DOHTTPS, doh, "DNS-over-HTTPS")
-
-/** The identifiers of pre-defined protocol layer sequences. */
-enum protolayer_grp {
-	PROTOLAYER_GRP_NULL = 0,
-#define XX(cid, vid, name) PROTOLAYER_GRP_ ## cid,
-	PROTOLAYER_GRP_MAP(XX)
-#undef XX
-	PROTOLAYER_GRP_COUNT
-};
-
-/** Gets the constant string name of the specified protocol layer group. */
-const char *protolayer_grp_name(enum protolayer_grp g);
+const char *protolayer_layer_name(enum protolayer_type p);
 
 /** Flow control indicators for protocol layer `wrap` and `unwrap` callbacks.
  * Use via `protolayer_continue`, `protolayer_break`, and `protolayer_push`
@@ -617,7 +580,7 @@ typedef void (*protolayer_request_cb)(struct protolayer_manager *manager,
  * `grp`), which define how the data processed by the session is to be
  * interpreted. */
 struct protolayer_manager {
-	enum protolayer_grp grp;
+	enum kr_proto grp;
 	struct wire_buf wire_buf;
 	size_t wire_buf_max_length;
 	struct session2 *session;
@@ -651,7 +614,7 @@ struct protolayer_manager {
 
 /** Initialization parameters for protocol layer session data. */
 struct protolayer_data_param {
-	enum protolayer_protocol protocol; /**< Which protocol these parameters
+	enum protolayer_type protocol; /**< Which protocol these parameters
 	                                    * are meant for. */
 	void *param; /**< Pointer to protolayer-related initialization
 	              * parameters. Only needs to be valid during session
@@ -743,9 +706,9 @@ struct protolayer_globals {
 	protolayer_request_cb request_init;
 };
 
-/** Global data about layered protocols. Mapped by `enum protolayer_protocol`.
+/** Global data about layered protocols. Mapped by `enum protolayer_type`.
  * Individual protocols are to be initialized during resolver startup. */
-extern struct protolayer_globals protolayer_globals[PROTOLAYER_PROTOCOL_COUNT];
+extern struct protolayer_globals protolayer_globals[PROTOLAYER_TYPE_COUNT];
 
 
 /** *Layer sequence return function* - signalizes the protolayer manager to
@@ -880,7 +843,7 @@ struct session2 {
  * individual layer implementations to determine the lifetime of the data
  * pointed to by the parameters. */
 struct session2 *session2_new(enum session2_transport_type transport_type,
-                              enum protolayer_grp layer_grp,
+                              enum kr_proto layer_grp,
                               struct protolayer_data_param *layer_param,
                               size_t layer_param_count,
                               bool outgoing);
@@ -888,7 +851,7 @@ struct session2 *session2_new(enum session2_transport_type transport_type,
 /** Allocates and initializes a new session with the specified protocol layer
  * group, using a *libuv handle* as its transport. */
 static inline struct session2 *session2_new_io(uv_handle_t *handle,
-                                               enum protolayer_grp layer_grp,
+                                               enum kr_proto layer_grp,
                                                struct protolayer_data_param *layer_param,
                                                size_t layer_param_count,
                                                bool outgoing)
@@ -904,7 +867,7 @@ static inline struct session2 *session2_new_io(uv_handle_t *handle,
 /** Allocates and initializes a new session with the specified protocol layer
  * group, using a *parent session* as its transport. */
 static inline struct session2 *session2_new_child(struct session2 *parent,
-                                                  enum protolayer_grp layer_grp,
+                                                  enum kr_proto layer_grp,
                                                   struct protolayer_data_param *layer_param,
                                                   size_t layer_param_count,
                                                   bool outgoing)
@@ -1030,7 +993,7 @@ int session2_unwrap(struct session2 *s, struct protolayer_payload payload,
  *
  * Layers may use this to generate their own data to send in the sequence, e.g.
  * for protocol-specific ceremony. */
-int session2_unwrap_after(struct session2 *s, enum protolayer_protocol protocol,
+int session2_unwrap_after(struct session2 *s, enum protolayer_type protocol,
                           struct protolayer_payload payload,
                           const struct comm_info *comm,
                           protolayer_finished_cb cb, void *baton);
@@ -1059,7 +1022,7 @@ int session2_wrap(struct session2 *s, struct protolayer_payload payload,
  *
  * Layers may use this to generate their own data to send in the sequence, e.g.
  * for protocol-specific ceremony. */
-int session2_wrap_after(struct session2 *s, enum protolayer_protocol protocol,
+int session2_wrap_after(struct session2 *s, enum protolayer_type protocol,
                         struct protolayer_payload payload,
                         const struct comm_info *comm,
                         protolayer_finished_cb cb, void *baton);
@@ -1077,7 +1040,7 @@ void session2_event(struct session2 *s, enum protolayer_event_type event, void *
  * NOTE: The bounced iteration does not exclude any layers - the layer
  * specified by `protocol` and those before it are only skipped in the
  * `_UNWRAP` direction! */
-void session2_event_after(struct session2 *s, enum protolayer_protocol protocol,
+void session2_event_after(struct session2 *s, enum protolayer_type protocol,
                           enum protolayer_event_type event, void *baton);
 
 /** Sends a `PROTOLAYER_EVENT_CLOSE` event to be processed by the protocol

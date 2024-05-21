@@ -128,7 +128,7 @@ struct worker_ctx *the_worker = NULL;
 /*! @internal Create a UDP/TCP handle for an outgoing AF_INET* connection.
  *  socktype is SOCK_* */
 static struct session2 *ioreq_spawn(int socktype, sa_family_t family,
-                                    enum protolayer_grp grp,
+                                    enum kr_proto grp,
                                     struct protolayer_data_param *layer_param,
                                     size_t layer_param_count)
 {
@@ -832,7 +832,7 @@ static int transmit(struct qr_task *task)
 		return ret;
 
 	struct session2 *session = ioreq_spawn(SOCK_DGRAM, choice->sin6_family,
-			PROTOLAYER_GRP_DOUDP, NULL, 0);
+			KR_PROTO_UDP53, NULL, 0);
 	if (!session)
 		return kr_error(EINVAL);
 
@@ -1088,14 +1088,14 @@ static int tcp_task_make_connection(struct qr_task *task, const struct sockaddr 
 	bool has_tls = tls_entry;
 	if (has_tls) {
 		struct protolayer_data_param param = {
-			.protocol = PROTOLAYER_PROTOCOL_TLS,
+			.protocol = PROTOLAYER_TYPE_TLS,
 			.param = tls_entry
 		};
 		session = ioreq_spawn(SOCK_STREAM, addr->sa_family,
-				PROTOLAYER_GRP_DOTLS, &param, 1);
+				KR_PROTO_DOT, &param, 1);
 	} else {
 		session = ioreq_spawn(SOCK_STREAM, addr->sa_family,
-				PROTOLAYER_GRP_DOTCP, NULL, 0);
+				KR_PROTO_TCP53, NULL, 0);
 	}
 	if (!session) {
 		free(conn);
@@ -2310,13 +2310,13 @@ int worker_init(void)
 	kr_bindings_register(the_engine->L); // TODO move
 
 	/* DNS protocol layers */
-	protolayer_globals[PROTOLAYER_PROTOCOL_DNS_DGRAM] = (struct protolayer_globals){
+	protolayer_globals[PROTOLAYER_TYPE_DNS_DGRAM] = (struct protolayer_globals){
 		.wire_buf_overhead_cb = pl_dns_dgram_wire_buf_overhead,
 		.wire_buf_max_overhead = KNOT_WIRE_MAX_PKTSIZE,
 		.unwrap = pl_dns_dgram_unwrap,
 		.event_unwrap = pl_dns_dgram_event_unwrap
 	};
-	protolayer_globals[PROTOLAYER_PROTOCOL_DNS_UNSIZED_STREAM] = (struct protolayer_globals){
+	protolayer_globals[PROTOLAYER_TYPE_DNS_UNSIZED_STREAM] = (struct protolayer_globals){
 		.sess_size = sizeof(struct pl_dns_stream_sess_data),
 		.wire_buf_overhead = KNOT_WIRE_MAX_PKTSIZE,
 		.sess_init = pl_dns_stream_sess_init,
@@ -2335,10 +2335,10 @@ int worker_init(void)
 		.event_unwrap = pl_dns_stream_event_unwrap,
 		.request_init = pl_dns_stream_request_init
 	};
-	protolayer_globals[PROTOLAYER_PROTOCOL_DNS_MULTI_STREAM] = stream_common;
-	protolayer_globals[PROTOLAYER_PROTOCOL_DNS_MULTI_STREAM].sess_init = pl_dns_stream_sess_init;
-	protolayer_globals[PROTOLAYER_PROTOCOL_DNS_SINGLE_STREAM] = stream_common;
-	protolayer_globals[PROTOLAYER_PROTOCOL_DNS_SINGLE_STREAM].sess_init = pl_dns_single_stream_sess_init;
+	protolayer_globals[PROTOLAYER_TYPE_DNS_MULTI_STREAM] = stream_common;
+	protolayer_globals[PROTOLAYER_TYPE_DNS_MULTI_STREAM].sess_init = pl_dns_stream_sess_init;
+	protolayer_globals[PROTOLAYER_TYPE_DNS_SINGLE_STREAM] = stream_common;
+	protolayer_globals[PROTOLAYER_TYPE_DNS_SINGLE_STREAM].sess_init = pl_dns_single_stream_sess_init;
 
 	/* Create main worker. */
 	the_worker = &the_worker_value;
