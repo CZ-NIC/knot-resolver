@@ -16,6 +16,8 @@
 #include "daemon/io.h"
 #include "daemon/udp_queue.h"
 #include "daemon/worker.h"
+#include "daemon/rrl/api.h"
+#include "daemon/proxyv2.h"
 
 #include "daemon/session2.h"
 
@@ -547,13 +549,32 @@ static int protolayer_step(struct protolayer_iter_ctx *ctx)
  * PROTOLAYER_RET_ASYNC when some layers are asynchronous and waiting for
  * continuation, or a negative number for errors (kr_error). */
 static int protolayer_manager_submit(
-		struct protolayer_manager *manager,
+		struct session2 *s,
 		enum protolayer_direction direction, size_t layer_ix,
 		struct protolayer_payload payload, const struct comm_info *comm,
 		protolayer_finished_cb cb, void *baton)
 {
-	if (manager->session->closing)
-		return kr_error(ECANCELED);
+	struct protolayer_manager *manager = s->layers;
+	if (!comm)
+		comm = &manager->session->comm;
+
+	// RRL: at this point we might start doing nontrivial work,
+	// but we may not know the client's IP yet.
+	// Note two cases: incoming session (new request)
+	// vs. outgoing session (resuming work on some request)
+	if (direction == PROTOLAYER_UNWRAP) {
+		kr_rrl_sample_start();
+		// In particular we don't want to miss en/decryption work
+		// for regular connections from clients.
+		if (!s->outgoing && s->secure && !proxy_allowed(comm->comm_addr))
+			kr_rrl_sample_addr((const union kr_sockaddr *)comm->comm_addr);
+	}
+	int ret;
+
+	if (manager->session->closing) {
+		ret = kr_error(ECANCELED);
+		goto finish_ret;
+	}
 
 	struct protolayer_iter_ctx *ctx = malloc(manager->cb_ctx_size);
 	kr_require(ctx);
@@ -567,7 +588,7 @@ static int protolayer_manager_submit(
 
 	*ctx = (struct protolayer_iter_ctx) {
 		.payload = payload,
-		.comm = (comm) ? *comm : manager->session->comm,
+		.comm = *comm,
 		.direction = direction,
 		.layer_ix = layer_ix,
 		.manager = manager,
@@ -576,8 +597,10 @@ static int protolayer_manager_submit(
 	};
 
 	for (size_t i = 0; i < manager->num_layers; i++) {
-		if (kr_fails_assert(ctx->manager->grp < PROTOLAYER_GRP_COUNT))
-			return kr_error(EFAULT);
+		if (kr_fails_assert(ctx->manager->grp < PROTOLAYER_GRP_COUNT)) {
+			ret = kr_error(EFAULT);
+			goto finish_ret;
+		}
 
 		enum protolayer_protocol p = protolayer_grps[manager->grp][i];
 		struct protolayer_globals *globals = &protolayer_globals[p];
@@ -591,7 +614,11 @@ static int protolayer_manager_submit(
 			globals->iter_init(manager, ctx, iter_data);
 	}
 
-	return protolayer_step(ctx);
+	ret = protolayer_step(ctx);
+finish_ret:
+	if (direction == PROTOLAYER_UNWRAP)
+		kr_rrl_sample_stop();
+	return ret;
 }
 
 static void *get_init_param(enum protolayer_protocol p,
@@ -924,8 +951,10 @@ uv_handle_t *session2_get_handle(struct session2 *s)
 
 static void session2_on_timeout(uv_timer_t *timer)
 {
+	kr_rrl_sample_start();
 	struct session2 *s = timer->data;
 	session2_event(s, s->timer_event, NULL);
+	kr_rrl_sample_stop();
 }
 
 int session2_timer_start(struct session2 *s, enum protolayer_event_type event, uint64_t timeout, uint64_t repeat)
@@ -1177,7 +1206,7 @@ int session2_unwrap(struct session2 *s, struct protolayer_payload payload,
                     const struct comm_info *comm, protolayer_finished_cb cb,
                     void *baton)
 {
-	return protolayer_manager_submit(s->layers, PROTOLAYER_UNWRAP, 0,
+	return protolayer_manager_submit(s, PROTOLAYER_UNWRAP, 0,
 			payload, comm, cb, baton);
 }
 
@@ -1189,7 +1218,7 @@ int session2_unwrap_after(struct session2 *s, enum protolayer_protocol protocol,
 	ssize_t layer_ix = protolayer_manager_get_protocol(s->layers, protocol) + 1;
 	if (layer_ix < 0)
 		return layer_ix;
-	return protolayer_manager_submit(s->layers, PROTOLAYER_UNWRAP, layer_ix,
+	return protolayer_manager_submit(s, PROTOLAYER_UNWRAP, layer_ix,
 			payload, comm, cb, baton);
 }
 
@@ -1197,7 +1226,7 @@ int session2_wrap(struct session2 *s, struct protolayer_payload payload,
                   const struct comm_info *comm, protolayer_finished_cb cb,
                   void *baton)
 {
-	return protolayer_manager_submit(s->layers, PROTOLAYER_WRAP,
+	return protolayer_manager_submit(s, PROTOLAYER_WRAP,
 			s->layers->num_layers - 1,
 			payload, comm, cb, baton);
 }
@@ -1210,7 +1239,7 @@ int session2_wrap_after(struct session2 *s, enum protolayer_protocol protocol,
 	ssize_t layer_ix = protolayer_manager_get_protocol(s->layers, protocol) - 1;
 	if (layer_ix < 0)
 		return layer_ix;
-	return protolayer_manager_submit(s->layers, PROTOLAYER_WRAP, layer_ix,
+	return protolayer_manager_submit(s, PROTOLAYER_WRAP, layer_ix,
 			payload, comm, cb, baton);
 }
 

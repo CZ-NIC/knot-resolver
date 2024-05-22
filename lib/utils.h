@@ -309,7 +309,7 @@ struct sockaddr *kr_sockaddr_from_key(struct sockaddr_storage *dst,
 KR_EXPORT
 bool kr_sockaddr_key_same_addr(const char *key_a, const char *key_b);
 
-/** Compare two given sockaddr.
+/** Compare two given sockaddr.  (only address and port)
  * return 0 - addresses are equal, error code otherwise.
  */
 KR_EXPORT KR_PURE
