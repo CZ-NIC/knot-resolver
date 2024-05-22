@@ -97,7 +97,7 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 		.comm_addr = comm_addr,
 		.src_addr = comm_addr
 	};
-	session2_unwrap(s, protolayer_payload_wire_buf(&s->layers->wire_buf, false),
+	session2_unwrap(s, protolayer_payload_wire_buf(&s->layers->wire_buf, true),
 			&in_comm, udp_on_unwrapped, NULL);
 }
 

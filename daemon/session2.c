@@ -181,6 +181,46 @@ static size_t iovecs_copy(void *dest, const struct iovec *iov, int cnt,
 	return copy_size;
 }
 
+void *protolayer_buffer_list_add(struct protolayer_buffer_list *list, size_t n)
+{
+	struct protolayer_buffer_list_entry *e =
+			malloc(sizeof(struct protolayer_buffer_list_entry) + n);
+	if (!e)
+		return NULL;
+
+	if (!list->head) {
+		if (kr_fails_assert(!list->tail)) {
+			free(e);
+			return NULL;
+		}
+
+		list->head = list->tail = e;
+		return e->data;
+	}
+
+	if (kr_fails_assert(list->tail)) {
+		free(e);
+		return NULL;
+	}
+
+	list->tail->next = e;
+	list->tail = e;
+	return e->data;
+}
+
+void protolayer_buffer_list_deinit(struct protolayer_buffer_list *list)
+{
+	struct protolayer_buffer_list_entry *e = list->head;
+	struct protolayer_buffer_list_entry *next;
+	while (e) {
+		next = e->next;
+		free(e);
+		e = next;
+	}
+	list->head = NULL;
+	list->tail = NULL;
+}
+
 size_t protolayer_payload_size(const struct protolayer_payload *payload)
 {
 	switch (payload->type) {
@@ -411,7 +451,7 @@ static int protolayer_iter_ctx_finish(struct protolayer_iter_ctx *ctx, int ret)
 		ctx->finished_cb(ret, session, &ctx->comm,
 				ctx->finished_cb_baton);
 
-	free(ctx->async_buffer);
+	protolayer_buffer_list_deinit(&ctx->async_buffer_list);
 	free(ctx);
 
 	return ret;
@@ -465,11 +505,10 @@ static void protolayer_payload_ensure_long_lived(struct protolayer_iter_ctx *ctx
 	if (kr_fails_assert(buf_len))
 		return;
 
-	void *buf = malloc(buf_len);
+	void *buf = protolayer_buffer_list_add(&ctx->async_buffer_list, buf_len);
 	kr_require(buf);
 	protolayer_payload_copy(buf, &ctx->payload, buf_len);
 
-	ctx->async_buffer = buf;
 	ctx->payload = protolayer_payload_buffer(buf, buf_len, false);
 }
 
