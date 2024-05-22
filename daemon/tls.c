@@ -889,7 +889,7 @@ static int pl_tls_sess_data_deinit(struct pl_tls_sess_data *tls)
 	return kr_ok();
 }
 
-static int pl_tls_sess_server_init(struct protolayer_manager *manager,
+static int pl_tls_sess_server_init(struct session2 *session,
                                    struct pl_tls_sess_data *tls)
 {
 	if (kr_fails_assert(the_worker && the_engine))
@@ -967,7 +967,7 @@ static int pl_tls_sess_server_init(struct protolayer_manager *manager,
 					  tls->tls_session);
 	}
 
-	const gnutls_datum_t *alpn = &tls_grp_alpn[manager->proto];
+	const gnutls_datum_t *alpn = &tls_grp_alpn[session->proto];
 	if (alpn->size) { /* ALPN is a non-empty string */
 		flags = 0;
 #if GNUTLS_VERSION_NUMBER >= 0x030500
@@ -987,7 +987,7 @@ static int pl_tls_sess_server_init(struct protolayer_manager *manager,
 	return kr_ok();
 }
 
-static int pl_tls_sess_client_init(struct protolayer_manager *manager,
+static int pl_tls_sess_client_init(struct session2 *session,
                                    struct pl_tls_sess_data *tls,
                                    tls_client_param_t *param)
 {
@@ -1042,21 +1042,21 @@ static int pl_tls_sess_client_init(struct protolayer_manager *manager,
 	return kr_ok();
 }
 
-static int pl_tls_sess_init(struct protolayer_manager *manager,
+static int pl_tls_sess_init(struct session2 *session,
                             void *sess_data,
                             void *param)
 {
 	struct pl_tls_sess_data *tls = sess_data;
-	manager->session->secure = true;
+	session->secure = true;
 	queue_init(tls->unwrap_queue);
 	queue_init(tls->wrap_queue);
-	if (manager->session->outgoing)
-		return pl_tls_sess_client_init(manager, tls, param);
+	if (session->outgoing)
+		return pl_tls_sess_client_init(session, tls, param);
 	else
-		return pl_tls_sess_server_init(manager, tls);
+		return pl_tls_sess_server_init(session, tls);
 }
 
-static int pl_tls_sess_deinit(struct protolayer_manager *manager,
+static int pl_tls_sess_deinit(struct session2 *session,
                               void *sess_data)
 {
 	return pl_tls_sess_data_deinit(sess_data);
@@ -1067,7 +1067,7 @@ static enum protolayer_iter_cb_result pl_tls_unwrap(void *sess_data, void *iter_
 {
 	int brstatus = kr_ok();
 	struct pl_tls_sess_data *tls = sess_data;
-	struct session2 *s = ctx->manager->session;
+	struct session2 *s = ctx->session;
 
 	queue_push(tls->unwrap_queue, ctx);
 
@@ -1278,9 +1278,8 @@ static enum protolayer_event_cb_result pl_tls_client_connect_start(
 
 static enum protolayer_event_cb_result pl_tls_event_unwrap(
 		enum protolayer_event_type event, void **baton,
-		struct protolayer_manager *manager, void *sess_data)
+		struct session2 *s, void *sess_data)
 {
-	struct session2 *s = manager->session;
 	struct pl_tls_sess_data *tls = sess_data;
 
 	if (event == PROTOLAYER_EVENT_CLOSE) {
@@ -1308,7 +1307,7 @@ static enum protolayer_event_cb_result pl_tls_event_unwrap(
 
 static enum protolayer_event_cb_result pl_tls_event_wrap(
 		enum protolayer_event_type event, void **baton,
-		struct protolayer_manager *manager, void *sess_data)
+		struct session2 *session, void *sess_data)
 {
 	if (event == PROTOLAYER_EVENT_STATS_SEND_ERR) {
 		the_worker->stats.err_tls += 1;
@@ -1321,7 +1320,7 @@ static enum protolayer_event_cb_result pl_tls_event_wrap(
 	return PROTOLAYER_EVENT_PROPAGATE;
 }
 
-static void pl_tls_request_init(struct protolayer_manager *manager,
+static void pl_tls_request_init(struct session2 *session,
                                 struct kr_request *req,
                                 void *sess_data)
 {

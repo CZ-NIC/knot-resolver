@@ -49,7 +49,7 @@ static void check_bufsize(uv_handle_t* handle)
 static void handle_getbuf(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf)
 {
 	struct session2 *s = handle->data;
-	struct wire_buf *wb = &s->layers->wire_buf;
+	struct wire_buf *wb = &s->wire_buf;
 
 	buf->base = wire_buf_free_space(wb);
 	buf->len = wire_buf_free_space_length(wb);
@@ -58,7 +58,7 @@ static void handle_getbuf(uv_handle_t* handle, size_t suggested_size, uv_buf_t* 
 static void udp_on_unwrapped(int status, struct session2 *session,
                              const struct comm_info *comm, void *baton)
 {
-	wire_buf_reset(&session->layers->wire_buf);
+	wire_buf_reset(&session->wire_buf);
 }
 
 void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
@@ -87,9 +87,9 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 		return;
 	}
 
-	int ret = wire_buf_consume(&s->layers->wire_buf, nread);
+	int ret = wire_buf_consume(&s->wire_buf, nread);
 	if (ret) {
-		wire_buf_reset(&s->layers->wire_buf);
+		wire_buf_reset(&s->wire_buf);
 		return;
 	}
 
@@ -97,7 +97,7 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 		.comm_addr = comm_addr,
 		.src_addr = comm_addr
 	};
-	session2_unwrap(s, protolayer_payload_wire_buf(&s->layers->wire_buf, false),
+	session2_unwrap(s, protolayer_payload_wire_buf(&s->wire_buf, true),
 			&in_comm, udp_on_unwrapped, NULL);
 }
 
@@ -138,7 +138,7 @@ static int family_to_freebind_option(sa_family_t sa_family, int *level, int *nam
 
 static enum protolayer_event_cb_result pl_udp_event_wrap(
 		enum protolayer_event_type event, void **baton,
-		struct protolayer_manager *manager, void *sess_data)
+		struct session2 *session, void *sess_data)
 {
 	if (event == PROTOLAYER_EVENT_STATS_SEND_ERR) {
 		the_worker->stats.err_udp += 1;
@@ -153,7 +153,7 @@ static enum protolayer_event_cb_result pl_udp_event_wrap(
 
 static enum protolayer_event_cb_result pl_tcp_event_wrap(
 		enum protolayer_event_type event, void **baton,
-		struct protolayer_manager *manager, void *sess_data)
+		struct session2 *session, void *sess_data)
 {
 	if (event == PROTOLAYER_EVENT_STATS_SEND_ERR) {
 		the_worker->stats.err_tcp += 1;
@@ -306,17 +306,17 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 		return;
 	}
 
-	if (kr_fails_assert(buf->base == wire_buf_free_space(&s->layers->wire_buf))) {
+	if (kr_fails_assert(buf->base == wire_buf_free_space(&s->wire_buf))) {
 		return;
 	}
 
-	int ret = wire_buf_consume(&s->layers->wire_buf, nread);
+	int ret = wire_buf_consume(&s->wire_buf, nread);
 	if (ret) {
-		wire_buf_reset(&s->layers->wire_buf);
+		wire_buf_reset(&s->wire_buf);
 		return;
 	}
 
-	session2_unwrap(s, protolayer_payload_wire_buf(&s->layers->wire_buf, false),
+	session2_unwrap(s, protolayer_payload_wire_buf(&s->wire_buf, false),
 			NULL, NULL, NULL);
 }
 
