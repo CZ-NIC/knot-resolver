@@ -836,7 +836,7 @@ static ssize_t read_callback(nghttp2_session *h2, int32_t stream_id, uint8_t *bu
 	return send;
 }
 
-static int pl_http_sess_init(struct protolayer_manager *manager,
+static int pl_http_sess_init(struct session2 *session,
                              void *data, void *param)
 {
 	struct pl_http_sess_data *http = data;
@@ -868,17 +868,17 @@ static int pl_http_sess_init(struct protolayer_manager *manager,
 	http->current_method = HTTP_METHOD_NONE;
 	http->uri_path = NULL;
 	http->status = HTTP_STATUS_OK;
-	wire_buf_init(&http->wire_buf, manager->wire_buf.size);
+	wire_buf_init(&http->wire_buf, session->wire_buf.size);
 
 	ret = nghttp2_session_server_new(&http->h2, callbacks, http);
 	if (ret < 0)
 		goto exit_callbacks;
 	nghttp2_submit_settings(http->h2, NGHTTP2_FLAG_NONE, iv, ARRAY_SIZE(iv));
 
-	struct sockaddr *peer = session2_get_peer(manager->session);
+	struct sockaddr *peer = session2_get_peer(session);
 	kr_log_debug(DOH, "[%p] h2 session created for %s\n", (void *)http->h2, kr_straddr(peer));
 
-	manager->session->custom_emalf_handling = true;
+	session->custom_emalf_handling = true;
 
 	ret = kr_ok();
 
@@ -903,8 +903,7 @@ static int stream_write_data_break_err(trie_val_t *val, void *baton)
 	return 0;
 }
 
-static int pl_http_sess_deinit(struct protolayer_manager *manager,
-                               void *data)
+static int pl_http_sess_deinit(struct session2 *session, void *data)
 {
 	struct pl_http_sess_data *http = data;
 
@@ -1002,7 +1001,7 @@ static enum protolayer_iter_cb_result pl_http_wrap(
 
 static enum protolayer_event_cb_result pl_http_event_unwrap(
 		enum protolayer_event_type event, void **baton,
-		struct protolayer_manager *manager, void *sess_data)
+		struct session2 *session, void *sess_data)
 {
 	struct pl_http_sess_data *http = sess_data;
 
@@ -1014,7 +1013,7 @@ static enum protolayer_event_cb_result pl_http_event_unwrap(
 	return PROTOLAYER_EVENT_PROPAGATE;
 }
 
-static void pl_http_request_init(struct protolayer_manager *manager,
+static void pl_http_request_init(struct session2 *session,
                                  struct kr_request *req,
                                  void *sess_data)
 {

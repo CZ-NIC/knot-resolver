@@ -325,7 +325,7 @@ static enum protolayer_iter_cb_result pl_proxyv2_dgram_unwrap(
 		return protolayer_break(ctx, kr_error(EINVAL));
 	}
 
-	struct session2 *s = ctx->manager->session;
+	struct session2 *s = ctx->session;
 	struct pl_proxyv2_dgram_iter_data *udp = iter_data;
 
 	char *data = ctx->payload.buffer.buf;
@@ -385,12 +385,11 @@ struct pl_proxyv2_stream_sess_data {
 	bool has_proxy : 1;
 };
 
-static int pl_proxyv2_stream_sess_init(struct protolayer_manager *manager,
-                            void *data,
-                            void *param)
+static int pl_proxyv2_stream_sess_init(struct session2 *session,
+                                       void *data, void *param)
 {
-	struct sockaddr *peer = session2_get_peer(manager->session);
-	manager->session->comm = (struct comm_info) {
+	struct sockaddr *peer = session2_get_peer(session);
+	session->comm = (struct comm_info) {
 		.comm_addr = peer,
 		.src_addr = peer
 	};
@@ -400,7 +399,7 @@ static int pl_proxyv2_stream_sess_init(struct protolayer_manager *manager,
 static enum protolayer_iter_cb_result pl_proxyv2_stream_unwrap(
 		void *sess_data, void *iter_data, struct protolayer_iter_ctx *ctx)
 {
-	struct session2 *s = ctx->manager->session;
+	struct session2 *s = ctx->session;
 	struct pl_proxyv2_stream_sess_data *tcp = sess_data;
 	struct sockaddr *peer = session2_get_peer(s);
 
@@ -411,7 +410,7 @@ static enum protolayer_iter_cb_result pl_proxyv2_stream_unwrap(
 
 	char *data = wire_buf_data(ctx->payload.wire_buf); /* layer's or session's wirebuf */
 	ssize_t data_len = wire_buf_data_length(ctx->payload.wire_buf);
-	struct comm_info *comm = &ctx->manager->session->comm;
+	struct comm_info *comm = &ctx->session->comm;
 	if (!s->outgoing && !tcp->had_data && proxy_header_present(data, data_len)) {
 		if (!proxy_allowed(comm->src_addr)) {
 			if (kr_log_is_debug(IO, NULL)) {
@@ -459,7 +458,7 @@ static enum protolayer_iter_cb_result pl_proxyv2_stream_unwrap(
 	}
 
 	tcp->had_data = true;
-	ctx->comm = ctx->manager->session->comm;
+	ctx->comm = ctx->session->comm;
 	return protolayer_continue(ctx);
 }
 
