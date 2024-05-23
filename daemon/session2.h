@@ -438,7 +438,7 @@ struct protolayer_iter_ctx {
 	/** The index of the layer that is currently being (or has just been)
 	 * processed. */
 	unsigned int layer_ix;
-	struct protolayer_manager *manager;
+	struct session2 *session;
 	/** Status passed to the finish callback. */
 	int status;
 	enum protolayer_iter_action action;
@@ -447,7 +447,7 @@ struct protolayer_iter_ctx {
 	struct protolayer_buffer_list async_buffer_list;
 
 	/** Contains a sequence of variably-sized CPU-aligned layer-specific
-	 * structs. See `struct protolayer_manager::data`. */
+	 * structs. See `struct session2::layer_data` for details. */
 	alignas(CPU_STRUCT_ALIGN) char data[];
 };
 
@@ -570,7 +570,7 @@ enum protolayer_event_cb_result {
  * stops. */
 typedef enum protolayer_event_cb_result (*protolayer_event_cb)(
 		enum protolayer_event_type event, void **baton,
-		struct protolayer_manager *manager, void *sess_data);
+		struct session2 *session, void *sess_data);
 
 /** Function type for initialization callbacks of layer session data.
  *
@@ -582,9 +582,8 @@ typedef enum protolayer_event_cb_result (*protolayer_event_cb)(
  *
  * Returning 0 means success, other return values mean error and halt the
  * initialization. */
-typedef int (*protolayer_data_sess_init_cb)(struct protolayer_manager *manager,
-                                            void *data,
-                                            void *param);
+typedef int (*protolayer_data_sess_init_cb)(struct session2 *session,
+                                            void *data, void *param);
 
 /** Function type for determining the size of a layer's wire buffer overhead. */
 typedef size_t (*protolayer_wire_buf_overhead_cb)(bool outgoing);
@@ -597,8 +596,7 @@ typedef size_t (*protolayer_wire_buf_overhead_cb)(bool outgoing);
  *
  * Returning 0 means success, other return values mean error and halt the
  * initialization. */
-typedef int (*protolayer_iter_data_cb)(struct protolayer_manager *manager,
-                                       struct protolayer_iter_ctx *ctx,
+typedef int (*protolayer_iter_data_cb)(struct protolayer_iter_ctx *ctx,
                                        void *data);
 
 /** Function type for (de)initialization callbacks of layers.
@@ -607,52 +605,15 @@ typedef int (*protolayer_iter_data_cb)(struct protolayer_manager *manager,
  *
  * Returning 0 means success, other return values mean error and halt the
  * initialization. */
-typedef int (*protolayer_data_cb)(struct protolayer_manager *manager,
-                                  void *data);
+typedef int (*protolayer_data_cb)(struct session2 *session, void *data);
 
 /** Function type for (de)initialization callbacks of DNS requests.
  *
  * `req` points to the request for initialization.
  * `sess_data` points to layer-specific session data struct. */
-typedef void (*protolayer_request_cb)(struct protolayer_manager *manager,
+typedef void (*protolayer_request_cb)(struct session2 *session,
                                       struct kr_request *req,
                                       void *sess_data);
-
-/** A collection of protocol layers and their layer-specific data, tied to a
- * session. The manager contains a sequence of protocol layers (determined by
- * `grp`), which define how the data processed by the session is to be
- * interpreted. */
-struct protolayer_manager {
-	enum kr_proto proto;
-	struct wire_buf wire_buf;
-	size_t wire_buf_max_length;
-	struct session2 *session;
-	size_t cb_ctx_size; /**< Size of a single callback context, including
-	                     * layer-specific per-iteration data. */
-
-	/** The following flexible array has basically this structure:
-	 *
-	 * struct {
-	 * 	size_t sess_offsets[num_layers];
-	 * 	size_t iter_offsets[num_layers];
-	 * 	variably-sized-data sess_data[num_layers];
-	 * }
-	 *
-	 * It is done this way, because different layer groups will have
-	 * different numbers of layers and differently-sized layer-specific
-	 * data. C does not have a convenient way to define this in structs, so
-	 * we do it via this flexible array.
-	 *
-	 * `sess_data` is a sequence of variably-sized CPU-aligned
-	 * layer-specific structs.
-	 *
-	 * `sess_offsets` determines data offsets in `sess_data` for pointer
-	 * retrieval.
-	 *
-	 * `iter_offsets` determines data offsets in `struct
-	 * protolayer_iter_ctx::data` for pointer retrieval. */
-	alignas(CPU_STRUCT_ALIGN) char data[];
-};
 
 /** Initialization parameters for protocol layer session data. */
 struct protolayer_data_param {
@@ -788,8 +749,8 @@ enum session2_transport_type {
 
 /** A data unit for a single sequential data source. The data may be organized
  * as a stream or a sequence of datagrams - this is up to the actual individual
- * protocols used by the session, as defined by the `layers` member - see
- * `struct protolayer_manager` and the types of its members for more info.
+ * protocols used by the session - see `enum kr_proto` and
+ * `protolayer_`-prefixed types and functions for more information.
  *
  * A session processes data in two directions:
  *
@@ -822,14 +783,13 @@ struct session2 {
 		};
 	} transport;
 
-	struct protolayer_manager *layers; /**< Protocol layers of this session. */
 	knot_mm_t pool;
 	uv_timer_t timer; /**< For session-wide timeout events. */
 	enum protolayer_event_type timer_event; /**< The event fired on timeout. */
 	trie_t *tasks; /**< List of tasks associated with given session. */
 	queue_t(struct qr_task *) waiting; /**< List of tasks waiting for
 	                                    * sending to upstream. */
-
+	struct wire_buf wire_buf;
 	uint32_t log_id; /**< Session ID for logging. */
 
 	int uv_count; /**< Number of unclosed libUV handles owned by this
@@ -874,6 +834,37 @@ struct session2 {
 	/** If true, session is being rate-limited. One of the protocol layers
 	 * is going to be the writer for this flag. */
 	bool throttled : 1;
+
+	/* Protocol layers */
+
+	/** The set of protocol layers used by this session. */
+	enum kr_proto proto;
+	/** The size of a single iteration context
+	 * (`struct protolayer_iter_ctx`), including layer-specific data. */
+	size_t iter_ctx_size;
+
+	/** The following flexible array has basically this structure:
+	 *
+	 * struct {
+	 * 	size_t sess_offsets[num_layers];
+	 * 	size_t iter_offsets[num_layers];
+	 * 	variably-sized-data sess_data[num_layers];
+	 * }
+	 *
+	 * It is done this way, because different layer groups will have
+	 * different numbers of layers and differently-sized layer-specific
+	 * data. C does not have a convenient way to define this in structs, so
+	 * we do it via this flexible array.
+	 *
+	 * `sess_data` is a sequence of variably-sized CPU-aligned
+	 * layer-specific structs.
+	 *
+	 * `sess_offsets` determines data offsets in `sess_data` for pointer
+	 * retrieval.
+	 *
+	 * `iter_offsets` determines data offsets in `struct
+	 * protolayer_iter_ctx::data` for pointer retrieval. */
+	alignas(CPU_STRUCT_ALIGN) char layer_data[];
 };
 
 /** Allocates and initializes a new session with the specified protocol layer

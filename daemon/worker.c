@@ -1710,12 +1710,11 @@ static inline knot_pkt_t *produce_packet(uint8_t *buf, size_t buf_len)
 
 static enum protolayer_event_cb_result pl_dns_dgram_event_unwrap(
 		enum protolayer_event_type event, void **baton,
-		struct protolayer_manager *manager, void *sess_data)
+		struct session2 *session, void *sess_data)
 {
 	if (event != PROTOLAYER_EVENT_GENERAL_TIMEOUT)
 		return PROTOLAYER_EVENT_PROPAGATE;
 
-	struct session2 *session = manager->session;
 	if (session2_tasklist_get_len(session) != 1 ||
 			!session2_waitinglist_is_empty(session))
 		return PROTOLAYER_EVENT_PROPAGATE;
@@ -1753,7 +1752,7 @@ static size_t pl_dns_dgram_wire_buf_overhead(bool outgoing)
 static enum protolayer_iter_cb_result pl_dns_dgram_unwrap(
 		void *sess_data, void *iter_data, struct protolayer_iter_ctx *ctx)
 {
-	struct session2 *session = ctx->manager->session;
+	struct session2 *session = ctx->session;
 
 	if (ctx->payload.type == PROTOLAYER_PAYLOAD_IOVEC) {
 		int ret = kr_ok();
@@ -1831,26 +1830,25 @@ struct pl_dns_stream_iter_data {
 	} sent;
 };
 
-static int pl_dns_stream_sess_init(struct protolayer_manager *manager,
-                                         void *sess_data, void *param)
+static int pl_dns_stream_sess_init(struct session2 *session,
+                                   void *sess_data, void *param)
 {
 	/* _UNSIZED_STREAM and _MULTI_STREAM - don't forget to split if needed
 	 * at some point */
-	manager->session->stream = true;
+	session->stream = true;
 	return kr_ok();
 }
 
-static int pl_dns_single_stream_sess_init(struct protolayer_manager *manager,
+static int pl_dns_single_stream_sess_init(struct session2 *session,
                                           void *sess_data, void *param)
 {
-	manager->session->stream = true;
+	session->stream = true;
 	struct pl_dns_stream_sess_data *stream = sess_data;
 	stream->single = true;
 	return kr_ok();
 }
 
-static int pl_dns_stream_iter_deinit(struct protolayer_manager *manager,
-                                     struct protolayer_iter_ctx *ctx,
+static int pl_dns_stream_iter_deinit(struct protolayer_iter_ctx *ctx,
                                      void *iter_data)
 {
 	struct pl_dns_stream_iter_data *stream = iter_data;
@@ -2046,9 +2044,8 @@ static enum protolayer_event_cb_result pl_dns_stream_disconnected(
 
 static enum protolayer_event_cb_result pl_dns_stream_event_unwrap(
 		enum protolayer_event_type event, void **baton,
-		struct protolayer_manager *manager, void *sess_data)
+		struct session2 *session, void *sess_data)
 {
-	struct session2 *session = manager->session;
 	if (session->closing)
 		return PROTOLAYER_EVENT_PROPAGATE;
 
@@ -2056,10 +2053,10 @@ static enum protolayer_event_cb_result pl_dns_stream_event_unwrap(
 
 	switch (event) {
 	case PROTOLAYER_EVENT_GENERAL_TIMEOUT:
-		return pl_dns_stream_resolution_timeout(manager->session);
+		return pl_dns_stream_resolution_timeout(session);
 
 	case PROTOLAYER_EVENT_CONNECT_TIMEOUT:
-		return pl_dns_stream_connection_fail(manager->session,
+		return pl_dns_stream_connection_fail(session,
 				KR_SELECTION_TCP_CONNECT_TIMEOUT);
 
 	case PROTOLAYER_EVENT_CONNECT:
@@ -2069,7 +2066,7 @@ static enum protolayer_event_cb_result pl_dns_stream_event_unwrap(
 		enum kr_selection_error err = (*baton)
 			? *(enum kr_selection_error *)baton
 			: KR_SELECTION_TCP_CONNECT_FAILED;
-		return pl_dns_stream_connection_fail(manager->session, err);
+		return pl_dns_stream_connection_fail(session, err);
 
 	case PROTOLAYER_EVENT_DISCONNECT:
 	case PROTOLAYER_EVENT_CLOSE:
@@ -2171,7 +2168,7 @@ static enum protolayer_iter_cb_result pl_dns_stream_unwrap(
 	}
 
 	int status = kr_ok();
-	struct session2 *session = ctx->manager->session;
+	struct session2 *session = ctx->session;
 	struct pl_dns_stream_sess_data *stream_sess = sess_data;
 	struct wire_buf *wb = ctx->payload.wire_buf;
 
@@ -2236,7 +2233,7 @@ static enum protolayer_iter_cb_result pl_dns_stream_wrap(
 		void *sess_data, void *iter_data, struct protolayer_iter_ctx *ctx)
 {
 	struct pl_dns_stream_iter_data *stream = iter_data;
-	struct session2 *s = ctx->manager->session;
+	struct session2 *s = ctx->session;
 
 	if (kr_fails_assert(!stream->sent.mem))
 		return protolayer_break(ctx, kr_error(EINVAL));
@@ -2296,7 +2293,7 @@ static enum protolayer_iter_cb_result pl_dns_stream_wrap(
 	}
 }
 
-static void pl_dns_stream_request_init(struct protolayer_manager *manager,
+static void pl_dns_stream_request_init(struct session2 *session,
                                        struct kr_request *req,
                                        void *sess_data)
 {
