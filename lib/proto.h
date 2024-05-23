@@ -26,6 +26,7 @@
     XX(TCP53, tcp53, "DNS TCP") \
     XX(DOT, dot, "DNS-over-TLS") \
     XX(DOH, doh, "DNS-over-HTTPS") \
+    XX(DOH_INSECURE, doh_insecure, "Insecure DNS-over-HTTP") \
     XX(DOQ, doq, "DNS-over-QUIC") /* unused for now */ \
     //
 

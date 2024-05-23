@@ -406,6 +406,11 @@ static void https_accept(uv_stream_t *master, int status)
 {
 	tcp_accept_internal(master, status, KR_PROTO_DOH);
 }
+
+static void http_insecure_accept(uv_stream_t *master, int status)
+{
+	tcp_accept_internal(master, status, KR_PROTO_DOH_INSECURE);
+}
 #endif
 
 int io_listen_tcp(uv_loop_t *loop, uv_tcp_t *handle, int fd, int tcp_backlog, bool has_tls, bool has_http)
@@ -428,7 +433,12 @@ int io_listen_tcp(uv_loop_t *loop, uv_tcp_t *handle, int fd, int tcp_backlog, bo
 	} else if (has_tls) {
 		connection = tls_accept;
 	} else if (has_http) {
-		return kr_error(EPROTONOSUPPORT);
+#if ENABLE_DOH2
+		connection = http_insecure_accept;
+#else
+		kr_log_error(IO, "kresd was compiled without libnghttp2 support\n");
+		return kr_error(ENOPROTOOPT);
+#endif
 	} else {
 		connection = tcp_accept;
 	}

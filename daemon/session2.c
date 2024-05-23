@@ -60,6 +60,13 @@ static const enum protolayer_type protolayer_grp_doh[] = {
 	PROTOLAYER_TYPE_DNS_UNSIZED_STREAM,
 };
 
+static const enum protolayer_type protolayer_grp_doh_insecure[] = {
+	PROTOLAYER_TYPE_TCP,
+	PROTOLAYER_TYPE_PROXYV2_STREAM,
+	PROTOLAYER_TYPE_HTTP,
+	PROTOLAYER_TYPE_DNS_UNSIZED_STREAM,
+};
+
 static const enum protolayer_type protolayer_grp_doq[] = {
 	// not yet used
 	PROTOLAYER_TYPE_NULL,

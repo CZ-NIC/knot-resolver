@@ -26,8 +26,12 @@ static int net_list_add(const char *b_key, uint32_t key_len, trie_val_t *val, vo
 
 		if (ep->flags.kind) {
 			lua_pushstring(L, ep->flags.kind);
-		} else if (ep->flags.http && ep->flags.tls) {
-			lua_pushliteral(L, "doh2");
+		} else if (ep->flags.http) {
+			if (ep->flags.tls) {
+				lua_pushliteral(L, "doh2");
+			} else {
+				lua_pushliteral(L, "doh2-insecure");
+			}
 		} else if (ep->flags.tls) {
 			lua_pushliteral(L, "tls");
 		} else if (ep->flags.xdp) {
@@ -255,6 +259,9 @@ static int net_listen(lua_State *L)
 			flags.http = false;
 		} else if (k && strcasecmp(k, "doh2") == 0) {
 			flags.tls = flags.http = true;
+		} else if (k && strcasecmp(k, "doh2-insecure") == 0) {
+			flags.tls = false;
+			flags.http = true;
 		} else if (k) {
 			flags.kind = k;
 			if (strcasecmp(k, "doh") == 0) {
