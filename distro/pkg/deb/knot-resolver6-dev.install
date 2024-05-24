@@ -1,0 +1,3 @@
+usr/include/libkres/*.h
+usr/lib/*.so
+usr/lib/pkgconfig/libkres.pc

@@ -78,6 +78,16 @@ Description: caching, DNSSEC-validating DNS resolver - core binaries
  resolver processes while ensuring zero-downtime reconfiguration with YAML/JSON
  declarative configuration and an optional HTTP API for dynamic changes.
 
+Package: knot-resolver6-dev
+Architecture: any
+Depends:
+ knot-resolver6 (= ${binary:Version}),
+ ${misc:Depends}
+ ${shlibs:Depends},
+Section: libdevel
+Description: Knot Resolver development files
+ This package provides the development headers for Knot Resolver.
+
 Package: knot-resolver6-dbg
 Architecture: any
 Depends:
