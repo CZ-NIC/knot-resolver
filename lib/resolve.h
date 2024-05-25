@@ -410,6 +410,10 @@ knot_mm_t *kr_resolve_pool(struct kr_request *request);
 KR_EXPORT
 int kr_request_set_extended_error(struct kr_request *request, int info_code, const char *extra_text);
 
+#if KNOT_VERSION_HEX < 0x030200
+	enum { KNOT_EDNS_EDE_NSEC3_ITERS = 27 };
+#endif
+
 static inline void kr_query_inform_timeout(struct kr_request *req, const struct kr_query *qry)
 {
 	kr_request_set_extended_error(req, KNOT_EDNS_EDE_NREACH_AUTH, "RRPF");

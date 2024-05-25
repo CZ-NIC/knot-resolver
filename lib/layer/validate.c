@@ -141,6 +141,7 @@ do_downgrade: // we do this deep inside calls because of having signer name avai
 	qry->flags.DNSSEC_INSECURE = true;
 	rank_records(qry, true, KR_RANK_INSECURE, vctx->zone_name);
 	mark_insecure_parents(qry);
+	kr_request_set_extended_error(qry->request, KNOT_EDNS_EDE_NSEC3_ITERS, "5JBS");
 	return true;
 }
 

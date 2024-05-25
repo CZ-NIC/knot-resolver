@@ -1687,6 +1687,7 @@ static int ede_priority(int info_code)
 	case KNOT_EDNS_EDE_NREACH_AUTH:
 	case KNOT_EDNS_EDE_NETWORK:
 	case KNOT_EDNS_EDE_INV_DATA:
+	case KNOT_EDNS_EDE_NSEC3_ITERS:
 		return 200;  /* Assorted codes */
 	case KNOT_EDNS_EDE_OTHER:
 		return 100;  /* Most generic catch-all error */
