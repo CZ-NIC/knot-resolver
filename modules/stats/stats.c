@@ -46,8 +46,9 @@
 	X(answer,aa) X(answer,tc) X(answer,rd) X(answer,ra) X(answer, ad) X(answer,cd) \
 	X(answer,edns0) X(answer,do) \
 	X(query,edns) X(query,dnssec) \
-	X(request,total) X(request,udp) X(request,tcp) X(request,xdp) \
-	X(request,dot) X(request,doh) X(request,internal) \
+	X(request,total) X(request,total4) X(request,total6) X(request,internal) \
+	X(request,udp4) X(request,tcp4) X(request,xdp4) X(request,dot4) X(request,doh4) \
+	X(request,udp6) X(request,tcp6) X(request,xdp6) X(request,dot6) X(request,doh6) \
 	X(const,end)
 
 enum const_metric {
@@ -72,6 +73,29 @@ static struct const_metric_elm const_metrics[] = {
 	CONST_METRICS(X)
 	#undef X
 };
+
+/// These metrics are read-only views, each simply summing a pair of const_metrics items.
+struct sum_metric {
+	const char *sub_key;
+	const size_t *val1, *val2;
+};
+static const struct sum_metric sum_metrics[] = {
+	// We're using this to aggregate v4 + v6 pairs.
+	#define DEF(proto) { \
+		.sub_key = #proto, \
+		.val1 = &const_metrics[metric_request_ ## proto ## 4].val, \
+		.val2 = &const_metrics[metric_request_ ## proto ## 6].val, \
+	}
+	DEF(udp),
+	DEF(tcp),
+	DEF(xdp),
+	DEF(dot),
+	DEF(doh),
+	#undef DEF
+};
+static const size_t sum_metrics_len = sizeof(sum_metrics) / sizeof(sum_metrics[0]);
+#define SUM_METRICS_SUP_KEY "request"
+
 /** @endcond */
 
 /** @internal LRU hash of most frequent names. */
@@ -193,19 +217,26 @@ static int collect_transport(kr_layer_t *ctx)
 	}
 
 	/**
-	 * Count each transport only once,
+	 * Apart from the "total" stats, count each transport only once,
 	 * i.e. DoT does not count as TCP and XDP does not count as UDP.
+	 * We have two counts for each - IPv6 and IPv4 separately.
 	 */
+	const bool isIPv6 = req->qsource.addr->sa_family == AF_INET6;
+	#define INC_PROTO(proto) \
+		stat_const_add(data, isIPv6 ? metric_request_ ## proto ## 6 \
+					    : metric_request_ ## proto ## 4, 1)
+	INC_PROTO(total);
 	if (req->qsource.flags.http)
-		stat_const_add(data, metric_request_doh, 1);
+		INC_PROTO(doh);
 	else if (req->qsource.flags.tls)
-		stat_const_add(data, metric_request_dot, 1);
+		INC_PROTO(dot);
 	else if (req->qsource.flags.tcp)
-		stat_const_add(data, metric_request_tcp, 1);
+		INC_PROTO(tcp);
 	else if (req->qsource.flags.xdp)
-		stat_const_add(data, metric_request_xdp, 1);
+		INC_PROTO(xdp);
 	else
-		stat_const_add(data, metric_request_udp, 1);
+		INC_PROTO(udp);
+	#undef INC_PROTO
 	return ctx->state;
 }
 
@@ -282,6 +313,7 @@ static int collect(kr_layer_t *ctx)
  * Set nominal value of a key.
  *
  * Input:  { key, val }
+ * Aggregate metrics can't be set.
  *
  */
 static char* stats_set(void *env, struct kr_module *module, const char *args)
@@ -335,6 +367,16 @@ static char* stats_get(void *env, struct kr_module *module, const char *args)
 			return str_value;
 		}
 	}
+	/* Check if it exists in aggregate metrics. */
+	for (int i = 0; i < sum_metrics_len; ++i) {
+		const struct sum_metric *smi = &sum_metrics[i];
+		if (strcmp(smi->sub_key, args) == 0) {
+			ret = asprintf(&str_value, "%zu", *smi->val1 + *smi->val2);
+			if (ret < 0)
+				return NULL;
+			return str_value;
+		}
+	}
 	/* Check in variable map */
 	trie_val_t *val = trie_get_try(data->trie, args, strlen(args));
 	if (!val)
@@ -360,6 +402,24 @@ struct list_entry_context {
 	size_t key_prefix_len;  /**< Prefix length. Prefix is a wildcard if zero. */
 };
 
+/** Ensures that the `root` node contains an object (and only an object - not a
+ * number, array, or anything else) with the specified `key`. If this cannot be
+ * ensured, fails on an assertion, or returns `NULL` if asserts are disabled. */
+static JsonNode *ensure_object(JsonNode *root, const char *key)
+{
+	JsonNode *node = json_find_member(root, key);
+	if (node) {
+		if (kr_fails_assert(node->tag == JSON_OBJECT))
+			return NULL;
+	} else {
+		node = json_mkobject();
+		if (kr_fails_assert(node))
+			return NULL;
+		json_append_member(root, key, node);
+	}
+	return node;
+}
+
 /** Inserts the entry with a matching key into the JSON object. */
 static int list_entry(const char *key, uint32_t key_len, trie_val_t *val, void *baton)
 {
@@ -380,14 +440,8 @@ static int list_entry(const char *key, uint32_t key_len, trie_val_t *val, void *
 	if (dot_index) {
 		auto_free char *sup_key_nt = strndup(key, dot_index);
 		auto_free char *sub_key_nt = strndup(key + dot_index + 1, key_len - dot_index - 1);
-		JsonNode *sup = json_find_member(ctx->root, sup_key_nt);
-		if (!sup) {
-			sup = json_mkobject();
-			if (kr_fails_assert(sup))
-				return 0;
-			json_append_member(ctx->root, sup_key_nt, sup);
-		}
-		if (kr_fails_assert(sup))
+		JsonNode *sup = ensure_object(ctx->root, sup_key_nt);
+		if (!sup)
 			return 0;
 		json_append_member(sup, sub_key_nt, json_mknumber((double)number));
 	} else {
@@ -404,24 +458,36 @@ static int list_entry(const char *key, uint32_t key_len, trie_val_t *val, void *
  */
 static char* stats_list(void *env, struct kr_module *module, const char *args)
 {
+	char *ret;
 	JsonNode *root = json_mkobject();
 	/* Walk const metrics map */
 	size_t args_len = args ? strlen(args) : 0;
 	for (unsigned i = 0; i < metric_const_end; ++i) {
 		struct const_metric_elm *elm = &const_metrics[i];
 		if (!args || strcmp(elm->sup_key, args) == 0) {
-			JsonNode *sup = json_find_member(root, elm->sup_key);
+			JsonNode *sup = ensure_object(root, elm->sup_key);
 			if (!sup) {
-				sup = json_mkobject();
-				if (kr_fails_assert(sup))
-					break;
-				json_append_member(root, elm->sup_key, sup);
+				ret = strdup("\"ERROR\"");
+				goto exit;
 			}
-			if (kr_fails_assert(sup))
-				break;
 			json_append_member(sup, elm->sub_key, json_mknumber((double)elm->val));
 		}
 	}
+
+	/* Walk sum metrics map */
+	JsonNode *sum_sup = ensure_object(root, SUM_METRICS_SUP_KEY);
+	if (!sum_sup) {
+		ret = strdup("\"ERROR\"");
+		goto exit;
+	}
+	for (int i = 0; i < sum_metrics_len; ++i) {
+		const struct sum_metric *elm = &sum_metrics[i];
+		if (!args || strncmp(elm->sub_key, args, args_len) == 0) {
+			size_t val = *elm->val1 + *elm->val2;
+			json_append_member(sum_sup, elm->sub_key, json_mknumber(val));
+		}
+	}
+
 	struct list_entry_context ctx = {
 		.root = root,
 		.key_prefix = args,
@@ -429,7 +495,8 @@ static char* stats_list(void *env, struct kr_module *module, const char *args)
 	};
 	struct stat_data *data = module->data;
 	trie_apply_with_key(data->trie, list_entry, &ctx);
-	char *ret = json_encode(root);
+	ret = json_encode(root);
+exit:
 	json_delete(root);
 	return ret;
 }
