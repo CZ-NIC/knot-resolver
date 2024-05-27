@@ -59,12 +59,12 @@ static int event_sched(lua_State *L, unsigned timeout, unsigned repeat)
 
 	/* Start timer with the reference */
 	uv_loop_t *loop = uv_default_loop();
-	uv_timer_init(loop, timer);
-	int ret = uv_timer_start(timer, event_callback, timeout, repeat);
-	if (ret != 0) {
-		free(timer);
-		lua_error_p(L, "couldn't start the event");
-	}
+	int ret = uv_timer_init(loop, timer);
+	if (ret != 0)
+		goto exit_err;
+	ret = uv_timer_start(timer, event_callback, timeout, repeat);
+	if (ret != 0)
+		goto exit_err;
 
 	/* Save callback and timer in registry */
 	lua_newtable(L);
@@ -78,6 +78,10 @@ static int event_sched(lua_State *L, unsigned timeout, unsigned repeat)
 	timer->data = (void *) (intptr_t)ref;
 	lua_pushinteger(L, ref);
 	return 1;
+
+exit_err:
+	free(timer);
+	lua_error_p(L, "couldn't start the event");
 }
 
 static int event_after(lua_State *L)

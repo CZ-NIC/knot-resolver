@@ -8,20 +8,12 @@
 // libknot includes
 #include <libknot/libknot.h>
 
-// dynarray is inside libknot since 3.1, but it's differently named
-#ifdef knot_dynarray_declare
-	#define dynarray_declare knot_dynarray_declare
-	#define dynarray_define  knot_dynarray_define
-	#define dynarray_foreach knot_dynarray_foreach
-#else
-	#include <contrib/dynarray.h>
-#endif
-
 // resolver includes
 #include <lib/cache/api.h>
 #include <lib/cache/impl.h>
 #include <lib/defines.h>
 #include "lib/cache/cdb_lmdb.h"
+#include "lib/generic/array.h"
 #include "lib/utils.h"
 
 #include "kr_cache_gc.h"
@@ -43,41 +35,40 @@ static knot_db_val_t *dbval_copy(const knot_db_val_t * from)
 }
 
 // section: rrtype list
+typedef array_t(uint16_t) rrtype_array_t;
 
-dynarray_declare(rrtype, uint16_t, DYNARRAY_VISIBILITY_STATIC, 64)
-    dynarray_define(rrtype, uint16_t, DYNARRAY_VISIBILITY_STATIC)
-static void rrtypelist_add(rrtype_dynarray_t * arr, uint16_t add_type)
+static void rrtypelist_add(rrtype_array_t *arr, uint16_t add_type)
 {
 	bool already_present = false;
-	dynarray_foreach(rrtype, uint16_t, i, *arr) {
-		if (*i == add_type) {
+	for (size_t i = 0; i < arr->len; i++) {
+		if (arr->at[i] == add_type) {
 			already_present = true;
 			break;
 		}
 	}
 	if (!already_present) {
-		rrtype_dynarray_add(arr, &add_type);
+		kr_require(array_push(*arr, add_type) >= 0);
 	}
 }
 
-static void rrtypelist_print(rrtype_dynarray_t * arr)
+static void rrtypelist_print(rrtype_array_t *arr)
 {
 	char type_s[32] = { 0 };
-	dynarray_foreach(rrtype, uint16_t, i, *arr) {
-		knot_rrtype_to_string(*i, type_s, sizeof(type_s));
+	for (size_t i = 0; i < arr->len; i++) {
+		knot_rrtype_to_string(arr->at[i], type_s, sizeof(type_s));
 		printf(" %s", type_s);
 	}
 	printf("\n");
 }
 
-dynarray_declare(entry, knot_db_val_t *, DYNARRAY_VISIBILITY_STATIC, 256)
-    dynarray_define(entry, knot_db_val_t *, DYNARRAY_VISIBILITY_STATIC)
-static void entry_dynarray_deep_free(entry_dynarray_t * d)
+typedef array_t(knot_db_val_t *) entry_array_t;
+
+static void entry_array_deep_free(entry_array_t *d)
 {
-	dynarray_foreach(entry, knot_db_val_t *, i, *d) {
-		free(*i);
+	for (size_t i = 0; i < d->len; i++) {
+		free(d->at[i]);
 	}
-	entry_dynarray_free(d);
+	array_clear(*d);
 }
 
 typedef struct {
@@ -98,7 +89,7 @@ int cb_compute_categories(const knot_db_val_t * key, gc_record_info_t * info,
 
 typedef struct {
 	category_t limit_category;
-	entry_dynarray_t to_delete;
+	entry_array_t to_delete;
 	size_t cfg_temp_keys_space;
 	size_t used_space;
 	size_t oversize_records;
@@ -117,7 +108,7 @@ int cb_delete_categories(const knot_db_val_t * key, gc_record_info_t * info,
 			ctx->oversize_records++;
 			free(todelete);
 		} else {
-			entry_dynarray_add(&ctx->to_delete, &todelete);
+			kr_require(array_push(ctx->to_delete, todelete) >= 0);
 			ctx->used_space = used;
 		}
 	}
@@ -194,12 +185,12 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 	// Mixing ^^ page usage and entry sizes (key+value lengths) didn't work
 	// too well, probably due to internal fragmentation after some GC cycles.
 	// Therefore let's scale this by the ratio of these two sums.
-	ssize_t cats_sumsize = 0;
+	size_t cats_sumsize = 0;
 	for (int i = 0; i < CATEGORIES; ++i) {
 		cats_sumsize += cats.categories_sizes[i];
 	}
 	/* use less precise variant to avoid 32-bit overflow */
-	ssize_t amount_tofree = cats_sumsize / 100 * cfg->cache_to_be_freed;
+	size_t amount_tofree = cats_sumsize / 100 * cfg->cache_to_be_freed;
 
 	kr_log_debug(CACHE, "tofree: %zd / %zd\n", amount_tofree, cats_sumsize);
 	if (VERBOSE_STATUS) {
@@ -212,8 +203,11 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 	}
 
 	category_t limit_category = CATEGORIES;
-	while (limit_category > 0 && amount_tofree > 0) {
-		amount_tofree -= cats.categories_sizes[--limit_category];
+	while (limit_category > 0) {
+		size_t cat_size = cats.categories_sizes[--limit_category];
+		if (cat_size > amount_tofree)
+			break;
+		amount_tofree -= cat_size;
 	}
 
 	printf("Cache analyzed in %.0lf msecs, %zu records, limit category is %d.\n",
@@ -226,13 +220,13 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 	to_del.limit_category = limit_category;
 	ret = kr_gc_cache_iter(db, cfg, cb_delete_categories, &to_del);
 	if (ret != KNOT_EOK) {
-		entry_dynarray_deep_free(&to_del.to_delete);
+		entry_array_deep_free(&to_del.to_delete);
 		kr_cache_gc_free_state(state);
 		return ret;
 	}
 	printf
 	    ("%zu records to be deleted using %.2lf MBytes of temporary memory, %zu records skipped due to memory limit.\n",
-	     to_del.to_delete.size, ((double)to_del.used_space / 1048576.0),
+	     to_del.to_delete.len, ((double)to_del.used_space / 1048576.0),
 	     to_del.oversize_records);
 
 	//// 4. execute the planned deletions.
@@ -242,23 +236,24 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 
 	kr_timer_start(&timer_delete);
 	kr_timer_start(&timer_rw_txn);
-	rrtype_dynarray_t deleted_rrtypes = { 0 };
+	rrtype_array_t deleted_rrtypes = { 0 };
 
 	ret = api->txn_begin(db, &txn, 0);
 	if (ret != KNOT_EOK) {
 		printf("Error starting R/W DB transaction (%s).\n",
 		       knot_strerror(ret));
-		entry_dynarray_deep_free(&to_del.to_delete);
+		entry_array_deep_free(&to_del.to_delete);
 		kr_cache_gc_free_state(state);
 		return ret;
 	}
 
-	dynarray_foreach(entry, knot_db_val_t *, i, to_del.to_delete) {
-		ret = api->del(&txn, *i);
+	for (size_t i = 0; i < to_del.to_delete.len; i++) {
+		knot_db_val_t *val = to_del.to_delete.at[i];
+		ret = api->del(&txn, val);
 		switch (ret) {
 		case KNOT_EOK:
 			deleted_records++;
-			const int entry_type = kr_gc_key_consistent(**i);
+			const int entry_type = kr_gc_key_consistent(*val);
 			if (entry_type >= 0) // some "inconsistent" entries are OK
 				rrtypelist_add(&deleted_rrtypes, entry_type);
 			break;
@@ -267,8 +262,8 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 			if (VERBOSE_STATUS) {
 				// kresd normally only inserts (or overwrites),
 				// so it's generally suspicious when a key goes missing.
-				printf("Record already gone (key len %zu): ", (*i)->len);
-				debug_printbin((*i)->data, (*i)->len);
+				printf("Record already gone (key len %zu): ", val->len);
+				debug_printbin(val->data, val->len);
 				printf("\n");
 			}
 			break;
@@ -316,8 +311,8 @@ finish:
 	printf("It took %.0lf msecs, %zu transactions (%s)\n\n",
 	       kr_timer_elapsed(&timer_delete) * 1000, rw_txn_count, knot_strerror(ret));
 
-	rrtype_dynarray_free(&deleted_rrtypes);
-	entry_dynarray_deep_free(&to_del.to_delete);
+	array_clear(deleted_rrtypes);
+	entry_array_deep_free(&to_del.to_delete);
 
 	// OK, let's close it in this case.
 	kr_cache_gc_free_state(state);

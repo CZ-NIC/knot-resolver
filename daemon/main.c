@@ -7,6 +7,7 @@
 #include "contrib/ucw/mempool.h"
 #include "daemon/engine.h"
 #include "daemon/io.h"
+#include "daemon/proxyv2.h"
 #include "daemon/network.h"
 #include "daemon/udp_queue.h"
 #include "daemon/worker.h"
@@ -448,9 +449,9 @@ int main(int argc, char **argv)
 {
 	kr_log_group_reset();
 	if (setvbuf(stdout, NULL, _IONBF, 0) || setvbuf(stderr, NULL, _IONBF, 0)) {
-		kr_log_error(SYSTEM, "failed to to set output buffering (ignored): %s\n",
+		kr_log_error(SYSTEM, "failed to set output buffering (ignored): %s\n",
 				strerror(errno));
-		fflush(stderr);
+		(void)fflush(stderr);
 	}
 	if (strcmp("linux", OPERATING_SYSTEM) != 0)
 		kr_log_warning(SYSTEM, "Knot Resolver is tested on Linux, other platforms might exhibit bugs.\n"
@@ -513,7 +514,7 @@ int main(int argc, char **argv)
 	if (ret) {
 		kr_log_error(SYSTEM, "failed to get or set file-descriptor limit: %s\n",
 				strerror(errno));
-	} else if (rlim.rlim_cur < 512*1024) {
+	} else if (rlim.rlim_cur < (rlim_t)512 * 1024) {
 		kr_log_warning(SYSTEM, "warning: hard limit for number of file-descriptors is only %ld but recommended value is 524288\n",
 				(long)rlim.rlim_cur);
 	}
@@ -586,6 +587,7 @@ int main(int argc, char **argv)
 
 	io_protolayers_init();
 	tls_protolayers_init();
+	proxy_protolayers_init();
 #ifdef ENABLE_DOH2
 	http_protolayers_init();
 #endif

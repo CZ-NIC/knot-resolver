@@ -18,5 +18,5 @@ hints_mod = shared_module(
 )
 
 config_tests += [
-  ['hints', files('tests/hints.test.lua'), ['skip_asan']],
+  ['hints', files('tests/hints.test.lua')],
 ]

@@ -955,9 +955,8 @@ int kr_ranked_rrarray_add(ranked_rr_array_t *array, const knot_rrset_t *rr,
 static int rdata_p_cmp(const void *rp1, const void *rp2)
 {
 	/* Just correct types of the parameters and pass them dereferenced. */
-	const knot_rdata_t
-		*const *r1 = rp1,
-		*const *r2 = rp2;
+	const knot_rdata_t *const *r1 = (const knot_rdata_t *const *)rp1;
+	const knot_rdata_t *const *r2 = (const knot_rdata_t *const *)rp2;
 	return knot_rdata_cmp(*r1, *r2);
 }
 int kr_ranked_rrarray_finalize(ranked_rr_array_t *array, uint32_t qry_uid, knot_mm_t *pool)
@@ -982,7 +981,7 @@ int kr_ranked_rrarray_finalize(ranked_rr_array_t *array, uint32_t qry_uid, knot_
 		} else {
 			/* Multiple RRs; first: sort the array. */
 			stashed->rr->additional = NULL;
-			qsort(ra->at, ra->len, sizeof(ra->at[0]), rdata_p_cmp);
+			qsort((void *)ra->at, ra->len, array_member_size(*ra), rdata_p_cmp);
 			/* Prune duplicates: NULL all except the last instance. */
 			int dup_count = 0;
 			for (int i = 0; i + 1 < ra->len; ++i) {

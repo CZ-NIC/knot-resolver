@@ -298,7 +298,7 @@ static int http_send_response(struct pl_http_sess_data *http, int32_t stream_id,
 		max_age_len = asprintf(&max_age, "%s%" PRIu32, directive_max_age, ctx->payload.ttl);
 		kr_require(max_age_len >= 0);
 
-		/* TODO: add a per-protolayer_grp option for content-type if we
+		/* TODO: add a per-kr_proto option for content-type if we
 		 * need to support protocols other than DNS here */
 		push_nv(&hdrs, MAKE_STATIC_NV("content-type", "application/dns-message"));
 		push_nv(&hdrs, MAKE_STATIC_KEY_NV("content-length", size, size_len));
@@ -389,9 +389,9 @@ static ssize_t send_callback(nghttp2_session *h2, const uint8_t *data, size_t le
 	memcpy(send_ctx->data, data, length);
 
 	kr_log_debug(DOH, "[%p] send_callback: %p\n", (void *)h2, (void *)send_ctx->data);
-	session2_wrap_after(http->h.session, PROTOLAYER_PROTOCOL_HTTP,
-			protolayer_buffer(send_ctx->data, length, false), NULL,
-			callback_finished_free_baton, send_ctx);
+	session2_wrap_after(http->h.session, PROTOLAYER_TYPE_HTTP,
+			protolayer_payload_buffer(send_ctx->data, length, false),
+			NULL, callback_finished_free_baton, send_ctx);
 
 	return length;
 }
@@ -505,8 +505,8 @@ static int send_data_callback(nghttp2_session *h2, nghttp2_frame *frame, const u
 		dest_iov[cur++] = (struct iovec){ (void *)padding, padlen - 1 };
 
 	kr_assert(cur == iovcnt);
-	int ret = session2_wrap_after(http->h.session, PROTOLAYER_PROTOCOL_HTTP,
-			protolayer_iovec(dest_iov, cur, false),
+	int ret = session2_wrap_after(http->h.session, PROTOLAYER_TYPE_HTTP,
+			protolayer_payload_iovec(dest_iov, cur, false),
 			NULL, callback_finished_free_baton, sdctx);
 
 	if (ret < 0)
@@ -732,8 +732,9 @@ static int submit_to_wirebuffer(struct pl_http_sess_data *ctx)
 	}
 
 	ret = 0;
-	session2_unwrap_after(ctx->h.session, PROTOLAYER_PROTOCOL_HTTP,
-			protolayer_wire_buf(wb, false), NULL, NULL, NULL);
+	session2_unwrap_after(ctx->h.session, PROTOLAYER_TYPE_HTTP,
+			protolayer_payload_wire_buf(wb, false),
+			NULL, NULL, NULL);
 cleanup:
 	http_cleanup_stream(ctx);
 	return ret;
@@ -835,7 +836,7 @@ static ssize_t read_callback(nghttp2_session *h2, int32_t stream_id, uint8_t *bu
 	return send;
 }
 
-static int pl_http_sess_init(struct protolayer_manager *manager,
+static int pl_http_sess_init(struct session2 *session,
                              void *data, void *param)
 {
 	struct pl_http_sess_data *http = data;
@@ -867,17 +868,17 @@ static int pl_http_sess_init(struct protolayer_manager *manager,
 	http->current_method = HTTP_METHOD_NONE;
 	http->uri_path = NULL;
 	http->status = HTTP_STATUS_OK;
-	wire_buf_init(&http->wire_buf, manager->wire_buf.size);
+	wire_buf_init(&http->wire_buf, session->wire_buf.size);
 
 	ret = nghttp2_session_server_new(&http->h2, callbacks, http);
 	if (ret < 0)
 		goto exit_callbacks;
 	nghttp2_submit_settings(http->h2, NGHTTP2_FLAG_NONE, iv, ARRAY_SIZE(iv));
 
-	struct sockaddr *peer = session2_get_peer(manager->session);
+	struct sockaddr *peer = session2_get_peer(session);
 	kr_log_debug(DOH, "[%p] h2 session created for %s\n", (void *)http->h2, kr_straddr(peer));
 
-	manager->session->custom_emalf_handling = true;
+	session->custom_emalf_handling = true;
 
 	ret = kr_ok();
 
@@ -902,8 +903,7 @@ static int stream_write_data_break_err(trie_val_t *val, void *baton)
 	return 0;
 }
 
-static int pl_http_sess_deinit(struct protolayer_manager *manager,
-                               void *data)
+static int pl_http_sess_deinit(struct session2 *session, void *data)
 {
 	struct pl_http_sess_data *http = data;
 
@@ -938,7 +938,7 @@ static enum protolayer_iter_cb_result pl_http_unwrap(
 
 	struct protolayer_payload pld = ctx->payload;
 	if (pld.type == PROTOLAYER_PAYLOAD_WIRE_BUF) {
-		pld = protolayer_as_buffer(&pld);
+		pld = protolayer_payload_as_buffer(&pld);
 	}
 
 	if (pld.type == PROTOLAYER_PAYLOAD_BUFFER) {
@@ -969,7 +969,7 @@ static enum protolayer_iter_cb_result pl_http_unwrap(
 	if (ret < 0) {
 		kr_log_debug(DOH, "[%p] nghttp2_session_send failed: %s (%zd)\n",
 			     (void *)http->h2, nghttp2_strerror(ret), ret);
-		return kr_error(EIO);
+		return protolayer_break(ctx, kr_error(EIO));
 	}
 
 	if (!http_status_has_category(http->status, 2)) {
@@ -1001,7 +1001,7 @@ static enum protolayer_iter_cb_result pl_http_wrap(
 
 static enum protolayer_event_cb_result pl_http_event_unwrap(
 		enum protolayer_event_type event, void **baton,
-		struct protolayer_manager *manager, void *sess_data)
+		struct session2 *session, void *sess_data)
 {
 	struct pl_http_sess_data *http = sess_data;
 
@@ -1013,7 +1013,7 @@ static enum protolayer_event_cb_result pl_http_event_unwrap(
 	return PROTOLAYER_EVENT_PROPAGATE;
 }
 
-static void pl_http_request_init(struct protolayer_manager *manager,
+static void pl_http_request_init(struct session2 *session,
                                  struct kr_request *req,
                                  void *sess_data)
 {
@@ -1032,7 +1032,7 @@ static void pl_http_request_init(struct protolayer_manager *manager,
 
 void http_protolayers_init(void)
 {
-	protolayer_globals[PROTOLAYER_PROTOCOL_HTTP] = (struct protolayer_globals) {
+	protolayer_globals[PROTOLAYER_TYPE_HTTP] = (struct protolayer_globals) {
 		.sess_size = sizeof(struct pl_http_sess_data),
 		.sess_deinit = pl_http_sess_deinit,
 		.wire_buf_overhead = HTTP_MAX_FRAME_SIZE,

@@ -17,7 +17,6 @@
 #endif
 
 #include "daemon/network.h"
-#include "daemon/proxyv2.h"
 #include "daemon/worker.h"
 #include "daemon/tls.h"
 #include "daemon/http.h"
@@ -40,7 +39,7 @@ static void check_bufsize(uv_handle_t* handle)
 	 * This is magic presuming we can pull in a whole recvmmsg width in one wave.
 	 * Linux will double this the bufsize wanted.
 	 */
-	const int BUF_SIZE = 2 * sizeof(RECVMMSG_BATCH * KNOT_WIRE_MAX_PKTSIZE);
+	const int BUF_SIZE = 2 * RECVMMSG_BATCH * KNOT_WIRE_MAX_PKTSIZE;
 	negotiate_bufsize(uv_recv_buffer_size, handle, BUF_SIZE);
 	negotiate_bufsize(uv_send_buffer_size, handle, BUF_SIZE);
 }
@@ -50,7 +49,7 @@ static void check_bufsize(uv_handle_t* handle)
 static void handle_getbuf(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf)
 {
 	struct session2 *s = handle->data;
-	struct wire_buf *wb = &s->layers->wire_buf;
+	struct wire_buf *wb = &s->wire_buf;
 
 	buf->base = wire_buf_free_space(wb);
 	buf->len = wire_buf_free_space_length(wb);
@@ -59,7 +58,7 @@ static void handle_getbuf(uv_handle_t* handle, size_t suggested_size, uv_buf_t* 
 static void udp_on_unwrapped(int status, struct session2 *session,
                              const struct comm_info *comm, void *baton)
 {
-	wire_buf_reset(&session->layers->wire_buf);
+	wire_buf_reset(&session->wire_buf);
 }
 
 void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
@@ -88,9 +87,9 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 		return;
 	}
 
-	int ret = wire_buf_consume(&s->layers->wire_buf, nread);
+	int ret = wire_buf_consume(&s->wire_buf, nread);
 	if (ret) {
-		wire_buf_reset(&s->layers->wire_buf);
+		wire_buf_reset(&s->wire_buf);
 		return;
 	}
 
@@ -98,7 +97,7 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 		.comm_addr = comm_addr,
 		.src_addr = comm_addr
 	};
-	session2_unwrap(s, protolayer_wire_buf(&s->layers->wire_buf, false),
+	session2_unwrap(s, protolayer_payload_wire_buf(&s->wire_buf, true),
 			&in_comm, udp_on_unwrapped, NULL);
 }
 
@@ -107,7 +106,7 @@ static int family_to_freebind_option(sa_family_t sa_family, int *level, int *nam
 #define LOG_NO_FB kr_log_error(NETWORK, "your system does not support 'freebind', " \
 				"please remove it from your configuration\n")
 	switch (sa_family) {
-	case AF_INET:
+	case AF_INET:  // NOLINT(bugprone-branch-clone): The branches are only cloned for specific macro configs
 		*level = IPPROTO_IP;
 #if defined(IP_FREEBIND)
 		*name = IP_FREEBIND;
@@ -137,76 +136,9 @@ static int family_to_freebind_option(sa_family_t sa_family, int *level, int *nam
 }
 
 
-struct pl_udp_iter_data {
-	struct protolayer_data h;
-	struct proxy_result proxy;
-	bool has_proxy;
-};
-
-static enum protolayer_iter_cb_result pl_udp_unwrap(
-		void *sess_data, void *iter_data, struct protolayer_iter_ctx *ctx)
-{
-	ctx->payload = protolayer_as_buffer(&ctx->payload);
-	if (kr_fails_assert(ctx->payload.type == PROTOLAYER_PAYLOAD_BUFFER)) {
-		/* unsupported payload */
-		return protolayer_break(ctx, kr_error(EINVAL));
-	}
-
-	struct session2 *s = ctx->manager->session;
-	struct pl_udp_iter_data *udp = iter_data;
-
-	char *data = ctx->payload.buffer.buf;
-	ssize_t data_len = ctx->payload.buffer.len;
-	struct comm_info *comm = &ctx->comm;
-	if (!s->outgoing && proxy_header_present(data, data_len)) {
-		if (!proxy_allowed(comm->comm_addr)) {
-			kr_log_debug(IO, "<= ignoring PROXYv2 UDP from disallowed address '%s'\n",
-					kr_straddr(comm->comm_addr));
-			return protolayer_break(ctx, kr_error(EPERM));
-		}
-
-		ssize_t trimmed = proxy_process_header(&udp->proxy, data, data_len);
-		if (trimmed == KNOT_EMALF) {
-			if (kr_log_is_debug(IO, NULL)) {
-				kr_log_debug(IO, "<= ignoring malformed PROXYv2 UDP "
-						"from address '%s'\n",
-						kr_straddr(comm->comm_addr));
-			}
-			return protolayer_break(ctx, kr_error(EINVAL));
-		} else if (trimmed < 0) {
-			if (kr_log_is_debug(IO, NULL)) {
-				kr_log_debug(IO, "<= error processing PROXYv2 UDP "
-						"from address '%s', ignoring\n",
-						kr_straddr(comm->comm_addr));
-			}
-			return protolayer_break(ctx, kr_error(EINVAL));
-		}
-
-		if (udp->proxy.command == PROXY2_CMD_PROXY && udp->proxy.family != AF_UNSPEC) {
-			udp->has_proxy = true;
-
-			comm->src_addr = &udp->proxy.src_addr.ip;
-			comm->dst_addr = &udp->proxy.dst_addr.ip;
-			comm->proxy = &udp->proxy;
-
-			if (kr_log_is_debug(IO, NULL)) {
-				kr_log_debug(IO, "<= UDP query from '%s'\n",
-						kr_straddr(comm->src_addr));
-				kr_log_debug(IO, "<= proxied through '%s'\n",
-						kr_straddr(comm->comm_addr));
-			}
-		}
-
-		ctx->payload = protolayer_buffer(
-				data + trimmed, data_len - trimmed, false);
-	}
-
-	return protolayer_continue(ctx);
-}
-
 static enum protolayer_event_cb_result pl_udp_event_wrap(
 		enum protolayer_event_type event, void **baton,
-		struct protolayer_manager *manager, void *sess_data)
+		struct session2 *session, void *sess_data)
 {
 	if (event == PROTOLAYER_EVENT_STATS_SEND_ERR) {
 		the_worker->stats.err_udp += 1;
@@ -219,132 +151,9 @@ static enum protolayer_event_cb_result pl_udp_event_wrap(
 	return PROTOLAYER_EVENT_PROPAGATE;
 }
 
-
-struct pl_tcp_sess_data {
-	struct protolayer_data h;
-	struct proxy_result proxy;
-	struct wire_buf wire_buf;
-	bool had_data : 1;
-	bool has_proxy : 1;
-};
-
-static int pl_tcp_sess_init(struct protolayer_manager *manager,
-                            void *data,
-                            void *param)
-{
-	struct sockaddr *peer = session2_get_peer(manager->session);
-	manager->session->comm = (struct comm_info) {
-		.comm_addr = peer,
-		.src_addr = peer
-	};
-	return 0;
-}
-
-static int pl_tcp_sess_deinit(struct protolayer_manager *manager, void *sess_data)
-{
-	struct pl_tcp_sess_data *tcp = sess_data;
-	wire_buf_deinit(&tcp->wire_buf);
-	return 0;
-}
-
-static enum protolayer_iter_cb_result pl_tcp_unwrap(
-		void *sess_data, void *iter_data, struct protolayer_iter_ctx *ctx)
-{
-	struct session2 *s = ctx->manager->session;
-	struct pl_tcp_sess_data *tcp = sess_data;
-	struct sockaddr *peer = session2_get_peer(s);
-
-	if (ctx->payload.type == PROTOLAYER_PAYLOAD_BUFFER) {
-		const char *buf = ctx->payload.buffer.buf;
-		const size_t len = ctx->payload.buffer.len;
-
-		/* Copy a simple buffer into internal wirebuffer. */
-		if (len > KNOT_WIRE_MAX_PKTSIZE)
-			return protolayer_break(ctx, kr_error(EMSGSIZE));
-
-		if (!tcp->wire_buf.buf) {
-			int ret = wire_buf_reserve(&tcp->wire_buf,
-					KNOT_WIRE_MAX_PKTSIZE);
-			if (ret)
-				return protolayer_break(ctx, ret);
-		}
-
-		/* Try to make space */
-		while (len > wire_buf_free_space_length(&tcp->wire_buf)) {
-			if (wire_buf_data_length(&tcp->wire_buf) > 0 ||
-					tcp->wire_buf.start == 0)
-				return protolayer_break(ctx, kr_error(EMSGSIZE));
-
-			wire_buf_movestart(&tcp->wire_buf);
-		}
-
-		memcpy(wire_buf_free_space(&tcp->wire_buf), buf, len);
-		wire_buf_consume(&tcp->wire_buf, ctx->payload.buffer.len);
-		ctx->payload = protolayer_wire_buf(&tcp->wire_buf, false);
-	}
-
-	if (kr_fails_assert(ctx->payload.type == PROTOLAYER_PAYLOAD_WIRE_BUF)) {
-		/* TODO: iovec support unimplemented */
-		return protolayer_break(ctx, kr_error(EINVAL));
-	}
-
-	char *data = wire_buf_data(ctx->payload.wire_buf); /* layer's or session's wirebuf */
-	ssize_t data_len = wire_buf_data_length(ctx->payload.wire_buf);
-	struct comm_info *comm = &ctx->manager->session->comm;
-	if (!s->outgoing && !tcp->had_data && proxy_header_present(data, data_len)) {
-		if (!proxy_allowed(comm->src_addr)) {
-			if (kr_log_is_debug(IO, NULL)) {
-				kr_log_debug(IO, "<= connection to '%s': PROXYv2 not allowed "
-						"for this peer, close\n",
-						kr_straddr(peer));
-			}
-			worker_end_tcp(s);
-			return protolayer_break(ctx, kr_error(ECONNRESET));
-		}
-
-		ssize_t trimmed = proxy_process_header(&tcp->proxy, data, data_len);
-		if (trimmed < 0) {
-			if (kr_log_is_debug(IO, NULL)) {
-				if (trimmed == KNOT_EMALF) {
-					kr_log_debug(IO, "<= connection to '%s': "
-							"malformed PROXYv2 header, close\n",
-							kr_straddr(comm->src_addr));
-				} else {
-					kr_log_debug(IO, "<= connection to '%s': "
-							"error processing PROXYv2 header, close\n",
-							kr_straddr(comm->src_addr));
-				}
-			}
-			worker_end_tcp(s);
-			return protolayer_break(ctx, kr_error(ECONNRESET));
-		} else if (trimmed == 0) {
-			session2_close(s);
-			return protolayer_break(ctx, kr_error(ECONNRESET));
-		}
-
-		if (tcp->proxy.command != PROXY2_CMD_LOCAL && tcp->proxy.family != AF_UNSPEC) {
-			comm->src_addr = &tcp->proxy.src_addr.ip;
-			comm->dst_addr = &tcp->proxy.dst_addr.ip;
-
-			if (kr_log_is_debug(IO, NULL)) {
-				kr_log_debug(IO, "<= TCP stream from '%s'\n",
-						kr_straddr(comm->src_addr));
-				kr_log_debug(IO, "<= proxied through '%s'\n",
-						kr_straddr(comm->comm_addr));
-			}
-		}
-
-		wire_buf_trim(ctx->payload.wire_buf, trimmed);
-	}
-
-	tcp->had_data = true;
-	ctx->comm = ctx->manager->session->comm;
-	return protolayer_continue(ctx);
-}
-
 static enum protolayer_event_cb_result pl_tcp_event_wrap(
 		enum protolayer_event_type event, void **baton,
-		struct protolayer_manager *manager, void *sess_data)
+		struct session2 *session, void *sess_data)
 {
 	if (event == PROTOLAYER_EVENT_STATS_SEND_ERR) {
 		the_worker->stats.err_tcp += 1;
@@ -359,17 +168,11 @@ static enum protolayer_event_cb_result pl_tcp_event_wrap(
 
 void io_protolayers_init(void)
 {
-	protolayer_globals[PROTOLAYER_PROTOCOL_UDP] = (struct protolayer_globals){
-		.iter_size = sizeof(struct pl_udp_iter_data),
-		.unwrap = pl_udp_unwrap,
+	protolayer_globals[PROTOLAYER_TYPE_UDP] = (struct protolayer_globals){
 		.event_wrap = pl_udp_event_wrap,
 	};
 
-	protolayer_globals[PROTOLAYER_PROTOCOL_TCP] = (struct protolayer_globals){
-		.sess_size = sizeof(struct pl_tcp_sess_data),
-		.sess_init = pl_tcp_sess_init,
-		.sess_deinit = pl_tcp_sess_deinit,
-		.unwrap = pl_tcp_unwrap,
+	protolayer_globals[PROTOLAYER_TYPE_TCP] = (struct protolayer_globals){
 		.event_wrap = pl_tcp_event_wrap,
 	};
 }
@@ -460,7 +263,7 @@ int io_listen_udp(uv_loop_t *loop, uv_udp_t *handle, int fd)
 	uv_handle_t *h = (uv_handle_t *)handle;
 	check_bufsize(h);
 	/* Handle is already created, just create context. */
-	struct session2 *s = session2_new_io(h, PROTOLAYER_GRP_DOUDP, NULL, 0, false);
+	struct session2 *s = session2_new_io(h, KR_PROTO_UDP53, NULL, 0, false);
 	kr_require(s);
 
 	int socklen = sizeof(union kr_sockaddr);
@@ -503,21 +306,21 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 		return;
 	}
 
-	if (kr_fails_assert(buf->base == wire_buf_free_space(&s->layers->wire_buf))) {
+	if (kr_fails_assert(buf->base == wire_buf_free_space(&s->wire_buf))) {
 		return;
 	}
 
-	int ret = wire_buf_consume(&s->layers->wire_buf, nread);
+	int ret = wire_buf_consume(&s->wire_buf, nread);
 	if (ret) {
-		wire_buf_reset(&s->layers->wire_buf);
+		wire_buf_reset(&s->wire_buf);
 		return;
 	}
 
-	session2_unwrap(s, protolayer_wire_buf(&s->layers->wire_buf, false),
+	session2_unwrap(s, protolayer_payload_wire_buf(&s->wire_buf, false),
 			NULL, NULL, NULL);
 }
 
-static void _tcp_accept(uv_stream_t *master, int status, enum protolayer_grp grp)
+static void tcp_accept_internal(uv_stream_t *master, int status, enum kr_proto grp)
 {
  	if (status != 0) {
 		return;
@@ -578,18 +381,18 @@ static void _tcp_accept(uv_stream_t *master, int status, enum protolayer_grp grp
 
 static void tcp_accept(uv_stream_t *master, int status)
 {
-	_tcp_accept(master, status, PROTOLAYER_GRP_DOTCP);
+	tcp_accept_internal(master, status, KR_PROTO_TCP53);
 }
 
 static void tls_accept(uv_stream_t *master, int status)
 {
-	_tcp_accept(master, status, PROTOLAYER_GRP_DOTLS);
+	tcp_accept_internal(master, status, KR_PROTO_DOT);
 }
 
 #if ENABLE_DOH2
 static void https_accept(uv_stream_t *master, int status)
 {
-	_tcp_accept(master, status, PROTOLAYER_GRP_DOHTTPS);
+	tcp_accept_internal(master, status, KR_PROTO_DOH);
 }
 #endif
 
@@ -790,18 +593,27 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 				len_s = 0;
 			}
 			uint32_t len_n = htonl(len_s);
-			fwrite(&len_n, sizeof(len_n), 1, out);
-			if (len_s > 0)
-				fwrite(message, len_s, 1, out);
+			if (fwrite(&len_n, sizeof(len_n), 1, out) != 1)
+				goto finish;
+			if (len_s > 0) {
+				if (fwrite(message, len_s, 1, out) != 1)
+					goto finish;
+			}
 			break;
 		case IO_MODE_TEXT:
 			/* Human-readable and console-printable mode */
-			if (message)
-				fprintf(out, "%s", message);
-			if (message || !args->quiet)
-				fprintf(out, "\n");
-			if (!args->quiet)
-				fprintf(out, "> ");
+			if (message) {
+				if (fprintf(out, "%s", message) < 0)
+					goto finish;
+			}
+			if (message || !args->quiet) {
+				if (fprintf(out, "\n") < 0)
+					goto finish;
+			}
+			if (!args->quiet) {
+				if (fprintf(out, "> ") < 0)
+					goto finish;
+			}
 			break;
 		}
 
@@ -824,7 +636,7 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 finish:
 	/* Close if redirected */
 	if (stream_fd != STDIN_FILENO) {
-		fclose(out);
+		(void)fclose(out);
 	}
 	/* If a LMDB transaction got open, we can't leave it hanging.
 	 * We accept the changes, if any. */
@@ -943,7 +755,7 @@ static void xdp_rx(uv_poll_t* handle, int status, int events)
 		memcpy(comm.eth_from, msg->eth_from, sizeof(comm.eth_from));
 		memcpy(comm.eth_to, msg->eth_to, sizeof(comm.eth_to));
 		session2_unwrap(xhd->session,
-				protolayer_buffer(
+				protolayer_payload_buffer(
 					msg->payload.iov_base,
 					msg->payload.iov_len, false),
 				&comm, NULL, NULL);
@@ -1034,7 +846,7 @@ int io_listen_xdp(uv_loop_t *loop, struct endpoint *ep, const char *ifname)
 		return kr_error(ret);
 	}
 
-	xhd->session = session2_new_io(ep->handle, PROTOLAYER_GRP_DOUDP,
+	xhd->session = session2_new_io(ep->handle, KR_PROTO_UDP53,
 			NULL, 0, false);
 	kr_require(xhd->session);
 	session2_get_sockname(xhd->session)->sa_family = AF_XDP; // to have something in there
@@ -1046,7 +858,7 @@ int io_listen_xdp(uv_loop_t *loop, struct endpoint *ep, const char *ifname)
 #endif
 
 int io_create(uv_loop_t *loop, struct session2 **out_session, int type,
-              unsigned family, enum protolayer_grp grp,
+              unsigned family, enum kr_proto grp,
               struct protolayer_data_param *layer_param,
               size_t layer_param_count, bool outgoing)
 {

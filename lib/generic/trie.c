@@ -470,6 +470,10 @@ static int ns_longer_alloc(nstack_t *ns)
 			memcpy(st, ns->stack, ns->len * sizeof(node_t *));
 	} else {
 		st = realloc(ns->stack, new_size);
+		if (st == NULL) {
+			free(ns->stack); // left behind by realloc, callers bail out
+			ns->stack = NULL;
+		}
 	}
 	if (st == NULL)
 		return KNOT_ENOMEM;
