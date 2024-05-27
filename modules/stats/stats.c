@@ -42,11 +42,13 @@
 	X(answer,total) X(answer,noerror) X(answer,nodata) X(answer,nxdomain) X(answer,servfail) \
 	X(answer,cached) X(answer,1ms) X(answer,10ms) X(answer,50ms) X(answer,100ms) \
 	X(answer,250ms) X(answer,500ms) X(answer,1000ms) X(answer,1500ms) X(answer,slow) \
+	X(answer,sum_ms) \
 	X(answer,aa) X(answer,tc) X(answer,rd) X(answer,ra) X(answer, ad) X(answer,cd) \
 	X(answer,edns0) X(answer,do) \
 	X(query,edns) X(query,dnssec) \
-	X(request,total) X(request,udp) X(request,tcp) X(request,xdp) \
-	X(request,dot) X(request,doh) X(request,internal) \
+	X(request,total) X(request,total4) X(request,total6) X(request,internal) \
+	X(request,udp4) X(request,tcp4) X(request,xdp4) X(request,dot4) X(request,doh4) \
+	X(request,udp6) X(request,tcp6) X(request,xdp6) X(request,dot6) X(request,doh6) \
 	X(const,end)
 
 enum const_metric {
@@ -63,6 +65,28 @@ static struct const_metric_elm const_metrics[] = {
 	CONST_METRICS(X)
 	#undef X
 };
+
+/// These metrics are read-only views, each simply summing a pair of const_metrics items.
+struct sum_metric {
+	const char *key;
+	const size_t *val1, *val2;
+};
+static const struct sum_metric sum_metrics[] = {
+	// We're using this to aggregate v4 + v6 pairs.
+	#define DEF(proto) { \
+		.key = "request." #proto, \
+		.val1 = &const_metrics[metric_request_ ## proto ## 4].val, \
+		.val2 = &const_metrics[metric_request_ ## proto ## 6].val, \
+	}
+	DEF(udp),
+	DEF(tcp),
+	DEF(xdp),
+	DEF(dot),
+	DEF(doh),
+	#undef DEF
+};
+static const size_t sum_metrics_len = sizeof(sum_metrics) / sizeof(sum_metrics[0]);
+
 /** @endcond */
 
 /** @internal LRU hash of most frequent names. */
@@ -184,19 +208,26 @@ static int collect_transport(kr_layer_t *ctx)
 	}
 
 	/**
-	 * Count each transport only once,
+	 * Apart from the "total" stats, count each transport only once,
 	 * i.e. DoT does not count as TCP and XDP does not count as UDP.
+	 * We have two counts for each - IPv6 and IPv4 separately.
 	 */
+	const bool isIPv6 = req->qsource.addr->sa_family == AF_INET6;
+	#define INC_PROTO(proto) \
+		stat_const_add(data, isIPv6 ? metric_request_ ## proto ## 6 \
+					    : metric_request_ ## proto ## 4, 1)
+	INC_PROTO(total);
 	if (req->qsource.flags.http)
-		stat_const_add(data, metric_request_doh, 1);
+		INC_PROTO(doh);
 	else if (req->qsource.flags.tls)
-		stat_const_add(data, metric_request_dot, 1);
+		INC_PROTO(dot);
 	else if (req->qsource.flags.tcp)
-		stat_const_add(data, metric_request_tcp, 1);
+		INC_PROTO(tcp);
 	else if (req->qsource.flags.xdp)
-		stat_const_add(data, metric_request_xdp, 1);
+		INC_PROTO(xdp);
 	else
-		stat_const_add(data, metric_request_udp, 1);
+		INC_PROTO(udp);
+	#undef INC_PROTO
 	return ctx->state;
 }
 
@@ -220,6 +251,7 @@ static int collect(kr_layer_t *ctx)
 		/* Histogram of answer latency. */
 		struct kr_query *first = rplan->resolved.at[0];
 		uint64_t elapsed = kr_now() - first->timestamp_mono;
+		stat_const_add(data, metric_answer_sum_ms, elapsed);
 		if (elapsed <= 1) {
 			stat_const_add(data, metric_answer_1ms, 1);
 		} else if (elapsed <= 10) {
@@ -272,6 +304,7 @@ static int collect(kr_layer_t *ctx)
  * Set nominal value of a key.
  *
  * Input:  { key, val }
+ * Aggregate metrics can't be set.
  *
  */
 static char* stats_set(void *env, struct kr_module *module, const char *args)
@@ -320,6 +353,16 @@ static char* stats_get(void *env, struct kr_module *module, const char *args)
 	for (unsigned i = 0; i < metric_const_end; ++i) {
 		if (strcmp(const_metrics[i].key, args) == 0) {
 			ret = asprintf(&str_value, "%zu", const_metrics[i].val);
+			if (ret < 0)
+				return NULL;
+			return str_value;
+		}
+	}
+	/* Check if it exists in aggregate metrics. */
+	for (int i = 0; i < sum_metrics_len; ++i) {
+		const struct sum_metric *smi = &sum_metrics[i];
+		if (strcmp(smi->key, args) == 0) {
+			ret = asprintf(&str_value, "%zu", *smi->val1 + *smi->val2);
 			if (ret < 0)
 				return NULL;
 			return str_value;
@@ -376,6 +419,13 @@ static char* stats_list(void *env, struct kr_module *module, const char *args)
 		struct const_metric_elm *elm = &const_metrics[i];
 		if (!args || strncmp(elm->key, args, args_len) == 0) {
 			json_append_member(root, elm->key, json_mknumber((double)elm->val));
+		}
+	}
+	for (int i = 0; i < sum_metrics_len; ++i) {
+		const struct sum_metric *elm = &sum_metrics[i];
+		if (!args || strncmp(elm->key, args, args_len) == 0) {
+			size_t val = *elm->val1 + *elm->val2;
+			json_append_member(root, elm->key, json_mknumber(val));
 		}
 	}
 	struct list_entry_context ctx = {

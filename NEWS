@@ -1,3 +1,10 @@
+Knot Resolver 5.7.3 (2024-0m-dd)
+================================
+
+Improvements
+------------
+- stats: add separate metrics for IPv6 and IPv4 (!1544)
+
 Knot Resolver 5.7.2 (2024-03-27)
 ================================
 
