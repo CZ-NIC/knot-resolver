@@ -14,7 +14,11 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include "lib/defines.h"
 #include "./kru.inc.c"
 
+KR_EXPORT
 const struct kru_api KRU_GENERIC = KRU_API_INITIALIZER;
+
+KR_EXPORT
 struct kru_api KRU = KRU_API_INITIALIZER; // generic version is the default

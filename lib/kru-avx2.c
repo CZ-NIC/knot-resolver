@@ -40,7 +40,9 @@
 #define USE_AVX2 1
 #define USE_SSE41 1
 
+#include "lib/defines.h"
 #include "./kru.inc.c"
+KR_EXPORT
 const struct kru_api KRU_AVX2 = KRU_API_INITIALIZER;
 
 #ifdef __clang__
@@ -61,6 +63,7 @@ static void detect_CPU_avx2(void)
 #else
 
 #include "./kru.h"
+KR_EXPORT
 const struct kru_api KRU_AVX2 = {NULL};
 
 #endif
