@@ -392,28 +392,6 @@ struct protolayer_payload {
 	};
 };
 
-/** An entry in a linked list of buffers. The buffer data itself is allocated in
- * the same object as the header. */
-struct protolayer_buffer_list_entry {
-	struct protolayer_buffer_list_entry *next;
-	alignas(CPU_STRUCT_ALIGN) char data[];
-};
-
-/** A linked list of buffers. */
-struct protolayer_buffer_list {
-	struct protolayer_buffer_list_entry *head;
-	struct protolayer_buffer_list_entry *tail;
-};
-
-/** Uses `malloc()` to allocate a new buffer of size `n` and adds it to the
- * specified `list`. Returns a pointer to the buffer data (excl. the header) or
- * `NULL` if the allocation fails. */
-void *protolayer_buffer_list_add(struct protolayer_buffer_list *list, size_t n);
-
-/** Frees the specified buffer list's entries (but not the list's control
- * structure itself). */
-void protolayer_buffer_list_deinit(struct protolayer_buffer_list *list);
-
 /** Context for protocol layer iterations, containing payload data,
  * layer-specific data, and internal information for the protocol layer
  * manager. */
@@ -424,6 +402,10 @@ struct protolayer_iter_ctx {
 	/** Communication information. Typically written into by one of the
 	 * first layers facilitating transport protocol processing. */
 	struct comm_info comm;
+	/** Per-iter memory pool. Has no `free` procedure, gets freed as a whole
+	 * when the context is being destroyed. Initialized and destroyed
+	 * automatically - layers may use it to allocate memory. */
+	knot_mm_t pool;
 
 /* callback for when the layer iteration has ended - read-only for layers: */
 	protolayer_finished_cb finished_cb;
@@ -442,9 +424,6 @@ struct protolayer_iter_ctx {
 	/** Status passed to the finish callback. */
 	int status;
 	enum protolayer_iter_action action;
-	/** Points to a buffers where data has been copied from short-lived
-	 * payloads. Automatically freed together with the context. */
-	struct protolayer_buffer_list async_buffer_list;
 
 	/** Contains a sequence of variably-sized CPU-aligned layer-specific
 	 * structs. See `struct session2::layer_data` for details. */
@@ -783,7 +762,6 @@ struct session2 {
 		};
 	} transport;
 
-	knot_mm_t pool;
 	uv_timer_t timer; /**< For session-wide timeout events. */
 	enum protolayer_event_type timer_event; /**< The event fired on timeout. */
 	trie_t *tasks; /**< List of tasks associated with given session. */

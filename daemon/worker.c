@@ -1822,14 +1822,6 @@ struct pl_dns_stream_sess_data {
 	bool connected : 1; /**< True: The stream is connected */
 };
 
-struct pl_dns_stream_iter_data {
-	struct protolayer_data h;
-	struct {
-		knot_mm_t *pool;
-		void *mem;
-	} sent;
-};
-
 static int pl_dns_stream_sess_init(struct session2 *session,
                                    void *sess_data, void *param)
 {
@@ -1845,14 +1837,6 @@ static int pl_dns_single_stream_sess_init(struct session2 *session,
 	session->stream = true;
 	struct pl_dns_stream_sess_data *stream = sess_data;
 	stream->single = true;
-	return kr_ok();
-}
-
-static int pl_dns_stream_iter_deinit(struct protolayer_iter_ctx *ctx,
-                                     void *iter_data)
-{
-	struct pl_dns_stream_iter_data *stream = iter_data;
-	mm_free(stream->sent.pool, stream->sent.mem);
 	return kr_ok();
 }
 
@@ -2232,18 +2216,12 @@ struct sized_iovs {
 static enum protolayer_iter_cb_result pl_dns_stream_wrap(
 		void *sess_data, void *iter_data, struct protolayer_iter_ctx *ctx)
 {
-	struct pl_dns_stream_iter_data *stream = iter_data;
-	struct session2 *s = ctx->session;
-
-	if (kr_fails_assert(!stream->sent.mem))
-		return protolayer_break(ctx, kr_error(EINVAL));
-
 	if (ctx->payload.type == PROTOLAYER_PAYLOAD_BUFFER) {
 		if (kr_fails_assert(ctx->payload.buffer.len <= UINT16_MAX))
 			return protolayer_break(ctx, kr_error(EMSGSIZE));
 
 		const int iovcnt = 2;
-		struct sized_iovs *siov = mm_alloc(&s->pool,
+		struct sized_iovs *siov = mm_alloc(&ctx->pool,
 				sizeof(*siov) + iovcnt * sizeof(struct iovec));
 		kr_require(siov);
 		knot_wire_write_u16(siov->nlen, ctx->payload.buffer.len);
@@ -2256,14 +2234,11 @@ static enum protolayer_iter_cb_result pl_dns_stream_wrap(
 			.iov_len = ctx->payload.buffer.len
 		};
 
-		stream->sent.mem = siov;
-		stream->sent.pool = &s->pool;
-
 		ctx->payload = protolayer_payload_iovec(siov->iovs, iovcnt, false);
 		return protolayer_continue(ctx);
 	} else if (ctx->payload.type == PROTOLAYER_PAYLOAD_IOVEC) {
 		const int iovcnt = 1 + ctx->payload.iovec.cnt;
-		struct sized_iovs *siov = mm_alloc(&s->pool,
+		struct sized_iovs *siov = mm_alloc(&ctx->pool,
 				sizeof(*siov) + iovcnt * sizeof(struct iovec));
 		kr_require(siov);
 
@@ -2281,9 +2256,6 @@ static enum protolayer_iter_cb_result pl_dns_stream_wrap(
 			.iov_base = &siov->nlen,
 			.iov_len = sizeof(siov->nlen)
 		};
-
-		stream->sent.mem = siov;
-		stream->sent.pool = &s->pool;
 
 		ctx->payload = protolayer_payload_iovec(siov->iovs, iovcnt, false);
 		return protolayer_continue(ctx);
@@ -2323,10 +2295,8 @@ int worker_init(void)
 	};
 	const struct protolayer_globals stream_common = {
 		.sess_size = sizeof(struct pl_dns_stream_sess_data),
-		.iter_size = sizeof(struct pl_dns_stream_iter_data),
 		.wire_buf_overhead = KNOT_WIRE_MAX_PKTSIZE,
 		.sess_init = NULL, /* replaced in specific layers below */
-		.iter_deinit = pl_dns_stream_iter_deinit,
 		.unwrap = pl_dns_stream_unwrap,
 		.wrap = pl_dns_stream_wrap,
 		.event_unwrap = pl_dns_stream_event_unwrap,
