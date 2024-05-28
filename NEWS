@@ -26,6 +26,10 @@ Incompatible changes
   <https://www.knot-resolver.cz/documentation/latest/config-cache-predict.html>`_
   for more.
 
+Bugfixes
+--------
+- fix startup with `dnssec: false` (!1548)
+
 
 Knot Resolver 6.0.7 (2024-03-27)
 ================================

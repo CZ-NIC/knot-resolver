@@ -26,8 +26,10 @@ modules.load('detect_time_skew')
 modules.unload('detect_time_skew')
 {% endif %}
 
+{% if cfg.dnssec.keep_removed %}
 -- dnssec.keep-removed
 trust_anchors.keep_removed = {{ cfg.dnssec.keep_removed }}
+{% endif %}
 
 {% if cfg.dnssec.refresh_time %}
 -- dnssec.refresh-time
