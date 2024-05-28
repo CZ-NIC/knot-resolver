@@ -11,7 +11,8 @@
 #include "daemon/network.h"
 #include "daemon/udp_queue.h"
 #include "daemon/worker.h"
-#include "daemon/rrl/api.h"
+#include "daemon/ratelimiting.h"
+#include "daemon/defer.h"
 
 #ifdef ENABLE_DOH2
 #include "daemon/http.h"
@@ -588,6 +589,7 @@ int main(int argc, char **argv)
 	io_protolayers_init();
 	tls_protolayers_init();
 	proxy_protolayers_init();
+	defer_init();
 #ifdef ENABLE_DOH2
 	http_protolayers_init();
 #endif
@@ -650,7 +652,7 @@ int main(int argc, char **argv)
 cleanup:/* Cleanup. */
 	network_unregister();
 
-	kr_rrl_deinit();
+	ratelimiting_deinit();
 	kr_resolver_deinit();
 	worker_deinit();
 	engine_deinit();

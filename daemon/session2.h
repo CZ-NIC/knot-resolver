@@ -240,7 +240,9 @@ static inline size_t wire_buf_free_space_length(const struct wire_buf *wb)
 	XX(DNS_MULTI_STREAM) /**< Multiple packets WITH prepended sizes in a
 	                      * stream (may span multiple (un)wraps). */\
 	XX(DNS_SINGLE_STREAM) /**< Singular packet WITH prepended size in a
-	                       * stream (may span multiple (un)wraps). */
+	                       * stream (may span multiple (un)wraps). */\
+	/* Requests prioritization */\
+	XX(DEFER)
 
 /** The identifiers of protocol layer types. */
 enum protolayer_type {
@@ -627,7 +629,7 @@ struct protolayer_data_param {
 /** Global data for a specific layered protocol. This is to be initialized in
  * the `protolayer_globals` global array (below) during the the resolver's
  * startup. It contains pointers to functions implementing a particular
- * protocol, as well as other importand data.
+ * protocol, as well as other important data.
  *
  * Every member of this struct is allowed to be zero/NULL if a particular
  * protocol has no use for it. */

@@ -1,8 +1,8 @@
 {% from 'macros/common_macros.lua.j2' import boolean %}
 
 {% if cfg.rate_limiting.rate_limit -%}
-C.kr_rrl_init(
-	'{{ cfg.rundir }}/rrl',
+C.ratelimiting_init(
+	'{{ cfg.rundir }}/ratelimiting',
 	{{ cfg.rate_limiting.capacity }},
 	{{ cfg.rate_limiting.instant_limit }},
 	{{ cfg.rate_limiting.rate_limit }},
