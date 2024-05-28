@@ -80,6 +80,7 @@ struct kru_api {
 	uint8_t (*limited_multi_prefix_or)(struct kru *kru, uint32_t time_now,
 			uint8_t namespace, uint8_t key[static 16], uint8_t *prefixes, kru_price_t *prices, size_t queries_cnt, uint16_t *max_load_out);
 };
+
 // The functions are stored this way to make it easier to switch
 // implementation based on detected CPU.
 extern struct kru_api KRU;
