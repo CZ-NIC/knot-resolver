@@ -1,8 +1,8 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 
-#include "daemon/rrl/api.h"
-#include "daemon/rrl/kru.h"
+#include "daemon/ratelimiting.h"
+#include "lib/kru.h"
 #include "lib/utils.h"
 #include "lib/resolve.h"
 
@@ -17,7 +17,7 @@
 #define RRL_V6_PREFIXES_CNT (sizeof(RRL_V6_PREFIXES) / sizeof(*RRL_V6_PREFIXES))
 #define RRL_MAX_PREFIXES_CNT ((RRL_V4_PREFIXES_CNT > RRL_V6_PREFIXES_CNT) ? RRL_V4_PREFIXES_CNT : RRL_V6_PREFIXES_CNT)
 
-struct rrl {
+struct rrl {  // TODO rename?
 	size_t capacity;
 	uint32_t instant_limit;
 	uint32_t rate_limit;
@@ -31,11 +31,6 @@ struct rrl *the_rrl = NULL;
 int the_rrl_fd = -1;
 char *the_rrl_mmap_file = NULL;
 
-kr_rrl_sample_state_t kr_rrl_sample_state = {
-	.do_sample = true, // FIXME: start with false, set to true based on config when opening KRU
-	.is_accounting = 0,
-};
-
 /// return whether we're using optimized variant right now
 static bool using_avx2(void)
 {
@@ -44,7 +39,7 @@ static bool using_avx2(void)
 	return result;
 }
 
-void kr_rrl_init(const char *mmap_file, size_t capacity, uint32_t instant_limit, uint32_t rate_limit, int tc_limit_perc)
+void ratelimiting_init(const char *mmap_file, size_t capacity, uint32_t instant_limit, uint32_t rate_limit, int tc_limit_perc)
 {
 	int fd = the_rrl_fd = open(mmap_file, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
 	if (fd == -1) {
@@ -133,7 +128,7 @@ check_fail:
 	abort();
 }
 
-void kr_rrl_deinit(void)
+void ratelimiting_deinit(void)
 {
 	if (the_rrl == NULL) return;
 	int fd = the_rrl_fd;
@@ -162,7 +157,7 @@ void kr_rrl_deinit(void)
 	the_rrl = NULL;
 }
 
-bool kr_rrl_request_begin(struct kr_request *req)
+bool ratelimiting_request_begin(struct kr_request *req)
 {
 	if (!req->qsource.addr)
 		return false;  // don't consider internal requests

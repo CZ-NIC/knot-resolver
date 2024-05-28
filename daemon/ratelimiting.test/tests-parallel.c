@@ -16,7 +16,7 @@
 
 static void the_tests(void **state);
 
-#include "daemon/rrl/tests.inc.c"
+#include "./tests.inc.c"
 
 #define THREADS 4
 
@@ -98,7 +98,7 @@ static void *runnable(void *arg)
 				         hqi % 0xff, (hqi >> 8) % 0xff, (hqi >> 16) % 0xff);
 				kr_straddr_socket_set((struct sockaddr *)&addr, addr_str, 0);
 
-				if (!kr_rrl_request_begin(&req)) {
+				if (!ratelimiting_request_begin(&req)) {
 					atomic_fetch_add(&d->stages[si].hosts[hi].passed, 1);
 				}
 

@@ -29,7 +29,7 @@
 #include "lib/utils.h"
 uint64_t fakeclock_now(void);
 #define kr_now fakeclock_now
-#include "daemon/rrl/api.c"
+#include "daemon/ratelimiting.c"
 #undef kr_now
 
 #define RRL_TABLE_SIZE     (1 << 20)
@@ -95,7 +95,7 @@ static void test_rrl(void **state) {
 	const char *tmpdir = test_tmpdir_create();
 	char mmap_file[64];
 	stpcpy(stpcpy(mmap_file, tmpdir), "/rrl");
-	kr_rrl_init(mmap_file, RRL_TABLE_SIZE, RRL_INSTANT_LIMIT, RRL_RATE_LIMIT, 100);
+	ratelimiting_init(mmap_file, RRL_TABLE_SIZE, RRL_INSTANT_LIMIT, RRL_RATE_LIMIT, 100);
 
 	if (KRU.initialize == KRU_GENERIC.initialize) {
 		struct kru_generic *kru = (struct kru_generic *) the_rrl->kru;
@@ -109,7 +109,7 @@ static void test_rrl(void **state) {
 
 	the_tests(state);
 
-	kr_rrl_deinit();
+	ratelimiting_deinit();
 	test_tmpdir_remove(tmpdir);
 	dnssec_crypto_cleanup();
 }

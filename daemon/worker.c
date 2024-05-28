@@ -34,7 +34,7 @@
 #include "lib/layer.h"
 #include "lib/layer/iterate.h" /* kr_response_classify */
 #include "lib/utils.h"
-#include "daemon/rrl/api.h"
+#include "daemon/defer.h"
 
 
 /* Magic defaults for the worker. */
@@ -71,6 +71,7 @@ struct request_ctx
 		bool xdp : 1;
 	} source;
 };
+
 
 /** Query resolution task. */
 struct qr_task
@@ -363,7 +364,7 @@ static struct request_ctx *request_create(struct session2 *session,
 		/* We need to store a copy of peer address. */
 		memcpy(&ctx->source.addr.ip, src_addr, kr_sockaddr_len(src_addr));
 		req->qsource.addr = &ctx->source.addr.ip;
-		kr_rrl_sample_addr(&ctx->source.addr);
+		defer_sample_addr(&ctx->source.addr);
 
 		if (!comm_addr)
 			comm_addr = src_addr;
@@ -1217,7 +1218,7 @@ static int qr_task_step(struct qr_task *task,
 			const struct sockaddr *packet_source, knot_pkt_t *packet)
 {
 	if (task && task->ctx->source.session)
-		kr_rrl_sample_addr(&task->ctx->source.addr);
+		defer_sample_addr(&task->ctx->source.addr);
 
 	/* No more steps after we're finished. */
 	if (!task || task->finished) {

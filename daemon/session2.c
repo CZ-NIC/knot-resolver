@@ -16,7 +16,7 @@
 #include "daemon/io.h"
 #include "daemon/udp_queue.h"
 #include "daemon/worker.h"
-#include "daemon/rrl/api.h"
+#include "daemon/defer.h"
 #include "daemon/proxyv2.h"
 
 #include "daemon/session2.h"
@@ -38,18 +38,21 @@ struct protolayer_globals protolayer_globals[PROTOLAYER_TYPE_COUNT] = {{0}};
 static const enum protolayer_type protolayer_grp_udp53[] = {
 	PROTOLAYER_TYPE_UDP,
 	PROTOLAYER_TYPE_PROXYV2_DGRAM,
+	PROTOLAYER_TYPE_DEFER,
 	PROTOLAYER_TYPE_DNS_DGRAM,
 };
 
 static const enum protolayer_type protolayer_grp_tcp53[] = {
 	PROTOLAYER_TYPE_TCP,
 	PROTOLAYER_TYPE_PROXYV2_STREAM,
+	PROTOLAYER_TYPE_DEFER,
 	PROTOLAYER_TYPE_DNS_MULTI_STREAM,
 };
 
 static const enum protolayer_type protolayer_grp_dot[] = {
 	PROTOLAYER_TYPE_TCP,
 	PROTOLAYER_TYPE_PROXYV2_STREAM,
+	PROTOLAYER_TYPE_DEFER,
 	PROTOLAYER_TYPE_TLS,
 	PROTOLAYER_TYPE_DNS_MULTI_STREAM,
 };
@@ -57,6 +60,7 @@ static const enum protolayer_type protolayer_grp_dot[] = {
 static const enum protolayer_type protolayer_grp_doh[] = {
 	PROTOLAYER_TYPE_TCP,
 	PROTOLAYER_TYPE_PROXYV2_STREAM,
+	PROTOLAYER_TYPE_DEFER,
 	PROTOLAYER_TYPE_TLS,
 	PROTOLAYER_TYPE_HTTP,
 	PROTOLAYER_TYPE_DNS_UNSIZED_STREAM,
@@ -615,11 +619,11 @@ static int session2_submit(
 	// Note two cases: incoming session (new request)
 	// vs. outgoing session (resuming work on some request)
 	if (direction == PROTOLAYER_UNWRAP) {
-		kr_rrl_sample_start();
+		defer_sample_start();
 		// In particular we don't want to miss en/decryption work
 		// for regular connections from clients.
 		if (!session->outgoing && session->secure && !proxy_allowed(comm->comm_addr))
-			kr_rrl_sample_addr((const union kr_sockaddr *)comm->comm_addr);
+			defer_sample_addr((const union kr_sockaddr *)comm->comm_addr);
 	}
 	int ret;
 
@@ -658,7 +662,7 @@ static int session2_submit(
 
 	ret = protolayer_step(ctx);
 	if (direction == PROTOLAYER_UNWRAP)
-		kr_rrl_sample_stop();
+		defer_sample_stop();
 	return ret;
 }
 
@@ -946,10 +950,10 @@ uv_handle_t *session2_get_handle(struct session2 *s)
 
 static void session2_on_timeout(uv_timer_t *timer)
 {
-	kr_rrl_sample_start();
+	defer_sample_start();
 	struct session2 *s = timer->data;
 	session2_event(s, s->timer_event, NULL);
-	kr_rrl_sample_stop();
+	defer_sample_stop();
 }
 
 int session2_timer_start(struct session2 *s, enum protolayer_event_type event, uint64_t timeout, uint64_t repeat)

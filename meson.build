@@ -29,6 +29,8 @@ if not lmdb.found()  # darwin workaround: missing pkgconfig
 endif
 gnutls = dependency('gnutls')
 luajit = dependency('luajit')
+# https://mesonbuild.com/howtox.html#add-math-library-lm-portably
+libm = meson.get_compiler('c').find_library('m', required : false)
 message('------------------------------')
 
 

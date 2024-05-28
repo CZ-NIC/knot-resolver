@@ -16,7 +16,7 @@
 
 static void the_tests(void **state);
 
-#include "daemon/rrl/tests.inc.c"
+#include "./tests.inc.c"
 
 // defining count_test as macro to let it print usable line number on failure
 #define count_test(DESC, EXPECTED_PASSING, MARGIN_FRACT, ...) { \
@@ -42,7 +42,7 @@ uint32_t _count_test(int expected_passing, int addr_family, char *addr_format, u
 				i % (max_value - min_value + 1) + min_value,
 				i / (max_value - min_value + 1) % 256);
 		kr_straddr_socket_set((struct sockaddr *) &addr, addr_str, 0);
-		if (kr_rrl_request_begin(&req)) {
+		if (ratelimiting_request_begin(&req)) {
 			cnt = i;
 			break;
 		}

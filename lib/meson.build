@@ -19,6 +19,8 @@ libkres_src = files([
   'generic/lru.c',
   'generic/queue.c',
   'generic/trie.c',
+  'kru-avx2.c',
+  'kru-generic.c',
   'layer/cache.c',
   'layer/iterate.c',
   'layer/validate.c',
@@ -38,6 +40,7 @@ libkres_src = files([
   'selection_iter.c',
   'utils.c',
   'zonecut.c',
+  '../contrib/openbsd/siphash.c', # needed for kru
 ])
 c_src_lint += libkres_src
 
@@ -57,6 +60,7 @@ libkres_headers = files([
   'generic/pack.h',
   'generic/queue.h',
   'generic/trie.h',
+  'kru.h',
   'layer.h',
   'layer/iterate.h',
   'log.h',
@@ -110,6 +114,7 @@ libkres_lib = library('kres',
     gnutls,
     luajit,
     libsystemd,
+    libm
   ],
   install: true,
 )
