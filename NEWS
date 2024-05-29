@@ -5,6 +5,12 @@ Improvements
 ------------
 - stats: add separate metrics for IPv6 and IPv4 (!1544)
 
+Bugfixes
+--------
+- fix NSEC3 records missing in answer for positive wildcard expansion
+  with the NSEC3 having over-limit iteration count (#910, !1550)
+
+
 Knot Resolver 5.7.2 (2024-03-27)
 ================================
 
