@@ -41,7 +41,7 @@
 #define USE_SSE41 1
 
 #include "lib/defines.h"
-#include "./kru.inc.c"
+#include "./kru.inc.c"  // NOLINT(bugprone-suspicious-include)
 KR_EXPORT
 const struct kru_api KRU_AVX2 = KRU_API_INITIALIZER;
 

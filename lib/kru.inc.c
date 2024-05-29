@@ -46,30 +46,9 @@ Size (`loads_bits` = log2 length):
 #include <stdbool.h>
 #include <stddef.h>
 #include <string.h>
+#include <math.h>
 
 #include "./kru.h"
-
-/// Block of loads sharing the same time, so that we're more space-efficient.
-/// It's exactly a single cache line.
-struct load_cl {
-	_Atomic uint32_t time;
-	#define LOADS_LEN 15
-	uint16_t ids[LOADS_LEN];
-	uint16_t loads[LOADS_LEN];
-} ALIGNED_CPU_CACHE;
-static_assert(64 == sizeof(struct load_cl), "bad size of struct load_cl");
-
-inline static uint64_t rand_bits(unsigned int bits) {
-	static _Thread_local uint64_t state = 3723796604792068981ull;
-	const uint64_t prime1 = 11737314301796036329ull;
-	const uint64_t prime2 = 3107264277052274849ull;
-	state = prime1 * state + prime2;
-	//return state & ((1 << bits) - 1);
-	return state >> (64 - bits);
-}
-
-#include "./kru-decay.inc.c"
-
 #include "contrib/ucw/lib.h"
 #include "libdnssec/error.h"
 #include "libdnssec/random.h"
@@ -92,6 +71,27 @@ typedef uint64_t hash_t;
 	#include <x86intrin.h>
 #endif
 
+/// Block of loads sharing the same time, so that we're more space-efficient.
+/// It's exactly a single cache line.
+struct load_cl {
+	_Atomic uint32_t time;
+	#define LOADS_LEN 15
+	uint16_t ids[LOADS_LEN];
+	uint16_t loads[LOADS_LEN];
+} ALIGNED_CPU_CACHE;
+static_assert(64 == sizeof(struct load_cl), "bad size of struct load_cl");
+
+/// Parametrization for speed of decay.
+struct decay_config {
+	/// Bit shift per tick, fractional
+	double shift_bits;
+
+	/// Ticks to get zero loads
+	uint32_t max_ticks;
+
+	uint32_t mult_cache[32];
+};
+
 struct kru {
 #if USE_AES
 	/// Hashing secret.  Random but shared by all users of the table.
@@ -110,6 +110,69 @@ struct kru {
 	/// These are read-write.  Each struct has exactly one cache line.
 	struct load_cl load_cls[][TABLE_COUNT];
 };
+
+inline static uint64_t rand_bits(unsigned int bits) {
+	static _Thread_local uint64_t state = 3723796604792068981ull;
+	const uint64_t prime1 = 11737314301796036329ull;
+	const uint64_t prime2 = 3107264277052274849ull;
+	state = prime1 * state + prime2;
+	//return state & ((1 << bits) - 1);
+	return state >> (64 - bits);
+}
+
+static inline void decay_initialize(struct decay_config *decay, kru_price_t max_decay)
+{
+	decay->shift_bits = log2(KRU_LIMIT - 1) - log2(KRU_LIMIT - 1 - max_decay);
+	decay->max_ticks = 18 / decay->shift_bits;
+
+	decay->mult_cache[0] = 0;  // not used
+	for (size_t ticks = 1; ticks < sizeof(decay->mult_cache) / sizeof(*decay->mult_cache); ticks++) {
+		decay->mult_cache[ticks] = exp2(32 - decay->shift_bits * ticks) + 0.5;
+	}
+}
+
+/// Catch up the time drift with configurably slower decay.
+static inline void update_time(struct load_cl *l, const uint32_t time_now,
+			const struct decay_config *decay)
+{
+	uint32_t ticks;
+	uint32_t time_last = atomic_load_explicit(&l->time,memory_order_relaxed);
+	do {
+		ticks = time_now - time_last;
+		if (__builtin_expect(!ticks, true)) // we optimize for time not advancing
+			return;
+		// We accept some desynchronization of time_now (e.g. from different threads).
+		if (ticks > (uint32_t)-1024)
+			return;
+	} while (!atomic_compare_exchange_weak_explicit(&l->time, &time_last, time_now, memory_order_relaxed, memory_order_relaxed));
+
+	// If we passed here, we have acquired a time difference we are responsibe for.
+
+	// Don't bother with complex computations if lots of ticks have passed. (little to no speed-up)
+	if (ticks > decay->max_ticks) {
+		memset(l->loads, 0, sizeof(l->loads));
+		return;
+	}
+
+	uint32_t mult;
+	if (__builtin_expect(ticks < sizeof(decay->mult_cache) / sizeof(*decay->mult_cache), 1)) {
+		mult = decay->mult_cache[ticks];
+	} else {
+		mult = exp2(32 - decay->shift_bits * ticks) + 0.5;
+	}
+
+	for (int i = 0; i < LOADS_LEN; ++i) {
+		// We perform decay for the acquired time difference; decays from different threads are commutative.
+		_Atomic uint16_t *load_at = (_Atomic uint16_t *)&l->loads[i];
+		uint16_t l1, load_orig = atomic_load_explicit(load_at, memory_order_relaxed);
+		const uint16_t rnd = rand_bits(16);
+		do {
+			uint64_t m = (((uint64_t)load_orig << 16)) * mult;
+			m = (m >> 32) + ((m >> 31) & 1);
+			l1 = (m >> 16) + (rnd < (uint16_t)m);
+		} while (!atomic_compare_exchange_weak_explicit(load_at, &load_orig, l1, memory_order_relaxed, memory_order_relaxed));
+	}
+}
 
 /// Convert capacity_log to loads_bits
 static inline int32_t capacity2loads(int capacity_log)
