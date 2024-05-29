@@ -589,7 +589,7 @@ int main(int argc, char **argv)
 	io_protolayers_init();
 	tls_protolayers_init();
 	proxy_protolayers_init();
-	defer_init();
+	defer_init(loop);
 #ifdef ENABLE_DOH2
 	http_protolayers_init();
 #endif
