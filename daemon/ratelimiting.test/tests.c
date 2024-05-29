@@ -16,7 +16,7 @@
 
 static void the_tests(void **state);
 
-#include "./tests.inc.c"
+#include "./tests.inc.c"  // NOLINT(bugprone-suspicious-include)
 
 // defining count_test as macro to let it print usable line number on failure
 #define count_test(DESC, EXPECTED_PASSING, MARGIN_FRACT, ...) { \

@@ -15,7 +15,7 @@
  */
 
 #include "lib/defines.h"
-#include "./kru.inc.c"
+#include "./kru.inc.c"  // NOLINT(bugprone-suspicious-include)
 
 KR_EXPORT
 const struct kru_api KRU_GENERIC = KRU_API_INITIALIZER;

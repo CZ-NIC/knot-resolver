@@ -16,7 +16,8 @@
 
 static void the_tests(void **state);
 
-#include "./tests.inc.c"
+#include "./tests.inc.c"  // NOLINT(bugprone-suspicious-include)
+
 
 #define THREADS 4
 
