@@ -67,7 +67,7 @@ static const knot_dname_t * raw_addr2reverse(const uint8_t *raw_addr, int family
 	#undef REV_MAXLEN
 
 	if (family == AF_INET) {
-		snprintf(reverse_addr, sizeof(reverse_addr),
+		(void)snprintf(reverse_addr, sizeof(reverse_addr),
 			 "%d.%d.%d.%d.in-addr.arpa.",
 		         raw_addr[3], raw_addr[2], raw_addr[1], raw_addr[0]);
 	} else if (family == AF_INET6) {
