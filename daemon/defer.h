@@ -75,4 +75,4 @@ static inline void defer_sample_stop(void)
 }
 
 
-void defer_init(void);
+void defer_init(uv_loop_t *loop);
