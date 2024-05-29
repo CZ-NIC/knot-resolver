@@ -218,6 +218,11 @@ static ssize_t kres_gnutls_vec_push(gnutls_transport_ptr_t h, const giovec_t * i
 		return 0;
 	}
 
+	if (kr_fails_assert(iovcnt > 0)) {
+		errno = EINVAL;
+		return -1;
+	}
+
 	size_t total_len = 0;
 	for (int i = 0; i < iovcnt; i++)
 		total_len += iov[i].iov_len;
