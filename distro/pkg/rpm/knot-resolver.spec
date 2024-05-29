@@ -25,16 +25,11 @@ Source100:      kresd-keyblock.asc
 BuildRequires:  gnupg2
 %endif
 
-%description
-The Knot Resolver is a DNSSEC-enabled caching full resolver implementation
-written in C and LuaJIT, including both a resolver library and a daemon.
-Modular architecture of the library keeps the core tiny and efficient, and
-provides a state-machine like API for extensions.
+Provides:       knot-resolver6 = %{version}-%{release}
 
-
-%package core
-Summary:        Caching full DNS Resolver - core binaries
-Conflicts:      knot-resolver < 6
+# alpha packaging compat, can be removed around 6.2
+Conflicts:      knot-resolver-core
+Conflicts:      knot-resolver-manager
 
 # LuaJIT only on these arches
 ExclusiveArch:	%{arm} aarch64 %{ix86} x86_64
@@ -58,6 +53,19 @@ BuildRequires:  python3-devel
 
 Requires:       systemd
 Requires(post): systemd
+
+# manager dependencies
+Requires:       python3
+Requires:       python3-aiohttp
+Requires:       supervisor
+%if 0%{?suse_version}
+Requires:       python3-PyYAML
+Requires:       python3-typing_extensions
+%else
+Requires:       python3-pyyaml
+Requires:       python3-typing-extensions
+%endif
+Recommends:     python3-prometheus_client
 
 # dnstap module dependencies
 # SUSE is missing protoc-c protobuf compiler
@@ -96,15 +104,21 @@ BuildRequires:  python3-setuptools
 Requires(pre):  shadow
 %endif
 
-%description core
+%description
 The Knot Resolver is a DNSSEC-enabled caching full resolver implementation
 written in C and LuaJIT, including both a resolver library and a daemon.
 Modular architecture of the library keeps the core tiny and efficient, and
 provides a state-machine like API for extensions.
 
+Knot Resolver Manager is a configuration tool for Knot Resolver. The Manager
+hides the complexity of running several independent resolver processes while
+ensuring zero-downtime reconfiguration with YAML/JSON declarative
+configuration and an optional HTTP API for dynamic changes.
+
+
 %package devel
 Summary:        Development headers for Knot Resolver
-Requires:       %{name}-core%{?_isa} = %{version}-%{release}
+Requires:       %{name}%{?_isa} = %{version}-%{release}
 
 %description devel
 The package contains development headers for Knot Resolver.
@@ -112,7 +126,7 @@ The package contains development headers for Knot Resolver.
 %if "x%{?suse_version}" == "x"
 %package module-dnstap
 Summary:        dnstap module for Knot Resolver
-Requires:       %{name}-core = %{version}-%{release}
+Requires:       %{name} = %{version}-%{release}
 
 %description module-dnstap
 dnstap module for Knot Resolver supports logging DNS responses to a unix socket
@@ -123,7 +137,7 @@ need effectively log all DNS traffic.
 %if "x%{?suse_version}" == "x"
 %package module-http
 Summary:        HTTP module for Knot Resolver
-Requires:       %{name}-core = %{version}-%{release}
+Requires:       %{name} = %{version}-%{release}
 %if 0%{?fedora} || 0%{?rhel} > 7
 Requires:       lua5.1-http
 Requires:       lua5.1-mmdb
@@ -138,28 +152,6 @@ provide a web interface for local visualization of the resolver cache and
 queries. It can also serve DNS-over-HTTPS, but it is deprecated in favor of
 native C implementation, which doesn't require this package.
 %endif
-
-%package -n knot-resolver-manager
-Summary:        Configuration tool for Knot Resolver
-Provides:       knot-resolver6 = %{version}-%{release}
-Requires:       %{name}-core = %{version}-%{release}
-Requires:       python3
-Requires:       python3-aiohttp
-Requires:       supervisor
-%if 0%{?suse_version}
-Requires:       python3-PyYAML
-Requires:       python3-typing_extensions
-%else
-Requires:       python3-pyyaml
-Requires:       python3-typing-extensions
-%endif
-Recommends:     python3-prometheus_client
-
-%description -n knot-resolver-manager
-Knot Resolver Manager is a configuration tool for Knot Resolver. The Manager
-hides the complexity of running several independent resolver processes while
-ensuring zero-downtime reconfiguration with YAML/JSON declarative
-configuration and an optional HTTP API for dynamic changes.
 
 %prep
 %if 0%{GPG_CHECK}
@@ -237,44 +229,48 @@ install -m 644 -D shell-completion/client.fish %{buildroot}%{_datarootdir}/fish/
 
 popd
 
-%pre core
+%pre
 getent group knot-resolver >/dev/null || groupadd -r knot-resolver
 getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysconfdir}/knot-resolver -s /sbin/nologin -c "Knot Resolver" knot-resolver
 
-%post core
+%post
 # systemd_post macro is not needed for anything (calls systemctl preset)
 %tmpfiles_create %{_tmpfilesdir}/knot-resolver.conf
 %if "x%{?fedora}" == "x"
 /sbin/ldconfig
 %endif
 
-%preun manager
+%preun
 %systemd_preun knot-resolver.service
 
-%postun manager
+%postun
 %systemd_postun_with_restart knot-resolver.service
 %if "x%{?fedora}" == "x"
 /sbin/ldconfig
 %endif
 
 
-%files core
+%files
 %dir %{_pkgdocdir}
 %license %{_pkgdocdir}/COPYING
 %doc %{_pkgdocdir}/AUTHORS
 %doc %{_pkgdocdir}/NEWS
 %doc %{_pkgdocdir}/examples
 %dir %{_sysconfdir}/knot-resolver
+%config(noreplace) %{_sysconfdir}/knot-resolver/config.yaml
 %config(noreplace) %{_sysconfdir}/knot-resolver/root.hints
 %{_sysconfdir}/knot-resolver/icann-ca.pem
 %attr(750,knot-resolver,knot-resolver) %dir %{_sharedstatedir}/knot-resolver
 %attr(640,knot-resolver,knot-resolver) %{_sharedstatedir}/knot-resolver/root.keys
 %dir %{_unitdir}/multi-user.target.wants
+%{_unitdir}/knot-resolver.service
 %{_unitdir}/multi-user.target.wants/knot-resolver.service
 %{_tmpfilesdir}/knot-resolver.conf
 %ghost /run/%{name}
 %ghost %{_localstatedir}/cache/%{name}
 %attr(750,knot-resolver,knot-resolver) %dir %{_libdir}/%{name}
+%{_bindir}/kresctl
+%{_bindir}/knot-resolver
 %{_sbindir}/kresd
 %{_sbindir}/kres-cache-gc
 %{_libdir}/libkres.so.*
@@ -313,6 +309,7 @@ getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysc
 %{_libdir}/knot-resolver/kres_modules/workarounds.lua
 %{python3_sitelib}/knot_resolver.py
 %{python3_sitelib}/knot_resolver-*
+%{python3_sitearch}/knot_resolver_manager*
 %if 0%{?suse_version}
 %pycache_only %{python3_sitelib}/__pycache__/knot_resolver.*
 %else
@@ -320,6 +317,8 @@ getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysc
 %endif
 %{_mandir}/man8/kresd.8.gz
 %{_mandir}/man8/kresctl.8.gz
+%{_datarootdir}/bash-completion/completions/kresctl
+%{_datarootdir}/fish/completions/kresctl.fish
 
 %files devel
 %{_includedir}/libkres
@@ -338,15 +337,6 @@ getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysc
 %{_libdir}/knot-resolver/kres_modules/http*.lua
 %{_libdir}/knot-resolver/kres_modules/prometheus.lua
 %endif
-
-%files -n knot-resolver-manager
-%{python3_sitearch}/knot_resolver_manager*
-%config(noreplace) %{_sysconfdir}/knot-resolver/config.yaml
-%{_unitdir}/knot-resolver.service
-%{_bindir}/kresctl
-%{_bindir}/knot-resolver
-%{_datarootdir}/bash-completion/completions/kresctl
-%{_datarootdir}/fish/completions/kresctl.fish
 
 %changelog
 * {{ now }} Jakub Ružička <jakub.ruzicka@nic.cz> - {{ version }}-{{ release }}

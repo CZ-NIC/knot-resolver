@@ -10,4 +10,4 @@ signature_url = "https://secure.nic.cz/files/knot-resolver/knot-resolver-{{ vers
 version_script = "scripts/upstream-version.sh"
 
 [apkg]
-compat = 2
+compat = 4
