@@ -854,7 +854,7 @@ struct session2 {
  * individual layer implementations to determine the lifetime of the data
  * pointed to by the parameters. */
 struct session2 *session2_new(enum session2_transport_type transport_type,
-                              enum kr_proto layer_grp,
+                              enum kr_proto proto,
                               struct protolayer_data_param *layer_param,
                               size_t layer_param_count,
                               bool outgoing);
