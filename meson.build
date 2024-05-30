@@ -167,6 +167,7 @@ add_project_arguments(
   '-Wignored-qualifiers',
   '-Woverride-init',
   '-Wuninitialized',
+  '-Wno-error=nonnull-compare',
 
   '-fvisibility=hidden',
   '-DHAVE_ASPRINTF=' + have_asprintf.to_int().to_string(),
