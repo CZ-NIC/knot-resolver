@@ -151,6 +151,17 @@ static enum protolayer_event_cb_result pl_udp_event_wrap(
 	return PROTOLAYER_EVENT_PROPAGATE;
 }
 
+static int pl_tcp_sess_init(struct session2 *session,
+                            void *data, void *param)
+{
+	struct sockaddr *peer = session2_get_peer(session);
+	session->comm_storage = (struct comm_info) {
+		.comm_addr = peer,
+		.src_addr = peer
+	};
+	return 0;
+}
+
 static enum protolayer_event_cb_result pl_tcp_event_wrap(
 		enum protolayer_event_type event, void **baton,
 		struct session2 *session, void *sess_data)
@@ -173,6 +184,7 @@ void io_protolayers_init(void)
 	};
 
 	protolayer_globals[PROTOLAYER_TYPE_TCP] = (struct protolayer_globals){
+		.sess_init = pl_tcp_sess_init,
 		.event_wrap = pl_tcp_event_wrap,
 	};
 }

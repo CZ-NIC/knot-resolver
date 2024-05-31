@@ -406,7 +406,7 @@ static int protolayer_iter_ctx_finish(struct protolayer_iter_ctx *ctx, int ret)
 				ctx->layer_ix, layer_name_ctx(ctx), ctx->status);
 
 	if (ctx->finished_cb)
-		ctx->finished_cb(ret, s, &ctx->comm,
+		ctx->finished_cb(ret, s, ctx->comm,
 				ctx->finished_cb_baton);
 
 	mm_ctx_delete(&ctx->pool);
@@ -440,12 +440,12 @@ static int protolayer_push(struct protolayer_iter_ctx *ctx)
 		session2_transport_push(session,
 				ctx->payload.buffer.buf, ctx->payload.buffer.len,
 				ctx->payload.short_lived,
-				&ctx->comm, protolayer_push_finished, ctx);
+				ctx->comm, protolayer_push_finished, ctx);
 	} else if (ctx->payload.type == PROTOLAYER_PAYLOAD_IOVEC) {
 		session2_transport_pushv(session,
 				ctx->payload.iovec.iov, ctx->payload.iovec.cnt,
 				ctx->payload.short_lived,
-				&ctx->comm, protolayer_push_finished, ctx);
+				ctx->comm, protolayer_push_finished, ctx);
 	} else {
 		kr_assert(false && "Invalid payload type");
 		return kr_error(EINVAL);
@@ -473,8 +473,9 @@ static void protolayer_payload_ensure_long_lived(struct protolayer_iter_ctx *ctx
 /** Processes as many layers as possible synchronously, returning when either
  * a layer has gone asynchronous, or when the whole sequence has finished.
  *
- * May be called multiple times on the same `ctx` to continue processing
- * after an asynchronous operation. */
+ * May be called multiple times on the same `ctx` to continue processing after
+ * an asynchronous operation - user code will do this via *layer sequence return
+ * functions*. */
 static int protolayer_step(struct protolayer_iter_ctx *ctx)
 {
 	while (true) {
@@ -484,38 +485,52 @@ static int protolayer_step(struct protolayer_iter_ctx *ctx)
 		enum protolayer_type protocol = protolayer_grps[ctx->session->proto].layers[ctx->layer_ix];
 		struct protolayer_globals *globals = &protolayer_globals[protocol];
 
+		bool was_async = ctx->async_mode;
 		ctx->async_mode = false;
-		ctx->status = 0;
-		ctx->action = PROTOLAYER_ITER_ACTION_NULL;
 
-		protolayer_iter_cb cb = (ctx->direction == PROTOLAYER_UNWRAP)
-			? globals->unwrap : globals->wrap;
+		/* Basically if we went asynchronous, we want to "resume" from
+		 * underneath this `if` block. */
+		if (!was_async) {
+			ctx->status = 0;
+			ctx->action = PROTOLAYER_ITER_ACTION_NULL;
 
-		if (ctx->session->closing) {
-			return protolayer_iter_ctx_finish(
-					ctx, kr_error(ECANCELED));
-		}
+			protolayer_iter_cb cb = (ctx->direction == PROTOLAYER_UNWRAP)
+				? globals->unwrap : globals->wrap;
 
-		if (cb) {
-			struct protolayer_data *sess_data = protolayer_sess_data_get(
-					ctx->session, ctx->layer_ix);
-			struct protolayer_data *iter_data = protolayer_iter_data_get(
-					ctx, ctx->layer_ix);
-			enum protolayer_iter_cb_result result = cb(sess_data, iter_data, ctx);
-			if (kr_fails_assert(result == PROTOLAYER_ITER_CB_RESULT_MAGIC)) {
-				/* Callback did not use a continuation function to return. */
-				return protolayer_iter_ctx_finish(ctx, kr_error(EINVAL));
+			if (ctx->session->closing) {
+				return protolayer_iter_ctx_finish(
+						ctx, kr_error(ECANCELED));
 			}
-		} else {
-			ctx->action = PROTOLAYER_ITER_ACTION_CONTINUE;
+
+			if (cb) {
+				struct protolayer_data *sess_data = protolayer_sess_data_get(
+						ctx->session, ctx->layer_ix);
+				struct protolayer_data *iter_data = protolayer_iter_data_get(
+						ctx, ctx->layer_ix);
+				enum protolayer_iter_cb_result result = cb(sess_data, iter_data, ctx);
+				if (kr_fails_assert(result == PROTOLAYER_ITER_CB_RESULT_MAGIC)) {
+					/* Callback did not use a *layer
+					 * sequence return function* (see
+					 * glossary). */
+					return protolayer_iter_ctx_finish(ctx, kr_error(EINVAL));
+				}
+			} else {
+				ctx->action = PROTOLAYER_ITER_ACTION_CONTINUE;
+			}
+
+			if (!ctx->action) {
+				/* We're going asynchronous - the next step is
+				 * probably going to be from some sort of a
+				 * callback and we will "resume" from underneath
+				 * this `if` block. */
+				ctx->async_mode = true;
+				protolayer_payload_ensure_long_lived(ctx);
+				return PROTOLAYER_RET_ASYNC;
+			}
 		}
 
-
-		if (!ctx->action) {
-			/* Next step is from a callback */
-			ctx->async_mode = true;
-			protolayer_payload_ensure_long_lived(ctx);
-			return PROTOLAYER_RET_ASYNC;
+		if (kr_fails_assert(ctx->action)) {
+			return protolayer_iter_ctx_finish(ctx, kr_error(EINVAL));
 		}
 
 		if (ctx->action == PROTOLAYER_ITER_ACTION_BREAK) {
@@ -525,7 +540,7 @@ static int protolayer_step(struct protolayer_iter_ctx *ctx)
 
 		if (kr_fails_assert(ctx->status == 0)) {
 			/* Status should be zero without a BREAK. */
-			return protolayer_iter_ctx_finish(ctx, kr_error(ECANCELED));
+			return protolayer_iter_ctx_finish(ctx, kr_error(EINVAL));
 		}
 
 		if (ctx->action == PROTOLAYER_ITER_ACTION_CONTINUE) {
@@ -566,6 +581,10 @@ static int session2_submit(
 	if (kr_fails_assert(session->proto < KR_PROTO_COUNT))
 		return kr_error(EFAULT);
 
+	bool had_comm_param = (comm != NULL);
+	if (!had_comm_param)
+		comm = &session->comm_storage;
+
 	struct protolayer_iter_ctx *ctx = malloc(session->iter_ctx_size);
 	kr_require(ctx);
 
@@ -578,13 +597,33 @@ static int session2_submit(
 
 	*ctx = (struct protolayer_iter_ctx) {
 		.payload = payload,
-		.comm = (comm) ? *comm : session->comm,
 		.direction = direction,
 		.layer_ix = layer_ix,
 		.session = session,
 		.finished_cb = cb,
 		.finished_cb_baton = baton
 	};
+	if (had_comm_param) {
+		struct comm_addr_storage *addrst = &ctx->comm_addr_storage;
+		if (comm->src_addr) {
+			memcpy(&addrst->src_addr.ip, comm->src_addr,
+				kr_sockaddr_len(comm->src_addr));
+			ctx->comm_storage.src_addr = &addrst->src_addr.ip;
+		}
+		if (comm->comm_addr) {
+			memcpy(&addrst->comm_addr.ip, comm->comm_addr,
+				kr_sockaddr_len(comm->comm_addr));
+			ctx->comm_storage.comm_addr = &addrst->comm_addr.ip;
+		}
+		if (comm->dst_addr) {
+			memcpy(&addrst->dst_addr.ip, comm->dst_addr,
+				kr_sockaddr_len(comm->dst_addr));
+			ctx->comm_storage.dst_addr = &addrst->dst_addr.ip;
+		}
+		ctx->comm = &ctx->comm_storage;
+	} else {
+		ctx->comm = &session->comm_storage;
+	}
 	mm_ctx_mempool(&ctx->pool, CPU_PAGE_SIZE);
 
 	const struct protolayer_grp *grp = &protolayer_grps[session->proto];
@@ -616,25 +655,26 @@ static void *get_init_param(enum protolayer_type p,
 	return NULL;
 }
 
+/** Called by *Layer sequence return functions* to proceed with protolayer
+ * processing. If the  */
+static inline void maybe_async_do_step(struct protolayer_iter_ctx *ctx)
+{
+	if (ctx->async_mode)
+		protolayer_step(ctx);
+}
+
 enum protolayer_iter_cb_result protolayer_continue(struct protolayer_iter_ctx *ctx)
 {
-	if (ctx->async_mode) {
-		protolayer_iter_ctx_next(ctx);
-		protolayer_step(ctx);
-	} else {
-		ctx->action = PROTOLAYER_ITER_ACTION_CONTINUE;
-	}
+	ctx->action = PROTOLAYER_ITER_ACTION_CONTINUE;
+	maybe_async_do_step(ctx);
 	return PROTOLAYER_ITER_CB_RESULT_MAGIC;
 }
 
 enum protolayer_iter_cb_result protolayer_break(struct protolayer_iter_ctx *ctx, int status)
 {
 	ctx->status = status;
-	if (ctx->async_mode) {
-		protolayer_iter_ctx_finish(ctx, PROTOLAYER_RET_NORMAL);
-	} else {
-		ctx->action = PROTOLAYER_ITER_ACTION_BREAK;
-	}
+	ctx->action = PROTOLAYER_ITER_ACTION_BREAK;
+	maybe_async_do_step(ctx);
 	return PROTOLAYER_ITER_CB_RESULT_MAGIC;
 }
 

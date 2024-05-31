@@ -330,7 +330,7 @@ static enum protolayer_iter_cb_result pl_proxyv2_dgram_unwrap(
 
 	char *data = ctx->payload.buffer.buf;
 	ssize_t data_len = ctx->payload.buffer.len;
-	struct comm_info *comm = &ctx->comm;
+	struct comm_info *comm = ctx->comm;
 	if (!s->outgoing && proxy_header_present(data, data_len)) {
 		if (!proxy_allowed(comm->comm_addr)) {
 			kr_log_debug(IO, "<= ignoring PROXYv2 UDP from disallowed address '%s'\n",
@@ -385,17 +385,6 @@ struct pl_proxyv2_stream_sess_data {
 	bool has_proxy : 1;
 };
 
-static int pl_proxyv2_stream_sess_init(struct session2 *session,
-                                       void *data, void *param)
-{
-	struct sockaddr *peer = session2_get_peer(session);
-	session->comm = (struct comm_info) {
-		.comm_addr = peer,
-		.src_addr = peer
-	};
-	return 0;
-}
-
 static enum protolayer_iter_cb_result pl_proxyv2_stream_unwrap(
 		void *sess_data, void *iter_data, struct protolayer_iter_ctx *ctx)
 {
@@ -410,7 +399,7 @@ static enum protolayer_iter_cb_result pl_proxyv2_stream_unwrap(
 
 	char *data = wire_buf_data(ctx->payload.wire_buf); /* layer's or session's wirebuf */
 	ssize_t data_len = wire_buf_data_length(ctx->payload.wire_buf);
-	struct comm_info *comm = &ctx->session->comm;
+	struct comm_info *comm = ctx->comm;
 	if (!s->outgoing && !tcp->had_data && proxy_header_present(data, data_len)) {
 		if (!proxy_allowed(comm->src_addr)) {
 			if (kr_log_is_debug(IO, NULL)) {
@@ -458,7 +447,6 @@ static enum protolayer_iter_cb_result pl_proxyv2_stream_unwrap(
 	}
 
 	tcp->had_data = true;
-	ctx->comm = ctx->session->comm;
 	return protolayer_continue(ctx);
 }
 
@@ -472,7 +460,6 @@ void proxy_protolayers_init(void)
 
 	protolayer_globals[PROTOLAYER_TYPE_PROXYV2_STREAM] = (struct protolayer_globals){
 		.sess_size = sizeof(struct pl_proxyv2_stream_sess_data),
-		.sess_init = pl_proxyv2_stream_sess_init,
 		.unwrap = pl_proxyv2_stream_unwrap,
 	};
 }
