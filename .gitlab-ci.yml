@@ -20,7 +20,7 @@ variables:
   # IMAGE_TAG is a Git branch/tag name from https://gitlab.nic.cz/knot/knot-resolver-ci
   # In general, keep it pointing to a tag - use a branch only for development.
   # More info in the knot-resolver-ci repository.
-  IMAGE_TAG: 'v20240506'
+  IMAGE_TAG: 'v20240604'
   IMAGE_PREFIX: '$CI_REGISTRY/knot/knot-resolver-ci'
 
 image: $IMAGE_PREFIX/debian12-knot_3_3:$IMAGE_TAG
@@ -84,6 +84,12 @@ stages:
     reports:
       junit: build_ci*/meson-logs/integration.deckard.junit.xml
 
+.after_build_arch: &after_build_arch
+  <<: *after_build
+  image: $IMAGE_PREFIX/arch:$IMAGE_TAG
+  needs:
+    - build-arch
+
 .nodep: &nodep
   <<: *common
   needs: []
@@ -111,6 +117,15 @@ archive:
   except: null
   script:
     - apkg make-archive
+
+build-arch:
+  <<: *build
+  image: $IMAGE_PREFIX/arch:$IMAGE_TAG
+  script:
+    - meson build_ci_arch --prefix=$PREFIX -Dmalloc=disabled -Dwerror=true
+    - ninja -C build_ci_arch
+    - ninja -C build_ci_arch install >/dev/null
+    - ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite snowflake
 
 build-stable:
   <<: *build
@@ -264,7 +279,7 @@ lint:pedantic:
     - ninja -C build_pedantic_clang
 
 lint:tidy:
-  <<: *after_build
+  <<: *after_build_arch
   stage: sanity
   script:
     - ninja -C build_ci* tidy

@@ -37,6 +37,10 @@ Checks: |-
   -readability-magic-numbers,
   -readability-non-const-parameter,
   -readability-redundant-declaration,
+  -clang-analyzer-core.UndefinedBinaryOperatorResult
+
+# TODO: remove `-clang-analyzer-core.UndefinedBinaryOperatorResult` when we
+# upgrade to Clang >=18 (it's a false positive )
 
 WarningsAsErrors: |-
   cert-*,
@@ -45,7 +49,7 @@ WarningsAsErrors: |-
   readability-*,
   -readability-non-const-parameter,
 
-HeaderFilterRegex: '(contrib/ucw/*.h|/usr/*.h)'
+HeaderFilterRegex: 'contrib/ucw/*.h'
 CheckOptions:
   - key:             readability-identifier-naming
     value:           'lower_case'
