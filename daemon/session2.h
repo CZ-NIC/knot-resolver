@@ -22,6 +22,13 @@
  *   processing, it is also the lifetime of `struct protolayer_iter_ctx` and
  *   layer-specific data contained therein.
  *
+ * Layer sequence return function:
+ *   - One of `protolayer_break()`, `protolayer_continue()`, or
+ *   `protolayer_async()` - a function that a protolayer's `_wrap` or `_unwrap`
+ *   callback should call to get its return value. They may either be called
+ *   synchronously directly in the callback to end/pause the processing, or, if
+ *   the processing went asynchronous, called to resume the iteration of layers.
+ *
  * Payload:
  *   - Data processed by protocol layers in a particular sequence. In the wrap
  *   direction, this data generally starts as a DNS packet, which is then
@@ -103,6 +110,14 @@ struct comm_info {
 	ethaddr_t eth_from;
 	ethaddr_t eth_to;
 	bool xdp:1;
+};
+
+/** Just a simple struct able to hold three IPv6 or IPv4 addresses, so that we
+ * can hold them somewhere. */
+struct comm_addr_storage {
+	union kr_sockaddr src_addr;
+	union kr_sockaddr comm_addr;
+	union kr_sockaddr dst_addr;
 };
 
 
@@ -399,9 +414,14 @@ struct protolayer_iter_ctx {
 /* read-write for layers: */
 	/** The payload */
 	struct protolayer_payload payload;
-	/** Communication information. Typically written into by one of the
-	 * first layers facilitating transport protocol processing. */
-	struct comm_info comm;
+	/** Pointer to communication information. For TCP, this will generally
+	 * point to the storage in the session. For UDP, this will generally
+	 * point to the storage in this context. */
+	struct comm_info *comm;
+	/** Communication information storage. This will generally be set by one
+	 * of the first layers in the sequence, if used, e.g. UDP PROXYv2. */
+	struct comm_info comm_storage;
+	struct comm_addr_storage comm_addr_storage;
 	/** Per-iter memory pool. Has no `free` procedure, gets freed as a whole
 	 * when the context is being destroyed. Initialized and destroyed
 	 * automatically - layers may use it to allocate memory. */
@@ -414,8 +434,9 @@ struct protolayer_iter_ctx {
 /* internal information for the manager - should only be used by the protolayer
  * system, never by layers: */
 	enum protolayer_direction direction;
-	/** If `true`, the processing of layers has been paused and is waiting
-	 * to be resumed or canceled. */
+	/** If `true`, the processing of the layer sequence has been paused and
+	 * is waiting to be resumed (`protolayer_continue()`) or cancelled
+	 * (`protolayer_break()`). */
 	bool async_mode;
 	/** The index of the layer that is currently being (or has just been)
 	 * processed. */
@@ -509,8 +530,8 @@ struct protolayer_data {
 };
 
 /** Return value of `protolayer_iter_cb` callbacks. To be returned by *layer
- * sequence return functions* as a sanity check. Not to be used directly by
- * user code. */
+ * sequence return functions* (see glossary) as a sanity check. Not to be used
+ * directly by user code. */
 enum protolayer_iter_cb_result {
 	PROTOLAYER_ITER_CB_RESULT_MAGIC = 0x364F392E,
 };
@@ -522,9 +543,9 @@ enum protolayer_iter_cb_result {
  *
  * The function (or another function, that the pointed-to function causes to be
  * called, directly or through an asynchronous operation), must call one of the
- * *layer sequence return functions* (e.g. `protolayer_continue()`,
- * `protolayer_async()`, ...) to advance (or end) the layer sequence. The
- * function must return the result of such a return function. */
+ * *layer sequence return functions* (see glossary) to advance (or end) the
+ * layer sequence. The function must return the result of such a return
+ * function. */
 typedef enum protolayer_iter_cb_result (*protolayer_iter_cb)(
 		void *sess_data,
 		void *iter_data,
@@ -693,25 +714,25 @@ struct protolayer_globals {
 extern struct protolayer_globals protolayer_globals[PROTOLAYER_TYPE_COUNT];
 
 
-/** *Layer sequence return function* - signalizes the protolayer manager to
- * continue processing the next layer. */
+/** *Layer sequence return function* (see glossary) - signalizes the protolayer
+ * manager to continue processing the next layer. */
 enum protolayer_iter_cb_result protolayer_continue(struct protolayer_iter_ctx *ctx);
 
-/** *Layer sequence return function* - signalizes that the layer wants to stop
- * processing of the buffer and clean up, possibly due to an error (indicated
- * by a non-zero `status`). */
+/** *Layer sequence return function* (see glossary) - signalizes that the layer
+ * wants to stop processing of the buffer and clean up, possibly due to an error
+ * (indicated by a non-zero `status`). */
 enum protolayer_iter_cb_result protolayer_break(struct protolayer_iter_ctx *ctx, int status);
 
-/** *Layer sequence return function* - signalizes that the current sequence
- * will continue in an asynchronous manner. The layer should store the context
- * and call another sequence return function at another point. This may be used
- * in layers that work through libraries whose operation is asynchronous, like
- * GnuTLS.
+/** *Layer sequence return function* (see glossary) - signalizes that the
+ * current sequence will continue in an asynchronous manner. The layer should
+ * store the context and call another sequence return function at another point.
+ * This may be used in layers that work through libraries whose operation is
+ * asynchronous, like GnuTLS.
  *
- * Note that this return function is just a readability hint - another return
- * function may be called in another stack frame before it (generally during a
- * call to an external library function, e.g. GnuTLS or nghttp2) and the
- * sequence will continue correctly. */
+ * Note that this one is basically just a readability hint - another return
+ * function may be actually called before it (generally during a call to an
+ * external library function, e.g. GnuTLS or nghttp2). This is completely legal
+ * and the sequence will continue correctly. */
 static inline enum protolayer_iter_cb_result protolayer_async(void)
 {
 	return PROTOLAYER_ITER_CB_RESULT_MAGIC;
@@ -776,7 +797,7 @@ struct session2 {
 	/** Communication information. Typically written into by one of the
 	 * first layers facilitating transport protocol processing.
 	 * Zero-initialized by default. */
-	struct comm_info comm;
+	struct comm_info comm_storage;
 
 	/** Time of last IO activity (if any occurs). Otherwise session
 	 * creation time. */
@@ -996,7 +1017,7 @@ void session2_penalize(struct session2 *session);
  * indicating an error. */
 int session2_unwrap(struct session2 *s, struct protolayer_payload payload,
                     const struct comm_info *comm, protolayer_finished_cb cb,
-		    void *baton);
+                    void *baton);
 
 /** Same as `session2_unwrap`, but looks up the specified `protocol` in the
  * session's assigned protocol group and sends the `payload` to the layer that

@@ -633,9 +633,6 @@ static int qr_task_send(struct qr_task *task, struct session2 *session,
 
 	int ret = 0;
 
-	if (comm == NULL)
-		comm = &session->comm;
-
 	if (pkt == NULL)
 		pkt = worker_task_get_pktbuf(task);
 
@@ -1771,7 +1768,7 @@ static enum protolayer_iter_cb_result pl_dns_dgram_unwrap(
 				break;
 			}
 
-			ret = worker_submit(session, &ctx->comm, pkt);
+			ret = worker_submit(session, ctx->comm, pkt);
 			if (ret)
 				break;
 		}
@@ -1789,7 +1786,7 @@ static enum protolayer_iter_cb_result pl_dns_dgram_unwrap(
 		if (!pkt)
 			return protolayer_break(ctx, KNOT_EMALF);
 
-		int ret = worker_submit(session, &ctx->comm, pkt);
+		int ret = worker_submit(session, ctx->comm, pkt);
 		mp_flush(the_worker->pkt_pool.ctx);
 		return protolayer_break(ctx, ret);
 	} else if (ctx->payload.type == PROTOLAYER_PAYLOAD_WIRE_BUF) {
@@ -1805,7 +1802,7 @@ static enum protolayer_iter_cb_result pl_dns_dgram_unwrap(
 		if (!pkt)
 			return protolayer_break(ctx, KNOT_EMALF);
 
-		int ret = worker_submit(session, &ctx->comm, pkt);
+		int ret = worker_submit(session, ctx->comm, pkt);
 		wire_buf_reset(ctx->payload.wire_buf);
 		mp_flush(the_worker->pkt_pool.ctx);
 		return protolayer_break(ctx, ret);
@@ -2173,14 +2170,14 @@ static enum protolayer_iter_cb_result pl_dns_stream_unwrap(
 		if (stream_sess->single && stream_sess->produced) {
 			if (kr_log_is_debug(WORKER, NULL)) {
 				kr_log_debug(WORKER, "Unexpected extra data from %s\n",
-						kr_straddr(ctx->comm.src_addr));
+						kr_straddr(ctx->comm->src_addr));
 			}
 			status = KNOT_EMALF;
 			goto exit;
 		}
 
 		stream_sess->produced = true;
-		int ret = worker_submit(session, &ctx->comm, pkt);
+		int ret = worker_submit(session, ctx->comm, pkt);
 
 		/* Errors from worker_submit() are intentionally *not* handled
 		 * in order to ensure the entire wire buffer is processed. */
