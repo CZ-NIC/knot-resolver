@@ -715,6 +715,8 @@ int kr_resolve_consume(struct kr_request *request, struct kr_transport **transpo
 	if (transport && !qry->flags.CACHED) {
 		if (!(request->state & KR_STATE_FAIL)) {
 			/* Do not complete NS address resolution on soft-fail. */
+			if (kr_fails_assert(packet->wire))
+				return KR_STATE_FAIL;
 			const int rcode = knot_wire_get_rcode(packet->wire);
 			if (rcode != KNOT_RCODE_SERVFAIL && rcode != KNOT_RCODE_REFUSED) {
 				qry->flags.AWAIT_IPV6 = false;
@@ -748,7 +750,7 @@ int kr_resolve_consume(struct kr_request *request, struct kr_transport **transpo
 	}
 
 	/* Pop query if resolved. */
-	if (request->state == KR_STATE_YIELD) {
+	if (request->state == KR_STATE_YIELD) { // NOLINT(bugprone-branch-clone)
 		return KR_STATE_PRODUCE; /* Requery */
 	} else if (qry->flags.RESOLVED) {
 		kr_rplan_pop(rplan, qry);
@@ -931,6 +933,7 @@ int kr_resolve_finish(struct kr_request *request, int state)
 				knot_wire_clear_ad(wire);
 				knot_wire_clear_aa(wire);
 				knot_wire_set_rcode(wire, KNOT_RCODE_SERVFAIL);
+			default:; // Do nothing
 			}
 		}
 	}

@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 config_tests += [
-  ['basic', files('basic.test.lua'), ['skip_asan']],
-  ['cache', files('cache.test.lua'), ['skip_asan']],
+  ['basic', files('basic.test.lua')],
+  ['cache', files('cache.test.lua')],
   ['net', files('net.test.lua'), ['config_net']],
   ['doh2', files('doh2.test.lua')],
   ['lru', files('lru.test.lua')],

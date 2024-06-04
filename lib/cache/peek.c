@@ -174,6 +174,7 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 					knot_db_val_bound(v), new_ttl);
 		return ret == kr_ok() ? KR_STATE_DONE : ctx->state;
 		}
+	default:; // Continue below
 	}
 
 	/* We have to try proving from NSEC*. */
@@ -359,7 +360,7 @@ static int peek_encloser(
 	/** Name of the closest (provable) encloser. */
 	const knot_dname_t *clencl_name = qry->sname;
 	for (int l = sname_labels; l > clencl_labels; --l)
-		clencl_name = knot_wire_next_label(clencl_name, NULL);
+		clencl_name = knot_dname_next_label(clencl_name);
 
 	/**** 3. source of synthesis checks, in case the next closer name was covered.
 	 **** 3a. We want to query for NSEC* of source of synthesis (SS) or its

@@ -13,6 +13,7 @@
 #include "kr_cache_gc.h"
 
 static volatile int killed = 0;
+static volatile int exit_code = 0;
 
 static void got_killed(int signum)
 {
@@ -21,12 +22,10 @@ static void got_killed(int signum)
 	case 1:
 		break;
 	case 2:
-		exit(5);
+		exit_code = 5;
 		break;
-	case 3:
-		abort();
 	default:
-		kr_assert(false);
+		abort();
 	}
 }
 
@@ -60,16 +59,20 @@ int main(int argc, char *argv[])
 {
 	printf("Knot Resolver Cache Garbage Collector, version %s\n", PACKAGE_VERSION);
 	if (setvbuf(stdout, NULL, _IONBF, 0) || setvbuf(stderr, NULL, _IONBF, 0)) {
-		fprintf(stderr, "Failed to to set output buffering (ignored): %s\n",
+		(void)fprintf(stderr, "Failed to to set output buffering (ignored): %s\n",
 				strerror(errno));
-		fflush(stderr);
+		(void)fflush(stderr);
 	}
 
-	signal(SIGTERM, got_killed);
-	signal(SIGKILL, got_killed);
-	signal(SIGPIPE, got_killed);
-	signal(SIGCHLD, got_killed);
-	signal(SIGINT, got_killed);
+	struct sigaction act = {
+		.sa_handler = got_killed,
+		.sa_flags = SA_RESETHAND,
+	};
+	sigemptyset(&act.sa_mask);
+	kr_assert(!sigaction(SIGTERM, &act, NULL));
+	kr_assert(!sigaction(SIGPIPE, &act, NULL));
+	kr_assert(!sigaction(SIGCHLD, &act, NULL));
+	kr_assert(!sigaction(SIGINT, &act, NULL));
 
 	kr_cache_gc_cfg_t cfg = {
 		.ro_txn_items = 200,
@@ -131,7 +134,6 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	int exit_code = 0;
 	kr_cache_gc_state_t *gc_state = NULL;
 	bool last_espace = false;
 	do {

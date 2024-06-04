@@ -30,7 +30,7 @@
  * So it takes 2 RTT.
  * As we use session tickets, there are additional messages, add one RTT mode.
  */
-#define TLS_MAX_HANDSHAKE_TIME (KR_CONN_RTT_MAX * 3)
+#define TLS_MAX_HANDSHAKE_TIME (KR_CONN_RTT_MAX * (uint64_t)3)
 
 /** Transport session (opaque). */
 struct session2;

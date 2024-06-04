@@ -126,7 +126,7 @@ void kr_log_fmt(enum kr_log_group group, kr_log_level_t level, const char *file,
 		}
 
 		va_start(args, fmt);
-		vfprintf(stream, fmt, args);
+		(void)vfprintf(stream, fmt, args);
 		va_end(args);
 	}
 }

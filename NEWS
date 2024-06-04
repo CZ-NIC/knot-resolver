@@ -14,6 +14,7 @@ Improvements
 
   * predict module: prefetching expiring records moved to prefetch module
   * prefetch module: new module to prefetch expiring records
+- stats: add separate metrics for IPv6 and IPv4 (!1545)
 
 .. TODO: Change the link below to a versioned one when releasing.
 
@@ -24,6 +25,10 @@ Incompatible changes
   the default behaviour as well. See the `relevant documentation section
   <https://www.knot-resolver.cz/documentation/latest/config-cache-predict.html>`_
   for more.
+
+Bugfixes
+--------
+- fix startup with `dnssec: false` (!1548)
 
 
 Knot Resolver 6.0.7 (2024-03-27)
@@ -99,6 +104,13 @@ https://www.knot-resolver.cz/documentation/latest/upgrading-to-6.html
 
 5.x branch longterm support
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Knot Resolver 5.7.3 (2024-0m-dd)
+================================
+
+Improvements
+------------
+- stats: add separate metrics for IPv6 and IPv4 (!1544)
 
 Knot Resolver 5.7.2 (2024-03-27)
 ================================

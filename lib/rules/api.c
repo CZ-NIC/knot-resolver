@@ -91,7 +91,7 @@ int kr_rule_tag_add(const char *tag, kr_rule_tags_t *tagset)
 			kr_log_error(RULES, "ERROR: invalid length: %d\n", (int)val.len);
 			return kr_error(EILSEQ);
 		}
-		*tagset |= (1 << *tindex_p);
+		*tagset |= ((kr_rule_tags_t)1 << *tindex_p);
 		return kr_ok();
 	} else if (ret != kr_error(ENOENT)) {
 		return ret;
@@ -114,7 +114,7 @@ int kr_rule_tag_add(const char *tag, kr_rule_tags_t *tagset)
 	int ix = ffsll(~bmp) - 1;
 	if (ix < 0 || ix >= 8 * sizeof(bmp))
 		return kr_error(E2BIG);
-	const kr_rule_tags_t tag_new = 1 << ix;
+	const kr_rule_tags_t tag_new = (kr_rule_tags_t)1 << ix;
 	kr_require((tag_new & bmp) == 0);
 
 	// Update the bitmap.  ATM ruledb does not overwrite, so we `remove` before `write`.
@@ -158,7 +158,7 @@ int kr_rules_init(const char *path, size_t maxsize)
 		// Later we might improve it to auto-resize in case of running out of space.
 		// Caveat: mdb_env_set_mapsize() can only be called without transactions open.
 		.maxsize = maxsize ? maxsize :
-			(sizeof(size_t) > 4 ? 2048 : 500) * 1024*(size_t)1024,
+			(size_t)(sizeof(size_t) > 4 ? 2048 : 500) * 1024*1024,
 	};
 	int ret = the_rules->api->open(&the_rules->db, &the_rules->stats, &opts, NULL);
 	/* No persistence - we always refill from config for now.
@@ -848,8 +848,8 @@ static int subnet_encode(const struct sockaddr *addr, int sub_len, uint8_t buf[3
 		uint16_t x = a[i] * 85; // interleave by zero bits
 		uint8_t sub_mask = 255 >> (8 - MIN(sub_len, 8));
 		uint16_t r = x | (sub_mask * 85 * 2);
-		buf[2*i] = r / 256;
-		buf[2*i + 1] = r % 256;
+		buf[(ssize_t)2*i] = r / 256;
+		buf[(ssize_t)2*i + 1] = r % 256;
 	}
 	return i * 2;
 }
@@ -870,9 +870,9 @@ bool subnet_is_prefix(uint8_t a, uint8_t b)
 }
 
 #define KEY_PREPEND(key, arr) do { \
-		key.data -= sizeof(arr); \
-		key.len  += sizeof(arr); \
-		memcpy(key.data, arr, sizeof(arr)); \
+		(key).data -= sizeof(arr); \
+		(key).len  += sizeof(arr); \
+		memcpy((key).data, arr, sizeof(arr)); \
 	} while (false)
 
 int kr_view_insert_action(const char *subnet, const char *dst_subnet,

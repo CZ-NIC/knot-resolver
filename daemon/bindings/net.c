@@ -468,7 +468,7 @@ static int net_interfaces(lua_State *L)
 		/* Hardware address. */
 		char *p = buf;
 		for (int k = 0; k < sizeof(iface.phys_addr); ++k) {
-			sprintf(p, "%.2x:", (uint8_t)iface.phys_addr[k]);
+			(void)sprintf(p, "%.2x:", (uint8_t)iface.phys_addr[k]);
 			p += 3;
 		}
 		p[-1] = '\0';
@@ -788,7 +788,7 @@ static int net_tls_client(lua_State *L)
 		/* Sort the strings for easier comparison later. */
 		if (newcfg->ca_files.len) {
 			qsort(&newcfg->ca_files.at[0], newcfg->ca_files.len,
-				sizeof(newcfg->ca_files.at[0]), strcmp_p);
+				array_member_size(newcfg->ca_files), strcmp_p);
 		}
 	}
 	lua_pop(L, 1);
@@ -828,7 +828,7 @@ static int net_tls_client(lua_State *L)
 		/* Sort the raw strings for easier comparison later. */
 		if (newcfg->pins.len) {
 			qsort(&newcfg->pins.at[0], newcfg->pins.len,
-				sizeof(newcfg->pins.at[0]), cmp_sha256);
+				array_member_size(newcfg->pins), cmp_sha256);
 		}
 	}
 	lua_pop(L, 1);
@@ -1031,7 +1031,11 @@ static int net_tls_sticket_secret_file(lua_State *L)
 				STR(net_tls_sticket_MIN_SECRET_LEN) " bytes",
 			file_name);
 	}
-	fclose(fp);
+	if (fclose(fp) == EOF) {
+		lua_error_p(L,
+			"net.tls_sticket_secret_file - reading of file '%s' failed",
+			file_name);
+	}
 
 	tls_session_ticket_ctx_destroy(the_network->tls_session_ticket_ctx);
 	the_network->tls_session_ticket_ctx =

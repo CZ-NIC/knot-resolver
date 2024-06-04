@@ -312,5 +312,7 @@ KRESD_LOG_IO_CLOSE = re.compile(r'^\[io    \].*closed by peer.*')
 @contextmanager
 def make_kresd(workdir, certname=None, ip='127.0.0.1', ip6='::1', **kwargs):
     with Kresd(workdir, ip=ip, ip6=ip6, certname=certname, **kwargs) as kresd:
-        yield kresd
-        print(kresd.partial_log())
+        try:
+            yield kresd
+        finally:
+            print(kresd.partial_log())

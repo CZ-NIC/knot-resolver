@@ -71,7 +71,7 @@
 /** @brief Initialize a queue.  You can malloc() it the usual way. */
 #define queue_init(q) do { \
 	(void)(((__typeof__(((q).pdata_t)))0) == (void *)0); /* typecheck queue_t */ \
-	queue_init_impl(&(q).queue, sizeof(*(q).pdata_t)); \
+	queue_init_impl(&(q).queue, queue_member_size((q))); \
 	} while (false)
 
 /** @brief De-initialize a queue: make it invalid and free any inner allocations. */
@@ -104,6 +104,10 @@
 /** @brief Return the number of elements in the queue (very efficient). */
 #define queue_len(q) \
 	((const size_t)(q).queue.len)
+
+/** @brief Return the size of a single element in the queue. */
+#define queue_member_size(q) \
+	(sizeof(*(q).pdata_t)) // NOLINT(bugprone-sizeof-expression): usually a false-positive
 
 
 /** @brief Type for queue iterator, parametrized by value type.

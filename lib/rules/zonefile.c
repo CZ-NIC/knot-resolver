@@ -50,7 +50,8 @@ static void rr_scan2trie(zs_scanner_t *s)
 		knot_rrset_init(rr, NULL, s->r_type, KNOT_CLASS_IN, s->r_ttl);
 			// we don't ^^ need owner so save allocation
 	}
-	knot_rrset_add_rdata(rr, s->r_data, s->r_data_length, s_data->pool);
+	int ret = knot_rrset_add_rdata(rr, s->r_data, s->r_data_length, s_data->pool);
+	kr_assert(!ret);
 }
 /// Process an RRset of other types into a rule
 static int rr_trie2rule(const char *key_data, uint32_t key_len, trie_val_t *rr_p, void *config)
@@ -202,6 +203,7 @@ static void process_record(zs_scanner_t *s)
 		KR_RRTYPE_GET_STR(type_str, s->r_type);
 		kr_log_warning(RULES, "skipping unsupported RR type %s\n", type_str);
 		return;
+	default:; // Continue below
 	}
 	if (knot_rrtype_is_metatype(s->r_type))
 		goto unsupported_type;
@@ -244,7 +246,7 @@ int kr_rule_zonefile(const struct kr_rule_zonefile_config *c)
 
 	s_data_t s_data = { 0 };
 	s_data.c = c;
-	s_data.pool = mm_ctx_mempool2(64 * 1024);
+	s_data.pool = mm_ctx_mempool2((size_t)64 * 1024);
 	s_data.rrs = trie_create(s_data.pool);
 	ret = zs_set_processing(s, process_record, NULL, &s_data);
 	if (kr_fails_assert(ret == 0))

@@ -529,7 +529,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 		goto return_needs_pkt;
 	const knot_dname_t *encloser = rr->owner; /**< the closest encloser name */
 	for (int i = 0; i < wild_labels; ++i) {
-		encloser = knot_wire_next_label(encloser, NULL);
+		encloser = knot_dname_next_label(encloser);
 	}
 
 	/* Construct the key under which RRs will be stored,
