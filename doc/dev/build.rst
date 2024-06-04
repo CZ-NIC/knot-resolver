@@ -92,20 +92,6 @@ The following dependencies are needed to build and run Knot Resolver with core f
    "lmdb", "Memory-mapped database for cache"
    "GnuTLS", "TLS"
 
-Additional dependencies are needed to build and run Knot Resolver with ``manager``:
-All dependencies are also listed in `pyproject.toml <https://gitlab.nic.cz/knot/knot-resolver/-/blob/manager/manager/pyproject.toml>`_ which is our authoritative source.
-
-.. csv-table::
-   :header: "Requirement", "Notes"
-
-   "python3_ >=3.7", "Python language interpreter"
-   "Jinja2_", "Template engine for Python"
-   "PyYAML_", "YAML framework for Python"
-   "aiohttp_", "HTTP Client/Server for Python."
-   "prometheus-client_", "Prometheus client for Python"
-   "typing-extensions_", "Compatibility module for Python"
-
-
 There are also *optional* packages that enable specific functionality in Knot
 Resolver:
 
@@ -306,6 +292,36 @@ or root hints use this:
 In case you want to have automatically managed DNSSEC trust anchors instead,
 set ``-Dmanaged_ta=enabled`` and make sure both ``keyfile_default`` file and
 its parent directories are writable by kresd process (after package installation!).
+
+**********************************
+Installing the manager from source
+**********************************
+
+Additional dependencies are needed to run Knot Resolver with the ``manager``.
+All dependencies are also listed in `pyproject.toml <https://gitlab.nic.cz/knot/knot-resolver/-/blob/master/manager/pyproject.toml>`_ which is our authoritative source.
+
+.. csv-table::
+   :header: "Requirement", "Notes"
+
+   "python3_ >=3.8", "Python language interpreter"
+   "Jinja2_", "Template engine for Python"
+   "PyYAML_", "YAML framework for Python"
+   "aiohttp_", "HTTP Client/Server for Python."
+   "typing-extensions_", "Compatibility module for Python"
+   "prometheus-client_", "Prometheus client for Python (optional)"
+
+
+ You can install the ``manager`` using generated ``setup.py``.
+
+.. code-block:: bash
+
+   cd manager
+   python3 setup.py install
+
+.. tip::
+
+   For development, it is recommended to run the manager using the procedure described in `manager/README.md <https://gitlab.nic.cz/knot/knot-resolver/-/blob/master/manager/README.md>`_.
+
 
 ************
 Docker image
