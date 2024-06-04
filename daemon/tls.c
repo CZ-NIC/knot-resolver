@@ -27,7 +27,7 @@
 #define EPHEMERAL_CERT_EXPIRATION_SECONDS_RENEW_BEFORE ((time_t)60*60*24*7)
 #define GNUTLS_PIN_MIN_VERSION  0x030400
 #define UNWRAP_BUF_SIZE 131072
-#define TLS_CHUNK_SIZE (16 * 1024)
+#define TLS_CHUNK_SIZE ((size_t)16 * 1024)
 
 #define VERBOSE_MSG(cl_side, ...)\
 	if (cl_side) \
@@ -35,9 +35,9 @@
 	else \
 		kr_log_debug(TLS, __VA_ARGS__);
 
-static const gnutls_datum_t tls_grp_alpn[PROTOLAYER_GRP_COUNT] = {
-	[PROTOLAYER_GRP_DOTLS] = { (uint8_t *)"dot", 3 },
-	[PROTOLAYER_GRP_DOHTTPS] = { (uint8_t *)"h2", 2 },
+static const gnutls_datum_t tls_grp_alpn[KR_PROTO_COUNT] = {
+	[KR_PROTO_DOT] = { (uint8_t *)"dot", 3 },
+	[KR_PROTO_DOH] = { (uint8_t *)"h2", 2 },
 };
 
 typedef enum tls_client_hs_state {
@@ -218,6 +218,11 @@ static ssize_t kres_gnutls_vec_push(gnutls_transport_ptr_t h, const giovec_t * i
 		return 0;
 	}
 
+	if (kr_fails_assert(iovcnt > 0)) {
+		errno = EINVAL;
+		return -1;
+	}
+
 	size_t total_len = 0;
 	for (int i = 0; i < iovcnt; i++)
 		total_len += iov[i].iov_len;
@@ -228,9 +233,9 @@ static ssize_t kres_gnutls_vec_push(gnutls_transport_ptr_t h, const giovec_t * i
 	push_ctx->sess_data = tls;
 	memcpy(push_ctx->iov, iov, sizeof(struct iovec[iovcnt]));
 
-	session2_wrap_after(tls->h.session, PROTOLAYER_PROTOCOL_TLS,
-			protolayer_iovec(push_ctx->iov, iovcnt, true), NULL,
-			kres_gnutls_push_finished, push_ctx);
+	session2_wrap_after(tls->h.session, PROTOLAYER_TYPE_TLS,
+			protolayer_payload_iovec(push_ctx->iov, iovcnt, true),
+			NULL, kres_gnutls_push_finished, push_ctx);
 
 	return total_len;
 }
@@ -260,7 +265,7 @@ static void tls_handshake_success(struct pl_tls_sess_data *tls,
 		}
 	}
 	if (!tls->first_handshake_done) {
-		session2_event_after(session, PROTOLAYER_PROTOCOL_TLS,
+		session2_event_after(session, PROTOLAYER_TYPE_TLS,
 				PROTOLAYER_EVENT_CONNECT, NULL);
 		tls->first_handshake_done = true;
 	}
@@ -889,7 +894,7 @@ static int pl_tls_sess_data_deinit(struct pl_tls_sess_data *tls)
 	return kr_ok();
 }
 
-static int pl_tls_sess_server_init(struct protolayer_manager *manager,
+static int pl_tls_sess_server_init(struct session2 *session,
                                    struct pl_tls_sess_data *tls)
 {
 	if (kr_fails_assert(the_worker && the_engine))
@@ -967,7 +972,7 @@ static int pl_tls_sess_server_init(struct protolayer_manager *manager,
 					  tls->tls_session);
 	}
 
-	const gnutls_datum_t *alpn = &tls_grp_alpn[manager->grp];
+	const gnutls_datum_t *alpn = &tls_grp_alpn[session->proto];
 	if (alpn->size) { /* ALPN is a non-empty string */
 		flags = 0;
 #if GNUTLS_VERSION_NUMBER >= 0x030500
@@ -987,7 +992,7 @@ static int pl_tls_sess_server_init(struct protolayer_manager *manager,
 	return kr_ok();
 }
 
-static int pl_tls_sess_client_init(struct protolayer_manager *manager,
+static int pl_tls_sess_client_init(struct session2 *session,
                                    struct pl_tls_sess_data *tls,
                                    tls_client_param_t *param)
 {
@@ -1042,21 +1047,21 @@ static int pl_tls_sess_client_init(struct protolayer_manager *manager,
 	return kr_ok();
 }
 
-static int pl_tls_sess_init(struct protolayer_manager *manager,
+static int pl_tls_sess_init(struct session2 *session,
                             void *sess_data,
                             void *param)
 {
 	struct pl_tls_sess_data *tls = sess_data;
-	manager->session->secure = true;
+	session->secure = true;
 	queue_init(tls->unwrap_queue);
 	queue_init(tls->wrap_queue);
-	if (manager->session->outgoing)
-		return pl_tls_sess_client_init(manager, tls, param);
+	if (session->outgoing)
+		return pl_tls_sess_client_init(session, tls, param);
 	else
-		return pl_tls_sess_server_init(manager, tls);
+		return pl_tls_sess_server_init(session, tls);
 }
 
-static int pl_tls_sess_deinit(struct protolayer_manager *manager,
+static int pl_tls_sess_deinit(struct session2 *session,
                               void *sess_data)
 {
 	return pl_tls_sess_data_deinit(sess_data);
@@ -1067,7 +1072,7 @@ static enum protolayer_iter_cb_result pl_tls_unwrap(void *sess_data, void *iter_
 {
 	int brstatus = kr_ok();
 	struct pl_tls_sess_data *tls = sess_data;
-	struct session2 *s = ctx->manager->session;
+	struct session2 *s = ctx->session;
 
 	queue_push(tls->unwrap_queue, ctx);
 
@@ -1160,7 +1165,7 @@ static enum protolayer_iter_cb_result pl_tls_unwrap(void *sess_data, void *iter_
 	struct protolayer_iter_ctx *ctx_head = queue_head(tls->unwrap_queue);
 	if (!kr_fails_assert(ctx == ctx_head))
 		queue_pop(tls->unwrap_queue);
-	ctx->payload = protolayer_wire_buf(&tls->unwrap_buf, false);
+	ctx->payload = protolayer_payload_wire_buf(&tls->unwrap_buf, false);
 	return protolayer_continue(ctx);
 
 exit_break:
@@ -1174,7 +1179,7 @@ static ssize_t pl_tls_submit(gnutls_session_t tls_session,
                              struct protolayer_payload payload)
 {
 	if (payload.type == PROTOLAYER_PAYLOAD_WIRE_BUF)
-		payload = protolayer_as_buffer(&payload);
+		payload = protolayer_payload_as_buffer(&payload);
 
 	if (payload.type == PROTOLAYER_PAYLOAD_BUFFER) {
 		ssize_t count = gnutls_record_send(tls_session,
@@ -1278,9 +1283,8 @@ static enum protolayer_event_cb_result pl_tls_client_connect_start(
 
 static enum protolayer_event_cb_result pl_tls_event_unwrap(
 		enum protolayer_event_type event, void **baton,
-		struct protolayer_manager *manager, void *sess_data)
+		struct session2 *s, void *sess_data)
 {
-	struct session2 *s = manager->session;
 	struct pl_tls_sess_data *tls = sess_data;
 
 	if (event == PROTOLAYER_EVENT_CLOSE) {
@@ -1308,7 +1312,7 @@ static enum protolayer_event_cb_result pl_tls_event_unwrap(
 
 static enum protolayer_event_cb_result pl_tls_event_wrap(
 		enum protolayer_event_type event, void **baton,
-		struct protolayer_manager *manager, void *sess_data)
+		struct session2 *session, void *sess_data)
 {
 	if (event == PROTOLAYER_EVENT_STATS_SEND_ERR) {
 		the_worker->stats.err_tls += 1;
@@ -1321,7 +1325,7 @@ static enum protolayer_event_cb_result pl_tls_event_wrap(
 	return PROTOLAYER_EVENT_PROPAGATE;
 }
 
-static void pl_tls_request_init(struct protolayer_manager *manager,
+static void pl_tls_request_init(struct session2 *session,
                                 struct kr_request *req,
                                 void *sess_data)
 {
@@ -1330,7 +1334,7 @@ static void pl_tls_request_init(struct protolayer_manager *manager,
 
 void tls_protolayers_init(void)
 {
-	protolayer_globals[PROTOLAYER_PROTOCOL_TLS] = (struct protolayer_globals){
+	protolayer_globals[PROTOLAYER_TYPE_TLS] = (struct protolayer_globals){
 		.sess_size = sizeof(struct pl_tls_sess_data),
 		.sess_deinit = pl_tls_sess_deinit,
 		.wire_buf_overhead = TLS_CHUNK_SIZE,

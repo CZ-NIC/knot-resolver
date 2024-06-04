@@ -128,7 +128,7 @@ struct worker_ctx *the_worker = NULL;
 /*! @internal Create a UDP/TCP handle for an outgoing AF_INET* connection.
  *  socktype is SOCK_* */
 static struct session2 *ioreq_spawn(int socktype, sa_family_t family,
-                                    enum protolayer_grp grp,
+                                    enum kr_proto grp,
                                     struct protolayer_data_param *layer_param,
                                     size_t layer_param_count)
 {
@@ -633,9 +633,6 @@ static int qr_task_send(struct qr_task *task, struct session2 *session,
 
 	int ret = 0;
 
-	if (comm == NULL)
-		comm = &session->comm;
-
 	if (pkt == NULL)
 		pkt = worker_task_get_pktbuf(task);
 
@@ -662,7 +659,7 @@ static int qr_task_send(struct qr_task *task, struct session2 *session,
 
 	/* Pending '_finished' callback on current task */
 	qr_task_ref(task);
-	struct protolayer_payload payload = protolayer_buffer(
+	struct protolayer_payload payload = protolayer_payload_buffer(
 			(char *)pkt->wire, pkt->size, false);
 	payload.ttl = packet_ttl(pkt);
 	ret = session2_wrap(session, payload, comm, qr_task_wrap_finished, task);
@@ -832,7 +829,7 @@ static int transmit(struct qr_task *task)
 		return ret;
 
 	struct session2 *session = ioreq_spawn(SOCK_DGRAM, choice->sin6_family,
-			PROTOLAYER_GRP_DOUDP, NULL, 0);
+			KR_PROTO_UDP53, NULL, 0);
 	if (!session)
 		return kr_error(EINVAL);
 
@@ -1088,14 +1085,14 @@ static int tcp_task_make_connection(struct qr_task *task, const struct sockaddr 
 	bool has_tls = tls_entry;
 	if (has_tls) {
 		struct protolayer_data_param param = {
-			.protocol = PROTOLAYER_PROTOCOL_TLS,
+			.protocol = PROTOLAYER_TYPE_TLS,
 			.param = tls_entry
 		};
 		session = ioreq_spawn(SOCK_STREAM, addr->sa_family,
-				PROTOLAYER_GRP_DOTLS, &param, 1);
+				KR_PROTO_DOT, &param, 1);
 	} else {
 		session = ioreq_spawn(SOCK_STREAM, addr->sa_family,
-				PROTOLAYER_GRP_DOTCP, NULL, 0);
+				KR_PROTO_TCP53, NULL, 0);
 	}
 	if (!session) {
 		free(conn);
@@ -1710,12 +1707,11 @@ static inline knot_pkt_t *produce_packet(uint8_t *buf, size_t buf_len)
 
 static enum protolayer_event_cb_result pl_dns_dgram_event_unwrap(
 		enum protolayer_event_type event, void **baton,
-		struct protolayer_manager *manager, void *sess_data)
+		struct session2 *session, void *sess_data)
 {
 	if (event != PROTOLAYER_EVENT_GENERAL_TIMEOUT)
 		return PROTOLAYER_EVENT_PROPAGATE;
 
-	struct session2 *session = manager->session;
 	if (session2_tasklist_get_len(session) != 1 ||
 			!session2_waitinglist_is_empty(session))
 		return PROTOLAYER_EVENT_PROPAGATE;
@@ -1753,7 +1749,7 @@ static size_t pl_dns_dgram_wire_buf_overhead(bool outgoing)
 static enum protolayer_iter_cb_result pl_dns_dgram_unwrap(
 		void *sess_data, void *iter_data, struct protolayer_iter_ctx *ctx)
 {
-	struct session2 *session = ctx->manager->session;
+	struct session2 *session = ctx->session;
 
 	if (ctx->payload.type == PROTOLAYER_PAYLOAD_IOVEC) {
 		int ret = kr_ok();
@@ -1772,7 +1768,7 @@ static enum protolayer_iter_cb_result pl_dns_dgram_unwrap(
 				break;
 			}
 
-			ret = worker_submit(session, &ctx->comm, pkt);
+			ret = worker_submit(session, ctx->comm, pkt);
 			if (ret)
 				break;
 		}
@@ -1790,7 +1786,7 @@ static enum protolayer_iter_cb_result pl_dns_dgram_unwrap(
 		if (!pkt)
 			return protolayer_break(ctx, KNOT_EMALF);
 
-		int ret = worker_submit(session, &ctx->comm, pkt);
+		int ret = worker_submit(session, ctx->comm, pkt);
 		mp_flush(the_worker->pkt_pool.ctx);
 		return protolayer_break(ctx, ret);
 	} else if (ctx->payload.type == PROTOLAYER_PAYLOAD_WIRE_BUF) {
@@ -1806,7 +1802,7 @@ static enum protolayer_iter_cb_result pl_dns_dgram_unwrap(
 		if (!pkt)
 			return protolayer_break(ctx, KNOT_EMALF);
 
-		int ret = worker_submit(session, &ctx->comm, pkt);
+		int ret = worker_submit(session, ctx->comm, pkt);
 		wire_buf_reset(ctx->payload.wire_buf);
 		mp_flush(the_worker->pkt_pool.ctx);
 		return protolayer_break(ctx, ret);
@@ -1823,38 +1819,21 @@ struct pl_dns_stream_sess_data {
 	bool connected : 1; /**< True: The stream is connected */
 };
 
-struct pl_dns_stream_iter_data {
-	struct protolayer_data h;
-	struct {
-		knot_mm_t *pool;
-		void *mem;
-	} sent;
-};
-
-static int pl_dns_stream_sess_init(struct protolayer_manager *manager,
-                                         void *sess_data, void *param)
+static int pl_dns_stream_sess_init(struct session2 *session,
+                                   void *sess_data, void *param)
 {
 	/* _UNSIZED_STREAM and _MULTI_STREAM - don't forget to split if needed
 	 * at some point */
-	manager->session->stream = true;
+	session->stream = true;
 	return kr_ok();
 }
 
-static int pl_dns_single_stream_sess_init(struct protolayer_manager *manager,
+static int pl_dns_single_stream_sess_init(struct session2 *session,
                                           void *sess_data, void *param)
 {
-	manager->session->stream = true;
+	session->stream = true;
 	struct pl_dns_stream_sess_data *stream = sess_data;
 	stream->single = true;
-	return kr_ok();
-}
-
-static int pl_dns_stream_iter_deinit(struct protolayer_manager *manager,
-                                     struct protolayer_iter_ctx *ctx,
-                                     void *iter_data)
-{
-	struct pl_dns_stream_iter_data *stream = iter_data;
-	mm_free(stream->sent.pool, stream->sent.mem);
 	return kr_ok();
 }
 
@@ -2046,9 +2025,8 @@ static enum protolayer_event_cb_result pl_dns_stream_disconnected(
 
 static enum protolayer_event_cb_result pl_dns_stream_event_unwrap(
 		enum protolayer_event_type event, void **baton,
-		struct protolayer_manager *manager, void *sess_data)
+		struct session2 *session, void *sess_data)
 {
-	struct session2 *session = manager->session;
 	if (session->closing)
 		return PROTOLAYER_EVENT_PROPAGATE;
 
@@ -2056,10 +2034,10 @@ static enum protolayer_event_cb_result pl_dns_stream_event_unwrap(
 
 	switch (event) {
 	case PROTOLAYER_EVENT_GENERAL_TIMEOUT:
-		return pl_dns_stream_resolution_timeout(manager->session);
+		return pl_dns_stream_resolution_timeout(session);
 
 	case PROTOLAYER_EVENT_CONNECT_TIMEOUT:
-		return pl_dns_stream_connection_fail(manager->session,
+		return pl_dns_stream_connection_fail(session,
 				KR_SELECTION_TCP_CONNECT_TIMEOUT);
 
 	case PROTOLAYER_EVENT_CONNECT:
@@ -2069,7 +2047,7 @@ static enum protolayer_event_cb_result pl_dns_stream_event_unwrap(
 		enum kr_selection_error err = (*baton)
 			? *(enum kr_selection_error *)baton
 			: KR_SELECTION_TCP_CONNECT_FAILED;
-		return pl_dns_stream_connection_fail(manager->session, err);
+		return pl_dns_stream_connection_fail(session, err);
 
 	case PROTOLAYER_EVENT_DISCONNECT:
 	case PROTOLAYER_EVENT_CLOSE:
@@ -2171,7 +2149,7 @@ static enum protolayer_iter_cb_result pl_dns_stream_unwrap(
 	}
 
 	int status = kr_ok();
-	struct session2 *session = ctx->manager->session;
+	struct session2 *session = ctx->session;
 	struct pl_dns_stream_sess_data *stream_sess = sess_data;
 	struct wire_buf *wb = ctx->payload.wire_buf;
 
@@ -2192,14 +2170,14 @@ static enum protolayer_iter_cb_result pl_dns_stream_unwrap(
 		if (stream_sess->single && stream_sess->produced) {
 			if (kr_log_is_debug(WORKER, NULL)) {
 				kr_log_debug(WORKER, "Unexpected extra data from %s\n",
-						kr_straddr(ctx->comm.src_addr));
+						kr_straddr(ctx->comm->src_addr));
 			}
 			status = KNOT_EMALF;
 			goto exit;
 		}
 
 		stream_sess->produced = true;
-		int ret = worker_submit(session, &ctx->comm, pkt);
+		int ret = worker_submit(session, ctx->comm, pkt);
 
 		/* Errors from worker_submit() are intentionally *not* handled
 		 * in order to ensure the entire wire buffer is processed. */
@@ -2235,18 +2213,12 @@ struct sized_iovs {
 static enum protolayer_iter_cb_result pl_dns_stream_wrap(
 		void *sess_data, void *iter_data, struct protolayer_iter_ctx *ctx)
 {
-	struct pl_dns_stream_iter_data *stream = iter_data;
-	struct session2 *s = ctx->manager->session;
-
-	if (kr_fails_assert(!stream->sent.mem))
-		return protolayer_break(ctx, kr_error(EINVAL));
-
 	if (ctx->payload.type == PROTOLAYER_PAYLOAD_BUFFER) {
 		if (kr_fails_assert(ctx->payload.buffer.len <= UINT16_MAX))
 			return protolayer_break(ctx, kr_error(EMSGSIZE));
 
 		const int iovcnt = 2;
-		struct sized_iovs *siov = mm_alloc(&s->pool,
+		struct sized_iovs *siov = mm_alloc(&ctx->pool,
 				sizeof(*siov) + iovcnt * sizeof(struct iovec));
 		kr_require(siov);
 		knot_wire_write_u16(siov->nlen, ctx->payload.buffer.len);
@@ -2259,14 +2231,11 @@ static enum protolayer_iter_cb_result pl_dns_stream_wrap(
 			.iov_len = ctx->payload.buffer.len
 		};
 
-		stream->sent.mem = siov;
-		stream->sent.pool = &s->pool;
-
-		ctx->payload = protolayer_iovec(siov->iovs, iovcnt, false);
+		ctx->payload = protolayer_payload_iovec(siov->iovs, iovcnt, false);
 		return protolayer_continue(ctx);
 	} else if (ctx->payload.type == PROTOLAYER_PAYLOAD_IOVEC) {
 		const int iovcnt = 1 + ctx->payload.iovec.cnt;
-		struct sized_iovs *siov = mm_alloc(&s->pool,
+		struct sized_iovs *siov = mm_alloc(&ctx->pool,
 				sizeof(*siov) + iovcnt * sizeof(struct iovec));
 		kr_require(siov);
 
@@ -2285,10 +2254,7 @@ static enum protolayer_iter_cb_result pl_dns_stream_wrap(
 			.iov_len = sizeof(siov->nlen)
 		};
 
-		stream->sent.mem = siov;
-		stream->sent.pool = &s->pool;
-
-		ctx->payload = protolayer_iovec(siov->iovs, iovcnt, false);
+		ctx->payload = protolayer_payload_iovec(siov->iovs, iovcnt, false);
 		return protolayer_continue(ctx);
 	} else {
 		kr_assert(false && "Invalid payload");
@@ -2296,7 +2262,7 @@ static enum protolayer_iter_cb_result pl_dns_stream_wrap(
 	}
 }
 
-static void pl_dns_stream_request_init(struct protolayer_manager *manager,
+static void pl_dns_stream_request_init(struct session2 *session,
                                        struct kr_request *req,
                                        void *sess_data)
 {
@@ -2310,13 +2276,13 @@ int worker_init(void)
 	kr_bindings_register(the_engine->L); // TODO move
 
 	/* DNS protocol layers */
-	protolayer_globals[PROTOLAYER_PROTOCOL_DNS_DGRAM] = (struct protolayer_globals){
+	protolayer_globals[PROTOLAYER_TYPE_DNS_DGRAM] = (struct protolayer_globals){
 		.wire_buf_overhead_cb = pl_dns_dgram_wire_buf_overhead,
 		.wire_buf_max_overhead = KNOT_WIRE_MAX_PKTSIZE,
 		.unwrap = pl_dns_dgram_unwrap,
 		.event_unwrap = pl_dns_dgram_event_unwrap
 	};
-	protolayer_globals[PROTOLAYER_PROTOCOL_DNS_UNSIZED_STREAM] = (struct protolayer_globals){
+	protolayer_globals[PROTOLAYER_TYPE_DNS_UNSIZED_STREAM] = (struct protolayer_globals){
 		.sess_size = sizeof(struct pl_dns_stream_sess_data),
 		.wire_buf_overhead = KNOT_WIRE_MAX_PKTSIZE,
 		.sess_init = pl_dns_stream_sess_init,
@@ -2326,19 +2292,17 @@ int worker_init(void)
 	};
 	const struct protolayer_globals stream_common = {
 		.sess_size = sizeof(struct pl_dns_stream_sess_data),
-		.iter_size = sizeof(struct pl_dns_stream_iter_data),
 		.wire_buf_overhead = KNOT_WIRE_MAX_PKTSIZE,
 		.sess_init = NULL, /* replaced in specific layers below */
-		.iter_deinit = pl_dns_stream_iter_deinit,
 		.unwrap = pl_dns_stream_unwrap,
 		.wrap = pl_dns_stream_wrap,
 		.event_unwrap = pl_dns_stream_event_unwrap,
 		.request_init = pl_dns_stream_request_init
 	};
-	protolayer_globals[PROTOLAYER_PROTOCOL_DNS_MULTI_STREAM] = stream_common;
-	protolayer_globals[PROTOLAYER_PROTOCOL_DNS_MULTI_STREAM].sess_init = pl_dns_stream_sess_init;
-	protolayer_globals[PROTOLAYER_PROTOCOL_DNS_SINGLE_STREAM] = stream_common;
-	protolayer_globals[PROTOLAYER_PROTOCOL_DNS_SINGLE_STREAM].sess_init = pl_dns_single_stream_sess_init;
+	protolayer_globals[PROTOLAYER_TYPE_DNS_MULTI_STREAM] = stream_common;
+	protolayer_globals[PROTOLAYER_TYPE_DNS_MULTI_STREAM].sess_init = pl_dns_stream_sess_init;
+	protolayer_globals[PROTOLAYER_TYPE_DNS_SINGLE_STREAM] = stream_common;
+	protolayer_globals[PROTOLAYER_TYPE_DNS_SINGLE_STREAM].sess_init = pl_dns_single_stream_sess_init;
 
 	/* Create main worker. */
 	the_worker = &the_worker_value;
