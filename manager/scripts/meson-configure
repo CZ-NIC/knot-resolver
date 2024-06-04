@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# ensure consistent behaviour
+src_dir="$(dirname "$(realpath "$0")")"
+source $src_dir/_env.sh
+
+pushd ..
+meson setup manager/.build_kresd --reconfigure --prefix=$(realpath manager/.install_kresd) "$@"
+popd
+
+build_kresd
