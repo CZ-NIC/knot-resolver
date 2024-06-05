@@ -172,6 +172,13 @@ add_project_arguments(
   language: 'c',
 )
 
+if meson.get_compiler('c').get_id() == 'gcc'
+  add_project_arguments(
+    '-Wno-nonnull-compare', # reasonable to do in assertions
+    language: 'c',
+  )
+endif
+
 # Files for clang-tidy lint
 c_src_lint = files()
 
