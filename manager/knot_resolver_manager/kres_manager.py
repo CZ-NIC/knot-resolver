@@ -3,10 +3,10 @@ import logging
 import sys
 import time
 from subprocess import SubprocessError
-from typing import Callable, List, Optional
+from typing import Any, Callable, List, Optional
 
 from knot_resolver_manager.compat.asyncio import create_task
-from knot_resolver_manager.config_store import ConfigStore, only_on_real_changes
+from knot_resolver_manager.config_store import ConfigStore, only_on_real_changes, only_on_real_changes_verifier
 from knot_resolver_manager.constants import (
     FIX_COUNTER_DECREASE_INTERVAL_SEC,
     MANAGER_FIX_ATTEMPT_MAX_COUNTER,
@@ -121,30 +121,30 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
             )
         )
 
+        # configuration nodes that are relevant to kresd workers and the cache garbage collector
+        def config_nodes(config: KresConfig) -> List[Any]:
+            return [
+                config.nsid,
+                config.hostname,
+                config.workers,
+                config.max_workers,
+                config.webmgmt,
+                config.options,
+                config.network,
+                config.forward,
+                config.cache,
+                config.dnssec,
+                config.dns64,
+                config.logging,
+                config.monitoring,
+                config.lua,
+            ]
+
         # register and immediately call a verififier that validates config with 'canary' kresd process
-        await config_store.register_verifier(self.validate_config)
+        await config_store.register_verifier(only_on_real_changes_verifier(config_nodes)(self.validate_config))
 
         # register and immediately call a callback to apply config to all 'kresd' workers and 'cache-gc'
-        await config_store.register_on_change_callback(
-            only_on_real_changes(
-                lambda config: [
-                    config.nsid,
-                    config.hostname,
-                    config.workers,
-                    config.max_workers,
-                    config.webmgmt,
-                    config.options,
-                    config.network,
-                    config.forward,
-                    config.cache,
-                    config.dnssec,
-                    config.dns64,
-                    config.logging,
-                    config.monitoring,
-                    config.lua,
-                ]
-            )(self.apply_config)
-        )
+        await config_store.register_on_change_callback(only_on_real_changes(config_nodes)(self.apply_config))
 
         # register controller config change listeners
         await config_store.register_verifier(_deny_max_worker_changes)
