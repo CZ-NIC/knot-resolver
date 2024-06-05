@@ -57,12 +57,12 @@ class ConfigStore:
         return self._config
 
 
-def only_on_real_changes(selector: Callable[[KresConfig], Any]) -> Callable[[UpdateCallback], UpdateCallback]:
+def only_on_real_changes_update(selector: Callable[[KresConfig], Any]) -> Callable[[UpdateCallback], UpdateCallback]:
     def decorator(orig_func: UpdateCallback) -> UpdateCallback:
         original_value_set: Any = False
         original_value: Any = None
 
-        async def new_func(config: KresConfig) -> None:
+        async def new_func_update(config: KresConfig) -> None:
             nonlocal original_value_set
             nonlocal original_value
             if not original_value_set:
@@ -73,7 +73,7 @@ def only_on_real_changes(selector: Callable[[KresConfig], Any]) -> Callable[[Upd
                 original_value = selector(config)
                 await orig_func(config)
 
-        return new_func
+        return new_func_update
 
     return decorator
 
