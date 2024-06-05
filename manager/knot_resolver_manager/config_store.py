@@ -6,6 +6,7 @@ from knot_resolver_manager.datamodel import KresConfig
 from knot_resolver_manager.exceptions import KresManagerException
 from knot_resolver_manager.utils.functional import Result
 from knot_resolver_manager.utils.modeling.exceptions import DataParsingError
+from knot_resolver_manager.utils.modeling.types import NoneType
 
 VerifyCallback = Callable[[KresConfig, KresConfig], Awaitable[Result[None, str]]]
 UpdateCallback = Callable[[KresConfig], Awaitable[None]]
@@ -73,5 +74,27 @@ def only_on_real_changes(selector: Callable[[KresConfig], Any]) -> Callable[[Upd
                 await orig_func(config)
 
         return new_func
+
+    return decorator
+
+
+def only_on_real_changes_verifier(selector: Callable[[KresConfig], Any]) -> Callable[[VerifyCallback], VerifyCallback]:
+    def decorator(orig_func: VerifyCallback) -> VerifyCallback:
+        original_value_set: Any = False
+        original_value: Any = None
+
+        async def new_func_verifier(old: KresConfig, new: KresConfig) -> Result[NoneType, str]:
+            nonlocal original_value_set
+            nonlocal original_value
+            if not original_value_set:
+                original_value_set = True
+                original_value = selector(new)
+                await orig_func(old, new)
+            elif original_value != selector(new):
+                original_value = selector(new)
+                await orig_func(old, new)
+            return Result.ok(None)
+
+        return new_func_verifier
 
     return decorator
