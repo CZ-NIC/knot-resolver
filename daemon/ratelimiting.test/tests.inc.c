@@ -98,10 +98,10 @@ static void test_rrl(void **state) {
 	ratelimiting_init(mmap_file, RRL_TABLE_SIZE, RRL_INSTANT_LIMIT, RRL_RATE_LIMIT, 100);
 
 	if (KRU.initialize == KRU_GENERIC.initialize) {
-		struct kru_generic *kru = (struct kru_generic *) the_rrl->kru;
+		struct kru_generic *kru = (struct kru_generic *) ratelimiting->kru;
 		memset(&kru->hash_key, RRL_SEED_GENERIC, sizeof(kru->hash_key));
 	} else if (KRU.initialize == KRU_AVX2.initialize) {
-		struct kru_avx2 *kru = (struct kru_avx2 *) the_rrl->kru;
+		struct kru_avx2 *kru = (struct kru_avx2 *) ratelimiting->kru;
 		memset(&kru->hash_key, RRL_SEED_AVX2, sizeof(kru->hash_key));
 	} else {
 		assert(0);

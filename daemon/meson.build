@@ -13,6 +13,7 @@ kresd_src = files([
   'ffimodule.c',
   'io.c',
   'main.c',
+  'mmapped.c',
   'network.c',
   'proxyv2.c',
   'ratelimiting.c',
@@ -32,10 +33,10 @@ endif
 c_src_lint += kresd_src
 
 unit_tests += [
-  ['ratelimiting', files('ratelimiting.test/tests.c') + libkres_src ],
+  ['ratelimiting', files('ratelimiting.test/tests.c', 'mmapped.c') + libkres_src ],
 
   # parallel tests timeouts under valgrind; they checks mainly for race conditions, which is not needed there
-  ['ratelimiting-parallel', files('ratelimiting.test/tests-parallel.c') + libkres_src, ['skip_valgrind']]
+  ['ratelimiting-parallel', files('ratelimiting.test/tests-parallel.c', 'mmapped.c') + libkres_src, ['skip_valgrind']]
 ]
 
 config_tests += [

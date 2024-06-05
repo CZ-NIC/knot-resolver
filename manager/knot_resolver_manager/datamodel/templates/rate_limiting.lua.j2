@@ -1,10 +1,10 @@
 {% from 'macros/common_macros.lua.j2' import boolean %}
 
 {% if cfg.rate_limiting.rate_limit -%}
-C.ratelimiting_init(
+assert(C.ratelimiting_init(
 	'{{ cfg.rundir }}/ratelimiting',
 	{{ cfg.rate_limiting.capacity }},
 	{{ cfg.rate_limiting.instant_limit }},
 	{{ cfg.rate_limiting.rate_limit }},
-	{{ cfg.rate_limiting.tc_limit_perc }})
+	{{ cfg.rate_limiting.tc_limit_perc }}) == 0)
 {%- endif %}
