@@ -81,8 +81,8 @@ Package: knot-resolver6-dev
 Architecture: any
 Depends:
  knot-resolver6 (= ${binary:Version}),
- ${misc:Depends}
- ${shlibs:Depends},
+ ${misc:Depends},
+ ${shlibs:Depends}
 Section: libdevel
 Description: Knot Resolver development files
  This package provides the development headers for Knot Resolver.
