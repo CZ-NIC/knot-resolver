@@ -1184,6 +1184,9 @@ static ssize_t pl_tls_submit(gnutls_session_t tls_session,
 	if (payload.type == PROTOLAYER_PAYLOAD_WIRE_BUF)
 		payload = protolayer_payload_as_buffer(&payload);
 
+	// TODO: the handling of positive gnutls_record_send() is weird/confusing,
+	// but it seems caught later when checking gnutls_record_uncork()
+
 	if (payload.type == PROTOLAYER_PAYLOAD_BUFFER) {
 		ssize_t count = gnutls_record_send(tls_session,
 				payload.buffer.buf, payload.buffer.len);
