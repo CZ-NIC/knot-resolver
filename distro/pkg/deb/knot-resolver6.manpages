@@ -1,2 +1,2 @@
-debian/tmp/usr/share/man/man8/kresctl.8*
-debian/tmp/usr/share/man/man8/kresd.8*
+usr/share/man/man8/kresctl.8*
+usr/share/man/man8/kresd.8*
