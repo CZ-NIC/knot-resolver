@@ -27,6 +27,7 @@ Build-Depends:
  libssl-dev,
 Standards-Version: 4.7.0
 Homepage: https://www.knot-resolver.cz/
+Rules-Requires-Root: no
 
 Package: knot-resolver6
 Architecture: any
