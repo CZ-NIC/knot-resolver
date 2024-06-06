@@ -52,6 +52,3 @@ override_dh_auto_install:
 
 override_dh_auto_test:
 	meson test -C build_deb
-
-override_dh_strip:
-	dh_strip --dbg-package=knot-resolver6-dbg
