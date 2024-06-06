@@ -5,26 +5,26 @@ Maintainer: Knot Resolver <knot-resolver@labs.nic.cz>
 Build-Depends:
  debhelper (>= 12~),
  dh-python,
+ libcap-ng-dev,
  libcmocka-dev (>= 1.0.0),
  libfstrm-dev,
  libgnutls28-dev,
+ libjemalloc-dev,
  libknot-dev (>= 3.0.2),
  liblmdb-dev,
  libluajit-5.1-dev,
  libnghttp2-dev,
  libprotobuf-c-dev,
+ libssl-dev,
  libsystemd-dev (>= 227) [linux-any],
- libcap-ng-dev,
  libuv1-dev,
- libjemalloc-dev,
  luajit,
- pkg-config,
  meson (>= 0.49),
+ pkg-config,
  protobuf-c-compiler,
  python3,
  python3-dev,
  python3-setuptools,
- libssl-dev,
 Standards-Version: 4.7.0
 Homepage: https://www.knot-resolver.cz/
 Rules-Requires-Root: no
@@ -40,8 +40,8 @@ Depends:
  supervisor,
  systemd,
  ${misc:Depends},
- ${shlibs:Depends},
  ${python3:Depends},
+ ${shlibs:Depends},
 Breaks:
  knot-resolver (<< 6),
  knot-resolver-core (<< 6.0.8),
@@ -84,7 +84,7 @@ Architecture: any
 Depends:
  knot-resolver6 (= ${binary:Version}),
  ${misc:Depends},
- ${shlibs:Depends}
+ ${shlibs:Depends},
 Section: libdevel
 Description: Knot Resolver development files
  This package provides the development headers for Knot Resolver.
