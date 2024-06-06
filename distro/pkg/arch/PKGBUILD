@@ -13,7 +13,6 @@ depends=(
     'dnssec-anchors'
     'gnutls'
     'knot'
-    'libedit'
     'libuv'
     'lmdb'
     'luajit'

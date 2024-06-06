@@ -15,6 +15,7 @@ Improvements
   * predict module: prefetching expiring records moved to prefetch module
   * prefetch module: new module to prefetch expiring records
 - stats: add separate metrics for IPv6 and IPv4 (!1545)
+- remove unused dependency on `libedit` (!1553)
 
 .. TODO: Change the link below to a versioned one when releasing.
 

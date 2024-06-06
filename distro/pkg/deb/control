@@ -6,7 +6,6 @@ Build-Depends:
  debhelper (>= 12~),
  dh-python,
  libcmocka-dev (>= 1.0.0),
- libedit-dev,
  libfstrm-dev,
  libgnutls28-dev,
  libknot-dev (>= 3.0.2),
