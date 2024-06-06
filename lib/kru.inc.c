@@ -400,15 +400,17 @@ static inline bool kru_limited_fetch(struct kru *kru, struct query_ctx *ctx)
 	}
 #endif
 
+	ctx->final_load_value = 0;
 	return false;
 
 load_found:;
-	return (*ctx->load >= ctx->limit16);
+	ctx->final_load_value = *ctx->load;
+	return (ctx->final_load_value >= ctx->limit16);
 }
 
 /// Phase 3/3 of a query -- state update, return value overrides previous answer in case of race.
-/// Not needed if blocked by fetch phase.
-static inline bool kru_limited_update(struct kru *kru, struct query_ctx *ctx)
+/// Not needed if blocked by fetch phase. If overflow_update is activated, false is always returned.
+static inline bool kru_limited_update(struct kru *kru, struct query_ctx *ctx, bool overflow_update)
 {
 	_Atomic uint16_t *load_at;
 	if (!ctx->load) {
@@ -473,12 +475,20 @@ static inline bool kru_limited_update(struct kru *kru, struct query_ctx *ctx)
 	const uint16_t price = ctx->price16;
 	const uint16_t limit = ctx->limit16;
 	uint16_t load_orig = atomic_load_explicit(load_at, memory_order_relaxed);
+	uint16_t load_new;
 	do {
-		if (load_orig >= limit)
-			return true;
-	} while (!atomic_compare_exchange_weak_explicit(load_at, &load_orig, load_orig + price, memory_order_relaxed, memory_order_relaxed));
+		if (load_orig >= limit) {
+			if (overflow_update) {
+				load_new = -1;
+			} else {
+				return true;
+			}
+		} else {
+			load_new = load_orig + price;
+		}
+	} while (!atomic_compare_exchange_weak_explicit(load_at, &load_orig, load_new, memory_order_relaxed, memory_order_relaxed));
 
-	ctx->final_load_value = load_orig + price;
+	ctx->final_load_value = load_new;
 	return false;
 }
 
@@ -496,7 +506,7 @@ static bool kru_limited_multi_or(struct kru *kru, uint32_t time_now, uint8_t **k
 	bool ret = false;
 
 	for (size_t i = 0; i < queries_cnt; i++) {
-		ret |= kru_limited_update(kru, ctx + i);
+		ret |= kru_limited_update(kru, ctx + i, false);
 	}
 
 	return ret;
@@ -517,7 +527,7 @@ static bool kru_limited_multi_or_nobreak(struct kru *kru, uint32_t time_now, uin
 	if (ret) return true;
 
 	for (size_t i = 0; i < queries_cnt; i++) {
-		if (kru_limited_update(kru, ctx + i))
+		if (kru_limited_update(kru, ctx + i, false))
 			ret = true;
 	}
 
@@ -539,7 +549,7 @@ static uint8_t kru_limited_multi_prefix_or(struct kru *kru, uint32_t time_now, u
 	}
 
 	for (int i = queries_cnt - 1; i >= 0; i--) {
-		if (kru_limited_update(kru, ctx + i))
+		if (kru_limited_update(kru, ctx + i, false))
 			return prefixes[i];
 	}
 
@@ -551,6 +561,32 @@ static uint8_t kru_limited_multi_prefix_or(struct kru *kru, uint32_t time_now, u
 	}
 
 	return 0;
+}
+
+static uint16_t kru_load_multi_prefix_max(struct kru *kru, uint32_t time_now, uint8_t namespace,
+                                           uint8_t key[static 16], uint8_t *prefixes, kru_price_t *prices, size_t queries_cnt)
+{
+	struct query_ctx ctx[queries_cnt];
+
+	for (size_t i = 0; i < queries_cnt; i++) {
+		kru_limited_prefetch_prefix(kru, time_now, namespace, key, prefixes[i], (prices ? prices[i] : 0), ctx + i);
+	}
+
+	for (size_t i = 0; i < queries_cnt; i++) {
+		kru_limited_fetch(kru, ctx + i);
+	}
+
+	if (prices) {
+		for (int i = queries_cnt - 1; i >= 0; i--) {
+			kru_limited_update(kru, ctx + i, true);
+		}
+	}
+
+	uint16_t max_load = 0;
+	for (size_t i = 0; i < queries_cnt; i++) {
+		max_load = MAX(max_load, ctx[i].final_load_value);
+	}
+	return max_load;
 }
 
 /// Update limiting and return true iff it hit the limit instead.
@@ -566,4 +602,5 @@ static bool kru_limited(struct kru *kru, uint32_t time_now, uint8_t key[static 1
 	.limited_multi_or = kru_limited_multi_or, \
 	.limited_multi_or_nobreak = kru_limited_multi_or_nobreak, \
 	.limited_multi_prefix_or = kru_limited_multi_prefix_or, \
+	.load_multi_prefix_max = kru_load_multi_prefix_max, \
 }
