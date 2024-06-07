@@ -27,7 +27,7 @@ prometheus-client = { version = "*", optional = true }
 prometheus = ["prometheus-client"]
 
 [tool.poetry.group.dev.dependencies]
-poetry = "^1.7.1"
+poetry = "^1.8.3"
 pyparsing = "^3.1.1"
 poethepoet = "^0.24.4"
 debugpy = "^1.8.1"
