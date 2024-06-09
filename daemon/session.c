@@ -814,6 +814,8 @@ int session_wirebuf_process(struct session *session, struct io_comm_data *comm)
 			 * something went wrong, normally should not happen. */
 			break;
 		}
+		if (session->sflags.closing)
+			break; /* Submitting into a closing session could cause trouble. */
 	}
 
 	/* worker_submit() may cause the session to close (e.g. due to IO
