@@ -1,3 +1,11 @@
+Knot Resolver 5.7.4 (2024-06-dd)
+================================
+
+Improvements
+------------
+- add the fresh DNSSEC root key "KSK-2024" already, Key ID 38696 (!1556)
+
+
 Knot Resolver 5.7.3 (2024-05-30)
 ================================
 
