@@ -76,7 +76,12 @@ void network_init(uv_loop_t *loop, int tcp_backlog)
 			tls_session_ticket_ctx_create(loop, NULL, 0);
 	the_network->tcp.in_idle_timeout = 10000;
 	the_network->tcp.tls_handshake_timeout = TLS_MAX_HANDSHAKE_TIME;
+	the_network->tcp.user_timeout = 1000; // 1s should be more than enough
 	the_network->tcp_backlog = tcp_backlog;
+
+	// On Linux, unset means some auto-tuning mechanism also depending on RAM,
+	// which might be OK default (together with the user_timeout above)
+	//the_network->listen_{tcp,udp}_buflens.{snd,rcv}
 }
 
 /** Notify the registered function about endpoint getting open.
