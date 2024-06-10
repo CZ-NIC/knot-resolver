@@ -251,6 +251,17 @@ int io_bind(const struct sockaddr *addr, int type, const endpoint_flags_t *flags
 	return fd;
 }
 
+/// Optionally set a socket option and log error on failure.
+static void set_so(int fd, int so_option, int value, const char *descr)
+{
+	if (!value) return;
+	if (setsockopt(fd, SOL_SOCKET, so_option, &value, sizeof(value))) {
+		kr_log_error(IO, "failed to set %s to %d: %s\n",
+				descr, value, strerror(errno));
+		// we treat this as non-critical failure
+	}
+}
+
 int io_listen_udp(uv_loop_t *loop, uv_udp_t *handle, int fd)
 {
 	if (!handle) {
@@ -261,6 +272,10 @@ int io_listen_udp(uv_loop_t *loop, uv_udp_t *handle, int fd)
 
 	ret = uv_udp_open(handle, fd);
 	if (ret) return ret;
+
+	struct network *net = &the_worker->engine->net;
+	set_so(fd, SO_SNDBUF, net->listen_udp_buflens.snd, "UDP send buffer size");
+	set_so(fd, SO_RCVBUF, net->listen_udp_buflens.rcv, "UDP receive buffer size");
 
 	uv_handle_t *h = (uv_handle_t *)handle;
 	check_bufsize(h);
@@ -700,6 +715,18 @@ int io_listen_tcp(uv_loop_t *loop, uv_tcp_t *handle, int fd, int tcp_backlog, bo
 			(errno != EPERM ? "" :
 			 ".  This may be caused by TCP Fast Open being disabled in the OS."));
 	}
+#endif
+
+	/* These get inherited into the individual connections (on Linux at least). */
+	struct network *net = &the_worker->engine->net;
+	set_so(fd, SO_SNDBUF, net->listen_tcp_buflens.snd, "TCP send buffer size");
+	set_so(fd, SO_RCVBUF, net->listen_tcp_buflens.rcv, "TCP receive buffer size");
+#ifdef TCP_USER_TIMEOUT
+	val = net->tcp.user_timeout;
+	if (val && setsockopt(fd, IPPROTO_TCP, TCP_USER_TIMEOUT, &val, sizeof(val))) {
+		kr_log_error(IO, "listen TCP (user_timeout): %s\n", strerror(errno));
+	}
+	// TODO: also for upstream connections, at least this one option?
 #endif
 
 	handle->data = NULL;

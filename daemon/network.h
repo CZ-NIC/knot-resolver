@@ -67,6 +67,10 @@ typedef array_t(struct endpoint) endpoint_array_t;
 struct net_tcp_param {
 	uint64_t in_idle_timeout;
 	uint64_t tls_handshake_timeout;
+
+	/** Milliseconds of unacknowledged data; see TCP_USER_TIMEOUT in man tcp.7
+	 * Linux only, probably. */
+	unsigned int user_timeout;
 };
 
 /** Information about an address that is allowed to use PROXYv2. */
@@ -104,6 +108,13 @@ struct network {
 	struct tls_session_ticket_ctx *tls_session_ticket_ctx;
 	struct net_tcp_param tcp;
 	int tcp_backlog;
+
+	/** Kernel-side buffer sizes for sending and receiving. (in bytes)
+	 * They are per socket, so in the TCP case they are per connection.
+	 * See SO_SNDBUF and SO_RCVBUF in man socket.7  These are in POSIX. */
+	struct {
+		int snd, rcv;
+	} listen_udp_buflens, listen_tcp_buflens;
 };
 
 void network_init(struct network *net, uv_loop_t *loop, int tcp_backlog);
