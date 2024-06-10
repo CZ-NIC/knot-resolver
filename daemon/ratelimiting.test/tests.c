@@ -53,7 +53,7 @@ uint32_t _count_test(int expected_passing, int addr_family, char *addr_format, u
 static void the_tests(void **state)
 {
 	/* IPv4 multi-prefix tests */
-	static_assert(RRL_V4_PREFIXES_CNT == 4,
+	static_assert(V4_PREFIXES_CNT == 4,
 			"There are no more IPv4 limited prefixes (/32, /24, /20, /18 will be tested).");
 
 	count_test("IPv4 instant limit /32", INST(V4, 32), 0,
@@ -81,7 +81,7 @@ static void the_tests(void **state)
 			AF_INET, "128.0.64.0", 0, 0);
 
 	/* IPv6 multi-prefix tests */
-	static_assert(RRL_V6_PREFIXES_CNT == 5,
+	static_assert(V6_PREFIXES_CNT == 5,
 			"There are no more IPv6 limited prefixes (/128, /64, /56, /48, /32 will be tested).");
 
 	count_test("IPv6 instant limit /128, independent to IPv4", INST(V6, 128), 0,

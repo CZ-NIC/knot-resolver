@@ -589,7 +589,6 @@ int main(int argc, char **argv)
 	io_protolayers_init();
 	tls_protolayers_init();
 	proxy_protolayers_init();
-	defer_init();
 #ifdef ENABLE_DOH2
 	http_protolayers_init();
 #endif
@@ -621,6 +620,11 @@ int main(int argc, char **argv)
 			goto cleanup;
 		}
 		lua_settop(the_engine->L, 0);
+	}
+
+	if (defer_init(loop) != 0) {
+		ret = EXIT_FAILURE;
+		goto cleanup;
 	}
 
 	ret = kr_rules_init_ensure();
@@ -657,6 +661,7 @@ cleanup:/* Cleanup. */
 	worker_deinit();
 	engine_deinit();
 	network_deinit();
+	defer_deinit();
 	kr_rules_commit(false);
 	kr_rules_deinit();
 	if (loop != NULL) {

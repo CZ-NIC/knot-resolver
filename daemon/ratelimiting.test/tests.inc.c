@@ -40,7 +40,7 @@ uint64_t fakeclock_now(void);
 // Accessing RRL configuration of INSTANT/RATE limits for V4/V6 and specific prefix.
 #define LIMIT(type, Vx, prefix) (RRL_MULT(Vx, prefix) * RRL_ ## type ## _LIMIT)
 
-#define RRL_CONFIG(Vx, name) RRL_ ## Vx ## _ ## name
+#define RRL_CONFIG(Vx, name) Vx ## _ ## name
 #define RRL_MULT(Vx, prefix) get_mult(RRL_CONFIG(Vx, PREFIXES), RRL_CONFIG(Vx, RATE_MULT), RRL_CONFIG(Vx, PREFIXES_CNT), prefix)
 static inline kru_price_t get_mult(uint8_t prefixes[], kru_price_t mults[], size_t cnt, uint8_t wanted_prefix) {
 	for (size_t i = 0; i < cnt; i++)

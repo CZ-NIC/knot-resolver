@@ -364,7 +364,6 @@ static struct request_ctx *request_create(struct session2 *session,
 		/* We need to store a copy of peer address. */
 		memcpy(&ctx->source.addr.ip, src_addr, kr_sockaddr_len(src_addr));
 		req->qsource.addr = &ctx->source.addr.ip;
-		defer_sample_addr(&ctx->source.addr);
 
 		if (!comm_addr)
 			comm_addr = src_addr;

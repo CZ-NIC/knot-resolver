@@ -590,17 +590,13 @@ static int session2_submit(
 	if (!had_comm_param)
 		comm = &session->comm_storage;
 
-	// RRL: at this point we might start doing nontrivial work,
+	// DEFER: at this point we might start doing nontrivial work,
 	// but we may not know the client's IP yet.
 	// Note two cases: incoming session (new request)
 	// vs. outgoing session (resuming work on some request)
-	if (direction == PROTOLAYER_UNWRAP) {
+	if (direction == PROTOLAYER_UNWRAP)
 		defer_sample_start();
-		// In particular we don't want to miss en/decryption work
-		// for regular connections from clients.
-		if (!session->outgoing && session->secure && !proxy_allowed(comm->comm_addr))
-			defer_sample_addr((const union kr_sockaddr *)comm->comm_addr);
-	}
+
 	int ret;
 
 	struct protolayer_iter_ctx *ctx = malloc(session->iter_ctx_size);

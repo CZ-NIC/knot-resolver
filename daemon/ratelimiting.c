@@ -4,15 +4,15 @@
 #include "lib/utils.h"
 #include "lib/resolve.h"
 
-#define RRL_V4_PREFIXES  (uint8_t[])       {  18,  20, 24, 32 }
-#define RRL_V4_RATE_MULT (kru_price_t[])   { 768, 256, 32,  1 }
+#define V4_PREFIXES  (uint8_t[])       {  18,  20, 24, 32 }
+#define V4_RATE_MULT (kru_price_t[])   { 768, 256, 32,  1 }
 
-#define RRL_V6_PREFIXES  (uint8_t[])       { 32, 48, 56, 64, 128 }
-#define RRL_V6_RATE_MULT (kru_price_t[])   { 64,  4,  3,  2,   1 }
+#define V6_PREFIXES  (uint8_t[])       { 32, 48, 56, 64, 128 }
+#define V6_RATE_MULT (kru_price_t[])   { 64,  4,  3,  2,   1 }
 
-#define RRL_V4_PREFIXES_CNT (sizeof(RRL_V4_PREFIXES) / sizeof(*RRL_V4_PREFIXES))
-#define RRL_V6_PREFIXES_CNT (sizeof(RRL_V6_PREFIXES) / sizeof(*RRL_V6_PREFIXES))
-#define RRL_MAX_PREFIXES_CNT ((RRL_V4_PREFIXES_CNT > RRL_V6_PREFIXES_CNT) ? RRL_V4_PREFIXES_CNT : RRL_V6_PREFIXES_CNT)
+#define V4_PREFIXES_CNT (sizeof(V4_PREFIXES) / sizeof(*V4_PREFIXES))
+#define V6_PREFIXES_CNT (sizeof(V6_PREFIXES) / sizeof(*V6_PREFIXES))
+#define MAX_PREFIXES_CNT ((V4_PREFIXES_CNT > V6_PREFIXES_CNT) ? V4_PREFIXES_CNT : V6_PREFIXES_CNT)
 
 struct ratelimiting {
 	size_t capacity;
@@ -20,8 +20,8 @@ struct ratelimiting {
 	uint32_t rate_limit;
 	uint16_t tc_limit;
 	bool using_avx2;
-	kru_price_t v4_prices[RRL_V4_PREFIXES_CNT];
-	kru_price_t v6_prices[RRL_V6_PREFIXES_CNT];
+	kru_price_t v4_prices[V4_PREFIXES_CNT];
+	kru_price_t v6_prices[V6_PREFIXES_CNT];
 	uint8_t kru[] ALIGNED(64);
 };
 struct ratelimiting *ratelimiting = NULL;
@@ -63,14 +63,18 @@ int ratelimiting_init(const char *mmap_file, size_t capacity, uint32_t instant_l
 			(uint64_t) base_price * rate_limit / 1000;
 
 		bool succ = KRU.initialize((struct kru *)ratelimiting->kru, capacity_log, max_decay);
-		kr_require(succ);
-
-		for (size_t i = 0; i < RRL_V4_PREFIXES_CNT; i++) {
-			ratelimiting->v4_prices[i] = base_price / RRL_V4_RATE_MULT[i];
+		if (!succ) {
+			ratelimiting = NULL;
+			ret = kr_error(EINVAL);
+			goto fail;
 		}
 
-		for (size_t i = 0; i < RRL_V6_PREFIXES_CNT; i++) {
-			ratelimiting->v6_prices[i] = base_price / RRL_V6_RATE_MULT[i];
+		for (size_t i = 0; i < V4_PREFIXES_CNT; i++) {
+			ratelimiting->v4_prices[i] = base_price / V4_RATE_MULT[i];
+		}
+
+		for (size_t i = 0; i < V6_PREFIXES_CNT; i++) {
+			ratelimiting->v6_prices[i] = base_price / V6_RATE_MULT[i];
 		}
 
 		ret = mmapped_init_continue(&ratelimiting_mmapped);
@@ -87,14 +91,11 @@ int ratelimiting_init(const char *mmap_file, size_t capacity, uint32_t instant_l
 fail:
 
 	kr_log_crit(SYSTEM, "Initialization of shared rate-limiting data failed.\n");
-
 	return ret;
 }
 
 void ratelimiting_deinit(void)
 {
-	if (ratelimiting == NULL) return;
-
 	mmapped_deinit(&ratelimiting_mmapped);
 	ratelimiting = NULL;
 }
@@ -114,13 +115,13 @@ bool ratelimiting_request_begin(struct kr_request *req)
 			memcpy(key, &ipv6->sin6_addr, 16);
 
 			limited_prefix = KRU.limited_multi_prefix_or((struct kru *)ratelimiting->kru, kr_now(),
-					1, key, RRL_V6_PREFIXES, ratelimiting->v6_prices, RRL_V6_PREFIXES_CNT, &max_final_load);
+					1, key, V6_PREFIXES, ratelimiting->v6_prices, V6_PREFIXES_CNT, &max_final_load);
 		} else {
 			struct sockaddr_in *ipv4 = (struct sockaddr_in *)req->qsource.addr;
 			memcpy(key, &ipv4->sin_addr, 4);  // TODO append port?
 
 			limited_prefix = KRU.limited_multi_prefix_or((struct kru *)ratelimiting->kru, kr_now(),
-					0, key, RRL_V4_PREFIXES, ratelimiting->v4_prices, RRL_V4_PREFIXES_CNT, &max_final_load);
+					0, key, V4_PREFIXES, ratelimiting->v4_prices, V4_PREFIXES_CNT, &max_final_load);
 		}
 		limited = (limited_prefix ? 2 : (max_final_load > ratelimiting->tc_limit ? 1 : 0));
 	}

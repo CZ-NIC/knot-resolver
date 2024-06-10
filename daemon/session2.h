@@ -241,7 +241,7 @@ static inline size_t wire_buf_free_space_length(const struct wire_buf *wb)
 	                      * stream (may span multiple (un)wraps). */\
 	XX(DNS_SINGLE_STREAM) /**< Singular packet WITH prepended size in a
 	                       * stream (may span multiple (un)wraps). */\
-	/* Requests prioritization */\
+	/* Prioritization of requests */\
 	XX(DEFER)
 
 /** The identifiers of protocol layer types. */
