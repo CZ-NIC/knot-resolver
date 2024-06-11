@@ -84,7 +84,6 @@ Architecture: any
 Depends:
  knot-resolver6 (= ${binary:Version}),
  ${misc:Depends},
- ${shlibs:Depends},
 Section: libdevel
 Description: Knot Resolver development files
  This package provides the development headers for Knot Resolver.
@@ -121,7 +120,6 @@ Depends:
  lua-mmdb,
  systemd,
  ${misc:Depends},
- ${shlibs:Depends},
 Description: HTTP module for Knot Resolver
  The Knot Resolver is a caching full resolver implementation
  written in C and LuaJIT, including both a resolver library and a
