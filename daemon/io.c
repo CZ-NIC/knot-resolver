@@ -165,15 +165,20 @@ static enum protolayer_event_cb_result pl_tcp_event_wrap(
 		enum protolayer_event_type event, void **baton,
 		struct session2 *session, void *sess_data)
 {
-	if (event == PROTOLAYER_EVENT_STATS_SEND_ERR) {
+	switch (event) {
+	case PROTOLAYER_EVENT_STATS_SEND_ERR:
 		the_worker->stats.err_tcp += 1;
 		return PROTOLAYER_EVENT_CONSUME;
-	} else if (event == PROTOLAYER_EVENT_STATS_QRY_OUT) {
+	case PROTOLAYER_EVENT_STATS_QRY_OUT:
 		the_worker->stats.tcp += 1;
 		return PROTOLAYER_EVENT_CONSUME;
+	case PROTOLAYER_EVENT_OS_BUFFER_FULL:
+		session2_force_close(session);
+		return PROTOLAYER_EVENT_CONSUME;
+	default:
+		return PROTOLAYER_EVENT_PROPAGATE;
 	}
 
-	return PROTOLAYER_EVENT_PROPAGATE;
 }
 
 __attribute__((constructor))

@@ -1235,7 +1235,7 @@ static void session2_event_wrap(struct session2 *s, enum protolayer_event_type e
 	session2_transport_event(s, event, baton);
 }
 
-void session2_event_unwrap(struct session2 *s, ssize_t start_ix, enum protolayer_event_type event, void *baton)
+static void session2_event_unwrap(struct session2 *s, ssize_t start_ix, enum protolayer_event_type event, void *baton)
 {
 	bool cont;
 	const struct protolayer_grp *grp = &protolayer_grps[s->proto];
@@ -1256,8 +1256,9 @@ void session2_event_unwrap(struct session2 *s, ssize_t start_ix, enum protolayer
 	 *
 	 * TODO: This might be undesirable for cases with sub-sessions - the
 	 * current idea is for the layers managing sub-sessions to just return
-	 * `false` on `event_unwrap`, but a more "automatic" mechanism may be
-	 * added when this is relevant, to make it less error-prone. */
+	 * `PROTOLAYER_EVENT_CONSUME` on `event_unwrap`, but a more "automatic"
+	 * mechanism may be added when this is relevant, to make it less
+	 * error-prone. */
 	session2_event_wrap(s, event, baton);
 }
 
@@ -1442,8 +1443,10 @@ static int session2_transport_pushv(struct session2 *s,
 			} else {
 				int ret = uv_udp_try_send((uv_udp_t*)handle,
 						(uv_buf_t *)iov, iovcnt, comm->comm_addr);
-				if (ret == UV_EAGAIN)
+				if (ret == UV_EAGAIN) {
 					ret = kr_error(ENOBUFS);
+					session2_event(s, PROTOLAYER_EVENT_OS_BUFFER_FULL, NULL);
+				}
 
 				if (false && ret == UV_EAGAIN) { // XXX: see uv_try_write() below
 					uv_udp_send_t *req = malloc(sizeof(*req));
@@ -1469,7 +1472,7 @@ static int session2_transport_pushv(struct session2 *s,
 			//	We were missing any handling of partial write success, too.
 			if (ret == UV_EAGAIN || (ret >= 0 && ret != iovec_sum(iov, iovcnt))) {
 				ret = kr_error(ENOBUFS);
-				session2_force_close(s);
+				session2_event(s, PROTOLAYER_EVENT_OS_BUFFER_FULL, NULL);
 			}
 
 			if (false && ret == UV_EAGAIN) {
