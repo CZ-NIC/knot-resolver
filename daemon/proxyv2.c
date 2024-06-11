@@ -407,7 +407,7 @@ static enum protolayer_iter_cb_result pl_proxyv2_stream_unwrap(
 						"for this peer, close\n",
 						kr_straddr(peer));
 			}
-			worker_end_tcp(s);
+			session2_force_close(s);
 			return protolayer_break(ctx, kr_error(ECONNRESET));
 		}
 
@@ -424,7 +424,7 @@ static enum protolayer_iter_cb_result pl_proxyv2_stream_unwrap(
 							kr_straddr(comm->src_addr));
 				}
 			}
-			worker_end_tcp(s);
+			session2_force_close(s);
 			return protolayer_break(ctx, kr_error(ECONNRESET));
 		} else if (trimmed == 0) {
 			session2_close(s);

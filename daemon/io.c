@@ -328,7 +328,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 				       uv_strerror(nread));
 		}
 		session2_penalize(s);
-		worker_end_tcp(s);
+		session2_force_close(s);
 		return;
 	}
 

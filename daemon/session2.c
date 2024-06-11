@@ -1442,6 +1442,9 @@ static int session2_transport_pushv(struct session2 *s,
 			} else {
 				int ret = uv_udp_try_send((uv_udp_t*)handle,
 						(uv_buf_t *)iov, iovcnt, comm->comm_addr);
+				if (ret == UV_EAGAIN)
+					ret = kr_error(ENOBUFS);
+
 				if (false && ret == UV_EAGAIN) { // XXX: see uv_try_write() below
 					uv_udp_send_t *req = malloc(sizeof(*req));
 					req->data = ctx;
@@ -1453,9 +1456,10 @@ static int session2_transport_pushv(struct session2 *s,
 							session2_transport_udp_pushv_finished);
 					if (ret)
 						session2_transport_udp_pushv_finished(req, ret);
-				} else {
-					session2_transport_pushv_finished(ret, ctx);
+					return ret;
 				}
+
+				session2_transport_pushv_finished(ret, ctx);
 				return ret;
 			}
 		} else if (handle->type == UV_TCP) {
@@ -1463,8 +1467,11 @@ static int session2_transport_pushv(struct session2 *s,
 			// XXX: queueing disabled for now if the OS can't accept the data.
 			//	Typically that happens when OS buffers are full.
 			//	We were missing any handling of partial write success, too.
-			if (ret == UV_EAGAIN || (ret >= 0 && ret != iovec_sum(iov, iovcnt)))
+			if (ret == UV_EAGAIN || (ret >= 0 && ret != iovec_sum(iov, iovcnt))) {
 				ret = kr_error(ENOBUFS);
+				session2_force_close(s);
+			}
+
 			if (false && ret == UV_EAGAIN) {
 				uv_write_t *req = malloc(sizeof(*req));
 				req->data = ctx;
@@ -1475,10 +1482,11 @@ static int session2_transport_pushv(struct session2 *s,
 						session2_transport_stream_pushv_finished);
 				if (ret)
 					session2_transport_stream_pushv_finished(req, ret);
-			} else {
-				session2_transport_pushv_finished(ret, ctx);
+				return ret;
 			}
-			return ret; // TODO: check again that errors ensure connection closure
+
+			session2_transport_pushv_finished(ret, ctx);
+			return ret;
 #if ENABLE_XDP
 		} else if (handle->type == UV_POLL) {
 			xdp_handle_data_t *xhd = handle->data;

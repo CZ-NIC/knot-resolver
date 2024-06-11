@@ -585,7 +585,7 @@ int qr_task_on_send(struct qr_task *task, struct session2 *s, int status)
 						"=> disconnected from '%s': %s\n",
 						peer_str, uv_strerror(status));
 			}
-			worker_end_tcp(s);
+			session2_force_close(s);
 			return status;
 		}
 
@@ -1287,7 +1287,7 @@ static int qr_task_step(struct qr_task *task,
 
 static int worker_submit(struct session2 *session, struct comm_info *comm, knot_pkt_t *pkt)
 {
-	if (!session || !pkt)
+	if (!session || !pkt || session->closing)
 		return kr_error(EINVAL);
 
 	const bool is_query = pkt->size > KNOT_WIRE_OFFSET_FLAGS1
@@ -1467,16 +1467,6 @@ static int worker_del_tcp_waiting(const struct sockaddr* addr)
 static struct session2* worker_find_tcp_waiting(const struct sockaddr* addr)
 {
 	return trie_find_tcp_session(the_worker->tcp_waiting, addr);
-}
-
-int worker_end_tcp(struct session2 *session)
-{
-	if (!session)
-		return kr_error(EINVAL);
-
-	session2_timer_stop(session);
-	session2_force_close(session);
-	return kr_ok();
 }
 
 knot_pkt_t *worker_resolve_mk_pkt_dname(knot_dname_t *qname, uint16_t qtype, uint16_t qclass,
@@ -2188,7 +2178,7 @@ exit:
 	wire_buf_movestart(wb);
 	mp_flush(the_worker->pkt_pool.ctx);
 	if (status < 0)
-		worker_end_tcp(session);
+		session2_force_close(session);
 	return protolayer_break(ctx, status);
 }
 
