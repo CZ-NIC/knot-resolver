@@ -21,6 +21,14 @@ Welcome to Knot Resolver's documentation for developers and advanced users!
    build
 
 .. toctree::
+   :caption: Development Guides
+   :name: development-guides
+   :maxdepth: 1
+
+   manager-dev-env
+   manager-dev-code
+
+.. toctree::
    :caption: Lua configuration
    :name: configuration-lua-chapter
    :maxdepth: 1
@@ -49,7 +57,6 @@ Welcome to Knot Resolver's documentation for developers and advanced users!
    :name: architecture-chapter
    :maxdepth: 1
 
-   manager-dev
    architecture
 
 .. toctree::
