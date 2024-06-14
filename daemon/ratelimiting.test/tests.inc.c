@@ -68,7 +68,7 @@ struct kru_generic {
 	// ...
 };
 struct kru_avx2 {
-	char hash_key[48] ALIGNED(32);
+	_Alignas(32) char hash_key[48];
 	// ...
 };
 

@@ -74,11 +74,12 @@ typedef uint64_t hash_t;
 /// Block of loads sharing the same time, so that we're more space-efficient.
 /// It's exactly a single cache line.
 struct load_cl {
+	ALIGNED_CPU_CACHE
 	_Atomic uint32_t time;
 	#define LOADS_LEN 15
 	uint16_t ids[LOADS_LEN];
 	uint16_t loads[LOADS_LEN];
-} ALIGNED_CPU_CACHE;
+};
 static_assert(64 == sizeof(struct load_cl), "bad size of struct load_cl");
 
 /// Parametrization for speed of decay.
@@ -96,7 +97,7 @@ struct kru {
 #if USE_AES
 	/// Hashing secret.  Random but shared by all users of the table.
 	/// Let's not make it too large, so that header fits into 64 Bytes.
-	char hash_key[48] ALIGNED(32);
+	_Alignas(32) char hash_key[48];
 #else
 	/// Hashing secret.  Random but shared by all users of the table.
 	SIPHASH_KEY hash_key;

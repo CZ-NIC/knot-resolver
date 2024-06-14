@@ -24,7 +24,7 @@ struct defer {
 	size_t capacity;
 	kru_price_t max_decay;
 	bool using_avx2;
-	uint8_t kru[] ALIGNED(64);
+	_Alignas(64) uint8_t kru[];
 };
 struct defer *defer = NULL;
 struct mmapped defer_mmapped = {0};
@@ -46,7 +46,7 @@ static bool using_avx2(void)
 
 /// Increment KRU counters by given time.
 void defer_account(uint64_t nsec, union kr_sockaddr addr) {
-	uint8_t key[16] ALIGNED(16) = {0, };
+	_Alignas(16) uint8_t key[16] = {0, };
 	uint16_t max_load = 0;
 	if (defer_sample_state.addr.ip.sa_family == AF_INET6) {
 		struct sockaddr_in6 *ipv6 = (struct sockaddr_in6 *)&defer_sample_state.addr.ip;
@@ -86,7 +86,7 @@ static enum protolayer_iter_cb_result pl_defer_unwrap(
 
 	defer_sample_addr((const union kr_sockaddr *)ctx->comm->comm_addr);
 
-	uint8_t key[16] ALIGNED(16) = {0, };
+	_Alignas(16) uint8_t key[16] = {0, };
 	uint16_t max_load = 0;
 	if (ctx->comm->comm_addr->sa_family == AF_INET6) {
 		struct sockaddr_in6 *ipv6 = (struct sockaddr_in6 *)ctx->comm->comm_addr;

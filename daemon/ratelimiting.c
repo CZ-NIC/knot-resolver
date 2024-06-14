@@ -22,7 +22,7 @@ struct ratelimiting {
 	bool using_avx2;
 	kru_price_t v4_prices[V4_PREFIXES_CNT];
 	kru_price_t v6_prices[V6_PREFIXES_CNT];
-	uint8_t kru[] ALIGNED(64);
+	_Alignas(64) uint8_t kru[];
 };
 struct ratelimiting *ratelimiting = NULL;
 struct mmapped ratelimiting_mmapped = {0};
@@ -107,7 +107,7 @@ bool ratelimiting_request_begin(struct kr_request *req)
 		return false;  // don't consider internal requests
 	uint8_t limited = 0;  // 0: not limited, 1: truncated, 2: no answer
 	if (ratelimiting) {
-		uint8_t key[16] ALIGNED(16) = {0, };
+		_Alignas(16) uint8_t key[16] = {0, };
 		uint8_t limited_prefix;
 		uint16_t max_final_load = 0;
 		if (req->qsource.addr->sa_family == AF_INET6) {

@@ -20,13 +20,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#if __GNUC__ >= 4 || __clang_major__ >= 4
-	#define ALIGNED_CPU_CACHE __attribute__((aligned(64)))
-	#define ALIGNED(_bytes)   __attribute__((aligned(_bytes)))
-#else
-	#define ALIGNED_CPU_CACHE
-	#define ALIGNED(_bytes)
-#endif
+#define ALIGNED_CPU_CACHE _Alignas(64)
 
 // An unsigned integral type used for prices, blocking occurs when sum of prices overflows.
 // Greater than 16-bit type enables randomized fractional incrementing as the internal counters are still 16-bit.
