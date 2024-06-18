@@ -70,16 +70,18 @@ struct kru_api {
 	/// Updates KRU only if no query is blocked, unless a race condition occurs --
 	/// in such a case all longer prefixes might have been updated.
 	/// The key of i-th query consists of prefixes[i] bits of key, prefixes[i], and namespace.
-	/// If zero is returned, *max_load_out is set to the maximum of final values of the involved counters normalized to the limit 2^16.
+	/// If zero is returned, *max_load_out (unless NULL) is set to
+	/// the maximum of final values of the involved counters normalized to the limit 2^16.
 	uint8_t (*limited_multi_prefix_or)(struct kru *kru, uint32_t time_now,
 			uint8_t namespace, uint8_t key[static 16], uint8_t *prefixes, kru_price_t *prices, size_t queries_cnt, uint16_t *max_load_out);
 
 	/// Multiple queries based on different prefixes of a single key.
-	/// Returns the maximum of final values of the involved counters normalized to the limit 2^16.
+	/// Returns the maximum of final values of the involved counters normalized to the limit 2^16
+	/// and stores the corresponding prefix (value in prefixes) to *prefix_out (unless NULL).
 	/// Set prices to NULL to skip updating; otherwise, KRU is always updated, using maximal allowed value on overflow.
 	/// The key of i-th query consists of prefixes[i] bits of key, prefixes[i], and namespace.
 	uint16_t (*load_multi_prefix_max)(struct kru *kru, uint32_t time_now,
-			uint8_t namespace, uint8_t key[static 16], uint8_t *prefixes, kru_price_t *prices, size_t queries_cnt);
+			uint8_t namespace, uint8_t key[static 16], uint8_t *prefixes, kru_price_t *prices, size_t queries_cnt, uint8_t *prefix_out);
 };
 
 // The functions are stored this way to make it easier to switch

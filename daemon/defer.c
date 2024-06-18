@@ -48,6 +48,7 @@ static bool using_avx2(void)
 void defer_account(uint64_t nsec, union kr_sockaddr addr) {
 	_Alignas(16) uint8_t key[16] = {0, };
 	uint16_t max_load = 0;
+	uint8_t prefix = 0;
 	if (defer_sample_state.addr.ip.sa_family == AF_INET6) {
 		struct sockaddr_in6 *ipv6 = (struct sockaddr_in6 *)&defer_sample_state.addr.ip;
 		memcpy(key, &ipv6->sin6_addr, 16);
@@ -58,7 +59,7 @@ void defer_account(uint64_t nsec, union kr_sockaddr addr) {
 		}
 
 		max_load = KRU.load_multi_prefix_max((struct kru *)defer->kru, kr_now(),
-				1, key, V6_PREFIXES, prices, V6_PREFIXES_CNT);
+				1, key, V6_PREFIXES, prices, V6_PREFIXES_CNT, &prefix);
 	} else if (defer_sample_state.addr.ip.sa_family == AF_INET) {
 		struct sockaddr_in *ipv4 = (struct sockaddr_in *)&defer_sample_state.addr.ip;
 		memcpy(key, &ipv4->sin_addr, 4);  // TODO append port?
@@ -69,11 +70,11 @@ void defer_account(uint64_t nsec, union kr_sockaddr addr) {
 		}
 
 		max_load = KRU.load_multi_prefix_max((struct kru *)defer->kru, kr_now(),
-				0, key, V4_PREFIXES, prices, V4_PREFIXES_CNT);
+				0, key, V4_PREFIXES, prices, V4_PREFIXES_CNT, &prefix);
 	}
 
-	kr_log_notice(DEVEL, "%8.3f ms for %s, load: %d\n", nsec / 1000000.0,
-			kr_straddr(&defer_sample_state.addr.ip), max_load);
+	kr_log_notice(DEVEL, "%8.3f ms for %s, load: %d on /%d\n", nsec / 1000000.0,
+			kr_straddr(&defer_sample_state.addr.ip), max_load, prefix);
 }
 
 /// Determine whether the request should be deferred during unwrapping.
@@ -88,26 +89,27 @@ static enum protolayer_iter_cb_result pl_defer_unwrap(
 
 	_Alignas(16) uint8_t key[16] = {0, };
 	uint16_t max_load = 0;
+	uint8_t prefix = 0;
 	if (ctx->comm->comm_addr->sa_family == AF_INET6) {
 		struct sockaddr_in6 *ipv6 = (struct sockaddr_in6 *)ctx->comm->comm_addr;
 		memcpy(key, &ipv6->sin6_addr, 16);
 
 		max_load = KRU.load_multi_prefix_max((struct kru *)defer->kru, kr_now(),
-				1, key, V6_PREFIXES, NULL, V6_PREFIXES_CNT);
+				1, key, V6_PREFIXES, NULL, V6_PREFIXES_CNT, &prefix);
 	} else if (ctx->comm->comm_addr->sa_family == AF_INET) {
 		struct sockaddr_in *ipv4 = (struct sockaddr_in *)ctx->comm->comm_addr;
 		memcpy(key, &ipv4->sin_addr, 4);  // TODO append port?
 
 		max_load = KRU.load_multi_prefix_max((struct kru *)defer->kru, kr_now(),
-				0, key, V4_PREFIXES, NULL, V4_PREFIXES_CNT);
+				0, key, V4_PREFIXES, NULL, V4_PREFIXES_CNT, &prefix);
 	}
 
 	int threshold_index = 0;  // 0: synchronous
 	for (; LOADS_THRESHOLDS[threshold_index] < max_load; threshold_index++);
 
-	kr_log_notice(DEVEL, "DEFER | addr: %s, load: %d, queue: %d\n",
+	kr_log_notice(DEVEL, "DEFER | addr: %s, load: %d on /%d, queue: %d\n",
 			kr_straddr(ctx->comm->src_addr),
-			max_load, threshold_index);
+			max_load, prefix, threshold_index);
 
 	if (threshold_index == 0)
 		return protolayer_continue(ctx);

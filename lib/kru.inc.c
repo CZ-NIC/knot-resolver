@@ -565,7 +565,7 @@ static uint8_t kru_limited_multi_prefix_or(struct kru *kru, uint32_t time_now, u
 }
 
 static uint16_t kru_load_multi_prefix_max(struct kru *kru, uint32_t time_now, uint8_t namespace,
-                                           uint8_t key[static 16], uint8_t *prefixes, kru_price_t *prices, size_t queries_cnt)
+                                           uint8_t key[static 16], uint8_t *prefixes, kru_price_t *prices, size_t queries_cnt, uint8_t *prefix_out)
 {
 	struct query_ctx ctx[queries_cnt];
 
@@ -583,10 +583,18 @@ static uint16_t kru_load_multi_prefix_max(struct kru *kru, uint32_t time_now, ui
 		}
 	}
 
+	uint8_t prefix = 0;
 	uint16_t max_load = 0;
 	for (size_t i = 0; i < queries_cnt; i++) {
-		max_load = MAX(max_load, ctx[i].final_load_value);
+		if (max_load < ctx[i].final_load_value) {
+			max_load = ctx[i].final_load_value;
+			prefix = prefixes[i];
+		}
 	}
+	if (prefix_out) {
+		*prefix_out = prefix;
+	}
+
 	return max_load;
 }
 
