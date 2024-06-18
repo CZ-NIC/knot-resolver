@@ -1484,7 +1484,7 @@ static int session2_transport_pushv(struct session2 *s,
 					&iovecmem, ctx);
 
 			knot_xdp_msg_t msg;
-#if KNOT_VERSION_HEX >= 0x030100
+
 			/* We don't have a nice way of preserving the _msg_t from frame allocation,
 			 * so we manually redo all other parts of knot_xdp_send_alloc() */
 			memset(&msg, 0, sizeof(msg));
@@ -1492,7 +1492,7 @@ static int session2_transport_pushv(struct session2 *s,
 			msg.flags = ipv6 ? KNOT_XDP_MSG_IPV6 : 0;
 			memcpy(msg.eth_from, comm->eth_from, sizeof(comm->eth_from));
 			memcpy(msg.eth_to,   comm->eth_to,   sizeof(comm->eth_to));
-#endif
+
 			const struct sockaddr *ip_from = comm->dst_addr;
 			const struct sockaddr *ip_to   = comm->comm_addr;
 			memcpy(&msg.ip_from, ip_from, kr_sockaddr_len(ip_from));
