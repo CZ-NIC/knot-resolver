@@ -32,15 +32,10 @@
 #include <libknot/rrset.h>
 #include <libzscanner/scanner.h>
 
-#include <libknot/version.h>
-#define ENABLE_ZONEMD (KNOT_VERSION_HEX >= 0x030100)
-#if ENABLE_ZONEMD
-	#include <libdnssec/digest.h>
-
-	#if KNOT_VERSION_HEX < 0x030200
-		#define KNOT_ZONEMD_ALGORITHM_SHA384 KNOT_ZONEMD_ALORITHM_SHA384
-		#define KNOT_ZONEMD_ALGORITHM_SHA512 KNOT_ZONEMD_ALORITHM_SHA512
-	#endif
+#include <libdnssec/digest.h>
+#if KNOT_VERSION_HEX < 0x030200
+	#define KNOT_ZONEMD_ALGORITHM_SHA384 KNOT_ZONEMD_ALORITHM_SHA384
+	#define KNOT_ZONEMD_ALGORITHM_SHA512 KNOT_ZONEMD_ALORITHM_SHA512
 #endif
 
 #include "daemon/worker.h"
@@ -72,7 +67,6 @@ struct zone_import_ctx {
 	struct kr_svldr_ctx *svldr; /// DNSSEC validator; NULL iff we don't validate
 	const knot_dname_t *last_cut; /// internal to zi_rrset_import()
 
-#if ENABLE_ZONEMD
 	uint8_t *digest_buf; /// temporary buffer for digest computation (on pool)
 	#define DIGEST_BUF_SIZE (64*1024 - 1)
 	#define DIGEST_ALG_COUNT 2
@@ -81,7 +75,6 @@ struct zone_import_ctx {
 		dnssec_digest_ctx_t *ctx;
 		const uint8_t *expected; /// expected digest (inside zonemd on pool)
 	} digests[DIGEST_ALG_COUNT]; /// we use indices 0 and 1 for SHA 384 and 512
-#endif
 };
 
 typedef struct zone_import_ctx zone_import_ctx_t;
@@ -130,7 +123,6 @@ static knot_rrset_t * rrset_get(trie_t *rrsets, const knot_dname_t *name,
 	return *rrsig_p;
 }
 
-#if ENABLE_ZONEMD
 static int digest_rrset(trie_val_t *rr_p, void *z_import_v)
 {
 	zone_import_ctx_t *z_import = z_import_v;
@@ -303,8 +295,6 @@ do_digest:
 	bool ok = has_match && (zonemd_is_valid || !z_import->svldr);
 	return ok ? kr_ok() : kr_error(ENOENT);
 }
-#endif
-
 
 /**
  * @internal Import given rrset to cache.
@@ -706,15 +696,9 @@ int zi_zone_import(const zi_config_t config)
 zonemd: (void)0; // C can't have a variable definition following a label
 	double time_zonemd = NAN;
 	if (c->zonemd) {
-		#if ENABLE_ZONEMD
-			kr_timer_start(&stopwatch);
-			ret = zonemd_verify(z_import);
-			time_zonemd = kr_timer_elapsed(&stopwatch);
-		#else
-			kr_log_error(PREFILL,
-				"ZONEMD check requested but not supported, fail\n");
-			ret = kr_error(ENOSYS);
-		#endif
+		kr_timer_start(&stopwatch);
+		ret = zonemd_verify(z_import);
+		time_zonemd = kr_timer_elapsed(&stopwatch);
 	} else {
 		ret = kr_ok();
 	}

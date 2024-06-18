@@ -1,9 +1,14 @@
-Knot Resolver 5.7.4 (2024-06-dd)
+Knot Resolver 5.7.4 (2024-0m-dd)
 ================================
 
 Improvements
 ------------
 - add the fresh DNSSEC root key "KSK-2024" already, Key ID 38696 (!1556)
+
+Incompatible changes
+--------------------
+- libknot 3.0.x support is dropped (!1558)
+  Upstream last maintained 3.0.x in spring 2022.
 
 
 Knot Resolver 5.7.3 (2024-05-30)

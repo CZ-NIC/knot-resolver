@@ -964,11 +964,7 @@ static void xdp_rx(uv_poll_t* handle, int status, int events)
 	kr_require(xhd && xhd->session && xhd->socket);
 	uint32_t rcvd;
 	knot_xdp_msg_t msgs[XDP_RX_BATCH_SIZE];
-	int ret = knot_xdp_recv(xhd->socket, msgs, XDP_RX_BATCH_SIZE, &rcvd
-			#if KNOT_VERSION_HEX >= 0x030100
-			, NULL
-			#endif
-			);
+	int ret = knot_xdp_recv(xhd->socket, msgs, XDP_RX_BATCH_SIZE, &rcvd, NULL);
 
 	if (kr_fails_assert(ret == KNOT_EOK)) {
 		/* ATM other error codes can only be returned when called incorrectly */
@@ -1048,10 +1044,7 @@ int io_listen_xdp(uv_loop_t *loop, struct endpoint *ep, const char *ifname)
 
 	// This call is a libknot version hell, unfortunately.
 	int ret = knot_xdp_init(&xhd->socket, ifname, ep->nic_queue,
-		#if KNOT_VERSION_HEX < 0x030100
-			ep->port ? ep->port : KNOT_XDP_LISTEN_PORT_ALL,
-			KNOT_XDP_LOAD_BPF_MAYBE
-		#elif KNOT_VERSION_HEX < 0x030200
+		#if KNOT_VERSION_HEX < 0x030200
 			ep->port ? ep->port : (KNOT_XDP_LISTEN_PORT_PASS | 0),
 			KNOT_XDP_LOAD_BPF_MAYBE
 		#else
