@@ -450,8 +450,8 @@ static enum protolayer_iter_cb_result pl_proxyv2_stream_unwrap(
 	return protolayer_continue(ctx);
 }
 
-
-void proxy_protolayers_init(void)
+__attribute__((constructor))
+static void proxy_protolayers_init(void)
 {
 	protolayer_globals[PROTOLAYER_TYPE_PROXYV2_DGRAM] = (struct protolayer_globals){
 		.iter_size = sizeof(struct pl_proxyv2_dgram_iter_data),

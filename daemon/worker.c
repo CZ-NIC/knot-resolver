@@ -2269,13 +2269,9 @@ static void pl_dns_stream_request_init(struct session2 *session,
 	req->qsource.comm_flags.tcp = true;
 }
 
-int worker_init(void)
+__attribute__((constructor))
+static void worker_protolayers_init(void)
 {
-	if (kr_fails_assert(the_worker == NULL))
-		return kr_error(EINVAL);
-	kr_bindings_register(the_engine->L); // TODO move
-
-	/* DNS protocol layers */
 	protolayer_globals[PROTOLAYER_TYPE_DNS_DGRAM] = (struct protolayer_globals){
 		.wire_buf_overhead_cb = pl_dns_dgram_wire_buf_overhead,
 		.wire_buf_max_overhead = KNOT_WIRE_MAX_PKTSIZE,
@@ -2303,6 +2299,13 @@ int worker_init(void)
 	protolayer_globals[PROTOLAYER_TYPE_DNS_MULTI_STREAM].sess_init = pl_dns_stream_sess_init;
 	protolayer_globals[PROTOLAYER_TYPE_DNS_SINGLE_STREAM] = stream_common;
 	protolayer_globals[PROTOLAYER_TYPE_DNS_SINGLE_STREAM].sess_init = pl_dns_single_stream_sess_init;
+}
+
+int worker_init(void)
+{
+	if (kr_fails_assert(the_worker == NULL))
+		return kr_error(EINVAL);
+	kr_bindings_register(the_engine->L); // TODO move
 
 	/* Create main worker. */
 	the_worker = &the_worker_value;

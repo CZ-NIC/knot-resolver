@@ -13,8 +13,6 @@
 #include "daemon/session2.h"
 #include "daemon/worker.h"
 
-#include "daemon/http.h"
-
 /** Makes a `nghttp2_nv`. `K` is the key, `KS` is the key length,
  * `V` is the value, `VS` is the value length. */
 #define MAKE_NV(K, KS, V, VS) \
@@ -1030,7 +1028,8 @@ static void pl_http_request_init(struct session2 *session,
 	}
 }
 
-void http_protolayers_init(void)
+__attribute__((constructor))
+static void http_protolayers_init(void)
 {
 	protolayer_globals[PROTOLAYER_TYPE_HTTP] = (struct protolayer_globals) {
 		.sess_size = sizeof(struct pl_http_sess_data),

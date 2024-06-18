@@ -1332,7 +1332,8 @@ static void pl_tls_request_init(struct session2 *session,
 	req->qsource.comm_flags.tls = true;
 }
 
-void tls_protolayers_init(void)
+__attribute__((constructor))
+static void tls_protolayers_init(void)
 {
 	protolayer_globals[PROTOLAYER_TYPE_TLS] = (struct protolayer_globals){
 		.sess_size = sizeof(struct pl_tls_sess_data),
