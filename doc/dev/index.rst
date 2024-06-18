@@ -2,10 +2,10 @@
 
 .. warning::
 
-   **This documentation is intended to help with advanced fine-tuning of Knot
-   Resolver!** If you are looking for help with day-to-day use without the need to
-   involve yourself with the Lua programming language, please see the
-   `user documentation <../index.html>`_.
+   **This documentation is intended to help with advanced fine-tuning and
+   development of Knot Resolver!** If you are looking for help with day-to-day
+   use without the need to involve yourself with C and/or Lua programming
+   languages, please see the `user documentation <../index.html>`_.
 
 #####################################
 Knot Resolver developer documentation
@@ -14,18 +14,19 @@ Knot Resolver developer documentation
 Welcome to Knot Resolver's documentation for developers and advanced users!
 
 .. toctree::
-   :caption: Building for sources
+   :caption: Building from sources
    :name: build-chapter
    :maxdepth: 1
 
    build
+   manager-dev-env
 
 .. toctree::
-   :caption: Development Guides
-   :name: development-guides
+   :caption: Architecture
+   :name: architecture-chapter
    :maxdepth: 1
 
-   manager-dev-env
+   architecture
    manager-dev-code
 
 .. toctree::
@@ -51,13 +52,6 @@ Welcome to Knot Resolver's documentation for developers and advanced users!
    modules_api
    worker_api
    logging_api
-
-.. toctree::
-   :caption: Architecture
-   :name: architecture-chapter
-   :maxdepth: 1
-
-   architecture
 
 .. toctree::
    :caption: Infrastructure

@@ -2,9 +2,9 @@
 
 .. _manager-dev-env:
 
-*************************************
-The manager's development environment
-*************************************
+*******************************
+Manager development environment
+*******************************
 
 In this guide, we will setup a development environment and discuss tooling.
 
@@ -44,13 +44,13 @@ Running the manager from source for the first time
 
    As mentioned above it is recommended to use ``pyenv`` to manage other Python versions.
    Then poetry needs to be told where to look for that version of Python, e.g.:
-   
+
    .. code-block:: bash
-      
+
       $ poetry env use ~/.pyenv/versions/3.12.1/bin/python3.12
 
 4. Run ``poetry install --all-extras`` to install all dependencies including all optional ones (--all-extras flag), in a newly created virtual environment.
-   All dependencies can be seen in ``pyproject.toml``. 
+   All dependencies can be seen in ``pyproject.toml``.
 5. Use ``./poe run`` to run the manager in development mode (Ctrl+C to exit).
    The manager is started with the configuration located in ``manager/etc/knot-resolver/config.dev.yaml``.
 
