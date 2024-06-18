@@ -992,7 +992,7 @@ static int client_verify_pin(const unsigned int cert_list_size,
  *
  * \returns GNUTLS_E_SUCCESS if certificate chain is valid, any other value is an error
  */
-static int client_verify_certchain(gnutls_session_t tls_session, const char *hostname)
+static int client_verify_certchain(struct tls_common_ctx *ctx, const char *hostname)
 {
 	if (kr_fails_assert(hostname)) {
 		kr_log_error(TLSCLIENT, "internal config inconsistency: no hostname set\n");
@@ -1000,27 +1000,30 @@ static int client_verify_certchain(gnutls_session_t tls_session, const char *hos
 	}
 
 	unsigned int status;
-	int ret = gnutls_certificate_verify_peers3(tls_session, hostname, &status);
+	int ret = gnutls_certificate_verify_peers3(ctx->tls_session, hostname, &status);
 	if ((ret == GNUTLS_E_SUCCESS) && (status == 0)) {
 		return GNUTLS_E_SUCCESS;
 	}
 
+	const char *addr_str = kr_straddr(session_get_peer(ctx->session));
 	if (ret == GNUTLS_E_SUCCESS) {
 		gnutls_datum_t msg;
 		ret = gnutls_certificate_verification_status_print(
-			status, gnutls_certificate_type_get(tls_session), &msg, 0);
+			status, gnutls_certificate_type_get(ctx->tls_session), &msg, 0);
 		if (ret == GNUTLS_E_SUCCESS) {
-			kr_log_error(TLSCLIENT, "failed to verify peer certificate: "
-					"%s\n", msg.data);
+			kr_log_error(TLSCLIENT, "failed to verify peer certificate of %s: "
+					"%s\n", addr_str, msg.data);
 			gnutls_free(msg.data);
 		} else {
-			kr_log_error(TLSCLIENT, "failed to verify peer certificate: "
+			kr_log_error(TLSCLIENT, "failed to verify peer certificate of %s: "
 					"unable to print reason: %s (%s)\n",
+					addr_str,
 					gnutls_strerror(ret), gnutls_strerror_name(ret));
 		} /* gnutls_certificate_verification_status_print end */
 	} else {
-		kr_log_error(TLSCLIENT, "failed to verify peer certificate: "
+		kr_log_error(TLSCLIENT, "failed to verify peer certificate of %s: "
 			     "gnutls_certificate_verify_peers3 error: %s (%s)\n",
+			     addr_str,
 			     gnutls_strerror(ret), gnutls_strerror_name(ret));
 	} /* gnutls_certificate_verify_peers3 end */
 	return GNUTLS_E_CERTIFICATE_ERROR;
@@ -1059,7 +1062,7 @@ static int client_verify_certificate(gnutls_session_t tls_session)
 		/* check hash of the certificate but ignore everything else */
 		return client_verify_pin(cert_list_size, cert_list, ctx->params);
 	else
-		return client_verify_certchain(ctx->c.tls_session, ctx->params->hostname);
+		return client_verify_certchain(&ctx->c, ctx->params->hostname);
 }
 
 struct tls_client_ctx *tls_client_ctx_new(tls_client_param_t *entry,
