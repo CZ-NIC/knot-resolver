@@ -30,6 +30,3 @@ struct proxy_result {
 	 * the proxy is unencrypted. */
 	bool has_tls : 1;
 };
-
-/** Initializes the protocol layers managed by the PROXYv2 "module". */
-void proxy_protolayers_init(void);

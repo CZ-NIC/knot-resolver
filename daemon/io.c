@@ -19,7 +19,6 @@
 #include "daemon/network.h"
 #include "daemon/worker.h"
 #include "daemon/tls.h"
-#include "daemon/http.h"
 #include "daemon/session2.h"
 #include "contrib/cleanup.h"
 #include "lib/utils.h"
@@ -177,7 +176,8 @@ static enum protolayer_event_cb_result pl_tcp_event_wrap(
 	return PROTOLAYER_EVENT_PROPAGATE;
 }
 
-void io_protolayers_init(void)
+__attribute__((constructor))
+static void io_protolayers_init(void)
 {
 	protolayer_globals[PROTOLAYER_TYPE_UDP] = (struct protolayer_globals){
 		.event_wrap = pl_udp_event_wrap,
