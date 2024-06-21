@@ -15,7 +15,7 @@ sys.modules["setuptools"] = dummy
 sys.modules["build_c_extensions"] = dummy
 
 # load install_requires array from setup.py
-spec = importlib.util.spec_from_file_location("setup", sys.argv[1] if len(sys.argv) == 2 else "manager/setup.py")
+spec = importlib.util.spec_from_file_location("setup", sys.argv[1] if len(sys.argv) == 2 else "setup.py")
 mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mod)
 install_requires = mod.install_requires
