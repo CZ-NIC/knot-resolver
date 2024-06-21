@@ -43,14 +43,14 @@ local-data:
       address: 1.2.3.4
       nodata: true
       tags: [t01]
-    - file: hosts.custom
-      tags: [t02]
-      ttl: 10m
     - subtree: empty
       tags: [ t02 ]
       name: [ example1.org ]
     - subtree: nxdomain
       name: [ sub4.example.org ]
+  #   - file: hosts.custom
+  #     tags: [t02]
+  #     ttl: 10m
   # rpz:
   #   - file: runtime/blocklist.rpz
   #     tags: [t01, t02]
