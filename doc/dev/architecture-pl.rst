@@ -5,14 +5,13 @@ policy-loader
 The ``policy-loader`` is a new special kresd instance ensuring that configured policies are loaded into the rules database where they are made available to all running kresd workers. 
 If the policies are loaded successfully, the ``policy-loader`` exits automatically, otherwise it exits with an error code that is detected by Supervisor.
 
+The ``policy-loader`` is triggered on every reload or a cold start to recompile the LMDB of rules,
+as changes to external files are not tracked (e.g. RPZ or /etc/hosts).
+This eliminates the need to restart kresd workers if only the policies have changed.
+In that case the running kresd workers are only notified of changes in the rules database by their control socket using the ``kr_rules_reset()`` function.
 
-The ``policy-loader`` is only triggered when there are the policies relevant configuration changes, or when the resolver is cold started.
-This eliminates the need to restart all running kresd workers if only the policies have changed.
-The running kresd workers are only notified of changes in the rules database by their control socket using the ``kr_rules_reset()`` function.
-The policies are all configuration options located under the ``views``, ``local-data`` and ``forward`` sections.
-
-
-The kresd workers are only fully restarted when a relevant configuration change is made to them (everything else outside the policies), or when the resolver is cold started.
+The kresd workers are only restarted when a relevant configuration change is made.
+In particular, options located under the ``views`` and ``local-data`` do not need kresd restarts.
 The same as for the kresd workers applies to the kresd canary process, which is always run before the kresd workers to validate the new configuration.
 The manager always waits for the ``policy-loader`` to finish before working with other processes.
 

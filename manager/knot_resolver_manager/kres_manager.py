@@ -115,11 +115,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
         await self._collect_already_running_workers()
 
         # register and immediately call a callback that applies policy rules configuration
-        await config_store.register_on_change_callback(
-            only_on_real_changes_update(lambda config: [config.views, config.local_data, config.forward])(
-                self.apply_policy_rules_config
-            )
-        )
+        await config_store.register_on_change_callback(self.apply_policy_rules_config)
 
         # configuration nodes that are relevant to kresd workers and the cache garbage collector
         def config_nodes(config: KresConfig) -> List[Any]:
