@@ -1,13 +1,23 @@
 .. SPDX-License-Identifier: GPL-3.0-or-later
 
-Tests
-=====
+**********************
+Testing infrastructure
+**********************
 
-The following is a non-comprehensitve lists of various tests that can be found
-in this repo. These can be enabled by the build system.
+The following is a non-exhaustive list of various tests that can be found in this repo.
+Some can be enabled by meson build system and some can be performed by Poetry tool.
+
+
+The manager unit tests
+======================
+
+The unit tests use ``pytest`` and can be run with the command ``poe test``.
+They can be run from a freshly cloned repository and should be successful.
+They are located in the ``manager`` subdirectory.
+
 
 Unit tests
-----------
+==========
 
 The unit tests depend on cmocka_ and can easily be executed after compilation.
 They are enabled by default (if ``cmocka`` is found).
@@ -17,8 +27,9 @@ They are enabled by default (if ``cmocka`` is found).
         $ ninja -C build_dir
         $ meson test -C build_dir --suite unit
 
+
 Postinstall tests
------------------
+=================
 
 There following tests require a working installation of kresd.  The
 binary ``kresd`` found in ``$PATH`` will be tested. When testing through meson,
@@ -29,8 +40,9 @@ kresd first.
 
         $ ninja install -C build_dir
 
+
 Config tests
-------------
+============
 
 Config tests utilize the kresd's lua config file to execute arbitrary tests,
 typically testing various modules, their API etc.
@@ -45,8 +57,9 @@ the build dir).
         $ ninja install -C build_dir
         $ meson test -C build_dir --suite config
 
+
 Extra tests
------------
+===========
 
 The extra tests require a large set of additional dependencies and executing
 them outside of upstream development is probably redundant.
@@ -82,7 +95,7 @@ example TCP, TLS and its connection management.
         $ meson test -C build_dir --suite pytests
 
 Useful meson commands
----------------------
+=====================
 
 It's possible to run only specific test suite or a test.
 
