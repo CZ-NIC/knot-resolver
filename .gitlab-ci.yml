@@ -784,6 +784,14 @@ pkg:alma-9:
   <<: *pkg_test
   image: $CI_REGISTRY/packaging/apkg/full/alma-9
 
+pkg:opensuse-tumbleweed:
+  <<: *pkg_test
+  image: $CI_REGISTRY/packaging/apkg/full/opensuse-tumbleweed
+
+pkg:opensuse-15.6:
+  <<: *pkg_test
+  image: $CI_REGISTRY/packaging/apkg/full/opensuse-15.6
+
 pkg:arch:
   <<: *pkg_test_user
   image: $CI_REGISTRY/packaging/apkg/full/arch
