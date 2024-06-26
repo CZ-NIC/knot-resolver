@@ -865,7 +865,7 @@ static int subnet_encode(const struct sockaddr *addr, int sub_len, uint8_t buf[3
 }
 
 // Is `a` subnet-prefix of `b`?  (a byte format of subnet_encode())
-bool subnet_is_prefix(uint8_t a, uint8_t b)
+static bool subnet_is_prefix(uint8_t a, uint8_t b)
 {
 	while (true) {
 		if (a >> 6 == 0)
