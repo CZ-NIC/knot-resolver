@@ -842,13 +842,22 @@ static int subnet_encode(const struct sockaddr *addr, int sub_len, uint8_t buf[3
 	//  - 00 -> beyond the subnet's prefix
 	//  - 10 -> zero bit within the subnet's prefix
 	//  - 11 ->  one bit within the subnet's prefix
-	// Multiplying one uint8_t by 01010101 (in binary) will do interleaving.
 	int i;
 	// Let's hope that compiler optimizes this into something reasonable.
 	for (i = 0; sub_len > 0; ++i, sub_len -= 8) {
-		uint16_t x = a[i] * 85; // interleave by zero bits
-		uint8_t sub_mask = 255 >> (8 - MIN(sub_len, 8));
-		uint16_t r = x | (sub_mask * 85 * 2);
+		// r = a[i] interleaved by 1 bits (with 1s on the higher-value positions)
+		// https://graphics.stanford.edu/~seander/bithacks.html#Interleave64bitOps
+		// but we modify it slightly: no need for the 0x5555 mask (==0b0101010101010101)
+		// or the y-part - we instead just set all odd bits to 1s.
+		uint16_t r = (
+			(a[i] * 0x0101010101010101ULL & 0x8040201008040201ULL)
+				* 0x0102040810204081ULL >> 49
+		        ) | 0xAAAAU/* = 0b1010'1010'1010'1010 */;
+		// now r might just need clipping
+		if (sub_len < 8) {
+			uint16_t mask = 0xFFFFffffU << (2 * (8 - sub_len));
+			r &= mask;
+		}
 		buf[(ssize_t)2*i] = r / 256;
 		buf[(ssize_t)2*i + 1] = r % 256;
 	}
