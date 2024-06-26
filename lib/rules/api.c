@@ -851,7 +851,7 @@ static int subnet_encode(const struct sockaddr *addr, int sub_len, uint8_t buf[3
 		uint16_t r = (
 			(a[i] * 0x0101010101010101ULL & 0x8040201008040201ULL)
 				* 0x0102040810204081ULL >> 49
-		        ) | 43690U/* = 0b1010'1010'1010'1010 */;
+		        ) | 0xAAAAu/* = 0b1010'1010'1010'1010 */;
 		// now r might just need clipping
 		if (sub_len < 8) {
 			uint16_t mask = 0xFFFFffffU << (2 * (8 - sub_len));
