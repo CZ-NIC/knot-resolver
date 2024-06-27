@@ -825,7 +825,10 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 		}
 	} else if (!query->parent) {
 		/* Answer for initial query */
-		const bool to_wire = ((pkt_class & (PKT_NXDOMAIN|PKT_NODATA)) != 0);
+		const bool to_wire = ((pkt_class & (PKT_NXDOMAIN|PKT_NODATA)) != 0)
+			/* We need to cover the case of positive wildcard answer
+			 * with over-limit NSEC3 iterations. */
+				|| query->flags.DNSSEC_WEXPAND;
 		state = pick_authority(pkt, req, to_wire);
 		if (state != kr_ok()) {
 			return KR_STATE_FAIL;
