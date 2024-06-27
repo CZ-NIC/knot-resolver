@@ -58,7 +58,9 @@ class _FixCounter:
 
 async def _deny_max_worker_changes(config_old: KresConfig, config_new: KresConfig) -> Result[None, str]:
     if config_old.max_workers != config_new.max_workers:
-        return Result.err("Changing manager's `rundir` during runtime is not allowed.")
+        return Result.err(
+            "Changing 'max-workers', the maximum number of workers allowed to run, is not allowed at runtime."
+        )
 
     return Result.ok(None)
 
