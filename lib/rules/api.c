@@ -818,16 +818,28 @@ int kr_rule_local_subtree(const knot_dname_t *apex, enum kr_rule_sub_t type,
 }
 
 
-/** Encode a subnet into a (longer) string.
+/** Encode a subnet into a (longer) string.  The result is in `buf` with returned length.
  *
  * The point is to have different encodings for different subnets,
  * with using just byte-length strings (e.g. for ::/1 vs. ::/2).
- * And we need to preserve order: FIXME description
- *  - natural partial order on subnets, one included in another
- *  - partial order on strings, one being a prefix of another
- *  - implies lexicographical order on the encoded strings
+ * You might imagine this as the space of all nodes of a binary trie.
  *
- * Consequently, given a set of subnets, the t
+ * == Key properties ==
+ * We're utilizing the order on the encoded strings.  LMDB uses lexicographical order.
+ * Optimization: the properties should cut down LMDB operation count when searching
+ * for rule sets typical in practice.  Some properties:
+ *  - full address is just a subnet containing only that address (/128 and /32)
+ *  - order of full addresses is kept the same as before encoding
+ *  - ancestor first: if subnet B is included inside subnet A, we get A < B
+ *  - subnet mixing: if two subnets do not share any address, all addresses of one
+ *    of them are ordered before all addresses of the other one
+ *
+ * == The encoding ==
+ * The encoding replaces each address bit by a pair of bits:
+ *  - 00 -> beyond the subnet's prefix
+ *  - 10 -> zero bit within the subnet's prefix
+ *  - 11 ->  one bit within the subnet's prefix
+ *  - we cut the byte-length - no need for all-zero suffixes
  */
 static int subnet_encode(const struct sockaddr *addr, int sub_len, uint8_t buf[32])
 {
@@ -838,10 +850,6 @@ static int subnet_encode(const struct sockaddr *addr, int sub_len, uint8_t buf[3
 		return kr_error(EINVAL);
 	const uint8_t *a = (const uint8_t *)/*sign*/kr_inaddr(addr);
 
-	// Algo: interleave bits of the address.  Bit pairs:
-	//  - 00 -> beyond the subnet's prefix
-	//  - 10 -> zero bit within the subnet's prefix
-	//  - 11 ->  one bit within the subnet's prefix
 	int i;
 	// Let's hope that compiler optimizes this into something reasonable.
 	for (i = 0; sub_len > 0; ++i, sub_len -= 8) {
