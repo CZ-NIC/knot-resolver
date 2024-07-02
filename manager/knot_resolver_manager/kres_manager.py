@@ -3,10 +3,10 @@ import logging
 import sys
 import time
 from subprocess import SubprocessError
-from typing import Callable, List, Optional
+from typing import Any, Callable, List, Optional
 
 from knot_resolver_manager.compat.asyncio import create_task
-from knot_resolver_manager.config_store import ConfigStore
+from knot_resolver_manager.config_store import ConfigStore, only_on_real_changes_update, only_on_real_changes_verifier
 from knot_resolver_manager.constants import (
     FIX_COUNTER_DECREASE_INTERVAL_SEC,
     MANAGER_FIX_ATTEMPT_MAX_COUNTER,
@@ -18,6 +18,10 @@ from knot_resolver_manager.kresd_controller.interface import (
     SubprocessController,
     SubprocessStatus,
     SubprocessType,
+)
+from knot_resolver_manager.kresd_controller.registered_workers import (
+    command_registered_workers,
+    get_registered_workers_kresids,
 )
 from knot_resolver_manager.utils.functional import Result
 from knot_resolver_manager.utils.modeling.types import NoneType
@@ -54,7 +58,9 @@ class _FixCounter:
 
 async def _deny_max_worker_changes(config_old: KresConfig, config_new: KresConfig) -> Result[None, str]:
     if config_old.max_workers != config_new.max_workers:
-        return Result.err("Changing manager's `rundir` during runtime is not allowed.")
+        return Result.err(
+            "Changing 'max-workers', the maximum number of workers allowed to run, is not allowed at runtime."
+        )
 
     return Result.ok(None)
 
@@ -77,7 +83,9 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
 
         self._workers: List[Subprocess] = []
         self._gc: Optional[Subprocess] = None
+        self._policy_loader: Optional[Subprocess] = None
         self._manager_lock = asyncio.Lock()
+        self._workers_reset_needed: bool = False
         self._controller: SubprocessController
         self._watchdog_task: Optional["asyncio.Task[None]"] = None
         self._fix_counter: _FixCounter = _FixCounter()
@@ -109,9 +117,36 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
         logger.debug("Looking for already running workers")
         await self._collect_already_running_workers()
 
-        # registering the function calls them immediately, therefore after this, the config is applied
-        await config_store.register_verifier(self.validate_config)
-        await config_store.register_on_change_callback(self.apply_config)
+        # register and immediately call a verifier that loads policy rules into the rules database
+        await config_store.register_verifier(self.load_policy_rules)
+
+        # configuration nodes that are relevant to kresd workers and the cache garbage collector
+        def config_nodes(config: KresConfig) -> List[Any]:
+            return [
+                config.nsid,
+                config.hostname,
+                config.workers,
+                config.max_workers,
+                config.webmgmt,
+                config.options,
+                config.network,
+                config.forward,
+                config.cache,
+                config.dnssec,
+                config.dns64,
+                config.logging,
+                config.monitoring,
+                config.lua,
+            ]
+
+        # register and immediately call a verifier that validates config with 'canary' kresd process
+        await config_store.register_verifier(only_on_real_changes_verifier(config_nodes)(self.validate_config))
+
+        # register and immediately call a callback to apply config to all 'kresd' workers and 'cache-gc'
+        await config_store.register_on_change_callback(only_on_real_changes_update(config_nodes)(self.apply_config))
+
+        # register callback to reset policy rules for each 'kresd' worker
+        await config_store.register_on_change_callback(self.reset_workers_policy_rules)
 
         # register controller config change listeners
         await config_store.register_verifier(_deny_max_worker_changes)
@@ -135,6 +170,9 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
             elif subp.type == SubprocessType.GC:
                 assert self._gc is None
                 self._gc = subp
+            elif subp.type == SubprocessType.POLICY_LOADER:
+                assert self._policy_loader is None
+                self._policy_loader = subp
             else:
                 raise RuntimeError("unexpected subprocess type")
 
@@ -150,6 +188,19 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
         # spawn new children if needed
         while len(self._workers) < n:
             await self._spawn_new_worker(config)
+
+    async def _run_policy_loader(self, config: KresConfig) -> None:
+        if self._policy_loader:
+            await self._policy_loader.start(config)
+        else:
+            subprocess = await self._controller.create_subprocess(config, SubprocessType.POLICY_LOADER)
+            await subprocess.start()
+            self._policy_loader = subprocess
+
+    def _is_policy_loader_exited(self) -> bool:
+        if self._policy_loader:
+            return self._policy_loader.status() is SubprocessStatus.EXITED
+        return False
 
     def _is_gc_running(self) -> bool:
         return self._gc is not None
@@ -183,8 +234,25 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
     async def _reload_system_state(self) -> None:
         async with self._manager_lock:
             self._workers = []
+            self._policy_loader = None
             self._gc = None
             await self._collect_already_running_workers()
+
+    async def reset_workers_policy_rules(self, _config: KresConfig) -> None:
+
+        # command all running 'kresd' workers to reset their old policy rules,
+        # unless the workers have already been started with a new config so reset is not needed
+        if self._workers_reset_needed and get_registered_workers_kresids():
+            logger.debug("Resetting policy rules for all running 'kresd' workers")
+            cmd_results = await command_registered_workers("require('ffi').C.kr_rules_reset()")
+            for worker, res in cmd_results.items():
+                if res != 0:
+                    logger.error("Failed to reset policy rules in %s: %s", worker, res)
+        else:
+            logger.debug(
+                "Skipped resetting policy rules for all running 'kresd' workers:"
+                " the workers are already running with new configuration"
+            )
 
     async def apply_config(self, config: KresConfig, _noretry: bool = False) -> None:
         try:
@@ -213,6 +281,27 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                 self._fix_counter.increase()
                 await self._reload_system_state()
                 await self.apply_config(config, _noretry=True)
+
+        self._workers_reset_needed = False
+
+    async def load_policy_rules(self, _old: KresConfig, new: KresConfig) -> Result[NoneType, str]:
+        try:
+            async with self._manager_lock:
+                logger.debug("Running kresd 'policy-loader'")
+                await self._run_policy_loader(new)
+
+                # wait for 'policy-loader' to finish
+                logger.debug("Waiting for 'policy-loader' to finish loading policy rules")
+                while not self._is_policy_loader_exited():
+                    await asyncio.sleep(1)
+
+        except (SubprocessError, SubprocessControllerException) as e:
+            logger.error(f"Failed to load policy rules: {e}")
+            return Result.err("kresd 'policy-loader' process failed to start. Config might be invalid.")
+
+        self._workers_reset_needed = True
+        logger.debug("Loading policy rules has been successfully completed")
+        return Result.ok(None)
 
     async def stop(self):
         if self._watchdog_task is not None:
@@ -267,6 +356,9 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                 expected_ids = [x.id for x in self._workers]
                 if self._gc:
                     expected_ids.append(self._gc.id)
+                if self._policy_loader:
+                    expected_ids.append(self._policy_loader.id)
+
                 invoke_callback = False
 
                 for eid in expected_ids:
@@ -275,18 +367,18 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                         invoke_callback = True
                         continue
 
-                    if detected_subprocesses[eid] is SubprocessStatus.FAILED:
-                        logger.error("Subprocess '%s' is failed.", eid)
+                    if detected_subprocesses[eid] is SubprocessStatus.FATAL:
+                        logger.error("Subprocess '%s' is in FATAL state!", eid)
                         invoke_callback = True
                         continue
 
                     if detected_subprocesses[eid] is SubprocessStatus.UNKNOWN:
-                        logger.warning("Subprocess '%s' is in unknown state!", eid)
+                        logger.warning("Subprocess '%s' is in UNKNOWN state!", eid)
 
                 non_registered_ids = detected_subprocesses.keys() - set(expected_ids)
                 if len(non_registered_ids) != 0:
                     logger.error(
-                        "Found additional kresd instances in the system, which shouldn't be there - %s",
+                        "Found additional process in the system, which shouldn't be there - %s",
                         non_registered_ids,
                     )
                     invoke_callback = True

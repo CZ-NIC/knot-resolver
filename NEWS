@@ -17,12 +17,19 @@ Improvements
 - stats: add separate metrics for IPv6 and IPv4 (!1545)
 - remove unused dependency on `libedit` (!1553)
 
+- manager: policy-loader: new component for separate loading policy rules (!1540)
+
+  The ``policy-loader`` ensures that configured policies are loaded into the rules database
+  where they are made available to all running kresd workers. This loading is no longer done
+  by all kresd workers as it was before, so this should significantly improve the resolver's
+  startup/reload time when loading large sets of policy rules, e.g. large RPZs.
+
 .. TODO: Change the link below to a versioned one when releasing.
 
 Incompatible changes
 --------------------
-- cache: the ``/cache/prediction`` configuration property has been reorganized
-  into ``/cache/prefetch/expiring`` and ``/cache/prefetch/prediction``, changing
+- cache: the ``cache.prediction`` configuration property has been reorganized
+  into ``cache.prefetch.expiring`` and ``cache.prefetch.prediction``, changing
   the default behaviour as well. See the `relevant documentation section
   <https://www.knot-resolver.cz/documentation/latest/config-cache-predict.html>`_
   for more.

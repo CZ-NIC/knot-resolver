@@ -1,0 +1,40 @@
+{% if not cfg.lua.script_only %}
+
+-- FFI library
+ffi = require('ffi')
+local C = ffi.C
+
+-- logging.level
+log_level('{{ cfg.logging.level }}')
+
+{% if cfg.logging.target -%}
+-- logging.target
+log_target('{{ cfg.logging.target }}')
+{%- endif %}
+
+{% if cfg.logging.groups %}
+-- logging.groups
+log_groups({
+{% for g in cfg.logging.groups %}
+{% if g != "manager" and g != "supervisord" and g != "cache-gc" %}
+    '{{ g }}',
+{% endif %}
+{% endfor %}
+})
+{% endif %}
+
+-- Config required for the cache opening
+cache.open({{ cfg.cache.size_max.bytes() }}, 'lmdb://{{ cfg.cache.storage }}')
+
+-- VIEWS section ------------------------------------
+{% include "views.lua.j2" %}
+
+-- LOCAL-DATA section -------------------------------
+{% include "local_data.lua.j2" %}
+
+-- FORWARD section ----------------------------------
+{% include "forward.lua.j2" %}
+
+{% endif %}
+
+quit()

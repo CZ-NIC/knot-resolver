@@ -19,11 +19,13 @@ typedef uint64_t kr_rule_tags_t;
 
 /** Open the rule DB.
  *
- * You can call this to override the path or size (NULL/0 -> default).
- * Not allowed if already open (EINVAL), so this optional call has to come
- * before writing anything into the DB. */
+ * You can call this to override the path or size (NULL/0 -> default)
+ * or choose not to overwrite the DB with just the defaults.
+ *
+ * \return error code.  Not allowed if already open (EINVAL),
+ * so this optional call has to come before writing anything into the DB. */
 KR_EXPORT
-int kr_rules_init(const char *path, size_t maxsize);
+int kr_rules_init(const char *path, size_t maxsize, bool overwrite);
 /** kr_rules_init() but OK if already open, and not allowing to override defaults. */
 KR_EXPORT
 int kr_rules_init_ensure(void);
@@ -36,9 +38,21 @@ void kr_rules_deinit(void);
  * Normally commit happens only on successfully loading a config file.
  * However, an advanced user may get in trouble e.g. if calling resolve() from there,
  * causing even an assertion failure.  In that case they might want to commit explicitly.
+ *
+ * If only read-only transaction is open, this will NOT reset it to the newest data.
  */
 KR_EXPORT
 int kr_rules_commit(bool accept);
+
+/** Reset to the latest version of rules committed in the DB.
+ *
+ * Note that this is not always a good idea.  For example, the `forward` rules
+ * now use data from both the DB and lua config, so reloading only the DB
+ * may lead to weird behavior in some cases.
+ * (Modifications will also do this, as you can only modify the latest DB.)
+ */
+KR_EXPORT
+int kr_rules_reset(void);
 
 /** Try answering the query from local data; WIP: otherwise determine data source overrides.
  *

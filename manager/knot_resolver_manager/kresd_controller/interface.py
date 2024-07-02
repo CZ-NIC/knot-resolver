@@ -6,10 +6,11 @@ import struct
 import sys
 from abc import ABC, abstractmethod  # pylint: disable=no-name-in-module
 from enum import Enum, auto
+from pathlib import Path
 from typing import Dict, Iterable, Optional, Type, TypeVar
 from weakref import WeakValueDictionary
 
-from knot_resolver_manager.constants import kresd_config_file
+from knot_resolver_manager.constants import kresd_config_file, policy_loader_config_file
 from knot_resolver_manager.datamodel.config_schema import KresConfig
 from knot_resolver_manager.exceptions import SubprocessControllerException
 from knot_resolver_manager.kresd_controller.registered_workers import register_worker, unregister_worker
@@ -20,7 +21,15 @@ logger = logging.getLogger(__name__)
 
 class SubprocessType(Enum):
     KRESD = auto()
+    POLICY_LOADER = auto()
     GC = auto()
+
+
+class SubprocessStatus(Enum):
+    RUNNING = auto()
+    FATAL = auto()
+    EXITED = auto()
+    UNKNOWN = auto()
 
 
 T = TypeVar("T", bound="KresID")
@@ -104,25 +113,46 @@ class Subprocess(ABC):
         self._config = config
         self._registered_worker: bool = False
 
-    async def start(self) -> None:
-        # create config file
-        lua_config = self._config.render_lua()
-        await writefile(kresd_config_file(self._config, self.id), lua_config)
+    async def start(self, new_config: Optional[KresConfig] = None) -> None:
+        if new_config:
+            self._config = new_config
+
+        config_file: Optional[Path] = None
+        if self.type is SubprocessType.KRESD:
+            config_lua = self._config.render_lua()
+            config_file = kresd_config_file(self._config, self.id)
+            await writefile(config_file, config_lua)
+        elif self.type is SubprocessType.POLICY_LOADER:
+            config_lua = self._config.render_lua_policy()
+            config_file = policy_loader_config_file(self._config)
+            await writefile(config_file, config_lua)
+
         try:
             await self._start()
             if self.type is SubprocessType.KRESD:
                 register_worker(self)
                 self._registered_worker = True
         except SubprocessControllerException as e:
-            kresd_config_file(self._config, self.id).unlink()
+            if config_file:
+                config_file.unlink()
             raise e
 
     async def apply_new_config(self, new_config: KresConfig) -> None:
         self._config = new_config
+
         # update config file
         logger.debug(f"Writing config file for {self.id}")
-        lua_config = new_config.render_lua()
-        await writefile(kresd_config_file(new_config, self.id), lua_config)
+
+        config_file: Optional[Path] = None
+        if self.type is SubprocessType.KRESD:
+            config_lua = self._config.render_lua()
+            config_file = kresd_config_file(self._config, self.id)
+            await writefile(config_file, config_lua)
+        elif self.type is SubprocessType.POLICY_LOADER:
+            config_lua = self._config.render_lua_policy()
+            config_file = policy_loader_config_file(self._config)
+            await writefile(config_file, config_lua)
+
         # update runtime status
         logger.debug(f"Restarting {self.id}")
         await self._restart()
@@ -138,7 +168,13 @@ class Subprocess(ABC):
         Remove temporary files and all traces of this instance running. It is NOT SAFE to call this while
         the kresd is running, because it will break automatic restarts (at the very least).
         """
-        kresd_config_file(self._config, self.id).unlink()
+
+        if self.type is SubprocessType.KRESD:
+            config_file = kresd_config_file(self._config, self.id)
+            config_file.unlink()
+        elif self.type is SubprocessType.POLICY_LOADER:
+            config_file = policy_loader_config_file(self._config)
+            config_file.unlink()
 
     def __eq__(self, o: object) -> bool:
         return isinstance(o, type(self)) and o.type == self.type and o.id == self.id
@@ -158,6 +194,10 @@ class Subprocess(ABC):
     async def _restart(self) -> None:
         pass
 
+    @abstractmethod
+    def status(self) -> SubprocessStatus:
+        pass
+
     @property
     def type(self) -> SubprocessType:
         return self.id.subprocess_type
@@ -167,8 +207,12 @@ class Subprocess(ABC):
         return self._id
 
     async def command(self, cmd: str) -> object:
+        if not self._registered_worker:
+            raise RuntimeError("the command cannot be sent to a process other than the kresd worker")
+
         reader: asyncio.StreamReader
         writer: Optional[asyncio.StreamWriter] = None
+
         try:
             reader, writer = await asyncio.open_unix_connection(f"./control/{int(self.id)}")
 
@@ -195,12 +239,6 @@ class Subprocess(ABC):
                 # proper closing of the socket is only implemented in later versions of python
                 if sys.version_info.minor >= 7:
                     await writer.wait_closed()  # type: ignore
-
-
-class SubprocessStatus(Enum):
-    RUNNING = auto()
-    FAILED = auto()
-    UNKNOWN = auto()
 
 
 class SubprocessController(ABC):

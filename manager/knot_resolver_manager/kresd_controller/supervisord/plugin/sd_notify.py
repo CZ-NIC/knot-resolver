@@ -49,25 +49,37 @@ class NotifySocketDispatcher:
             return None  # there was some junk
         pid, data = res
 
+        # pylint: disable=undefined-loop-variable
+        for proc in starting_processes:
+            if proc.pid == pid:
+                break
+        else:
+            logger.warn(f"ignoring ready notification from unregistered PID={pid}")
+            return None
+
         if data.startswith(b"READY=1"):
             # handle case, when some process is really ready
-
-            # pylint: disable=undefined-loop-variable
-            for proc in starting_processes:
-                if proc.pid == pid:
-                    break
-            else:
-                logger.warn(f"ignoring ready notification from unregistered PID={pid}")
-                return None
 
             if is_type_notify(proc):
                 proc._assertInState(ProcessStates.STARTING)
                 proc.change_state(ProcessStates.RUNNING)
                 logger.info(
-                    f"success: {proc.config.name} entered RUNNING state, process sent ready notification via $NOTIFY_SOCKET"
+                    f"success: {proc.config.name} entered RUNNING state, process sent notification via $NOTIFY_SOCKET"
                 )
             else:
-                logger.warn(f"ignoring ready notification from {proc.config.name}, which is not configured to send it")
+                logger.warn(f"ignoring READY notification from {proc.config.name}, which is not configured to send it")
+
+        elif data.startswith(b"STOPPING=1"):
+            # just accept the message, filter unwanted notifications and do nothing else
+
+            if is_type_notify(proc):
+                logger.info(
+                    f"success: {proc.config.name} entered STOPPING state, process sent notification via $NOTIFY_SOCKET"
+                )
+            else:
+                logger.warn(
+                    f"ignoring STOPPING notification from {proc.config.name}, which is not configured to send it"
+                )
 
         else:
             # handle case, when we got something unexpected
@@ -103,6 +115,7 @@ def keep_track_of_starting_processes(event: ProcessStateEvent) -> None:
         # process is starting
         # if proc not in starting_processes:
         starting_processes.append(proc)
+
     else:
         # not starting
         starting_processes = [p for p in starting_processes if p.pid is not proc.pid]

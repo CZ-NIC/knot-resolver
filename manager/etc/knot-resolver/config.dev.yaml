@@ -47,7 +47,7 @@ local-data:
       tags: [t02]
       ttl: 10m
     - subtree: empty
-      tags: [ t2 ]
+      tags: [ t02 ]
       name: [ example1.org ]
     - subtree: nxdomain
       name: [ sub4.example.org ]

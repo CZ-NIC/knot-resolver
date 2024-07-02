@@ -39,6 +39,10 @@ def kresd_cache_dir(config: "KresConfig") -> Path:
     return config.cache.storage.to_path()
 
 
+def policy_loader_config_file(_config: "KresConfig") -> Path:
+    return Path("policy-loader.conf")
+
+
 def kresd_config_file(_config: "KresConfig", kres_id: "KresID") -> Path:
     return Path(f"kresd{int(kres_id)}.conf")
 
