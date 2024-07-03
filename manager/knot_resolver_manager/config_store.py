@@ -27,9 +27,7 @@ class ConfigStore:
         err_res = filter(lambda r: r.is_err(), results)
         errs = list(map(lambda r: r.unwrap_err(), err_res))
         if len(errs) > 0:
-            raise KresManagerException(
-                "Validation of the new config failed. The reasons are:\n - " + "\n - ".join(errs)
-            )
+            raise KresManagerException("Configuration validation failed. The reasons are:\n - " + "\n - ".join(errs))
 
         async with self._update_lock:
             # update the stored config with the new version
@@ -38,6 +36,9 @@ class ConfigStore:
             # invoke change callbacks
             for call in self._callbacks:
                 await call(config)
+
+    async def renew(self) -> None:
+        await self.update(self._config)
 
     async def register_verifier(self, verifier: VerifyCallback) -> None:
         self._verifiers.append(verifier)

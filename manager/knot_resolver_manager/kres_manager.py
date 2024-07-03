@@ -337,9 +337,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
             self._fix_counter.increase()
             await self._reload_system_state()
             logger.warning("Workers reloaded. Applying old config....")
-            old_config = self._config_store.get()
-            await self.load_policy_rules(old_config, old_config)
-            await self.apply_config(old_config, _noretry=True)
+            await self._config_store.renew()
             logger.warning(f"System stability hopefully renewed. Fix attempt counter is currently {self._fix_counter}")
         except BaseException:
             logger.error("Failed attempting to fix an error. Forcefully shutting down.", exc_info=True)
