@@ -16,6 +16,7 @@ Improvements
   * prefetch module: new module to prefetch expiring records
 - stats: add separate metrics for IPv6 and IPv4 (!1545)
 - remove unused dependency on `libedit` (!1553)
+- add the fresh DNSSEC root key "KSK-2024" already, Key ID 38696 (!1556)
 
 - manager: policy-loader: new component for separate loading policy rules (!1540)
 
@@ -113,12 +114,26 @@ https://www.knot-resolver.cz/documentation/latest/upgrading-to-6.html
 5.x branch longterm support
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Knot Resolver 5.7.3 (2024-0m-dd)
+Knot Resolver 5.7.4 (2024-06-dd)
+================================
+
+Improvements
+------------
+- add the fresh DNSSEC root key "KSK-2024" already, Key ID 38696 (!1556)
+
+
+Knot Resolver 5.7.3 (2024-05-30)
 ================================
 
 Improvements
 ------------
 - stats: add separate metrics for IPv6 and IPv4 (!1544)
+
+Bugfixes
+--------
+- fix NSEC3 records missing in answer for positive wildcard expansion
+  with the NSEC3 having over-limit iteration count (#910, !1550)
+
 
 Knot Resolver 5.7.2 (2024-03-27)
 ================================
