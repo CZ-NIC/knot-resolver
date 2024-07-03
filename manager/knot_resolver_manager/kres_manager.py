@@ -345,7 +345,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
             logger.error("Failed attempting to fix an error. Forcefully shutting down.", exc_info=True)
             await self.forced_shutdown()
 
-    async def _watchdog(self) -> None:
+    async def _watchdog(self) -> None:  # pylint: disable=too-many-branches
         while True:
             await asyncio.sleep(WATCHDOG_INTERVAL)
 
@@ -358,10 +358,11 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                 expected_ids = [x.id for x in self._workers]
                 if self._gc:
                     expected_ids.append(self._gc.id)
-                if self._policy_loader:
-                    expected_ids.append(self._policy_loader.id)
 
                 invoke_callback = False
+
+                if self._policy_loader:
+                    expected_ids.append(self._policy_loader.id)
 
                 for eid in expected_ids:
                     if eid not in detected_subprocesses:
@@ -370,6 +371,12 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                         continue
 
                     if detected_subprocesses[eid] is SubprocessStatus.FATAL:
+                        if self._policy_loader and self._policy_loader.id == eid:
+                            logger.info(
+                                "Subprocess '%s' is skipped by WatchDog because its status is monitored in a different way.",
+                                eid,
+                            )
+                            continue
                         logger.error("Subprocess '%s' is in FATAL state!", eid)
                         invoke_callback = True
                         continue
