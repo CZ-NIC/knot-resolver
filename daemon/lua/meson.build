@@ -84,10 +84,15 @@ if get_option('kres_gen_test') and not meson.is_cross_build()
     { 'tname': 'knot_pkt_t', 'incl' : '#include <libknot/packet/pkt.h>', 'dep': libknot },
   ]
   # Construct the lua tester as a meson string.
+  if meson.version().version_compare('>=1.4')
+    kres_gen_lua_path = kres_gen_lua.full_path()
+  else
+    kres_gen_lua_path = '@0@/../../@1@'.format(meson.current_build_dir(), kres_gen_lua)
+  endif
   kres_gen_test_luastr = '''
-    dofile('@0@/../../@1@')
+    dofile('@0@')
     local ffi = require('ffi')
-  '''.format(meson.current_build_dir(), kres_gen_lua)
+  '''.format(kres_gen_lua_path)
   foreach ttc: types_to_check
     # We're careful with adding just includes; otherwise it's more fragile (e.g. linking flags).
     if 'dep' in ttc
