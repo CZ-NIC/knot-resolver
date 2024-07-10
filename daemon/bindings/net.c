@@ -1191,7 +1191,7 @@ static int net_register_endpoint_kind(lua_State *L)
 	if (param_count == 1) {
 		void *val;
 		if (trie_del(the_network->endpoint_kinds, kind, kind_len, &val) == KNOT_EOK) {
-			const int fun_id = (char *)val - (char *)NULL;
+			const int fun_id = (intptr_t)val;
 			luaL_unref(L, LUA_REGISTRYINDEX, fun_id);
 			return 0;
 		}
@@ -1209,7 +1209,7 @@ static int net_register_endpoint_kind(lua_State *L)
 	if (!pp) lua_error_maybe(L, kr_error(ENOMEM));
 	if (*pp != NULL || !strcasecmp(kind, "dns") || !strcasecmp(kind, "tls"))
 		lua_error_p(L, "attempt to register known kind '%s'\n", kind);
-	*pp = (char *)NULL + fun_id;
+	*pp = (void *)(intptr_t)fun_id;
 	/* We don't attempt to engage corresponding endpoints now.
 	 * That's the job for network_engage_endpoints() later. */
 	return 0;
