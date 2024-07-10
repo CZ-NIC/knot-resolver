@@ -823,16 +823,10 @@ int io_listen_xdp(uv_loop_t *loop, struct endpoint *ep, const char *ifname)
 
 	// This call is a libknot version hell, unfortunately.
 	int ret = knot_xdp_init(&xhd->socket, ifname, ep->nic_queue,
-		#if KNOT_VERSION_HEX < 0x030200
-			ep->port ? ep->port : (KNOT_XDP_LISTEN_PORT_PASS | 0),
-			KNOT_XDP_LOAD_BPF_MAYBE
-		#else
 			KNOT_XDP_FILTER_UDP | (ep->port ? 0 : KNOT_XDP_FILTER_PASS),
 			ep->port, 0/*quic_port*/,
 			KNOT_XDP_LOAD_BPF_MAYBE,
-			NULL/*xdp_config*/
-		#endif
-		);
+			NULL/*xdp_config*/);
 
 	if (!ret) xdp_warn_mode(ifname);
 

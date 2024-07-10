@@ -99,6 +99,7 @@ struct knot_pkt {
 	knot_rrset_t *rr;
 	knot_mm_t mm;
 	knot_compr_t compr;
+	knot_dname_storage_t lower_qname;
 };
 typedef struct trie trie_t;
 struct kr_qflags {
@@ -647,6 +648,7 @@ typedef struct zs_scanner {
 	uint8_t addr[16];
 	_Bool long_string;
 	_Bool comma_list;
+	_Bool pending_backslash;
 	uint8_t *dname;
 	uint32_t *dname_length;
 	uint32_t dname_tmp_length;

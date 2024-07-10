@@ -246,11 +246,7 @@ static int pkt_padding(knot_pkt_t *packet, int32_t padding)
 	if (padding == -1) { /* use the default padding policy from libknot */
 		const size_t block_size = knot_wire_get_qr(packet->wire)
 					? KNOT_EDNS_ALIGNMENT_RESPONSE_DEFAULT
-				#if KNOT_VERSION_HEX < 0x030200
-					: KNOT_EDNS_ALIGNMENT_QUERY_DEFALT;
-				#else
 					: KNOT_EDNS_ALIGNMENT_QUERY_DEFAULT;
-				#endif
 		pad_bytes = knot_edns_alignment_size(packet->size, knot_rrset_size(opt_rr),
 							block_size);
 	}

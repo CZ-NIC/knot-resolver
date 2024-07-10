@@ -34,8 +34,7 @@ Incompatible changes
   the default behaviour as well. See the `relevant documentation section
   <https://www.knot-resolver.cz/documentation/latest/config-cache-predict.html>`_
   for more.
-- libknot 3.0.x support is dropped (!1558)
-  Upstream last maintained 3.0.x in spring 2022.
+- libknot <=3.2.x support is dropped (!1565)
 
 Bugfixes
 --------

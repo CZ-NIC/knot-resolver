@@ -33,10 +33,6 @@
 #include <libzscanner/scanner.h>
 
 #include <libdnssec/digest.h>
-#if KNOT_VERSION_HEX < 0x030200
-	#define KNOT_ZONEMD_ALGORITHM_SHA384 KNOT_ZONEMD_ALORITHM_SHA384
-	#define KNOT_ZONEMD_ALGORITHM_SHA512 KNOT_ZONEMD_ALORITHM_SHA512
-#endif
 
 #include "daemon/worker.h"
 #include "lib/dnssec/ta.h"
