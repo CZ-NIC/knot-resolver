@@ -22,5 +22,5 @@ int mmapped_init(struct mmapped *mmapped, const char *mmap_file, size_t size, vo
  * Returns zero on success and kr_error(errno) on system error. */
 int mmapped_init_continue(struct mmapped *mmapped);
 
-/* Free mmapped memory and truncate underlying file to zero size unless it is used by other processes. */
+/* Free mmapped memory and, unless the underlying file is used by other processes, truncate it to zero size. */
 void mmapped_deinit(struct mmapped *mmapped);

@@ -525,6 +525,11 @@ size_t protolayer_queue_count_payload(const protolayer_iter_ctx_queue_t *queue);
  * queue iterators, as it does not need to iterate through the whole queue. */
 bool protolayer_queue_has_payload(const protolayer_iter_ctx_queue_t *queue);
 
+/** Gets layer-specific iteration data for the last processed layer.
+ * To be used after returning from its callback for async continuation but before calling protolayer_continue. */
+void *protolayer_iter_data_get_current(struct protolayer_iter_ctx *ctx);
+
+
 /** Layer-specific data - the generic struct. To be added as the first member of
  * each specific struct. */
 struct protolayer_data {
