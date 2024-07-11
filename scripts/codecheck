@@ -32,25 +32,25 @@ fi
 
 # check formatting using black
 echo -e "${yellow}Checking formatting using black...${reset}"
-black knot_resolver_manager tests scripts --check --diff
+black manager/knot_resolver_manager tests/manager scripts/create_setup.py --check --diff
 check_rv $?
 echo
 
 # check code with pylint
 echo -e "${yellow}Linting using pylint...${reset}"
-pylint knot_resolver_manager
+pylint manager/knot_resolver_manager
 check_rv $?
 echo
 
 # check code with flake8
 echo -e "${yellow}Linting using flake8...${reset}"
-flake8 --ignore=E266,W503 knot_resolver_manager
+flake8 --max-line-length=200 --ignore=E266,W503 --extend-ignore=E203 manager/knot_resolver_manager
 check_rv $?
 echo
 
 # check types with mypy
 echo -e "${yellow}Type checking using mypy...${reset}"
-mypy knot_resolver_manager
+mypy manager/knot_resolver_manager
 check_rv $?
 echo
 
