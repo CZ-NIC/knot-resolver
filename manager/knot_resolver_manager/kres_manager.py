@@ -327,7 +327,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
     async def _instability_handler(self) -> None:
         if self._fix_counter.is_too_high():
             logger.error(
-                "Already attempted to many times to fix system state. Refusing to try again and shutting down."
+                "Already attempted too many times to fix system state. Refusing to try again and shutting down."
             )
             await self.forced_shutdown()
             return
@@ -337,13 +337,13 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
             self._fix_counter.increase()
             await self._reload_system_state()
             logger.warning("Workers reloaded. Applying old config....")
-            await self.apply_config(self._config_store.get(), _noretry=True)
+            await self._config_store.renew()
             logger.warning(f"System stability hopefully renewed. Fix attempt counter is currently {self._fix_counter}")
         except BaseException:
             logger.error("Failed attempting to fix an error. Forcefully shutting down.", exc_info=True)
             await self.forced_shutdown()
 
-    async def _watchdog(self) -> None:
+    async def _watchdog(self) -> None:  # pylint: disable=too-many-branches
         while True:
             await asyncio.sleep(WATCHDOG_INTERVAL)
 
@@ -356,10 +356,11 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                 expected_ids = [x.id for x in self._workers]
                 if self._gc:
                     expected_ids.append(self._gc.id)
-                if self._policy_loader:
-                    expected_ids.append(self._policy_loader.id)
 
                 invoke_callback = False
+
+                if self._policy_loader:
+                    expected_ids.append(self._policy_loader.id)
 
                 for eid in expected_ids:
                     if eid not in detected_subprocesses:
@@ -368,6 +369,12 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                         continue
 
                     if detected_subprocesses[eid] is SubprocessStatus.FATAL:
+                        if self._policy_loader and self._policy_loader.id == eid:
+                            logger.info(
+                                "Subprocess '%s' is skipped by WatchDog because its status is monitored in a different way.",
+                                eid,
+                            )
+                            continue
                         logger.error("Subprocess '%s' is in FATAL state!", eid)
                         invoke_callback = True
                         continue
