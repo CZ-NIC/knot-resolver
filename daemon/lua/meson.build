@@ -39,12 +39,8 @@ distro_preconfig = configure_file(
 )
 
 # Unfortunately the different ABI implies different contents of 'kres-gen.lua'.
-if libknot.version().version_compare('>= 3.2')
-  kres_gen_fname = 'kres-gen-32.lua'
-elif libknot.version().version_compare('>= 3.1')
-  kres_gen_fname = 'kres-gen-31.lua'
-else
-  kres_gen_fname = 'kres-gen-30.lua'
+if libknot.version().version_compare('>= 3.3')
+  kres_gen_fname = 'kres-gen-33.lua'
 endif
 
 # Exact types around time_t aren't easy to detect, but at least we need the same size.

@@ -18,7 +18,7 @@ endif
 
 
 message('--- required dependencies ---')
-knot_version = '>=3.0.2'
+knot_version = '>=3.3'
 libknot = dependency('libknot', version: knot_version)
 libdnssec = dependency('libdnssec', version: knot_version)
 libzscanner = dependency('libzscanner', version: knot_version)
