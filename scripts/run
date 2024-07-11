@@ -14,8 +14,8 @@ poetry build
 shopt -s globstar
 shopt -s nullglob
 for d in build/lib*; do
-    for f in "$d/"**/*.so; do
-        cp -v "$f" ${f#"$d/"}
+    for f in "manager/$d/"**/*.so; do
+        cp -v "$f" ${f#"manager/$d/"}
     done
 done
 shopt -u globstar
@@ -26,17 +26,17 @@ echo Knot Manager API is accessible on http://localhost:5000
 echo -------------------------------------------------------
 
 # create runtime directories
-if [ -z "${KRES_MANAGER_RUNTIME:-}" ]; then
-    KRES_MANAGER_RUNTIME="etc/knot-resolver"
+if [ -z "${KRES_CONFIG_DIR:-}" ]; then
+    KRES_CONFIG_DIR="etc/config"
 fi
-mkdir -p "$KRES_MANAGER_RUNTIME/runtime" "$KRES_MANAGER_RUNTIME/cache"
+mkdir -p "$KRES_CONFIG_DIR/runtime" "$KRES_CONFIG_DIR/cache"
 
 if [ -z "${KRES_MANAGER_CONFIG:-}" ]; then
-    KRES_MANAGER_CONFIG="$KRES_MANAGER_RUNTIME/config.dev.yaml"
+    KRES_MANAGER_CONFIG="$KRES_CONFIG_DIR/config.dev.yaml"
 fi
 
 if [ -z "${KRES_MANAGER_API_SOCK:-}" ]; then
-    KRES_MANAGER_API_SOCK="$KRES_MANAGER_RUNTIME/manager.sock"
+    KRES_MANAGER_API_SOCK="$KRES_CONFIG_DIR/manager.sock"
 fi
 
 export KRES_MANAGER_CONFIG

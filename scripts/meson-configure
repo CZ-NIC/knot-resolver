@@ -4,12 +4,10 @@
 src_dir="$(dirname "$(realpath "$0")")"
 source $src_dir/_env.sh
 
-pushd ..
 reconfigure=''
-if [ -f manager/.build_kresd/ninja.build ]; then
+if [ -f .build_kresd/ninja.build ]; then
 	reconfigure='--reconfigure'
 fi
-meson setup manager/.build_kresd "$reconfigure" --prefix=$(realpath manager/.install_kresd) "$@"
-popd
+meson setup .build_kresd "$reconfigure" --prefix=$(realpath .install_kresd) "$@"
 
 build_kresd

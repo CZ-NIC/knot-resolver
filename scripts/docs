@@ -3,8 +3,8 @@
 # ensure consistent behaviour
 src_dir="$(dirname "$(realpath "$0")")"
 source $src_dir/_env.sh
-cd ..
 
-echo Building documentation for Knot Resolver
+echo Building Knot Resolver documentation
+echo ------------------------------------
 meson build_doc -Ddoc=enabled
 ninja -C build_doc doc
