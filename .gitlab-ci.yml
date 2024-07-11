@@ -765,11 +765,6 @@ packaging:centos_8:
   variables:
     DISTRO: centos_8
 
-packaging:centos_7:
-  <<: *packagingtest
-  variables:
-    DISTRO: centos_7
-
 packaging:fedora_31:
   <<: *packagingtest
   variables:

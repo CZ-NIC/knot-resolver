@@ -40,17 +40,6 @@ stages:
   - apt-get install -y python3-pip devscripts
   - *apkgbuild
 
-centos-7:pkgbuild:
-  <<: *pkgbuild
-  image: $CI_REGISTRY/labs/lxc-gitlab-runner/centos-7
-  before_script:
-    - export LC_ALL=en_US.UTF-8
-    - git config --global user.name CI
-    - git config --global user.email ci@nic
-  script:
-    - yum install -y rpm-build python3-pip epel-release
-    - *apkgbuild
-
 debian-10:pkgbuild:
   <<: *pkgbuild
   image: $CI_REGISTRY/labs/lxc-gitlab-runner/debian-10
@@ -146,20 +135,6 @@ nixos-unstable:pkgbuild:
   - apt-get install -y $(find ./pkg/pkgs -name '*.deb' | grep -v module | grep -v debug | grep -v devel)
   - systemctl start kresd@1
   - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
-
-centos-7:pkgtest:
-  <<: *pkgtest
-  needs:
-    - centos-7:pkgbuild
-  image: $CI_REGISTRY/labs/lxc-gitlab-runner/centos-7
-  before_script:
-    - export LC_ALL=en_US.UTF-8
-  script:
-    - yum install -y epel-release
-    - yum install -y knot-utils findutils
-    - yum install -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module | grep -v debug | grep -v devel)
-    - systemctl start kresd@1
-    - kdig @127.0.0.1 nic.cz | grep -qi NOERROR
 
 debian-10:pkgtest:
   <<: *pkgtest
