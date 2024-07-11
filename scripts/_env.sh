@@ -15,7 +15,7 @@ if test -z "$gitroot"; then
 	echo -e "${red}This command can be run only in a git repository tree.${reset}"
 	exit 1
 fi
-cd $gitroot/manager
+cd $gitroot
 
 # ensure consistent environment with virtualenv
 if test -z "$VIRTUAL_ENV" -a "$CI" != "true" -a -z "$KNOT_ENV"; then
@@ -34,19 +34,17 @@ PATH="$PATH:$gitroot/node_modules/.bin"
 # fail even on unbound variables
 set -o nounset
 
-
 function build_kresd {
-	pushd ..
-	if [ -d manager/.build_kresd ]; then
+	if [ -d .build_kresd ]; then
 		echo
 		echo Building Knot Resolver
 		echo ----------------------
 		echo -e "${blue}In case of an compilation error, run this command to try to fix it:${reset}"
 		echo -e "\t${blue}rm -r $(realpath .install_kresd) $(realpath .build_kresd)${reset}"
 		echo
-		ninja -C manager/.build_kresd
-		ninja install -C manager/.build_kresd
-		export PYTHONPATH="$(realpath manager/.build_kresd/python):${PYTHONPATH:-}"
+		ninja -C .build_kresd
+		ninja install -C .build_kresd
+		export PYTHONPATH="$(realpath .build_kresd/python):${PYTHONPATH:-}"
 	else
 		echo
 		echo Knot Resolver daemon is not configured.
@@ -54,5 +52,4 @@ function build_kresd {
 		echo
 		exit 2
 	fi
-	popd
 }

@@ -3,8 +3,7 @@
 # ensure consistent behaviour
 src_dir="$(dirname "$(realpath "$0")")"
 source $src_dir/_env.sh
-cd ..
 
-echo Building documentation for Knot Resolver
-meson build_doc -Ddoc=enabled
-ninja -C build_doc doc
+meson setup .build_kresd --reconfigure --prefix=$(realpath .install_kresd) "$@"
+
+build_kresd
