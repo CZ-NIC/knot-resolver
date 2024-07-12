@@ -1,8 +1,0 @@
-node_modules/
-.mypy_cache/
-.pytest_cache/
-.tox/
-.git/
-.vscode/
-
-containers/
