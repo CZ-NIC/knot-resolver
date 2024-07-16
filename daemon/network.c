@@ -102,7 +102,7 @@ static int endpoint_open_lua_cb(struct endpoint *ep,
 	if (!pp) return kr_ok();
 
 	/* Now execute the callback. */
-	const int fun_id = (char *)*pp - (char *)NULL;
+	const int fun_id = (intptr_t)*pp;
 	lua_rawgeti(L, LUA_REGISTRYINDEX, fun_id);
 	lua_pushboolean(L, true /* open */);
 	lua_pushpointer(L, ep);
@@ -182,7 +182,7 @@ static void endpoint_close_lua_cb(struct endpoint *ep)
 	}
 	if (!pp) return;
 
-	const int fun_id = (char *)*pp - (char *)NULL;
+	const int fun_id = (intptr_t)*pp;
 	lua_rawgeti(L, LUA_REGISTRYINDEX, fun_id);
 	lua_pushboolean(L, false /* close */);
 	lua_pushpointer(L, ep);
@@ -262,7 +262,7 @@ static int free_key(trie_val_t *val, void* ext)
 
 int kind_unregister(trie_val_t *tv, void *L)
 {
-	int fun_id = (char *)*tv - (char *)NULL;
+	int fun_id = (intptr_t)*tv;
 	luaL_unref(L, LUA_REGISTRYINDEX, fun_id);
 	return 0;
 }

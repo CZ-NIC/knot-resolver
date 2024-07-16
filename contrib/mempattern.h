@@ -81,7 +81,7 @@ static inline void mm_ctx_init_aligned(knot_mm_t *mm, size_t alignment)
 {
 	assert(__builtin_popcount(alignment) == 1);
 	mm_ctx_init(mm);
-	mm->ctx = (uint8_t *)NULL + alignment; /*< roundabout to satisfy linters */
+	mm->ctx = (void *)(uintptr_t)alignment; /*< roundabout to satisfy linters */
 	/* posix_memalign() doesn't allow alignment < sizeof(void*),
 	 * and there's no point in using it for small values anyway,
 	 * as plain malloc() guarantees at least max_align_t. */

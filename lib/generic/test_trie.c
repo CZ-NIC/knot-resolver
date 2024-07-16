@@ -48,7 +48,7 @@ static void test_insert(void **state)
 		trie_val_t *data = trie_get_ins(t, dict[i], KEY_LEN(dict[i]));
 		assert_non_null(data);
 		assert_null(*data);
-		*data = (char *)NULL + i; // yes, ugly
+		*data = (void *)(intptr_t)i; // yes, ugly
 		assert_ptr_equal(trie_get_try(t, dict[i], KEY_LEN(dict[i])), data);
 	}
 	assert_int_equal(trie_weight(t), dict_size);
@@ -82,7 +82,7 @@ static void test_iter(void **state)
 		const char *key = trie_it_key(it, &len);
 		assert_int_equal(KEY_LEN(key), len);
 		assert_string_equal(key, dict_sorted[i]);
-		assert_ptr_equal(dict[(char *)*trie_it_val(it) - (char *)NULL],
+		assert_ptr_equal(dict[(uintptr_t)*trie_it_val(it)],
 				 dict_sorted[i]);
 	}
 	assert_true(trie_it_finished(it));
@@ -100,7 +100,7 @@ static void test_queue(void **state)
 		assert_non_null(key);
 		assert_int_equal(len, KEY_LEN(key));
 		assert_non_null(data);
-		ptrdiff_t key_i = (char *)*data - (char *)NULL;
+		uintptr_t key_i = (uintptr_t)*data;
 		assert_string_equal(key, dict[key_i]);
 
 		len = 30;
