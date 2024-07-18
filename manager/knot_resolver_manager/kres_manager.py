@@ -2,6 +2,7 @@ import asyncio
 import logging
 import sys
 import time
+from secrets import token_hex
 from subprocess import SubprocessError
 from typing import Any, Callable, List, Optional
 
@@ -148,6 +149,11 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
         # register callback to reset policy rules for each 'kresd' worker
         await config_store.register_on_change_callback(self.reset_workers_policy_rules)
 
+        # register and immediately call a callback to set new TLS session ticket secret for 'kresd' workers
+        await config_store.register_on_change_callback(
+            only_on_real_changes_update(config_nodes)(self.set_new_tls_sticket_secret)
+        )
+
         # register controller config change listeners
         await config_store.register_verifier(_deny_max_worker_changes)
 
@@ -253,6 +259,20 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                 "Skipped resetting policy rules for all running 'kresd' workers:"
                 " the workers are already running with new configuration"
             )
+
+    async def set_new_tls_sticket_secret(self, config: KresConfig) -> None:
+
+        if config.network.tls.sticket_secret or config.network.tls.sticket_secret_file:
+            logger.debug("User-configured TLS resumption secret found - skipping auto-generation.")
+            return
+
+        logger.debug("Creating TLS session ticket secret")
+        secret = token_hex(32)
+        logger.debug("Setting TLS session ticket secret for all running 'kresd' workers")
+        cmd_results = await command_registered_workers(f"net.tls_sticket_secret('{secret}')")
+        for worker, res in cmd_results.items():
+            if res not in (0, True):
+                logger.error("Failed to set TLS session ticket secret in %s: %s", worker, res)
 
     async def apply_config(self, config: KresConfig, _noretry: bool = False) -> None:
         try:
