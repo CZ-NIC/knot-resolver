@@ -21,6 +21,7 @@ class ConvertCommand(Command):
         self.input_file: str = namespace.input_file
         self.output_file: Optional[str] = namespace.output_file
         self.strict: bool = namespace.strict
+        self.type: str = namespace.type
 
     @staticmethod
     def register_args_subparser(
@@ -33,6 +34,9 @@ class ConvertCommand(Command):
             help="Ignore strict rules during validation, e.g. path/file existence.",
             action="store_false",
             dest="strict",
+        )
+        convert.add_argument(
+            "--type", help="The type of Lua script to generate", choices=["worker", "policy-loader"], default="worker"
         )
         convert.add_argument(
             "input_file",
@@ -61,7 +65,14 @@ class ConvertCommand(Command):
         try:
             parsed = try_to_parse(data)
             set_global_validation_context(Context(Path(Path(self.input_file).parent), self.strict))
-            lua = KresConfig(parsed).render_lua()
+
+            if self.type == "worker":
+                lua = KresConfig(parsed).render_lua()
+            elif self.type == "policy-loader":
+                lua = KresConfig(parsed).render_lua_policy()
+            else:
+                raise ValueError(f"Invalid self.type={self.type}")
+
             reset_global_validation_context()
         except (DataParsingError, DataValidationError) as e:
             print(e, file=sys.stderr)

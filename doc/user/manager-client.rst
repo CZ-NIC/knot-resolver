@@ -262,6 +262,15 @@ single ``kresctl`` command.
 
         Ignore strict rules during validation, e.g. path/file existence.
 
+    .. option:: --type=<worker|policy-loader>
+
+        Which type of Lua script to generate.
+
+        * ``worker`` generates a script for the daemon (default)
+        * ``policy-loader`` generates a script for the one-shot policy loader,
+          which generates a rule database based on ``views``, ``local-data``,
+          and ``forward`` configuration
+
     .. option:: <input_file>
 
         File with the declarative configuration in YAML or JSON format.
