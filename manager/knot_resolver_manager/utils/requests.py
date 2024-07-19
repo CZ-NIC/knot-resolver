@@ -115,7 +115,7 @@ class UnixHTTPConnection(HTTPConnection):
 
     def connect(self):
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        sock.settimeout(1)  # there is something weird stored in self.timeout
+        sock.settimeout(self.timeout)
         sock.connect(self.unix_socket_path)
         self.sock = sock
 
