@@ -61,3 +61,12 @@ DNS protocol tweaks
    :maxdepth: 2
 
    daemon-bindings-net_dns_tweaks
+
+Buffering tweaks
+================
+
+.. toctree::
+   :maxdepth: 2
+
+   daemon-bindings-net_buffering
+

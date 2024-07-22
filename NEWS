@@ -1,5 +1,12 @@
-Knot Resolver 6.0.8 (2024-0m-dd)
+Knot Resolver 6.0.8 (2024-07-23)
 ================================
+
+Security
+--------
+- reduce buffering of transmitted data, especially TCP-based in userspace
+  Also expose some of the new tweaks in lua:
+   (require 'ffi').C.the_worker.engine.net.tcp.user_timeout = 1000
+   (require 'ffi').C.the_worker.engine.net.listen_{tcp,udp}_buflens.{snd,rcv}
 
 Improvements
 ------------
@@ -115,8 +122,15 @@ https://www.knot-resolver.cz/documentation/latest/upgrading-to-6.html
 5.x branch longterm support
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Knot Resolver 5.7.4 (2024-0m-dd)
+Knot Resolver 5.7.4 (2024-07-23)
 ================================
+
+Security
+--------
+- reduce buffering of transmitted data, especially TCP-based in userspace
+  Also expose some of the new tweaks in lua:
+   (require 'ffi').C.the_worker.engine.net.tcp.user_timeout = 1000
+   (require 'ffi').C.the_worker.engine.net.listen_{tcp,udp}_buflens.{snd,rcv}
 
 Improvements
 ------------
