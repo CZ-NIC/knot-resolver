@@ -43,10 +43,11 @@ static inline void defer_sample_start(void)
 }
 
 /// Annotate the work currently being accounted by an IP address.
-static inline void defer_sample_addr(const union kr_sockaddr *addr)
+static inline void defer_sample_addr(const union kr_sockaddr *addr, bool stream)
 {
 	if (!defer || kr_fails_assert(addr)) return;
 	if (!defer_sample_state.is_accounting) return;
+	if (!stream) return;  // UDP is not counted
 
 	if (defer_sample_state.addr.ip.sa_family != AF_UNSPEC) {
 		// TODO: this costs performance, so only in some debug mode?

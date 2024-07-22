@@ -1214,7 +1214,7 @@ static int qr_task_step(struct qr_task *task,
 			const struct sockaddr *packet_source, knot_pkt_t *packet)
 {
 	if (task && task->ctx->source.session)
-		defer_sample_addr(&task->ctx->source.addr);
+		defer_sample_addr(&task->ctx->source.addr, task->ctx->source.session->stream);
 
 	/* No more steps after we're finished. */
 	if (!task || task->finished) {
