@@ -25,6 +25,13 @@ echo
 echo Knot Manager API is accessible on http://localhost:5000
 echo -------------------------------------------------------
 
+if [ -z "$1" ]
+  then
+    CONFIG_FILE="config.dev.yaml" 
+else
+    CONFIG_FILE="$1"
+fi
+
 # create runtime directories
 if [ -z "${KRES_MANAGER_RUNTIME:-}" ]; then
     KRES_MANAGER_RUNTIME="etc/knot-resolver"
@@ -32,7 +39,7 @@ fi
 mkdir -p "$KRES_MANAGER_RUNTIME/runtime" "$KRES_MANAGER_RUNTIME/cache"
 
 if [ -z "${KRES_MANAGER_CONFIG:-}" ]; then
-    KRES_MANAGER_CONFIG="$KRES_MANAGER_RUNTIME/config.dev.yaml"
+    KRES_MANAGER_CONFIG="$KRES_MANAGER_RUNTIME/$CONFIG_FILE"
 fi
 
 if [ -z "${KRES_MANAGER_API_SOCK:-}" ]; then

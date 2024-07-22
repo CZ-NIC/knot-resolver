@@ -1,0 +1,9 @@
+rundir: ./runtime
+workers: 2
+management:
+  unix-socket: ./runtime/manager.sock
+cache:
+  storage: ./cache
+network:
+  listen:
+    - interface: 127.0.0.1@5353

@@ -1,5 +1,6 @@
 stages:
   - check
+  - test
 
 default:
   image: $IMAGE_PREFIX/manager:$IMAGE_TAG
@@ -70,3 +71,24 @@ unit:py3.12:
   <<: *unit
   variables:
     PYTHON_INTERPRETER: python3.12
+
+.interactive: &interactive
+  stage: test
+  script:
+    - poetry install --only main,dev,test --all-extras
+    - poe run config.ci.yaml
+    # the following command makes sure that the source root of the coverage file is at $gitroot
+    - poetry run bash -c "cd ..; coverage combine manager/.coverage; coverage xml"
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+      junit: manager/unit.junit.xml
+    paths:
+      - manager/unit.junit.xml
+
+interactive:py3.8:
+  <<: *interactive
+  variables:
+    PYTHON_INTERPRETER: python3.8
