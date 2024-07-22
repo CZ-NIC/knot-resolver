@@ -8,6 +8,7 @@ default:
     - cd manager
     - poetry --version
     - poetry env use $PYTHON_INTERPRETER
+    - poetry env info
   tags:
     - docker
     - linux
@@ -30,7 +31,7 @@ lint:py3.12:
     PYTHON_INTERPRETER: python3.12
 
 .unit: &unit
-  stage: check
+  stage: test
   script:
     - poetry install --only main,dev,test
     # create required directories that are in default config, otherwise unit tests fail
