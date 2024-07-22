@@ -395,19 +395,21 @@ static int protolayer_iter_ctx_finish(struct protolayer_iter_ctx *ctx, int ret)
 			globals->iter_deinit(ctx, d);
 	}
 
-	if (ret)
+	if (ret) {
 		VERBOSE_LOG(s, "layer context of group '%s' (on %u: %s) ended with return code %d\n",
 				kr_proto_name(s->proto),
 				ctx->layer_ix, layer_name_ctx(ctx), ret);
+	}
 
-	if (ctx->status)
-		VERBOSE_LOG(s, "iteration of group '%s' (on %u: %s) ended with status %d\n",
+	if (ctx->status) {
+		VERBOSE_LOG(s, "iteration of group '%s' (on %u: %s) ended with status '%s (%d)'\n",
 				kr_proto_name(s->proto),
-				ctx->layer_ix, layer_name_ctx(ctx), ctx->status);
+				ctx->layer_ix, layer_name_ctx(ctx),
+				kr_strerror(ctx->status), ctx->status);
+	}
 
 	if (ctx->finished_cb)
-		ctx->finished_cb(ret, s, ctx->comm,
-				ctx->finished_cb_baton);
+		ctx->finished_cb(ret, s, ctx->comm, ctx->finished_cb_baton);
 
 	mm_ctx_delete(&ctx->pool);
 	free(ctx);
