@@ -123,7 +123,6 @@ struct tls_common_ctx {
 	uint8_t recv_buf[16384];
 	tls_handshake_cb handshake_cb;
 	struct worker_ctx *worker;
-	size_t write_queue_size;
 };
 
 struct tls_ctx {
@@ -160,7 +159,7 @@ void tls_client_close(struct tls_client_ctx *ctx);
 void tls_free(struct tls_ctx* tls);
 
 /*! Push new data to TLS context for sending */
-int tls_write(uv_write_t *req, uv_handle_t* handle, knot_pkt_t * pkt, uv_write_cb cb);
+int tls_write(uv_handle_t* handle, knot_pkt_t * pkt);
 
 /*! Unwrap incoming data from a TLS stream and pass them to TCP session.
  * @return the number of newly-completed requests (>=0) or an error code
