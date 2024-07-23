@@ -136,6 +136,7 @@ nixos-unstable:pkgbuild:
   - echo 'log_level("debug")' >> /etc/knot-resolver/kresd.conf
   - systemctl start kresd@1
   - "kdig @127.0.0.1 +edns nic.cz | tee /dev/stderr | grep -qi 'status: NOERROR' || journalctl -u kresd@1"
+  - journalctl -u kresd@1
 
 debian-10:pkgtest:
   <<: *pkgtest
@@ -170,6 +171,7 @@ fedora-34:pkgtest:
     - echo 'log_level("debug")' >> /etc/knot-resolver/kresd.conf
     - systemctl start kresd@1
     - "kdig @127.0.0.1 +edns nic.cz | tee /dev/stderr | grep -qi 'status: NOERROR' || journalctl -u kresd@1"
+    - journalctl -u kresd@1
 
 fedora-35:pkgtest:
   <<: *pkgtest
@@ -182,6 +184,7 @@ fedora-35:pkgtest:
     - echo 'log_level("debug")' >> /etc/knot-resolver/kresd.conf
     - systemctl start kresd@1
     - "kdig @127.0.0.1 +edns nic.cz | tee /dev/stderr | grep -qi 'status: NOERROR' || journalctl -u kresd@1"
+    - journalctl -u kresd@1
 
 rocky-8:pkgtest:
   <<: *pkgtest
@@ -195,6 +198,7 @@ rocky-8:pkgtest:
     - echo 'log_level("debug")' >> /etc/knot-resolver/kresd.conf
     - systemctl start kresd@1
     - "kdig @127.0.0.1 +edns nic.cz | tee /dev/stderr | grep -qi 'status: NOERROR' || journalctl -u kresd@1"
+    - journalctl -u kresd@1
 
 ubuntu-18.04:pkgtest:
   <<: *pkgtest
