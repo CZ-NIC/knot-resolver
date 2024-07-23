@@ -133,8 +133,9 @@ nixos-unstable:pkgbuild:
   - *pkgdebrepo
   - apt-get install -y knot-dnsutils
   - apt-get install -y $(find ./pkg/pkgs -name '*.deb' | grep -v module | grep -v debug | grep -v devel)
+  - echo 'log_level("debug")' >> /etc/knot-resolver/kresd.conf
   - systemctl start kresd@1
-  - "kdig @127.0.0.1 +edns nic.cz | tee /dev/stderr | grep -qi 'status: NOERROR'"
+  - "kdig @127.0.0.1 +edns nic.cz | tee /dev/stderr | grep -qi 'status: NOERROR' || journalctl -u kresd@1"
 
 debian-10:pkgtest:
   <<: *pkgtest
@@ -166,8 +167,9 @@ fedora-34:pkgtest:
   script:
     - dnf install -y knot-utils findutils
     - dnf install -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module | grep -v debug | grep -v devel)
+    - echo 'log_level("debug")' >> /etc/knot-resolver/kresd.conf
     - systemctl start kresd@1
-    - "kdig @127.0.0.1 +edns nic.cz | tee /dev/stderr | grep -qi 'status: NOERROR'"
+    - "kdig @127.0.0.1 +edns nic.cz | tee /dev/stderr | grep -qi 'status: NOERROR' || journalctl -u kresd@1"
 
 fedora-35:pkgtest:
   <<: *pkgtest
@@ -177,8 +179,9 @@ fedora-35:pkgtest:
   script:
     - dnf install -y knot-utils findutils
     - dnf install -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module | grep -v debug | grep -v devel)
+    - echo 'log_level("debug")' >> /etc/knot-resolver/kresd.conf
     - systemctl start kresd@1
-    - "kdig @127.0.0.1 +edns nic.cz | tee /dev/stderr | grep -qi 'status: NOERROR'"
+    - "kdig @127.0.0.1 +edns nic.cz | tee /dev/stderr | grep -qi 'status: NOERROR' || journalctl -u kresd@1"
 
 rocky-8:pkgtest:
   <<: *pkgtest
@@ -189,8 +192,9 @@ rocky-8:pkgtest:
     - dnf install -y epel-release
     - dnf install -y knot-utils findutils
     - dnf install -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module | grep -v debug | grep -v devel)
+    - echo 'log_level("debug")' >> /etc/knot-resolver/kresd.conf
     - systemctl start kresd@1
-    - "kdig @127.0.0.1 +edns nic.cz | tee /dev/stderr | grep -qi 'status: NOERROR'"
+    - "kdig @127.0.0.1 +edns nic.cz | tee /dev/stderr | grep -qi 'status: NOERROR' || journalctl -u kresd@1"
 
 ubuntu-18.04:pkgtest:
   <<: *pkgtest
