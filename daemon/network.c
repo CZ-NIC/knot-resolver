@@ -73,6 +73,11 @@ void network_init(struct network *net, uv_loop_t *loop, int tcp_backlog)
 		net->tcp.in_idle_timeout = 10000;
 		net->tcp.tls_handshake_timeout = TLS_MAX_HANDSHAKE_TIME;
 		net->tcp_backlog = tcp_backlog;
+		net->tcp.user_timeout = 1000; // 1s should be more than enough
+
+		// On Linux, unset means some auto-tuning mechanism also depending on RAM,
+		// which might be OK default (together with the user_timeout above)
+		//net->listen_{tcp,udp}_buflens.{snd,rcv}
 	}
 }
 

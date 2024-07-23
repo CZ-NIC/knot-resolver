@@ -90,24 +90,6 @@ static ssize_t kres_gnutls_pull(gnutls_transport_ptr_t h, void *buf, size_t len)
 	return transfer;
 }
 
-static void on_write_complete(uv_write_t *req, int status)
-{
-	if (kr_fails_assert(req->data))
-		return;
-	struct async_write_ctx *async_ctx = (struct async_write_ctx *)req->data;
-	struct tls_common_ctx *t = async_ctx->t;
-	if (t->write_queue_size)
-		t->write_queue_size -= 1;
-	else
-		kr_assert(false);
-	free(req->data);
-}
-
-static bool stream_queue_is_empty(struct tls_common_ctx *t)
-{
-	return (t->write_queue_size == 0);
-}
-
 static ssize_t kres_gnutls_vec_push(gnutls_transport_ptr_t h, const giovec_t * iov, int iovcnt)
 {
 	struct tls_common_ctx *t = (struct tls_common_ctx *)h;
@@ -130,15 +112,6 @@ static ssize_t kres_gnutls_vec_push(gnutls_transport_ptr_t h, const giovec_t * i
 		return -1;
 	}
 
-	/*
-	 * This is a little bit complicated. There are two different writes:
-	 * 1. Immediate, these don't need to own the buffered data and return immediately
-	 * 2. Asynchronous, these need to own the buffers until the write completes
-	 * In order to avoid copying the buffer, an immediate write is tried first if possible.
-	 * If it isn't possible to write the data without queueing, an asynchronous write
-	 * is created (with copied buffered data).
-	 */
-
 	size_t total_len = 0;
 	uv_buf_t uv_buf[iovcnt];
 	for (int i = 0; i < iovcnt; ++i) {
@@ -147,9 +120,8 @@ static ssize_t kres_gnutls_vec_push(gnutls_transport_ptr_t h, const giovec_t * i
 		total_len += iov[i].iov_len;
 	}
 
-	/* Try to perform the immediate write first to avoid copy */
-	int ret = 0;
-	if (stream_queue_is_empty(t)) {
+	int ret;
+	{ // indentation kept to reduce diff:
 		ret = uv_try_write(handle, uv_buf, iovcnt);
 		DEBUG_MSG("[%s] push %zu <%p> = %d\n",
 		    t->client_side ? "tls_client" : "tls", total_len, h, ret);
@@ -173,73 +145,8 @@ static ssize_t kres_gnutls_vec_push(gnutls_transport_ptr_t h, const giovec_t * i
 			errno = EIO;
 			return ret;
 		}
-		/* Since we are here expression below is true
-		 * (ret != total_len) && (ret >= 0 || ret == UV_EAGAIN)
-		 * or the same
-		 * (ret != total_len && ret >= 0) || (ret != total_len && ret == UV_EAGAIN)
-		 * i.e. either occurs partial write or UV_EAGAIN.
-		 * Proceed and copy data amount to owned memory and perform async write.
-		 */
-		if (ret == UV_EAGAIN) {
-			/* No data were buffered, so we must buffer all the data. */
-			ret = 0;
-		}
+		return kr_error(ENOBUFS);
 	}
-
-	/* Fallback when the queue is full, and it's not possible to do an immediate write */
-	char *p = malloc(sizeof(struct async_write_ctx) + total_len - ret);
-	if (p != NULL) {
-		struct async_write_ctx *async_ctx = (struct async_write_ctx *)p;
-		/* Save pointer to session tls context */
-		async_ctx->t = t;
-		char *buf = async_ctx->buf;
-		/* Skip data written in the partial write */
-		size_t to_skip = ret;
-		/* Copy the buffer into owned memory */
-		size_t off = 0;
-		for (int i = 0; i < iovcnt; ++i) {
-			if (to_skip > 0) {
-				/* Ignore current buffer if it's all skipped */
-				if (to_skip >= uv_buf[i].len) {
-					to_skip -= uv_buf[i].len;
-					continue;
-				}
-				/* Skip only part of the buffer */
-				uv_buf[i].base += to_skip;
-				uv_buf[i].len -= to_skip;
-				to_skip = 0;
-			}
-			memcpy(buf + off, uv_buf[i].base, uv_buf[i].len);
-			off += uv_buf[i].len;
-		}
-		uv_buf[0].base = buf;
-		uv_buf[0].len = off;
-
-		/* Create an asynchronous write request */
-		uv_write_t *write_req = &async_ctx->write_req;
-		memset(write_req, 0, sizeof(uv_write_t));
-		write_req->data = p;
-
-		/* Perform an asynchronous write with a callback */
-		if (uv_write(write_req, handle, uv_buf, 1, on_write_complete) == 0) {
-			ret = total_len;
-			t->write_queue_size += 1;
-		} else {
-			free(p);
-			VERBOSE_MSG(t->client_side, "uv_write error: %s\n",
-					uv_strerror(ret));
-			errno = EIO;
-			ret = -1;
-		}
-	} else {
-		errno = ENOMEM;
-		ret = -1;
-	}
-
-	DEBUG_MSG("[%s] queued %zu <%p> = %d\n",
-	    t->client_side ? "tls_client" : "tls", total_len, h, ret);
-
-	return ret;
 }
 
 /** Perform TLS handshake and handle error codes according to the documentation.
@@ -413,7 +320,7 @@ void tls_free(struct tls_ctx *tls)
 	free(tls);
 }
 
-int tls_write(uv_write_t *req, uv_handle_t *handle, knot_pkt_t *pkt, uv_write_cb cb)
+int tls_write(uv_handle_t *handle, knot_pkt_t *pkt)
 {
 	if (!pkt || !handle || !handle->data) {
 		return kr_error(EINVAL);
@@ -456,9 +363,6 @@ int tls_write(uv_write_t *req, uv_handle_t *handle, knot_pkt_t *pkt, uv_write_cb
 	}
 
 	/* The data is now accepted in gnutls internal buffers, the message can be treated as sent */
-	req->handle = (uv_stream_t *)handle;
-	cb(req, 0);
-
 	return kr_ok();
 }
 

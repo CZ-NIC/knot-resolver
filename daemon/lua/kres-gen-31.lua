@@ -461,6 +461,7 @@ int kr_cache_remove(struct kr_cache *, const knot_dname_t *, uint16_t);
 int kr_cache_remove_subtree(struct kr_cache *, const knot_dname_t *, _Bool, int);
 int kr_cache_commit(struct kr_cache *);
 uint32_t packet_ttl(const knot_pkt_t *);
+struct tls_credentials;
 typedef struct {
 	int sock_type;
 	_Bool tls;
@@ -511,6 +512,36 @@ typedef struct {
 	zi_callback cb;
 	void *cb_param;
 } zi_config_t;
+typedef struct uv_loop_s uv_loop_t;
+typedef struct trie tls_client_params_t;
+struct net_tcp_param {
+	uint64_t in_idle_timeout;
+	uint64_t tls_handshake_timeout;
+	unsigned int user_timeout;
+};
+struct network {
+	uv_loop_t *loop;
+	trie_t *endpoints;
+	trie_t *endpoint_kinds;
+	_Bool missing_kind_is_error : 1;
+	_Bool proxy_all4 : 1;
+	_Bool proxy_all6 : 1;
+	trie_t *proxy_addrs4;
+	trie_t *proxy_addrs6;
+	struct tls_credentials *tls_credentials;
+	tls_client_params_t *tls_client_params;
+	struct tls_session_ticket_ctx *tls_session_ticket_ctx;
+	struct net_tcp_param tcp;
+	int tcp_backlog;
+	struct {
+		int snd;
+		int rcv;
+	} listen_udp_buflens;
+	struct {
+		int snd;
+		int rcv;
+	} listen_tcp_buflens;
+};
 struct args *the_args;
 struct endpoint {
 	void *handle;
@@ -536,6 +567,7 @@ knot_pkt_t *worker_resolve_mk_pkt(const char *, uint16_t, uint16_t, const struct
 struct qr_task *worker_resolve_start(knot_pkt_t *, struct kr_qflags);
 int zi_zone_import(const zi_config_t);
 struct engine {
+	struct network net;
 	struct kr_context resolver;
 	char _stub[];
 };

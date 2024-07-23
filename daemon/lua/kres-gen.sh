@@ -289,6 +289,7 @@ EOF
 
 
 ## kresd itself: worker stuff
+echo "struct tls_credentials;"
 
 ${CDEFS} ${KRESD} types <<-EOF
 	endpoint_flags_t
@@ -299,6 +300,11 @@ ${CDEFS} ${KRESD} types <<-EOF
 	config_array_t
 	struct args
 	zi_config_t
+	# struct network - and all requirements that are missing so far
+	typedef uv_loop_t
+	typedef tls_client_params_t
+	struct net_tcp_param
+	struct network
 EOF
 echo "struct args *the_args;"
 
@@ -317,7 +323,7 @@ ${CDEFS} ${KRESD} functions <<-EOF
 	zi_zone_import
 EOF
 
-echo "struct engine" | ${CDEFS} ${KRESD} types | sed '/struct network/,$ d'
+echo "struct engine" | ${CDEFS} ${KRESD} types | sed '/modules/,$ d'
 printf "\tchar _stub[];\n};\n"
 
 echo "struct worker_ctx" | ${CDEFS} ${KRESD} types | sed '/uv_loop_t/,$ d'

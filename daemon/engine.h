@@ -14,8 +14,8 @@ struct lua_State;
 #include "daemon/network.h"
 
 struct engine {
-    struct kr_context resolver;
     struct network net;
+    struct kr_context resolver;
     module_array_t modules;
     array_t(const struct kr_cdb_api *) backends;
     knot_mm_t *pool;

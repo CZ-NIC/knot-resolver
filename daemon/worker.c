@@ -635,15 +635,6 @@ int qr_task_on_send(struct qr_task *task, const uv_handle_t *handle, int status)
 	return status;
 }
 
-static void on_send(uv_udp_send_t *req, int status)
-{
-	struct qr_task *task = req->data;
-	uv_handle_t *h = (uv_handle_t *)req->handle;
-	qr_task_on_send(task, h, status);
-	qr_task_unref(task);
-	free(req);
-}
-
 static void on_write(uv_write_t *req, int status)
 {
 	struct qr_task *task = req->data;
@@ -696,59 +687,66 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 	if (kr_fails_assert(!session_flags(session)->closing))
 		return qr_task_on_send(task, NULL, kr_error(EIO));
 
-	uv_handle_t *ioreq = malloc(is_stream ? sizeof(uv_write_t) : sizeof(uv_udp_send_t));
-	if (!ioreq)
-		return qr_task_on_send(task, handle, kr_error(ENOMEM));
-
 	/* Pending ioreq on current task */
 	qr_task_ref(task);
 
 	if (session_flags(session)->has_http) {
 #if ENABLE_DOH2
-		uv_write_t *write_req = (uv_write_t *)ioreq;
+		uv_write_t *write_req = malloc(sizeof(*write_req));
+		if (!write_req)
+			return qr_task_on_send(task, handle, kr_error(ENOMEM));
 		write_req->data = task;
 		ret = http_write(write_req, handle, pkt, ctx->req.qsource.stream_id, &on_write);
+		if (ret != 0)
+			free(write_req);
 #else
 		ret = kr_error(ENOPROTOOPT);
 #endif
 	} else if (session_flags(session)->has_tls) {
-		uv_write_t *write_req = (uv_write_t *)ioreq;
-		write_req->data = task;
-		ret = tls_write(write_req, handle, pkt, &on_write);
+		ret = tls_write(handle, pkt);
 	} else if (handle->type == UV_UDP) {
-		uv_udp_send_t *send_req = (uv_udp_send_t *)ioreq;
 		uv_buf_t buf = { (char *)pkt->wire, pkt->size };
-		send_req->data = task;
-		ret = uv_udp_send(send_req, (uv_udp_t *)handle, &buf, 1, addr, &on_send);
-	} else if (handle->type == UV_TCP) {
-		uv_write_t *write_req = (uv_write_t *)ioreq;
-		/* We need to write message length in native byte order,
-		 * but we don't have a convenient place to store those bytes.
-		 * The problem is that all memory referenced from buf[] MUST retain
-		 * its contents at least until on_write() is called, and I currently
-		 * can't see any convenient place outside the `pkt` structure.
-		 * So we use directly the *individual* bytes in pkt->size.
-		 * The call to htonl() and the condition will probably be inlinable. */
-		int lsbi, slsbi; /* (second) least significant byte index */
-		if (htonl(1) == 1) { /* big endian */
-			lsbi  = sizeof(pkt->size) - 1;
-			slsbi = sizeof(pkt->size) - 2;
-		} else {
-			lsbi  = 0;
-			slsbi = 1;
+		ret = uv_udp_try_send((uv_udp_t *)handle, &buf, 1, addr);
+		if (ret >= 0 && ret == pkt->size) {
+			ret = 0; // this is the success
+		} else if (ret == UV_EAGAIN || ret >= 0) {
+			ret = kr_error(ENOBUFS);
 		}
-		uv_buf_t buf[3] = {
-			{ (char *)&pkt->size + slsbi, 1 },
-			{ (char *)&pkt->size + lsbi,  1 },
+	} else if (handle->type == UV_TCP) {
+		uint8_t size_buf[2] = { pkt->size / 256, pkt->size % 256 };
+		uv_buf_t buf[2] = {
+			{ (char *)&size_buf, 2 },
 			{ (char *)pkt->wire, pkt->size },
 		};
-		write_req->data = task;
-		ret = uv_write(write_req, (uv_stream_t *)handle, buf, 3, &on_write);
+		ret = uv_try_write((uv_stream_t *)handle, buf, 2);
+		if (ret >= 0 && ret == pkt->size + 2) {
+			ret = 0; // this is the success
+		} else if (ret == UV_EAGAIN || ret >= 0) {
+			ret = kr_error(ENOBUFS);
+		}
 	} else {
 		kr_assert(false);
+		ret = kr_error(EINVAL);
+	}
+
+	// FIXME: Hack to avoid a SERVFAIL when IPv6 is unavailable on the host
+	// machine. We uncovered this while changing the above writes/sends to
+	// try_writes/try_sends. We originally were not getting the
+	// `ENETUNREACH` from libuv and were just timeouting the request,
+	// falling back to IPv4 eventually.
+	//
+	// Note that this does not happen in Knot Resolver 6 with the rewritten
+	// I/O, so there is probably a bug somewhere in here, but we were not
+	// able to track it down.
+	if (ret == UV_ENETUNREACH) {
+		ret = 0;
 	}
 
 	if (ret == 0) {
+		if (!session_flags(session)->has_http) { // instead of completion callback
+			qr_task_on_send(task, handle, ret);
+			qr_task_unref(task);
+		}
 		session_touch(session);
 		if (session_flags(session)->outgoing) {
 			session_tasklist_add(session, task);
@@ -759,7 +757,6 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 			worker->too_many_open = false;
 		}
 	} else {
-		free(ioreq);
 		qr_task_unref(task);
 		if (ret == UV_EMFILE) {
 			worker->too_many_open = true;
