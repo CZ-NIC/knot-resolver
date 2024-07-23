@@ -509,6 +509,7 @@ int kr_rule_zonefile(const struct kr_rule_zonefile_config *);
 int kr_rule_forward(const knot_dname_t *, kr_rule_fwd_flags_t, const struct sockaddr **);
 int kr_rule_local_address(const char *, const char *, _Bool, uint32_t, kr_rule_tags_t);
 int kr_rule_local_hosts(const char *, _Bool, uint32_t, kr_rule_tags_t);
+struct tls_credentials;
 typedef struct {
 	int sock_type;
 	_Bool tls;
@@ -559,6 +560,36 @@ typedef struct {
 	zi_callback cb;
 	void *cb_param;
 } zi_config_t;
+typedef struct uv_loop_s uv_loop_t;
+typedef struct trie tls_client_params_t;
+struct net_tcp_param {
+	uint64_t in_idle_timeout;
+	uint64_t tls_handshake_timeout;
+	unsigned int user_timeout;
+};
+struct network {
+	uv_loop_t *loop;
+	trie_t *endpoints;
+	trie_t *endpoint_kinds;
+	_Bool missing_kind_is_error : 1;
+	_Bool proxy_all4 : 1;
+	_Bool proxy_all6 : 1;
+	trie_t *proxy_addrs4;
+	trie_t *proxy_addrs6;
+	struct tls_credentials *tls_credentials;
+	tls_client_params_t *tls_client_params;
+	struct tls_session_ticket_ctx *tls_session_ticket_ctx;
+	struct net_tcp_param tcp;
+	int tcp_backlog;
+	struct {
+		int snd;
+		int rcv;
+	} listen_udp_buflens;
+	struct {
+		int snd;
+		int rcv;
+	} listen_tcp_buflens;
+};
 struct args *the_args;
 struct endpoint {
 	void *handle;
@@ -591,6 +622,7 @@ struct worker_ctx {
 struct kr_context *the_resolver;
 struct worker_ctx *the_worker;
 struct engine *the_engine;
+struct network *the_network;
 typedef struct {
 	uint8_t *params_position;
 	uint8_t *mandatory_position;

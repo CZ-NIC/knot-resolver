@@ -30,7 +30,7 @@ entry_points = \
 
 setup_kwargs = {
     'name': 'knot-resolver-manager',
-    'version': '6.0.7',
+    'version': '6.0.8',
     'description': 'A central tool for managing individual parts of Knot Resolver',
     'long_description': 'None',
     'author': 'Aleš Mrázek',

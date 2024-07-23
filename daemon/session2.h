@@ -312,23 +312,31 @@ typedef void (*protolayer_finished_cb)(int status, struct session2 *session,
  * Event types are used to distinguish different events that can be passed to
  * sessions using `session2_event()`. */
 #define PROTOLAYER_EVENT_MAP(XX) \
-	XX(CLOSE) /**< Sending this event closes the session gracefully -
-	           * i.e. layers add their standard disconnection
-	           * ceremony (e.g. `gnutls_bye()`). */\
-	XX(FORCE_CLOSE) /**< Sending this event closes the session forcefully -
-	                 * i.e. layers SHOULD NOT add any disconnection
-	                 * ceremony, if avoidable. */\
-	XX(CONNECT_TIMEOUT) /**< Signal that a connection could not be
-	                     * established due to a timeout. */\
-	XX(GENERAL_TIMEOUT) /**< Signal that a general application-defined
-	                     * timeout has occurred. */\
-	XX(CONNECT) /**< Signal that a connection has been established. */\
-	XX(CONNECT_FAIL) /**< Signal that a connection could not have been
-	                  * established. */\
-	XX(MALFORMED) /**< Signal that a malformed request has been received. */\
-	XX(DISCONNECT) /**< Signal that a connection has ended. */\
-	XX(STATS_SEND_ERR) /**< Failed task send - update stats. */\
-	XX(STATS_QRY_OUT) /**< Outgoing query submission - update stats. */
+	/** Closes the session gracefully - i.e. layers add their standard
+	 * disconnection ceremony (e.g. `gnutls_bye()`). */\
+	XX(CLOSE) \
+	/** Closes the session forcefully - i.e. layers SHOULD NOT add any
+	 * disconnection ceremony, if avoidable. */\
+	XX(FORCE_CLOSE) \
+	/** Signal that a connection could not be established due to a timeout. */\
+	XX(CONNECT_TIMEOUT) \
+	/** Signal that a general application-defined timeout has occurred. */\
+	XX(GENERAL_TIMEOUT) \
+	/** Signal that a connection has been established. */\
+	XX(CONNECT) \
+	/** Signal that a connection could not have been established. */\
+	XX(CONNECT_FAIL) \
+	/** Signal that a malformed request has been received. */\
+	XX(MALFORMED) \
+	/** Signal that a connection has ended. */\
+	XX(DISCONNECT) \
+	/** Failed task send - update stats. */\
+	XX(STATS_SEND_ERR) \
+	/** Outgoing query submission - update stats. */\
+	XX(STATS_QRY_OUT) \
+	/** OS buffers are full, so not sending any more data. */\
+	XX(OS_BUFFER_FULL) \
+	//
 
 /** Event type, to be interpreted by a layer. */
 enum protolayer_event_type {

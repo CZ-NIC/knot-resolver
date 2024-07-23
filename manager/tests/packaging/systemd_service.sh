@@ -29,7 +29,7 @@ else
 	set +e
 
 	# check that the resolvers are actually running
-	kdig @127.0.0.1 nic.cz
+	kdig @127.0.0.1 +edns nic.cz | tee /dev/stderr | grep -qi 'status: NOERROR'
 	if [ "$?" -ne "0" ]; then
 		echo "Could not 'kdig' the resolvers - are they running?"
 		exit 1
