@@ -134,7 +134,7 @@ nixos-unstable:pkgbuild:
   - apt-get install -y knot-dnsutils
   - apt-get install -y $(find ./pkg/pkgs -name '*.deb' | grep -v module | grep -v debug | grep -v devel)
   - systemctl start kresd@1
-  - kdig @127.0.0.1 nic.cz | tee /dev/stderr | grep -qi NOERROR
+  - kdig @127.0.0.1 +edns nic.cz | tee /dev/stderr | grep -qi NOERROR
 
 debian-10:pkgtest:
   <<: *pkgtest
@@ -167,7 +167,7 @@ fedora-34:pkgtest:
     - dnf install -y knot-utils findutils
     - dnf install -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module | grep -v debug | grep -v devel)
     - systemctl start kresd@1
-    - kdig @127.0.0.1 nic.cz | tee /dev/stderr | grep -qi NOERROR
+    - kdig @127.0.0.1 +edns nic.cz | tee /dev/stderr | grep -qi NOERROR
 
 fedora-35:pkgtest:
   <<: *pkgtest
@@ -178,7 +178,7 @@ fedora-35:pkgtest:
     - dnf install -y knot-utils findutils
     - dnf install -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module | grep -v debug | grep -v devel)
     - systemctl start kresd@1
-    - kdig @127.0.0.1 nic.cz | tee /dev/stderr | grep -qi NOERROR
+    - kdig @127.0.0.1 +edns nic.cz | tee /dev/stderr | grep -qi NOERROR
 
 rocky-8:pkgtest:
   <<: *pkgtest
@@ -190,7 +190,7 @@ rocky-8:pkgtest:
     - dnf install -y knot-utils findutils
     - dnf install -y $(find ./pkg/pkgs -name '*.rpm' | grep -v module | grep -v debug | grep -v devel)
     - systemctl start kresd@1
-    - kdig @127.0.0.1 nic.cz | tee /dev/stderr | grep -qi NOERROR
+    - kdig @127.0.0.1 +edns nic.cz | tee /dev/stderr | grep -qi NOERROR
 
 ubuntu-18.04:pkgtest:
   <<: *pkgtest
