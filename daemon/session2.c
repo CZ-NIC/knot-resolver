@@ -602,7 +602,7 @@ static int session2_submit(
 	// but we may not know the client's IP yet.
 	// Note two cases: incoming session (new request)
 	// vs. outgoing session (resuming work on some request)
-	if (direction == PROTOLAYER_UNWRAP)
+	if ((direction == PROTOLAYER_UNWRAP) && (layer_ix == 0))
 		defer_sample_start();
 
 	int ret;
@@ -663,7 +663,7 @@ static int session2_submit(
 	}
 
 	ret = protolayer_step(ctx);
-	if (direction == PROTOLAYER_UNWRAP)
+	if ((direction == PROTOLAYER_UNWRAP) && (layer_ix == 0))
 		defer_sample_stop();
 	return ret;
 }

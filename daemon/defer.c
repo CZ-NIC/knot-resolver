@@ -181,8 +181,13 @@ static inline void process_single_deferred(void) {
 			queue_ix,
 			age_ns / 1000000.0);
 
+	if (ctx->session->closing) {
+		VERBOSE_LOG("    BREAK (session is closing)\n");
+		protolayer_break(ctx, kr_error(ECANCELED));
+		return;
+	}
 	if (age_ns >= REQ_TIMEOUT) {
-		VERBOSE_LOG("    BREAK\n");
+		VERBOSE_LOG("    BREAK (timeout)\n");
 		protolayer_break(ctx, kr_error(ETIME));
 		return;
 	}
