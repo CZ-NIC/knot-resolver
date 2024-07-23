@@ -729,6 +729,19 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 		ret = kr_error(EINVAL);
 	}
 
+	// FIXME: Hack to avoid a SERVFAIL when IPv6 is unavailable on the host
+	// machine. We uncovered this while changing the above writes/sends to
+	// try_writes/try_sends. We originally were not getting the
+	// `ENETUNREACH` from libuv and were just timeouting the request,
+	// falling back to IPv4 eventually.
+	//
+	// Note that this does not happen in Knot Resolver 6 with the rewritten
+	// I/O, so there is probably a bug somewhere in here, but we were not
+	// able to track it down.
+	if (ret == UV_ENETUNREACH) {
+		ret = 0;
+	}
+
 	if (ret == 0) {
 		if (!session_flags(session)->has_http) { // instead of completion callback
 			qr_task_on_send(task, handle, ret);
