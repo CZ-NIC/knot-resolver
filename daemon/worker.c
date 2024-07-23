@@ -637,6 +637,11 @@ int qr_task_on_send(struct qr_task *task, const uv_handle_t *handle, int status)
 
 static void on_send(uv_udp_send_t *req, int status)
 {
+	if (status) {
+		kr_log_error(WORKER, "UDP transmit failed in callback: %d\n", status);
+	} else {
+		kr_log_debug(WORKER, "UDP transmit succeeded (in callback)\n");
+	}
 	struct qr_task *task = req->data;
 	uv_handle_t *h = (uv_handle_t *)req->handle;
 	qr_task_on_send(task, h, status);
@@ -720,6 +725,11 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 		uv_buf_t buf = { (char *)pkt->wire, pkt->size };
 		send_req->data = task;
 		ret = uv_udp_send(send_req, (uv_udp_t *)handle, &buf, 1, addr, &on_send);
+		if (ret) {
+			kr_log_error(WORKER, "UDP transmit failed immediately: %d\n", ret);
+		} else {
+			kr_log_debug(WORKER, "UDP transmit succeeded (for now)\n");
+		}
 	} else if (handle->type == UV_TCP) {
 		uv_write_t *write_req = (uv_write_t *)ioreq;
 		/* We need to write message length in native byte order,
