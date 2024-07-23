@@ -799,8 +799,8 @@ struct session2 {
 	struct wire_buf wire_buf;
 	uint32_t log_id; /**< Session ID for logging. */
 
-	int uv_count; /**< Number of unclosed libUV handles owned by this
-	               * session. */
+	int ref_count; /**< Number of unclosed libUV handles owned by this
+	               * session + iteration contexts referencing the session. */
 
 	/** Communication information. Typically written into by one of the
 	 * first layers facilitating transport protocol processing.
@@ -900,7 +900,7 @@ static inline struct session2 *session2_new_io(uv_handle_t *handle,
 			layer_param, layer_param_count, outgoing);
 	s->transport.io.handle = handle;
 	handle->data = s;
-	s->uv_count++; /* Session owns the handle */
+	s->ref_count++; /* Session owns the handle */
 	return s;
 }
 

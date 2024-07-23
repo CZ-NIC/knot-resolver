@@ -422,6 +422,7 @@ static int protolayer_iter_ctx_finish(struct protolayer_iter_ctx *ctx, int ret)
 
 	mm_ctx_delete(&ctx->pool);
 	free(ctx);
+	session2_unhandle(s);
 
 	return ret;
 }
@@ -588,6 +589,8 @@ static int session2_submit(
 {
 	if (session->closing)
 		return kr_error(ECANCELED);
+	if (session->ref_count >= INT_MAX)
+		return kr_error(ETOOMANYREFS);
 	if (kr_fails_assert(session->proto < KR_PROTO_COUNT))
 		return kr_error(EFAULT);
 
@@ -622,6 +625,7 @@ static int session2_submit(
 		.finished_cb = cb,
 		.finished_cb_baton = baton
 	};
+	session->ref_count++;
 	if (had_comm_param) {
 		struct comm_addr_storage *addrst = &ctx->comm_addr_storage;
 		if (comm->src_addr) {
@@ -843,7 +847,7 @@ struct session2 *session2_new(enum session2_transport_type transport_type,
 	ret = uv_timer_init(uv_default_loop(), &s->timer);
 	kr_require(!ret);
 	s->timer.data = s;
-	s->uv_count++; /* Session owns the timer */
+	s->ref_count++; /* Session owns the timer */
 
 	/* Initialize the layer's session data */
 	for (size_t i = 0; i < grp->num_layers; i++) {
@@ -885,13 +889,13 @@ static void session2_free(struct session2 *s)
 
 void session2_unhandle(struct session2 *s)
 {
-	if (kr_fails_assert(s->uv_count > 0)) {
+	if (kr_fails_assert(s->ref_count > 0)) {
 		session2_free(s);
 		return;
 	}
 
-	s->uv_count--;
-	if (s->uv_count <= 0)
+	s->ref_count--;
+	if (s->ref_count <= 0)
 		session2_free(s);
 }
 
