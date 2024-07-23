@@ -893,7 +893,21 @@ static int pl_tls_sess_data_deinit(struct pl_tls_sess_data *tls)
 		tls_credentials_release(tls->server_credentials);
 	}
 	wire_buf_deinit(&tls->unwrap_buf);
-	queue_deinit(tls->unwrap_queue); /* TODO: break contexts? */
+
+	while (queue_len(tls->unwrap_queue) > 0) {
+		struct protolayer_iter_ctx *ctx = queue_head(tls->unwrap_queue);
+		protolayer_break(ctx, kr_error(EIO));
+		queue_pop(tls->unwrap_queue);
+	}
+	queue_deinit(tls->unwrap_queue);
+
+	while (queue_len(tls->wrap_queue)) {
+		struct protolayer_iter_ctx *ctx = queue_head(tls->wrap_queue);
+		protolayer_break(ctx, kr_error(EIO));
+		queue_pop(tls->wrap_queue);
+	}
+	queue_deinit(tls->wrap_queue);
+
 	return kr_ok();
 }
 
@@ -1183,6 +1197,9 @@ static ssize_t pl_tls_submit(gnutls_session_t tls_session,
 {
 	if (payload.type == PROTOLAYER_PAYLOAD_WIRE_BUF)
 		payload = protolayer_payload_as_buffer(&payload);
+
+	// TODO: the handling of positive gnutls_record_send() is weird/confusing,
+	// but it seems caught later when checking gnutls_record_uncork()
 
 	if (payload.type == PROTOLAYER_PAYLOAD_BUFFER) {
 		ssize_t count = gnutls_record_send(tls_session,

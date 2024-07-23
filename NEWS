@@ -1,44 +1,70 @@
-Knot Resolver 6.0.8 (2024-0m-dd)
+Knot Resolver 6.0.8 (2024-07-23)
 ================================
+
+Security
+--------
+- reduce buffering of transmitted data, especially TCP-based in userspace
+  Also expose some of the new tweaks in lua:
+   (require 'ffi').C.the_worker.engine.net.tcp.user_timeout = 1000
+   (require 'ffi').C.the_worker.engine.net.listen_{tcp,udp}_buflens.{snd,rcv}
+
+Packaging
+---------
+
+- all packages:
+	- remove unused dependency on `libedit` (!1553)
+- deb packages:
+	- packages ``knot-resolver-core`` and ``knot-resolver-manager`` have
+	  been merged into a single ``knot-resolver6`` package. Suffix packages
+	  ``knot-resolver-*`` have been renamed to ``knot-resolver6-*``. This
+	  change _should_ be transparent, but please do let us know if you
+	  encounter any issues while updating. (!1549)
+	- package ``python3-prometheus-client`` is now only an optional dependency
+- rpm packages:
+	- packages ``knot-resolver-core`` and ``knot-resolver-manager`` have
+	  been merged into a single ``knot-resolver`` package. This change
+	  _should_ be transparent, but please do let us know if you encounter
+	  any issues while updating. (!1549)
+	- bugfix: do not overwrite config.yaml (!1525)
+	- package ``python3-prometheus_client`` is now only an optional dependency
+- arch package:
+	- fix after they renamed a dependency (!1536)
 
 Improvements
 ------------
 - TLS (DoT, DoH): respect crypto policy overrides in OS (!1526)
-- arch package: fix after they renamed a dependency (!1536)
 - manager: export metrics to JSON via management HTTP API (!1527)
-
   * JSON is the new default metrics output format
   * the ``prometheus-client`` Python package is now an optional dependency,
     required only for Prometheus export to work
 - cache: prefetching records
-
   * predict module: prefetching expiring records moved to prefetch module
   * prefetch module: new module to prefetch expiring records
 - stats: add separate metrics for IPv6 and IPv4 (!1545)
-- remove unused dependency on `libedit` (!1553)
 - add the fresh DNSSEC root key "KSK-2024" already, Key ID 38696 (!1556)
-
-- manager: policy-loader: new component for separate loading policy rules (!1540)
-
+- manager: policy-loader: new component for separate loading of policy rules (!1540)
   The ``policy-loader`` ensures that configured policies are loaded into the rules database
   where they are made available to all running kresd workers. This loading is no longer done
   by all kresd workers as it was before, so this should significantly improve the resolver's
   startup/reload time when loading large sets of policy rules, e.g. large RPZs.
-
-.. TODO: Change the link below to a versioned one when releasing.
 
 Incompatible changes
 --------------------
 - cache: the ``cache.prediction`` configuration property has been reorganized
   into ``cache.prefetch.expiring`` and ``cache.prefetch.prediction``, changing
   the default behaviour as well. See the `relevant documentation section
-  <https://www.knot-resolver.cz/documentation/latest/config-cache-predict.html>`_
+  <https://www.knot-resolver.cz/documentation/v6.0.8/config-cache-predict.html>`_
   for more.
 - libknot <=3.2.x support is dropped (!1565)
 
 Bugfixes
 --------
+- arch package: fix after they renamed a dependency (!1536)
 - fix startup with `dnssec: false` (!1548)
+- rpm packages: do not overwrite config.yaml (!1525)
+- fix NSEC3 records missing in answer for positive wildcard expansion
+  with the NSEC3 having over-limit iteration count (#910, !1550)
+- views: fix a bug in subnet matching (!1562)
 
 
 Knot Resolver 6.0.7 (2024-03-27)
@@ -115,8 +141,15 @@ https://www.knot-resolver.cz/documentation/latest/upgrading-to-6.html
 5.x branch longterm support
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Knot Resolver 5.7.4 (2024-0m-dd)
+Knot Resolver 5.7.4 (2024-07-23)
 ================================
+
+Security
+--------
+- reduce buffering of transmitted data, especially TCP-based in userspace
+  Also expose some of the new tweaks in lua:
+   (require 'ffi').C.the_worker.engine.net.tcp.user_timeout = 1000
+   (require 'ffi').C.the_worker.engine.net.listen_{tcp,udp}_buflens.{snd,rcv}
 
 Improvements
 ------------
