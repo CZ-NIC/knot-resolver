@@ -744,6 +744,9 @@ static int qr_task_send(struct qr_task *task, struct session *session,
 			worker->too_many_open = false;
 		}
 	} else {
+		if (ret != kr_error(ENOBUFS)) {
+			qr_task_on_send(task, handle, ret);
+		}
 		qr_task_unref(task);
 		if (ret == UV_EMFILE) {
 			worker->too_many_open = true;
