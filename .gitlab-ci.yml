@@ -610,6 +610,10 @@ obs:odvr:
     - apkg info cache | grep archive/dev
     - apkg install --build-dep
     - apkg test --test-dep
+  artifacts:
+    expire_in: 1 week
+    paths:
+      - pkg/pkgs/
 
 .pkg_test_user: &pkg_test_user
   <<: *pkg_test
