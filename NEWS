@@ -11,6 +11,7 @@ Improvements
   This means that the workers will be able to resume each other's TLS sessions, regardless of whether the user has configured it to do so.
 
 - answer NOTIMPL for meta-types and non-IN RR classes (!1589)
+- views: improve interaction with old-style policies (!1576)
 
 Bugfixes
 --------
