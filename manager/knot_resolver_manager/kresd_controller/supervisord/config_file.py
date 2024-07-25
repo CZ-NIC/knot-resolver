@@ -1,10 +1,11 @@
 import logging
 import os
 
+from dataclasses import dataclass
+from pathlib import Path
 from jinja2 import Template
 from typing_extensions import Literal
 
-from knot_resolver_manager.compat.dataclasses import dataclass
 from knot_resolver_manager.constants import (
     kres_gc_executable,
     kresd_cache_dir,
@@ -83,7 +84,7 @@ class ProcessTypeConfig:
     Data structure holding data for supervisord config template
     """
 
-    logfile: str
+    logfile: Path
     workdir: str
     command: str
     environment: str
@@ -139,16 +140,16 @@ class ProcessTypeConfig:
             workdir=user_constants().working_directory_on_startup,
             command=cmd,
             environment="X-SUPERVISORD-TYPE=notify",
-            logfile="",  # this will be ignored
+            logfile=Path(""),  # this will be ignored
         )
 
 
 @dataclass
 class SupervisordConfig:
-    unix_http_server: str
-    pid_file: str
+    unix_http_server: Path
+    pid_file: Path
     workdir: str
-    logfile: str
+    logfile: Path
     loglevel: Literal["critical", "error", "warn", "info", "debug", "trace", "blather"]
     target: LogTargetEnum
 
@@ -166,14 +167,13 @@ class SupervisordConfig:
                 "info": "info",
                 "debug": "debug",
             }[config.logging.level]
-
         cwd = str(os.getcwd())
         return SupervisordConfig(  # type: ignore[call-arg]
             unix_http_server=supervisord_sock_file(config),
             pid_file=supervisord_pid_file(config),
             workdir=cwd,
-            logfile="syslog" if config.logging.target == "syslog" else "/dev/null",
-            loglevel=loglevel,
+            logfile=Path("syslog" if config.logging.target == "syslog" else "/dev/null"),
+            loglevel=loglevel,  # type: ignore[arg-type]
             target=config.logging.target,
         )
 
