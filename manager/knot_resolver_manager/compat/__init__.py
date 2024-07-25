@@ -1,3 +1,3 @@
-from . import asyncio, dataclasses
+from . import asyncio
 
-__all__ = ["asyncio", "dataclasses"]
+__all__ = ["asyncio"]
