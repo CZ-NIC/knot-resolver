@@ -185,9 +185,7 @@ pushd build_rpm/python
 %py3_build
 popd
 
-pushd manager
 %py3_build
-popd
 
 %install
 DESTDIR="${RPM_BUILD_ROOT}" %{NINJA} -v -C build_rpm install
@@ -220,13 +218,8 @@ pushd build_rpm/python
 popd
 
 # install knot-resolver-manager
-pushd manager
 %py3_install
-install -m 644 -D etc/knot-resolver/config.yaml %{buildroot}%{_sysconfdir}/knot-resolver/config.yaml
-install -m 644 -D shell-completion/client.bash %{buildroot}%{_datarootdir}/bash-completion/completions/kresctl
-install -m 644 -D shell-completion/client.fish %{buildroot}%{_datarootdir}/fish/completions/kresctl.fish
-
-popd
+install -m 644 -D etc/config/config.yaml %{buildroot}%{_sysconfdir}/knot-resolver/config.yaml
 
 %pre
 getent group knot-resolver >/dev/null || groupadd -r knot-resolver
@@ -316,8 +309,6 @@ getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysc
 %endif
 %{_mandir}/man8/kresd.8.gz
 %{_mandir}/man8/kresctl.8.gz
-%{_datarootdir}/bash-completion/completions/kresctl
-%{_datarootdir}/fish/completions/kresctl.fish
 
 %files devel
 %{_includedir}/libkres
