@@ -857,10 +857,14 @@ function policy.TAGS_ASSIGN(names)
 end
 
 -- Perform a list of actions sequentially; meant for kr_view_insert_action().
+-- Return value of the last one is propagated.
 function policy.COMBINE(list)
 	if #list == 1 then return list[1] end
 	local r = 'function(state,req) '
-		for _, item in ipairs(list) do
+		for i, item in ipairs(list) do
+			if i == #list then
+				r = r .. 'return '
+			end
 			r = r .. item .. '(state,req); '
 		end
 	return r .. 'end'
@@ -934,7 +938,11 @@ policy.layer = {
 
 		if ffi.C.kr_view_select_action(req, view_action_buf) == 0 then
 			local act_str = ffi.string(view_action_buf[0].data, view_action_buf[0].len)
-			return loadstring('return '..act_str)()(state, req)
+			local new_state = loadstring('return '..act_str)()(state, req)
+			-- We still respect the chain-rule notion, i.e. we skip
+			-- lua-configured policy rules iff the action was "final"
+			-- (`refused` and `noanswer` in the current 6.x)
+			if new_state ~= nil then return new_state end
 		end
 
 		local qry = req:initial() -- same as :current() but more descriptive
