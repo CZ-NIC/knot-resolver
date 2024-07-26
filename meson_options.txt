@@ -126,6 +126,19 @@ option(
 )
 
 option(
+  'manager',
+  type: 'combo',
+  choices: [
+    'auto',
+    'enabled',
+    'disabled',
+  ],
+  value: 'disabled',
+  description: 'deprecated - do not use',
+  deprecated: true,
+)
+
+option(
   'utils',
   type: 'combo',
   choices: [
