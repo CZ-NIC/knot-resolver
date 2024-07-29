@@ -1,0 +1,19 @@
+{# Tests that kresd can be started with default config and it resolves some domains #}
+Tests: systemd_service.sh
+Tests-Directory: distro/tests/
+Restrictions: needs-root
+{% if distro.match('fedora') -%}
+Depends: knot-utils
+{% elif distro.match('debian') or distro.match('ubuntu') -%}
+Depends: knot-dnsutils
+{% elif distro.match('arch') -%}
+Depends: knot
+{% elif distro.match('rocky', 'centos') -%}
+Depends: knot-utils
+{% elif distro.match('almalinux') -%}
+Depends: knot-utils
+{% elif distro.match('opensuse') -%}
+Depends: knot-utils
+{% else -%}
+Depends: unsupported-distro-this-package-does-not-exist-and-the-test-should-fail
+{%- endif %}
