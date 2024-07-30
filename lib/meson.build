@@ -40,7 +40,6 @@ libkres_src = files([
   'selection_iter.c',
   'utils.c',
   'zonecut.c',
-  '../contrib/openbsd/siphash.c', # needed for kru
 ])
 c_src_lint += libkres_src
 

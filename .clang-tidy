@@ -16,6 +16,7 @@ Checks: |-
   -bugprone-sizeof-expression,
   -bugprone-suspicious-string-compare,
   -cert-dcl03-c,
+  -cert-dcl16-c,
   -clang-analyzer-deadcode.DeadStores,
   -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,
   -clang-analyzer-unix.Malloc,
@@ -37,6 +38,7 @@ Checks: |-
   -readability-magic-numbers,
   -readability-non-const-parameter,
   -readability-redundant-declaration,
+  -readability-uppercase-literal-suffix,
   -clang-analyzer-core.UndefinedBinaryOperatorResult
 
 # TODO: remove `-clang-analyzer-core.UndefinedBinaryOperatorResult` when we

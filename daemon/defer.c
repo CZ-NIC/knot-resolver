@@ -21,7 +21,8 @@
 
 #define KRU_CAPACITY  (1<<10)
 #define MAX_DECAY     (KRU_LIMIT * 0.0006929)  // -> halving counters in 1s
-#define TIME_MULT     1/1   // max fraction of rate limit filled by one cpu (multiplies large int)
+#define TIME_MULT     1/1   // NOLINT for now, TODO improve readability
+	// max fraction of rate limit filled by one cpu (multiplies large int)
 	// TODO divide by #cpus?
 
 #define REQ_TIMEOUT        5000000 // ns (THREAD_CPUTIME), older deferred queries are dropped
