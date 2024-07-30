@@ -116,7 +116,7 @@ static inline void empty_root(node_t *root) {
 static void assert_portability(void) {
 #if FLAGS_HACK
 	kr_require(((union node){ .leaf = {
-			.key = (tkey_t *)(((uint8_t *)NULL) + 1),
+			.key = (tkey_t *)(void *)(uintptr_t)1,
 			.val = NULL
 		} }).branch.flags == 1);
 #endif

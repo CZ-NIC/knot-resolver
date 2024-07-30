@@ -103,9 +103,6 @@ int tls_credentials_release(struct tls_credentials *tls_credentials);
 /*! Generate new ephemeral TLS credentials. */
 struct tls_credentials * tls_get_ephemeral_credentials(void);
 
-/*! Initializes the protocol layers managed by tls. */
-void tls_protolayers_init(void);
-
 /* Session tickets, server side.  Implementation in ./tls_session_ticket-srv.c */
 
 /*! Opaque struct used by tls_session_ticket_* functions. */

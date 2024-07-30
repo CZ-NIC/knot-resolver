@@ -28,12 +28,6 @@ int worker_init(void);
 /** Destroy the worker (free memory). */
 void worker_deinit(void);
 
-/**
- * End current DNS/TCP session, this disassociates pending tasks from this session
- * which may be freely closed afterwards.
- */
-int worker_end_tcp(struct session2 *session);
-
 KR_EXPORT knot_pkt_t *worker_resolve_mk_pkt_dname(knot_dname_t *qname, uint16_t qtype, uint16_t qclass,
 				   const struct kr_qflags *options);
 

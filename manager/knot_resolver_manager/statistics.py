@@ -5,7 +5,7 @@ import logging
 from typing import TYPE_CHECKING, Any, Dict, Generator, List, Optional, Tuple
 
 from knot_resolver_manager import compat
-from knot_resolver_manager.config_store import ConfigStore, only_on_real_changes
+from knot_resolver_manager.config_store import ConfigStore, only_on_real_changes_update
 from knot_resolver_manager.datamodel.config_schema import KresConfig
 from knot_resolver_manager.kresd_controller.registered_workers import (
     command_registered_workers,
@@ -250,7 +250,7 @@ if _prometheus_support:
 
     _graphite_bridge: Optional[GraphiteBridge] = None
 
-    @only_on_real_changes(lambda c: c.monitoring.graphite)
+    @only_on_real_changes_update(lambda c: c.monitoring.graphite)
     async def _configure_graphite_bridge(config: KresConfig) -> None:
         """
         Starts graphite bridge if required

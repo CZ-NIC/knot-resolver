@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "knot-resolver-manager"
-version = "6.0.7"
+version = "6.0.8"
 description = "A central tool for managing individual parts of Knot Resolver"
 
 authors = [
@@ -27,7 +27,7 @@ prometheus-client = { version = "*", optional = true }
 prometheus = ["prometheus-client"]
 
 [tool.poetry.group.dev.dependencies]
-poetry = "^1.7.1"
+poetry = "^1.8.3"
 pyparsing = "^3.1.1"
 poethepoet = "^0.24.4"
 debugpy = "^1.8.1"
@@ -66,8 +66,6 @@ test = { shell = "env PYTHONPATH=. pytest --junitxml=unit.junit.xml --cov=knot_r
 check = { cmd = "scripts/codecheck", help = "Run static code analysis" }
 format = { shell = "black knot_resolver_manager/ tests/ scripts/ build_c_extensions.py; isort .", help = "Run code formatter" }
 fixdeps = { shell = "poetry install; npm install; npm update", help = "Install/update dependencies according to configuration files"}
-commit = { shell = "scripts/commit", help = "Invoke every single check before commiting" }
-container = { cmd = "scripts/container.py", help = "Manage containers" }
 examples = { cmd = "scripts/examples", help = "Validate all configuration examples" }
 kresctl = { script = "knot_resolver_manager.cli.main:main", cwd="${POE_PWD}", help="run kresctl" }
 kresctl-nocwd = { script = "knot_resolver_manager.cli.main:main", help="run kresctl" } # Python <3.8 and poethepoet <0.22.0 compatibility (see also `./poe`)
@@ -79,8 +77,6 @@ clean = """
          dist
 """
 gen-setuppy = { shell = "python scripts/create_setup.py > setup.py", help = "Generate setup.py file for backwards compatibility" }
-integration = {cmd = "python tests/integration/runner.py", help = "Run integration tests" }
-configure-vscode = {cmd = "scripts/configure-vscode", help = "Create VSCode configuration for debugging, virtual envs etc" }
 man = {cmd = "scripts/man", help = "Display manpage from sources" }
 
 [tool.black]

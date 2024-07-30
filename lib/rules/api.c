@@ -141,9 +141,9 @@ int kr_rules_init_ensure(void)
 {
 	if (the_rules)
 		return kr_ok();
-	return kr_rules_init(NULL, 0);
+	return kr_rules_init(NULL, 0, true);
 }
-int kr_rules_init(const char *path, size_t maxsize)
+int kr_rules_init(const char *path, size_t maxsize, bool overwrite)
 {
 	if (the_rules)
 		return kr_error(EINVAL);
@@ -157,21 +157,16 @@ int kr_rules_init(const char *path, size_t maxsize)
 		// FIXME: the file will be sparse, but we still need to choose its size somehow.
 		// Later we might improve it to auto-resize in case of running out of space.
 		// Caveat: mdb_env_set_mapsize() can only be called without transactions open.
-		.maxsize = maxsize ? maxsize :
-			(size_t)(sizeof(size_t) > 4 ? 2048 : 500) * 1024*1024,
+		.maxsize = !overwrite ? 0 :
+			(maxsize ? maxsize : (size_t)(sizeof(size_t) > 4 ? 2048 : 500) * 1024*1024),
 	};
 	int ret = the_rules->api->open(&the_rules->db, &the_rules->stats, &opts, NULL);
-	/* No persistence - we always refill from config for now.
-	 * LATER:
-	 *  - Make it include versioning?
-	 *  - "\0stamp" key when loading config(s)?
-	 *  - Don't clear ruleset data that doesn't come directly from config;
-	 *    and add marks for that, etc.
-	 *    (after there actually are any kinds of rules like that)
-	 */
-	if (ret == 0) ret = ruledb_op(clear);
+
+	if (ret == 0 && overwrite) ret = ruledb_op(clear);
 	if (ret != 0) goto failure;
 	kr_require(the_rules->db);
+
+	if (!overwrite) return kr_ok(); // we assume that the caller ensured OK contents
 
 	ret = tag_names_default();
 	if (ret != 0) goto failure;
@@ -205,7 +200,13 @@ void kr_rules_deinit(void)
 int kr_rules_commit(bool accept)
 {
 	if (!the_rules) return kr_error(EINVAL);
-	return ruledb_op(commit, accept);
+	return ruledb_op(commit, accept, false);
+}
+
+int kr_rules_reset(void)
+{
+	if (!the_rules) return kr_error(EINVAL);
+	return ruledb_op(commit, false, true);
 }
 
 static bool kr_rule_consume_tags(knot_db_val_t *val, const struct kr_request *req)
@@ -817,16 +818,28 @@ int kr_rule_local_subtree(const knot_dname_t *apex, enum kr_rule_sub_t type,
 }
 
 
-/** Encode a subnet into a (longer) string.
+/** Encode a subnet into a (longer) string.  The result is in `buf` with returned length.
  *
  * The point is to have different encodings for different subnets,
  * with using just byte-length strings (e.g. for ::/1 vs. ::/2).
- * And we need to preserve order: FIXME description
- *  - natural partial order on subnets, one included in another
- *  - partial order on strings, one being a prefix of another
- *  - implies lexicographical order on the encoded strings
+ * You might imagine this as the space of all nodes of a binary trie.
  *
- * Consequently, given a set of subnets, the t
+ * == Key properties ==
+ * We're utilizing the order on the encoded strings.  LMDB uses lexicographical order.
+ * Optimization: the properties should cut down LMDB operation count when searching
+ * for rule sets typical in practice.  Some properties:
+ *  - full address is just a subnet containing only that address (/128 and /32)
+ *  - order of full addresses is kept the same as before encoding
+ *  - ancestor first: if subnet B is included inside subnet A, we get A < B
+ *  - subnet mixing: if two subnets do not share any address, all addresses of one
+ *    of them are ordered before all addresses of the other one
+ *
+ * == The encoding ==
+ * The encoding replaces each address bit by a pair of bits:
+ *  - 00 -> beyond the subnet's prefix
+ *  - 10 -> zero bit within the subnet's prefix
+ *  - 11 ->  one bit within the subnet's prefix
+ *  - we cut the byte-length - no need for all-zero suffixes
  */
 static int subnet_encode(const struct sockaddr *addr, int sub_len, uint8_t buf[32])
 {
@@ -837,17 +850,22 @@ static int subnet_encode(const struct sockaddr *addr, int sub_len, uint8_t buf[3
 		return kr_error(EINVAL);
 	const uint8_t *a = (const uint8_t *)/*sign*/kr_inaddr(addr);
 
-	// Algo: interleave bits of the address.  Bit pairs:
-	//  - 00 -> beyond the subnet's prefix
-	//  - 10 -> zero bit within the subnet's prefix
-	//  - 11 ->  one bit within the subnet's prefix
-	// Multiplying one uint8_t by 01010101 (in binary) will do interleaving.
 	int i;
 	// Let's hope that compiler optimizes this into something reasonable.
 	for (i = 0; sub_len > 0; ++i, sub_len -= 8) {
-		uint16_t x = a[i] * 85; // interleave by zero bits
-		uint8_t sub_mask = 255 >> (8 - MIN(sub_len, 8));
-		uint16_t r = x | (sub_mask * 85 * 2);
+		// r = a[i] interleaved by 1 bits (with 1s on the higher-value positions)
+		// https://graphics.stanford.edu/~seander/bithacks.html#Interleave64bitOps
+		// but we modify it slightly: no need for the 0x5555 mask (==0b0101010101010101)
+		// or the y-part - we instead just set all odd bits to 1s.
+		uint16_t r = (
+			(a[i] * 0x0101010101010101ULL & 0x8040201008040201ULL)
+				* 0x0102040810204081ULL >> 49
+		        ) | 0xAAAAU/* = 0b1010'1010'1010'1010 */;
+		// now r might just need clipping
+		if (sub_len < 8) {
+			uint16_t mask = 0xFFFFffffU << (2 * (8 - sub_len));
+			r &= mask;
+		}
 		buf[(ssize_t)2*i] = r / 256;
 		buf[(ssize_t)2*i + 1] = r % 256;
 	}
@@ -855,7 +873,7 @@ static int subnet_encode(const struct sockaddr *addr, int sub_len, uint8_t buf[3
 }
 
 // Is `a` subnet-prefix of `b`?  (a byte format of subnet_encode())
-bool subnet_is_prefix(uint8_t a, uint8_t b)
+static bool subnet_is_prefix(uint8_t a, uint8_t b)
 {
 	while (true) {
 		if (a >> 6 == 0)

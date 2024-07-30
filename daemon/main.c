@@ -14,10 +14,6 @@
 #include "daemon/ratelimiting.h"
 #include "daemon/defer.h"
 
-#ifdef ENABLE_DOH2
-#include "daemon/http.h"
-#endif
-
 #include "lib/defines.h"
 #include "lib/dnssec.h"
 #include "lib/log.h"
@@ -585,13 +581,6 @@ int main(int argc, char **argv)
 		kr_log_info(SYSTEM, "failed to block SIGPROF in event loop, ignoring: %s\n",
 				uv_strerror(ret));
 	}
-
-	io_protolayers_init();
-	tls_protolayers_init();
-	proxy_protolayers_init();
-#ifdef ENABLE_DOH2
-	http_protolayers_init();
-#endif
 
 	/* Start listening, in the sense of network_listen_fd(). */
 	if (start_listening(&the_args->fds) != 0) {

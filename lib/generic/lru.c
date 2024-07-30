@@ -50,9 +50,9 @@ static uint item_size(const struct lru *lru, uint key_len, uint val_len)
 /** @internal Return pointer to value in an lru_item. */
 static void * item_val(const struct lru *lru, struct lru_item *it)
 {
-	size_t key_end = it->data + it->key_len - (char *)NULL;
+	size_t key_end = (uintptr_t)(it->data + it->key_len);
 	size_t val_begin = round_power(key_end, lru->val_alignment);
-	return (char *)NULL + val_begin;
+	return (void *)(uintptr_t)val_begin;
 }
 
 /** @internal Free each item. */

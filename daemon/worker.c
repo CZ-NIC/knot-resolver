@@ -229,25 +229,16 @@ static uint8_t *alloc_wire_cb(struct kr_request *req, uint16_t *maxlen)
 	xdp_handle_data_t *xhd = handle->data;
 	knot_xdp_msg_t out;
 	bool ipv6 = ctx->source.comm_addr.ip.sa_family == AF_INET6;
-	int ret = knot_xdp_send_alloc(xhd->socket,
-			#if KNOT_VERSION_HEX >= 0x030100
-					ipv6 ? KNOT_XDP_MSG_IPV6 : 0, &out);
-			#else
-					ipv6, &out, NULL);
-			#endif
+	int ret = knot_xdp_send_alloc(xhd->socket, ipv6 ? KNOT_XDP_MSG_IPV6 : 0, &out);
 	if (ret != KNOT_EOK) {
 		kr_assert(ret == KNOT_ENOMEM);
 		*maxlen = 0;
 		return NULL;
 	}
 	*maxlen = MIN(*maxlen, out.payload.iov_len);
-#if KNOT_VERSION_HEX < 0x030100
-	/* It's most convenient to fill the MAC addresses at this point. */
-	memcpy(out.eth_from, &ctx->source.eth_from, 6);
-	memcpy(out.eth_to,   &ctx->source.eth_to, 6);
-#endif
 	return out.payload.iov_base;
 }
+
 static void free_wire(const struct request_ctx *ctx)
 {
 	if (kr_fails_assert(ctx->req.alloc_wire_cb == alloc_wire_cb))
@@ -269,12 +260,8 @@ static void free_wire(const struct request_ctx *ctx)
 	out.payload.iov_base = ans->wire;
 	out.payload.iov_len = 0;
 	uint32_t sent = 0;
-#if KNOT_VERSION_HEX >= 0x030100
 	int ret = 0;
 	knot_xdp_send_free(xhd->socket, &out, 1);
-#else
-	int ret = knot_xdp_send(xhd->socket, &out, 1, &sent);
-#endif
 	kr_assert(ret == KNOT_EOK && sent == 0);
 	kr_log_debug(XDP, "freed unsent buffer, ret = %d\n", ret);
 }
@@ -600,7 +587,7 @@ int qr_task_on_send(struct qr_task *task, struct session2 *s, int status)
 						"=> disconnected from '%s': %s\n",
 						peer_str, uv_strerror(status));
 			}
-			worker_end_tcp(s);
+			session2_force_close(s);
 			return status;
 		}
 
@@ -1305,7 +1292,7 @@ static int qr_task_step(struct qr_task *task,
 
 static int worker_submit(struct session2 *session, struct comm_info *comm, knot_pkt_t *pkt)
 {
-	if (!session || !pkt)
+	if (!session || !pkt || session->closing)
 		return kr_error(EINVAL);
 
 	const bool is_query = pkt->size > KNOT_WIRE_OFFSET_FLAGS1
@@ -1485,16 +1472,6 @@ static int worker_del_tcp_waiting(const struct sockaddr* addr)
 static struct session2* worker_find_tcp_waiting(const struct sockaddr* addr)
 {
 	return trie_find_tcp_session(the_worker->tcp_waiting, addr);
-}
-
-int worker_end_tcp(struct session2 *session)
-{
-	if (!session)
-		return kr_error(EINVAL);
-
-	session2_timer_stop(session);
-	session2_force_close(session);
-	return kr_ok();
 }
 
 knot_pkt_t *worker_resolve_mk_pkt_dname(knot_dname_t *qname, uint16_t qtype, uint16_t qclass,
@@ -2206,7 +2183,7 @@ exit:
 	wire_buf_movestart(wb);
 	mp_flush(the_worker->pkt_pool.ctx);
 	if (status < 0)
-		worker_end_tcp(session);
+		session2_force_close(session);
 	return protolayer_break(ctx, status);
 }
 
@@ -2274,13 +2251,9 @@ static void pl_dns_stream_request_init(struct session2 *session,
 	req->qsource.comm_flags.tcp = true;
 }
 
-int worker_init(void)
+__attribute__((constructor))
+static void worker_protolayers_init(void)
 {
-	if (kr_fails_assert(the_worker == NULL))
-		return kr_error(EINVAL);
-	kr_bindings_register(the_engine->L); // TODO move
-
-	/* DNS protocol layers */
 	protolayer_globals[PROTOLAYER_TYPE_DNS_DGRAM] = (struct protolayer_globals){
 		.wire_buf_overhead_cb = pl_dns_dgram_wire_buf_overhead,
 		.wire_buf_max_overhead = KNOT_WIRE_MAX_PKTSIZE,
@@ -2308,6 +2281,13 @@ int worker_init(void)
 	protolayer_globals[PROTOLAYER_TYPE_DNS_MULTI_STREAM].sess_init = pl_dns_stream_sess_init;
 	protolayer_globals[PROTOLAYER_TYPE_DNS_SINGLE_STREAM] = stream_common;
 	protolayer_globals[PROTOLAYER_TYPE_DNS_SINGLE_STREAM].sess_init = pl_dns_single_stream_sess_init;
+}
+
+int worker_init(void)
+{
+	if (kr_fails_assert(the_worker == NULL))
+		return kr_error(EINVAL);
+	kr_bindings_register(the_engine->L); // TODO move
 
 	/* Create main worker. */
 	the_worker = &the_worker_value;

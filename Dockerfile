@@ -1,16 +1,22 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 # Intermediate container for build
-FROM debian:11 AS build
+FROM debian:12 AS build
 
 ENV OBS_REPO=knot-resolver-latest
-ENV DISTROTEST_REPO=Debian_11
+ENV DISTROTEST_REPO=Debian_12
 
 
 RUN apt-get update -qq && \
-	apt-get -qqq -y install python3-pip python3-venv devscripts && \
-	pip3 install pipx && \
+	apt-get -qqq -y install \
+		apt-transport-https ca-certificates wget \
+		pipx devscripts && \
 	pipx install apkg
+
+RUN wget -O /usr/share/keyrings/cznic-labs-pkg.gpg https://pkg.labs.nic.cz/gpg && \
+	echo "deb [signed-by=/usr/share/keyrings/cznic-labs-pkg.gpg] https://pkg.labs.nic.cz/knot-resolver bookworm main" \
+		> /etc/apt/sources.list.d/cznic-labs-knot-resolver.list && \
+	apt-get update -qq
 
 COPY . /source
 
@@ -24,15 +30,25 @@ RUN cd /source && \
 
 
 # Real container
-FROM debian:11-slim AS runtime
+FROM debian:12-slim AS runtime
 
 ENV OBS_REPO=knot-resolver-latest
-ENV DISTROTEST_REPO=Debian_11
+ENV DISTROTEST_REPO=Debian_12
+
+RUN apt-get update -qq && \
+	apt-get -qqq -y install apt-transport-https ca-certificates
+
+COPY --from=build \
+	/usr/share/keyrings/cznic-labs-pkg.gpg \
+	/usr/share/keyrings/cznic-labs-pkg.gpg
+COPY --from=build \
+	/etc/apt/sources.list.d/cznic-labs-knot-resolver.list \
+	/etc/apt/sources.list.d/cznic-labs-knot-resolver.list
 
 RUN apt-get update -qq && \
 	apt-get upgrade -qq
 
-COPY --from=build /source/pkg/pkgs/debian-11 /pkg
+COPY --from=build /source/pkg/pkgs/debian-12 /pkg
 
 # install resolver, minimize image and prepare config directory
 RUN apt-get install -y /pkg/*/*.deb && \

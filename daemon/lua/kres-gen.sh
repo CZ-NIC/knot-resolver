@@ -299,6 +299,7 @@ ${CDEFS} ${LIBKRES} functions <<-EOF
 # New policy
 	kr_rules_init
 	kr_rules_commit
+	kr_rules_reset
 	kr_view_insert_action
 	kr_view_select_action
 	kr_rule_tag_add
@@ -311,6 +312,7 @@ EOF
 
 
 ## kresd itself: worker stuff
+echo "struct tls_credentials;"
 
 ${CDEFS} ${KRESD} types <<-EOF
 	endpoint_flags_t
@@ -321,6 +323,11 @@ ${CDEFS} ${KRESD} types <<-EOF
 	config_array_t
 	struct args
 	zi_config_t
+	# struct network - and all requirements that are missing so far
+	typedef uv_loop_t
+	typedef tls_client_params_t
+	struct net_tcp_param
+	struct network
 EOF
 echo "struct args *the_args;"
 
@@ -350,6 +357,7 @@ printf "\tchar _stub[];\n};\n"
 echo "struct kr_context *the_resolver;"
 echo "struct worker_ctx *the_worker;"
 echo "struct engine *the_engine;"
+echo "struct network *the_network;"
 
 
 ## libzscanner API for ./zonefile.lua

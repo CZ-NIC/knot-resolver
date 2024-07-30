@@ -454,6 +454,9 @@ class IPNetwork(BaseValueType):
     def __repr__(self) -> str:
         return f'{type(self).__name__}("{self._value}")'
 
+    def __eq__(self, o: object) -> bool:
+        return isinstance(o, IPNetwork) and o._value == self._value
+
     def to_std(self) -> Union[ipaddress.IPv4Network, ipaddress.IPv6Network]:
         return self._value
 

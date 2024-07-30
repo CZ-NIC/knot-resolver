@@ -2,7 +2,7 @@ stages:
   - check
 
 default:
-  image: $CI_REGISTRY/knot/knot-resolver/ci/manager:knot-$KNOT_VERSION
+  image: $IMAGE_PREFIX/manager:$IMAGE_TAG
   before_script:
     - cd manager
     - poetry --version

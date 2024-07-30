@@ -789,7 +789,7 @@ static int client_verify_pin(const unsigned int cert_list_size,
  *
  * \returns GNUTLS_E_SUCCESS if certificate chain is valid, any other value is an error
  */
-static int client_verify_certchain(gnutls_session_t tls_session, const char *hostname)
+static int client_verify_certchain(struct pl_tls_sess_data *tls, const char *hostname)
 {
 	if (kr_fails_assert(hostname)) {
 		kr_log_error(TLSCLIENT, "internal config inconsistency: no hostname set\n");
@@ -797,27 +797,30 @@ static int client_verify_certchain(gnutls_session_t tls_session, const char *hos
 	}
 
 	unsigned int status;
-	int ret = gnutls_certificate_verify_peers3(tls_session, hostname, &status);
+	int ret = gnutls_certificate_verify_peers3(tls->tls_session, hostname, &status);
 	if ((ret == GNUTLS_E_SUCCESS) && (status == 0)) {
 		return GNUTLS_E_SUCCESS;
 	}
 
+	const char *addr_str = kr_straddr(session2_get_peer(tls->h.session));
 	if (ret == GNUTLS_E_SUCCESS) {
 		gnutls_datum_t msg;
 		ret = gnutls_certificate_verification_status_print(
-			status, gnutls_certificate_type_get(tls_session), &msg, 0);
+			status, gnutls_certificate_type_get(tls->tls_session), &msg, 0);
 		if (ret == GNUTLS_E_SUCCESS) {
-			kr_log_error(TLSCLIENT, "failed to verify peer certificate: "
-					"%s\n", msg.data);
+			kr_log_error(TLSCLIENT, "failed to verify peer certificate of %s: "
+					"%s\n", addr_str, msg.data);
 			gnutls_free(msg.data);
 		} else {
-			kr_log_error(TLSCLIENT, "failed to verify peer certificate: "
+			kr_log_error(TLSCLIENT, "failed to verify peer certificate of %s: "
 					"unable to print reason: %s (%s)\n",
+					addr_str,
 					gnutls_strerror(ret), gnutls_strerror_name(ret));
 		} /* gnutls_certificate_verification_status_print end */
 	} else {
-		kr_log_error(TLSCLIENT, "failed to verify peer certificate: "
+		kr_log_error(TLSCLIENT, "failed to verify peer certificate of %s: "
 			     "gnutls_certificate_verify_peers3 error: %s (%s)\n",
+			     addr_str,
 			     gnutls_strerror(ret), gnutls_strerror_name(ret));
 	} /* gnutls_certificate_verify_peers3 end */
 	return GNUTLS_E_CERTIFICATE_ERROR;
@@ -856,7 +859,7 @@ static int client_verify_certificate(gnutls_session_t tls_session)
 		/* check hash of the certificate but ignore everything else */
 		return client_verify_pin(cert_list_size, cert_list, tls->client_params);
 	else
-		return client_verify_certchain(tls->tls_session, tls->client_params->hostname);
+		return client_verify_certchain(tls, tls->client_params->hostname);
 }
 
 static int tls_pull_timeout_func(gnutls_transport_ptr_t h, unsigned int ms)
@@ -890,7 +893,21 @@ static int pl_tls_sess_data_deinit(struct pl_tls_sess_data *tls)
 		tls_credentials_release(tls->server_credentials);
 	}
 	wire_buf_deinit(&tls->unwrap_buf);
-	queue_deinit(tls->unwrap_queue); /* TODO: break contexts? */
+
+	while (queue_len(tls->unwrap_queue) > 0) {
+		struct protolayer_iter_ctx *ctx = queue_head(tls->unwrap_queue);
+		protolayer_break(ctx, kr_error(EIO));
+		queue_pop(tls->unwrap_queue);
+	}
+	queue_deinit(tls->unwrap_queue);
+
+	while (queue_len(tls->wrap_queue)) {
+		struct protolayer_iter_ctx *ctx = queue_head(tls->wrap_queue);
+		protolayer_break(ctx, kr_error(EIO));
+		queue_pop(tls->wrap_queue);
+	}
+	queue_deinit(tls->wrap_queue);
+
 	return kr_ok();
 }
 
@@ -1181,6 +1198,9 @@ static ssize_t pl_tls_submit(gnutls_session_t tls_session,
 	if (payload.type == PROTOLAYER_PAYLOAD_WIRE_BUF)
 		payload = protolayer_payload_as_buffer(&payload);
 
+	// TODO: the handling of positive gnutls_record_send() is weird/confusing,
+	// but it seems caught later when checking gnutls_record_uncork()
+
 	if (payload.type == PROTOLAYER_PAYLOAD_BUFFER) {
 		ssize_t count = gnutls_record_send(tls_session,
 				payload.buffer.buf, payload.buffer.len);
@@ -1332,7 +1352,8 @@ static void pl_tls_request_init(struct session2 *session,
 	req->qsource.comm_flags.tls = true;
 }
 
-void tls_protolayers_init(void)
+__attribute__((constructor))
+static void tls_protolayers_init(void)
 {
 	protolayer_globals[PROTOLAYER_TYPE_TLS] = (struct protolayer_globals){
 		.sess_size = sizeof(struct pl_tls_sess_data),

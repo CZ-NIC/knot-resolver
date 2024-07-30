@@ -34,6 +34,3 @@ struct proxy_result {
 /** Checks whether the use of PROXYv2 protocol is allowed for the specified
  * address. */
 bool proxy_allowed(const struct sockaddr *saddr);
-
-/** Initializes the protocol layers managed by the PROXYv2 "module". */
-void proxy_protolayers_init(void);

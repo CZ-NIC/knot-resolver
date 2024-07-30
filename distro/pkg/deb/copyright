@@ -18,26 +18,11 @@ Files: tests/config/tapered/*
 Copyright: 2012-2017, Peter Aronoff
 License: BSD-3-clause
 
-Files: contrib/lmdb/*
-Copyright: 1999-2003 The OpenLDAP Foundation
-License: OpenLDAP
-
-Files: tests/deckard/contrib/libfaketime/*
-Copyright: 2003-2017 Wolfgang Hommel
-License: GPL-2
-
-Files: tests/deckard/contrib/libswrap/*
-Copyright: 2005,2008 Jelmer Vernooij <jelmer@samba.org>
- 2006-2009 Stefan Metzmacher <metze@samba.org>
- 2013 Andreas Schneider <asn@samba.org>
-License: BSD-3-clause
-
 Files: contrib/murmurhash3/*
 Copyright: Austin Appleby
 License: CC0-1.0
 
-Files: debian/missing-sources/dygraph-combined.js
- modules/http/static/dygraph-combined.js
+Files: modules/http/static/dygraph.min.js
 Copyright: 2006-2014 Dan Vanderkam <danvdk@gmail.com>
  2016 Paul Miller
  2011 Robert Konigsberg <konigsberg@google.com>
@@ -68,9 +53,8 @@ Files: modules/http/static/d3.js
 Copyright: 2010-2015 Michael Bostock
 License: BSD-3-clause
 
-Files: modules/http/static/epoch.*
-       debian/missing-sources/epoch/*
-       debian/missing-sources/epoch.*
+Files: modules/http/static/epoch.js
+       modules/http/static/epoch.css
 Copyright: 2014 Fastly, Inc.
 License: Expat
 
@@ -86,9 +70,8 @@ Copyright: 2012-2016 Thomas Park
 	   2011-2015 Twitter, Inc.
 License: Expat
 
-Files: modules/http/static/selectize.bootstrap3.min.css
-       modules/http/static/selectize.min.css
-       modules/http/static/selectize.min.js
+Files: modules/http/static/selectize.min.js
+       modules/http/static/selectize.bootstrap3.css
 Copyright: 2013–2015 Brian Reavis & contributors
 License: Apache-2.0
 
@@ -385,48 +368,6 @@ License: MIT
  ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  SOFTWARE.
-
-License: OpenLDAP
- Redistribution and use of this software and associated documentation
- ("Software"), with or without modification, are permitted provided
- that the following conditions are met:
- .
- 1. Redistributions in source form must retain copyright statements
-    and notices,
- .
- 2. Redistributions in binary form must reproduce applicable copyright
-    statements and notices, this list of conditions, and the following
-    disclaimer in the documentation and/or other materials provided
-    with the distribution, and
- .
- 3. Redistributions must contain a verbatim copy of this document.
- .
- The OpenLDAP Foundation may revise this license from time to time.
- Each revision is distinguished by a version number.  You may use
- this Software under terms of this license revision or under the
- terms of any subsequent revision of the license.
- .
- THIS SOFTWARE IS PROVIDED BY THE OPENLDAP FOUNDATION AND ITS
- CONTRIBUTORS ``AS IS'' AND ANY EXPRESSED OR IMPLIED WARRANTIES,
- INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
- AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT
- SHALL THE OPENLDAP FOUNDATION, ITS CONTRIBUTORS, OR THE AUTHOR(S)
- OR OWNER(S) OF THE SOFTWARE BE LIABLE FOR ANY DIRECT, INDIRECT,
- INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
- ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- POSSIBILITY OF SUCH DAMAGE.
- .
- The names of the authors and copyright holders must not be used in
- advertising or otherwise to promote the sale, use or other dealing
- in this Software without specific, written prior permission.  Title
- to copyright in this Software shall at all times remain with copyright
- holders.
- .
- OpenLDAP is a registered trademark of the OpenLDAP Foundation.
 
 License: CC0-1.0
  This work is licensed under the "Creative Commons Zero" license.

@@ -22,8 +22,11 @@ foreach config_test : config_tests
   conftest_env.prepend('PATH', sbin_dir)
   conftest_env.set('KRESD_NO_LISTEN', '1')
   conftest_env.set('SOURCE_PATH', meson.current_source_dir())
-  conftest_env.set(
-    'TEST_FILE', '@0@/@1@'.format(meson.source_root(), config_test[1][0]))
+  if meson.version().version_compare('>=1.4')
+    conftest_env.set('TEST_FILE', '@0@'.format(config_test[1][0].full_path()))
+  else
+    conftest_env.set('TEST_FILE', '@0@/@1@'.format(meson.source_root(), config_test[1][0]))
+  endif
 
   test(
     'config.' + config_test[0],

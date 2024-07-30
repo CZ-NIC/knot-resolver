@@ -405,7 +405,7 @@ static enum protolayer_iter_cb_result pl_proxyv2_stream_unwrap(
 						"for this peer, close\n",
 						kr_straddr(peer));
 			}
-			worker_end_tcp(s);
+			session2_force_close(s);
 			return protolayer_break(ctx, kr_error(ECONNRESET));
 		}
 
@@ -422,7 +422,7 @@ static enum protolayer_iter_cb_result pl_proxyv2_stream_unwrap(
 							kr_straddr(comm->src_addr));
 				}
 			}
-			worker_end_tcp(s);
+			session2_force_close(s);
 			return protolayer_break(ctx, kr_error(ECONNRESET));
 		} else if (trimmed == 0) {
 			session2_close(s);
@@ -448,8 +448,8 @@ static enum protolayer_iter_cb_result pl_proxyv2_stream_unwrap(
 	return protolayer_continue(ctx);
 }
 
-
-void proxy_protolayers_init(void)
+__attribute__((constructor))
+static void proxy_protolayers_init(void)
 {
 	protolayer_globals[PROTOLAYER_TYPE_PROXYV2_DGRAM] = (struct protolayer_globals){
 		.iter_size = sizeof(struct pl_proxyv2_dgram_iter_data),

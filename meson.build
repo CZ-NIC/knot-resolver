@@ -4,7 +4,7 @@ project(
   'knot-resolver',
   ['c', 'cpp'],
   license: 'GPLv3+',
-  version: '6.0.7',
+  version: '6.0.8',
   default_options: ['c_std=gnu11', 'b_ndebug=true'],
   meson_version: '>=0.49',
 )
@@ -18,7 +18,7 @@ endif
 
 
 message('--- required dependencies ---')
-knot_version = '>=3.0.2'
+knot_version = '>=3.3'
 libknot = dependency('libknot', version: knot_version)
 libdnssec = dependency('libdnssec', version: knot_version)
 libzscanner = dependency('libzscanner', version: knot_version)

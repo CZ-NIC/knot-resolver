@@ -406,19 +406,21 @@ static int protolayer_iter_ctx_finish(struct protolayer_iter_ctx *ctx, int ret)
 			globals->iter_deinit(ctx, d);
 	}
 
-	if (ret)
+	if (ret) {
 		VERBOSE_LOG(s, "layer context of group '%s' (on %u: %s) ended with return code %d\n",
 				kr_proto_name(s->proto),
 				ctx->layer_ix, layer_name_ctx(ctx), ret);
+	}
 
-	if (ctx->status)
-		VERBOSE_LOG(s, "iteration of group '%s' (on %u: %s) ended with status %d\n",
+	if (ctx->status) {
+		VERBOSE_LOG(s, "iteration of group '%s' (on %u: %s) ended with status '%s (%d)'\n",
 				kr_proto_name(s->proto),
-				ctx->layer_ix, layer_name_ctx(ctx), ctx->status);
+				ctx->layer_ix, layer_name_ctx(ctx),
+				kr_strerror(ctx->status), ctx->status);
+	}
 
 	if (ctx->finished_cb)
-		ctx->finished_cb(ret, s, ctx->comm,
-				ctx->finished_cb_baton);
+		ctx->finished_cb(ret, s, ctx->comm, ctx->finished_cb_baton);
 
 	mm_ctx_delete(&ctx->pool);
 	free(ctx);
@@ -1263,7 +1265,7 @@ static void session2_event_wrap(struct session2 *s, enum protolayer_event_type e
 	session2_transport_event(s, event, baton);
 }
 
-void session2_event_unwrap(struct session2 *s, ssize_t start_ix, enum protolayer_event_type event, void *baton)
+static void session2_event_unwrap(struct session2 *s, ssize_t start_ix, enum protolayer_event_type event, void *baton)
 {
 	bool cont;
 	const struct protolayer_grp *grp = &protolayer_grps[s->proto];
@@ -1284,8 +1286,9 @@ void session2_event_unwrap(struct session2 *s, ssize_t start_ix, enum protolayer
 	 *
 	 * TODO: This might be undesirable for cases with sub-sessions - the
 	 * current idea is for the layers managing sub-sessions to just return
-	 * `false` on `event_unwrap`, but a more "automatic" mechanism may be
-	 * added when this is relevant, to make it less error-prone. */
+	 * `PROTOLAYER_EVENT_CONSUME` on `event_unwrap`, but a more "automatic"
+	 * mechanism may be added when this is relevant, to make it less
+	 * error-prone. */
 	session2_event_wrap(s, event, baton);
 }
 
@@ -1408,6 +1411,15 @@ static void session2_transport_pushv_ensure_long_lived(
 	*iovcnt = 1;
 }
 
+/// Count the total size of an iovec[] in bytes.
+static inline size_t iovec_sum(const struct iovec iov[], const int iovcnt)
+{
+	size_t result = 0;
+	for (int i = 0; i < iovcnt; ++i)
+		result += iov[i].iov_len;
+	return result;
+}
+
 static int session2_transport_pushv(struct session2 *s,
                                     struct iovec *iov, int iovcnt,
                                     bool iov_short_lived,
@@ -1462,6 +1474,11 @@ static int session2_transport_pushv(struct session2 *s,
 				int ret = uv_udp_try_send((uv_udp_t*)handle,
 						(uv_buf_t *)iov, iovcnt, comm->comm_addr);
 				if (ret == UV_EAGAIN) {
+					ret = kr_error(ENOBUFS);
+					session2_event(s, PROTOLAYER_EVENT_OS_BUFFER_FULL, NULL);
+				}
+
+				if (false && ret == UV_EAGAIN) { // XXX: see uv_try_write() below
 					uv_udp_send_t *req = malloc(sizeof(*req));
 					req->data = ctx;
 					session2_transport_pushv_ensure_long_lived(
@@ -1472,14 +1489,23 @@ static int session2_transport_pushv(struct session2 *s,
 							session2_transport_udp_pushv_finished);
 					if (ret)
 						session2_transport_udp_pushv_finished(req, ret);
-				} else {
-					session2_transport_pushv_finished(ret, ctx);
+					return ret;
 				}
+
+				session2_transport_pushv_finished(ret, ctx);
 				return ret;
 			}
 		} else if (handle->type == UV_TCP) {
 			int ret = uv_try_write((uv_stream_t *)handle, (uv_buf_t *)iov, iovcnt);
-			if (ret == UV_EAGAIN) {
+			// XXX: queueing disabled for now if the OS can't accept the data.
+			//	Typically that happens when OS buffers are full.
+			//	We were missing any handling of partial write success, too.
+			if (ret == UV_EAGAIN || (ret >= 0 && ret != iovec_sum(iov, iovcnt))) {
+				ret = kr_error(ENOBUFS);
+				session2_event(s, PROTOLAYER_EVENT_OS_BUFFER_FULL, NULL);
+			}
+
+			if (false && ret == UV_EAGAIN) {
 				uv_write_t *req = malloc(sizeof(*req));
 				req->data = ctx;
 				session2_transport_pushv_ensure_long_lived(
@@ -1489,9 +1515,10 @@ static int session2_transport_pushv(struct session2 *s,
 						session2_transport_stream_pushv_finished);
 				if (ret)
 					session2_transport_stream_pushv_finished(req, ret);
-			} else {
-				session2_transport_pushv_finished(ret, ctx);
+				return ret;
 			}
+
+			session2_transport_pushv_finished(ret, ctx);
 			return ret;
 #if ENABLE_XDP
 		} else if (handle->type == UV_POLL) {
@@ -1512,7 +1539,7 @@ static int session2_transport_pushv(struct session2 *s,
 					&iovecmem, ctx);
 
 			knot_xdp_msg_t msg;
-#if KNOT_VERSION_HEX >= 0x030100
+
 			/* We don't have a nice way of preserving the _msg_t from frame allocation,
 			 * so we manually redo all other parts of knot_xdp_send_alloc() */
 			memset(&msg, 0, sizeof(msg));
@@ -1520,7 +1547,7 @@ static int session2_transport_pushv(struct session2 *s,
 			msg.flags = ipv6 ? KNOT_XDP_MSG_IPV6 : 0;
 			memcpy(msg.eth_from, comm->eth_from, sizeof(comm->eth_from));
 			memcpy(msg.eth_to,   comm->eth_to,   sizeof(comm->eth_to));
-#endif
+
 			const struct sockaddr *ip_from = comm->dst_addr;
 			const struct sockaddr *ip_to   = comm->comm_addr;
 			memcpy(&msg.ip_from, ip_from, kr_sockaddr_len(ip_from));

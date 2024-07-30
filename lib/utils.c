@@ -1232,11 +1232,7 @@ char *kr_pkt_text(const knot_pkt_t *pkt)
 
 const knot_dump_style_t KR_DUMP_STYLE_DEFAULT = { /* almost all = false, */
 	.show_ttl = true,
-#if KNOT_VERSION_HEX >= 0x030200
 	.human_timestamp = true,
-#else
-	.human_tmstamp = true,
-#endif
 };
 
 char *kr_rrset_text(const knot_rrset_t *rr)

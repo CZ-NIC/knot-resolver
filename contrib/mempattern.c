@@ -125,7 +125,7 @@ void mm_ctx_mempool(knot_mm_t *mm, size_t chunk_size)
 
 void *mm_malloc_aligned(void *ctx, size_t n)
 {
-	size_t alignment = (size_t)ctx;
+	size_t alignment = (uintptr_t)ctx;
 	void *res;
 	int err = posix_memalign(&res, alignment, n);
 	if (err == 0) {

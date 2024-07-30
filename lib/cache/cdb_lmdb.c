@@ -76,7 +76,7 @@ static inline kr_cdb_pt env2db(struct lmdb_env *env)
 	return (kr_cdb_pt)env;
 }
 
-static int cdb_commit(kr_cdb_pt db, struct kr_cdb_stats *stats, bool accept);
+static int cdb_commit(kr_cdb_pt db, struct kr_cdb_stats *stats, bool accept_rw, bool reset_ro);
 static void txn_abort(struct lmdb_env *env);
 
 /** @brief Convert LMDB error code. */
@@ -114,7 +114,7 @@ static inline MDB_val val_knot2mdb(knot_db_val_t v)
  * It's much lighter than reopen_env(). */
 static int refresh_mapsize(struct lmdb_env *env)
 {
-	int ret = cdb_commit(env2db(env), NULL, true);
+	int ret = cdb_commit(env2db(env), NULL, true, true);
 	if (!ret) ret = lmdb_error(env, mdb_env_set_mapsize(env->env, 0));
 	if (ret) return ret;
 
@@ -223,20 +223,20 @@ static int txn_get(struct lmdb_env *env, MDB_txn **txn, bool rdonly)
 	return kr_ok();
 }
 
-static int cdb_commit(kr_cdb_pt db, struct kr_cdb_stats *stats, bool accept)
+static int cdb_commit(kr_cdb_pt db, struct kr_cdb_stats *stats, bool accept_rw, bool reset_ro)
 {
 	struct lmdb_env *env = db2env(db);
-	if (!accept) {
-		txn_abort(env);
-		return kr_ok();
-	}
 
 	int ret = kr_ok();
 	if (env->txn.rw) {
-		if (stats) stats->commit++;
-		ret = lmdb_error(env, mdb_txn_commit(env->txn.rw));
+		if (accept_rw) {
+			if (stats) stats->commit++;
+			ret = lmdb_error(env, mdb_txn_commit(env->txn.rw));
+		} else {
+			mdb_txn_abort(env->txn.rw);
+		}
 		env->txn.rw = NULL; /* the transaction got freed even in case of errors */
-	} else if (env->txn.ro && env->txn.ro_active) {
+	} else if (reset_ro && env->txn.ro && env->txn.ro_active) {
 		mdb_txn_reset(env->txn.ro);
 		env->txn.ro_active = false;
 		env->txn.ro_curs_active = false;
@@ -256,7 +256,7 @@ static int txn_curs_get(struct lmdb_env *env, MDB_cursor **curs, struct kr_cdb_s
 	 * At least for rules we don't do the auto-commit feature. */
 	if (env->txn.rw) {
 		if (!env->is_cache) return kr_error(EINPROGRESS);
-		int ret = cdb_commit(env2db(env), stats, true);
+		int ret = cdb_commit(env2db(env), stats, true, false);
 		if (ret) return ret;
 	}
 	MDB_txn *txn = NULL;
@@ -312,7 +312,7 @@ static void cdb_close_env(struct lmdb_env *env, struct kr_cdb_stats *stats)
 
 	/* Get rid of any transactions. */
 	txn_free_ro(env);
-	cdb_commit(env2db(env), stats, env->is_cache);
+	cdb_commit(env2db(env), stats, env->is_cache, true);
 
 	mdb_env_sync(env->env, 1);
 	stats->close++;
@@ -574,7 +574,7 @@ static int cdb_clear(kr_cdb_pt db, struct kr_cdb_stats *stats)
 		if (ret == kr_ok()) {
 			ret = lmdb_error(env, mdb_drop(txn, env->dbi, 0));
 			if (ret == kr_ok() && env->is_cache) {
-				ret = cdb_commit(db, stats, true);
+				ret = cdb_commit(db, stats, true, true);
 			}
 			if (ret == kr_ok()) {
 				return ret;
@@ -588,7 +588,7 @@ static int cdb_clear(kr_cdb_pt db, struct kr_cdb_stats *stats)
 
 	/* We are about to switch to a different file, so end all txns, to be sure. */
 	txn_free_ro(env);
-	(void) cdb_commit(db, stats, env->is_cache);
+	(void)cdb_commit(db, stats, env->is_cache, true);
 
 	const char *path = NULL;
 	int ret = mdb_env_get_path(env->env, &path);

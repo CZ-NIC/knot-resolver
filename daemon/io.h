@@ -17,9 +17,6 @@ struct tls_ctx;
 struct tls_client_ctx;
 struct io_stream_data;
 
-/** Initializes the protocol layers managed by io. */
-void io_protolayers_init(void);
-
 /** Bind address into a file-descriptor (only, no libuv).  type is e.g. SOCK_DGRAM */
 int io_bind(const struct sockaddr *addr, int type, const endpoint_flags_t *flags);
 /** Initialize a UDP handle and start listening. */

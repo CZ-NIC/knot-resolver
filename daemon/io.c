@@ -19,7 +19,6 @@
 #include "daemon/network.h"
 #include "daemon/worker.h"
 #include "daemon/tls.h"
-#include "daemon/http.h"
 #include "daemon/session2.h"
 #include "contrib/cleanup.h"
 #include "lib/utils.h"
@@ -166,18 +165,24 @@ static enum protolayer_event_cb_result pl_tcp_event_wrap(
 		enum protolayer_event_type event, void **baton,
 		struct session2 *session, void *sess_data)
 {
-	if (event == PROTOLAYER_EVENT_STATS_SEND_ERR) {
+	switch (event) {
+	case PROTOLAYER_EVENT_STATS_SEND_ERR:
 		the_worker->stats.err_tcp += 1;
 		return PROTOLAYER_EVENT_CONSUME;
-	} else if (event == PROTOLAYER_EVENT_STATS_QRY_OUT) {
+	case PROTOLAYER_EVENT_STATS_QRY_OUT:
 		the_worker->stats.tcp += 1;
 		return PROTOLAYER_EVENT_CONSUME;
+	case PROTOLAYER_EVENT_OS_BUFFER_FULL:
+		session2_force_close(session);
+		return PROTOLAYER_EVENT_CONSUME;
+	default:
+		return PROTOLAYER_EVENT_PROPAGATE;
 	}
 
-	return PROTOLAYER_EVENT_PROPAGATE;
 }
 
-void io_protolayers_init(void)
+__attribute__((constructor))
+static void io_protolayers_init(void)
 {
 	protolayer_globals[PROTOLAYER_TYPE_UDP] = (struct protolayer_globals){
 		.event_wrap = pl_udp_event_wrap,
@@ -261,6 +266,17 @@ int io_bind(const struct sockaddr *addr, int type, const endpoint_flags_t *flags
 	return fd;
 }
 
+/// Optionally set a socket option and log error on failure.
+static void set_so(int fd, int so_option, int value, const char *descr)
+{
+	if (!value) return;
+	if (setsockopt(fd, SOL_SOCKET, so_option, &value, sizeof(value))) {
+		kr_log_error(IO, "failed to set %s to %d: %s\n",
+				descr, value, strerror(errno));
+		// we treat this as non-critical failure
+	}
+}
+
 int io_listen_udp(uv_loop_t *loop, uv_udp_t *handle, int fd)
 {
 	if (!handle) {
@@ -271,6 +287,9 @@ int io_listen_udp(uv_loop_t *loop, uv_udp_t *handle, int fd)
 
 	ret = uv_udp_open(handle, fd);
 	if (ret) return ret;
+
+	set_so(fd, SO_SNDBUF, the_network->listen_udp_buflens.snd, "UDP send buffer size");
+	set_so(fd, SO_RCVBUF, the_network->listen_udp_buflens.rcv, "UDP receive buffer size");
 
 	uv_handle_t *h = (uv_handle_t *)handle;
 	check_bufsize(h);
@@ -314,7 +333,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 				       uv_strerror(nread));
 		}
 		session2_penalize(s);
-		worker_end_tcp(s);
+		session2_force_close(s);
 		return;
 	}
 
@@ -462,6 +481,17 @@ int io_listen_tcp(uv_loop_t *loop, uv_tcp_t *handle, int fd, int tcp_backlog, bo
 			(errno != EPERM ? "" :
 			 ".  This may be caused by TCP Fast Open being disabled in the OS."));
 	}
+#endif
+
+	/* These get inherited into the individual connections (on Linux at least). */
+	set_so(fd, SO_SNDBUF, the_network->listen_tcp_buflens.snd, "TCP send buffer size");
+	set_so(fd, SO_RCVBUF, the_network->listen_tcp_buflens.rcv, "TCP receive buffer size");
+#ifdef TCP_USER_TIMEOUT
+	val = the_network->tcp.user_timeout;
+	if (val && setsockopt(fd, IPPROTO_TCP, TCP_USER_TIMEOUT, &val, sizeof(val))) {
+		kr_log_error(IO, "listen TCP (user_timeout): %s\n", strerror(errno));
+	}
+	// TODO: also for upstream connections, at least this one option?
 #endif
 
 	handle->data = NULL;
@@ -742,11 +772,7 @@ static void xdp_rx(uv_poll_t* handle, int status, int events)
 	kr_require(xhd && xhd->session && xhd->socket);
 	uint32_t rcvd;
 	knot_xdp_msg_t msgs[XDP_RX_BATCH_SIZE];
-	int ret = knot_xdp_recv(xhd->socket, msgs, XDP_RX_BATCH_SIZE, &rcvd
-			#if KNOT_VERSION_HEX >= 0x030100
-			, NULL
-			#endif
-			);
+	int ret = knot_xdp_recv(xhd->socket, msgs, XDP_RX_BATCH_SIZE, &rcvd, NULL);
 
 	if (kr_fails_assert(ret == KNOT_EOK)) {
 		/* ATM other error codes can only be returned when called incorrectly */
@@ -827,19 +853,10 @@ int io_listen_xdp(uv_loop_t *loop, struct endpoint *ep, const char *ifname)
 
 	// This call is a libknot version hell, unfortunately.
 	int ret = knot_xdp_init(&xhd->socket, ifname, ep->nic_queue,
-		#if KNOT_VERSION_HEX < 0x030100
-			ep->port ? ep->port : KNOT_XDP_LISTEN_PORT_ALL,
-			KNOT_XDP_LOAD_BPF_MAYBE
-		#elif KNOT_VERSION_HEX < 0x030200
-			ep->port ? ep->port : (KNOT_XDP_LISTEN_PORT_PASS | 0),
-			KNOT_XDP_LOAD_BPF_MAYBE
-		#else
 			KNOT_XDP_FILTER_UDP | (ep->port ? 0 : KNOT_XDP_FILTER_PASS),
 			ep->port, 0/*quic_port*/,
 			KNOT_XDP_LOAD_BPF_MAYBE,
-			NULL/*xdp_config*/
-		#endif
-		);
+			NULL/*xdp_config*/);
 
 	if (!ret) xdp_warn_mode(ifname);
 

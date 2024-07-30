@@ -41,7 +41,7 @@ override_dh_auto_build:
 		dh_auto_build --buildsystem=pybuild --sourcedirectory manager
 
 override_dh_auto_install:
-	DESTDIR="${PWD}/debian/tmp" ninja -v -C build_deb install
+	DESTDIR="$(shell pwd)/debian/tmp" ninja -v -C build_deb install
 	PYBUILD_NAME=knot_resolver PYBUILD_DESTDIR="$${PYKRES_DESTDIR}" \
 		dh_auto_install --buildsystem=pybuild --sourcedirectory build_deb/python
 	PYBUILD_NAME=knot_resolver_manager PYBUILD_DESTDIR="$${PYKRES_DESTDIR}" \
@@ -52,6 +52,3 @@ override_dh_auto_install:
 
 override_dh_auto_test:
 	meson test -C build_deb
-
-override_dh_strip:
-	dh_strip --dbg-package=knot-resolver6-dbg

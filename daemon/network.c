@@ -76,7 +76,12 @@ void network_init(uv_loop_t *loop, int tcp_backlog)
 			tls_session_ticket_ctx_create(loop, NULL, 0);
 	the_network->tcp.in_idle_timeout = 10000;
 	the_network->tcp.tls_handshake_timeout = TLS_MAX_HANDSHAKE_TIME;
+	the_network->tcp.user_timeout = 1000; // 1s should be more than enough
 	the_network->tcp_backlog = tcp_backlog;
+
+	// On Linux, unset means some auto-tuning mechanism also depending on RAM,
+	// which might be OK default (together with the user_timeout above)
+	//the_network->listen_{tcp,udp}_buflens.{snd,rcv}
 }
 
 /** Notify the registered function about endpoint getting open.
@@ -102,7 +107,7 @@ static int endpoint_open_lua_cb(struct endpoint *ep,
 	if (!pp) return kr_ok();
 
 	/* Now execute the callback. */
-	const int fun_id = (char *)*pp - (char *)NULL;
+	const int fun_id = (intptr_t)*pp;
 	lua_rawgeti(L, LUA_REGISTRYINDEX, fun_id);
 	lua_pushboolean(L, true /* open */);
 	lua_pushpointer(L, ep);
@@ -182,7 +187,7 @@ static void endpoint_close_lua_cb(struct endpoint *ep)
 	}
 	if (!pp) return;
 
-	const int fun_id = (char *)*pp - (char *)NULL;
+	const int fun_id = (intptr_t)*pp;
 	lua_rawgeti(L, LUA_REGISTRYINDEX, fun_id);
 	lua_pushboolean(L, false /* close */);
 	lua_pushpointer(L, ep);
@@ -262,7 +267,7 @@ static int free_key(trie_val_t *val, void* ext)
 
 int kind_unregister(trie_val_t *tv, void *L)
 {
-	int fun_id = (char *)*tv - (char *)NULL;
+	int fun_id = (intptr_t)*tv;
 	luaL_unref(L, LUA_REGISTRYINDEX, fun_id);
 	return 0;
 }
