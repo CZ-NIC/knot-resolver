@@ -1,0 +1,8 @@
+#!/bin/bash
+
+# ensure consistent behaviour
+src_dir="$(dirname "$(realpath "$0")")"
+source $src_dir/_env.sh
+
+# create setup.py
+python scripts/create_setup.py > setup.py
