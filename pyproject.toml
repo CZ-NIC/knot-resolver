@@ -72,7 +72,7 @@ knot-resolver = 'knot_resolver_manager.__main__:run'
 # tasks runed through scripts located in 'scripts/poe-tasks/'
 configure = { cmd = "scripts/poe-tasks/configure", help = "(Re)configure Meson build directory" }
 run = { cmd = "scripts/poe-tasks/run", help = "Run Knot Resolver" }
-run-debug = { cmd = "scripts/poe-tasks/run-debug", help = "Run Knot Resolver under the debugger" }
+run-debug = { cmd = "scripts/poe-tasks/run-debug", help = "Debug Knot Resolver with debugpy" }
 docs = { cmd = "scripts/poe-tasks/docs", help = "Create Knot Resolver HTML documentation" }
 test = { cmd = "scripts/poe-tasks/test", help = "Run pytest unit tests" }
 check = { cmd = "scripts/poe-tasks/check", help = "Check that all dependencies are installed and run static code analysis" }
