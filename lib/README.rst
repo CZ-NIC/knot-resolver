@@ -4,11 +4,6 @@
 Knot Resolver library
 *********************
 
-Requirements
-============
-
-* libknot_ 2.0 (Knot DNS high-performance DNS library.)
-
 For users
 =========
 
