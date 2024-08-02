@@ -85,7 +85,7 @@ The following dependencies are needed to build and run Knot Resolver with core f
    "ninja", "*build only*"
    "meson >= 0.49", "*build only* [#]_"
    "C and C++ compiler", "*build only* [#]_"
-   "`pkg-config`_", "*build only* [#]_"
+   "`pkg-config`_", "*build only*"
    "libknot_ 3.3.0+", "Knot DNS libraries"
    "LuaJIT_ 2.0+", "Embedded scripting language"
    "libuv_ 1.7+", "Multiplatform I/O and services"
@@ -124,11 +124,8 @@ Resolver:
 
 .. [#] If ``meson >= 0.49`` isn't available for your distro, check backports
    repository or use python pip to install it.
-.. [#] Requires ``__attribute__((cleanup))`` and ``-MMD -MP`` for
-   dependency file generation. We test GCC and Clang, and ICC is likely to work as well.
-.. [#] You can use variables ``<dependency>_CFLAGS`` and ``<dependency>_LIBS``
-   to configure dependencies manually (i.e. ``libknot_CFLAGS`` and
-   ``libknot_LIBS``).
+.. [#] We test GCC and Clang.  We depend on GNU extensions to the C standard,
+   in particular ``__attribute__((cleanup))``.  
 
 .. note:: Some build dependencies can be found in
    `home:CZ-NIC:knot-resolver-build
