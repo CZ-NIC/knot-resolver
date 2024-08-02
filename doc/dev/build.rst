@@ -13,7 +13,8 @@ Knot Resolver is written for UNIX-like systems using modern C standards.
 Beware that some 64-bit systems with LuaJIT 2.1 may be affected by
 `a problem <https://github.com/LuaJIT/LuaJIT/blob/v2.1.0-beta3/doc/status.html#L100>`_
 -- Linux on x86_64 is unaffected but `Linux on aarch64 is
-<https://gitlab.nic.cz/knot/knot-resolver/issues/216>`_.
+<https://gitlab.nic.cz/knot/knot-resolver/issues/216>`_,
+but distros supporting LuaJIT on aarch64 have typically resolved this already.
 
 .. code-block:: bash
 
@@ -125,23 +126,20 @@ Resolver:
 .. [#] If ``meson >= 0.49`` isn't available for your distro, check backports
    repository or use python pip to install it.
 .. [#] We test GCC and Clang.  We depend on GNU extensions to the C standard,
-   in particular ``__attribute__((cleanup))``.  
+   in particular ``__attribute__((cleanup))``.
 
-.. note:: Some build dependencies can be found in
-   `home:CZ-NIC:knot-resolver-build
-   <https://build.opensuse.org/project/show/home:CZ-NIC:knot-resolver-build>`_.
+On reasonably new systems most of the dependencies can be resolved from packages.
+``apkg build-dep`` is one option of obtaining them (see above).
 
-On reasonably new systems most of the dependencies can be resolved from packages,
-here's an overview for several platforms.
-
-* **Debian/Ubuntu** - Current stable doesn't have new enough Meson
-  and libknot. Use repository above or build them yourself. Fresh list of dependencies can be found in `Debian control file in our repo <https://gitlab.nic.cz/knot/knot-resolver/blob/master/distro/deb/control>`_, search for "Build-Depends".
-
-* **CentOS/Fedora/RHEL/openSUSE** - Fresh list of dependencies can be found in `RPM spec file in our repo <https://gitlab.nic.cz/knot/knot-resolver/blob/master/distro/rpm/knot-resolver.spec>`_, search for "BuildRequires".
+We tend to require not too old libknot, so you might need to install a newer one.
+Their team also provides binaries for major Linux distros:
+https://www.knot-dns.cz/download/
 
 * **FreeBSD** - when installing from ports, all dependencies will install
   automatically, corresponding to the selected options.
+  FIXME: resolver 6.x stuff (manager) doesn't even work yet.
 * **Mac OS X** - the dependencies can be obtained from `Homebrew formula <https://formulae.brew.sh/formula/knot-resolver>`_.
+  FIXME: resolver 6.x stuff (manager) doesn't even work yet.
 
 Compilation
 ===========
