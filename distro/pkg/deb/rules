@@ -1,4 +1,4 @@
-#!/usr/bin/make -f
+#!/usr/bin/env make -f
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 # see FEATURE AREAS in dpkg-buildflags(1)

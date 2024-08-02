@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env sh
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 exec > /dev/null
