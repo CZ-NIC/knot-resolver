@@ -306,7 +306,7 @@ All dependencies are also listed in `pyproject.toml <https://gitlab.nic.cz/knot/
    "prometheus-client_", "Prometheus client for Python (optional)"
 
 
- You can install the ``manager`` using generated ``setup.py``.
+You can install the Manager using the generated ``setup.py``.
 
 .. code-block:: bash
 
@@ -315,7 +315,7 @@ All dependencies are also listed in `pyproject.toml <https://gitlab.nic.cz/knot/
 
 .. tip::
 
-   For development, it is recommended to run the manager using the procedure described in `manager/README.md <https://gitlab.nic.cz/knot/knot-resolver/-/blob/master/manager/README.md>`_.
+   For development, it is recommended to run the manager using the procedure described in :ref:`manager-dev-env`.
 
 
 ************
