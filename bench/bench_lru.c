@@ -13,13 +13,13 @@
 #include "daemon/engine.h"
 #include "lib/selection.h"
 
-typedef kr_nsrep_lru_t lru_bench_t;
+typedef lru_t(unsigned) lru_bench_t;
 
 #define p_out(...) do { \
 	printf(__VA_ARGS__); \
-	fflush(stdout); \
-	} while (0)
-#define p_err(...) fprintf(stderr, __VA_ARGS__)
+	(void)fflush(stdout); \
+} while (0)
+#define p_err(...) ((void)fprintf(stderr, __VA_ARGS__))
 
 #ifndef LRU_RTT_SIZE
 #define LRU_RTT_SIZE 65536 /**< NS RTT cache size */
@@ -27,7 +27,7 @@ typedef kr_nsrep_lru_t lru_bench_t;
 
 static int die(const char *cause)
 {
-	fprintf(stderr, "%s: %s\n", cause, strerror(errno));
+	(void)fprintf(stderr, "%s: %s\n", cause, strerror(errno));
 	exit(1);
 }
 
@@ -171,7 +171,7 @@ int main(int argc, char ** argv)
 	struct key *keys = read_lines(argv[2], &key_count, &data_to_free);
 	size_t run_count;
 	{
-		size_t run_log = atoi(argv[1]);
+		size_t run_log = atoi(argv[1]); // NOLINT: atoi is fine for this tool...
 		assert(run_log < 64);
 		run_count = 1ULL << run_log;
 		p_err("\ntest run length:\t2^");
@@ -179,7 +179,7 @@ int main(int argc, char ** argv)
 	}
 
 	struct timeval time;
-	const int lru_size = argc > 4 ? atoi(argv[4]) : LRU_RTT_SIZE;
+	const int lru_size = argc > 4 ? atoi(argv[4]) : LRU_RTT_SIZE; // NOLINT: ditto atoi
 
 	lru_bench_t *lru;
 	#ifdef lru_create
