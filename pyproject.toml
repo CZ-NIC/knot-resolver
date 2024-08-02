@@ -82,8 +82,7 @@ gen-setuppy = { cmd = "scripts/poe-tasks/gen-setuppy", help = "Generate 'setup.p
 format = { cmd = "scripts/poe-tasks/format", help = "Run code formatter" }
 # tasks runned directly
 fixdeps = { shell = "poetry install; npm install; npm update", help = "Install/update dependencies according to configuration files"}
-kresctl = { script = "knot_resolver_manager.cli.main:main", cwd="${POE_PWD}", help="Run kresctl utility" }
-kresctl-nocwd = { script = "knot_resolver_manager.cli.main:main", help="Run kresctl utility" } # Python <3.8 and poethepoet <0.22.0 compatibility (see also `./poe`)
+kresctl = { cmd = "scripts/poe-tasks/kresctl", help="Run kresctl utility" }
 clean = """
   rm -rf .coverage
          .mypy_cache
