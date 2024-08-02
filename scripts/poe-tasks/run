@@ -41,4 +41,18 @@ fi
 
 export KRES_MANAGER_CONFIG
 export KRES_MANAGER_API_SOCK
+
+# cleanup '~/.bashrc'
+sed -i.bak "/^export KRES_MANAGER_CONFIG=/d" ~/.bashrc
+sed -i.bak "/^export KRES_MANAGER_API_SOCK=/d" ~/.bashrc
+
+# create user ENV VARs shared across user shells
+echo export KRES_MANAGER_CONFIG="$KRES_MANAGER_CONFIG" >> ~/.bashrc
+echo export KRES_MANAGER_API_SOCK="$KRES_MANAGER_API_SOCK" >> ~/.bashrc
+
+# start the manager
 python3 -m knot_resolver_manager $@
+
+# make final cleanup in '~/.bashrc'
+sed -i.bak "/^export KRES_MANAGER_CONFIG=/d" ~/.bashrc
+sed -i.bak "/^export KRES_MANAGER_API_SOCK=/d" ~/.bashrc

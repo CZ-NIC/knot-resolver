@@ -1,0 +1,13 @@
+#!/bin/bash
+
+# ensure consistent behaviour
+src_dir="$(dirname "$(realpath "$0")")"
+source $src_dir/_env.sh
+
+# if path to the config file or socket is defined by user
+if [ -z "${KRES_MANAGER_CONFIG:-}" ] || [ "${1:-}" = "-c" ] || [ "${1:-}" = "-s" ]; then
+    python3 -m knot_resolver_manager.cli $@
+else
+    # run kresctl with the path to the configuration file
+    python3 -m knot_resolver_manager.cli -c $KRES_MANAGER_CONFIG $@
+fi

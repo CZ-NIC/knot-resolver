@@ -9,6 +9,11 @@ bright_black="\033[0;90m"
 blue="\033[0;34m"
 reset="\033[0m"
 
+# reload sessions shared env vars
+if [ -f "~/.bashrc" ]; then
+	source ~/.bashrc
+fi
+
 # ensure consistent top level directory
 gitroot="$(git rev-parse --show-toplevel)"
 if test -z "$gitroot"; then
