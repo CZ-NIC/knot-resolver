@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 expected_workers="5"
 

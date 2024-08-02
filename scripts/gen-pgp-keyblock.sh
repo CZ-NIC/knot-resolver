@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Script to create/update Knot Resolver PGP keyring
 set -o errexit -o nounset
 

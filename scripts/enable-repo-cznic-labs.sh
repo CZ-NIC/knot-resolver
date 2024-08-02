@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # enable CZ.NIC Labs Debian/Ubuntu repos - see https://pkg.labs.nic.cz/doc/
 set -e
 

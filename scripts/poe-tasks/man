@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # ensure consistent behaviour
 src_dir="$(dirname "$(realpath "$0")")"

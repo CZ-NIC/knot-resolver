@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -e
 KRESD_CMD=$1
 MESON_BUILD_ROOT=$(pwd)
