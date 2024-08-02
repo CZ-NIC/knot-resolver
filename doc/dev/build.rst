@@ -6,8 +6,8 @@
 Cloning the repository
 **********************
 
-.. note:: Latest up-to-date packages for various distribution can be obtained
-   from web `<https://knot-resolver.cz/download/>`_.
+.. note::  Maybe you do not need to build from source?
+   See `<../gettingstarted-install.html>`_.
 
 Knot Resolver is written for UNIX-like systems using modern C standards.
 Beware that some 64-bit systems with LuaJIT 2.1 may be affected by
@@ -107,7 +107,7 @@ Resolver:
    "`libcap-ng`_", "``daemon``", "Linux capabilities: support dropping them."
    "`lua-basexx`_", "``config tests``", "Number base encoding/decoding for Lua."
    "`lua-http`_", "``modules/http``", "HTTP/2 client/server for Lua."
-   "`lua-cqueues`_", "some lua modules", ""
+   "`lua-cqueues`_", "some modules and tests", ""
    "cmocka_", "``unit tests``", "Unit testing framework."
    "dnsdist_", "``proxyv2 test``", "DNS proxy server"
    "Doxygen_", "``documentation``", "Generating API documentation."
