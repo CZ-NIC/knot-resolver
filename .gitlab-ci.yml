@@ -116,7 +116,7 @@ archive:
 build-stable:
   <<: *build
   script:
-    - meson build_ci_stable --prefix=$PREFIX -Dmalloc=disabled -Dwerror=true -Dextra_tests=enabled
+    - meson build_ci_stable --prefix=$PREFIX -Dmalloc=disabled -Dwerror=true -Dextra_tests=enabled -Dbench=enabled
     - ninja -C build_ci_stable
     - ninja -C build_ci_stable install >/dev/null
     - ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite snowflake
