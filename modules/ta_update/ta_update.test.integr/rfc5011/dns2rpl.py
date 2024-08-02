@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 """
 Generate RFC 5011 test simulating successful KSK roll-over in 2017.
 

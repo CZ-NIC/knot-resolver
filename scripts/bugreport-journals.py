@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 """
 Collect systemd-journal log entries around time of daemon exit and coredumps.
 """
