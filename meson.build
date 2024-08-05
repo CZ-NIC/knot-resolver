@@ -137,9 +137,15 @@ systemd_files = get_option('systemd_files')
 systemd_legacy_units = get_option('systemd_legacy_units')
 libsystemd = dependency('libsystemd', required: systemd_files == 'enabled')
 
+# Uh, lifted this trivial line from tests/meson.build due to dependency sorting:
+build_extra_tests = get_option('extra_tests') == 'enabled'
+
 ### Allocator
 # use empty name to disable the dependency, but still compile the dependent kresd
-malloc_name = get_option('malloc') == 'disabled' ? '' : 'jemalloc'
+malloc_name = ''
+if get_option('malloc') == 'jemalloc' or (get_option('malloc') == 'auto' and not build_extra_tests)
+  malloc_name = 'jemalloc'
+endif
 malloc = meson.get_compiler('c').find_library(
   malloc_name,
   required: get_option('malloc') == 'jemalloc',
