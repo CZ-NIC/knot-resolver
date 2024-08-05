@@ -22,23 +22,8 @@ shopt -u globstar
 shopt -u nullglob
 
 echo
-echo Knot Manager API is accessible on http://localhost:5000
-echo -------------------------------------------------------
+echo The Knot Resolver management API is accessible on http://localhost:5000
+echo -----------------------------------------------------------------------
 
-# create runtime directories
-if [ -z "${KRES_CONFIG_DIR:-}" ]; then
-    KRES_CONFIG_DIR="etc/config"
-fi
-mkdir -p "$KRES_CONFIG_DIR/runtime" "$KRES_CONFIG_DIR/cache"
-
-if [ -z "${KRES_MANAGER_CONFIG:-}" ]; then
-    KRES_MANAGER_CONFIG="$KRES_CONFIG_DIR/config.dev.yaml"
-fi
-
-if [ -z "${KRES_MANAGER_API_SOCK:-}" ]; then
-    KRES_MANAGER_API_SOCK="$KRES_CONFIG_DIR/manager.sock"
-fi
-
-export KRES_MANAGER_CONFIG
-export KRES_MANAGER_API_SOCK
+# run the knot-resolver manager
 python3 -m knot_resolver_manager $@
