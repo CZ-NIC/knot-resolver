@@ -1,22 +1,3 @@
-#!/usr/bin/env bash
+#!/bin/sh
 
-script_dir="$(dirname "$(readlink -f "$0")")"
-
-if poetry --directory "$script_dir" run python -c 'import sys; sys.exit(0 if sys.version_info >= (3, 8) else 1)'; then
-    # Run poethepoet with the project root in the $script_dir directory (requires Python >=3.8)
-    poetry --directory "$script_dir" run poe --root "$script_dir" $@
-elif [ "$PWD" == "$script_dir" ]; then
-    # Compatibility workarounds for Python <3.8 and poethepoet <0.22.0
-    # Only works if the current working directory is the same as the script directory.
-    args=("$@")
-    if [ "${args[0]}" == "kresctl" ]; then
-        echo "WARNING: Workaround for Python <3.8: replacing 'kresctl' with 'kresctl-nocwd'" >&2
-        args[0]="kresctl-nocwd"
-    fi
-    poetry run poe "${args[@]}"
-else
-    echo "Running script from non project root is not supported for current 'poethepoet' version." >&2
-    echo "poethepoet version - must be >=0.22.0" >&2
-    echo "Python version - must be >=3.8" >&2
-    exit 1
-fi
+exec poetry run poe "$@"
