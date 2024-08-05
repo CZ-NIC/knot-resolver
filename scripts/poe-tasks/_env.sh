@@ -34,6 +34,23 @@ PATH="$PATH:$gitroot/node_modules/.bin"
 # fail even on unbound variables
 set -o nounset
 
+# create runtime directories
+if [ -z "${KRES_CONFIG_DIR:-}" ]; then
+	KRES_CONFIG_DIR="$gitroot/etc/config"
+fi
+mkdir -p "$KRES_CONFIG_DIR/runtime" "$KRES_CONFIG_DIR/cache"
+
+# env variables
+if [ -z "${KRES_MANAGER_CONFIG:-}" ]; then
+    KRES_MANAGER_CONFIG="$KRES_CONFIG_DIR/config.dev.yaml"
+fi
+
+if [ -z "${KRES_MANAGER_API_SOCK:-}" ]; then
+    KRES_MANAGER_API_SOCK="$KRES_CONFIG_DIR/manager.sock"
+fi
+export KRES_MANAGER_CONFIG
+export KRES_MANAGER_API_SOCK
+
 function build_kresd {
 	if [ -d .build_kresd ]; then
 		echo
