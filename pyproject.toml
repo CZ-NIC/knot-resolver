@@ -16,7 +16,7 @@ repository = "https://gitlab.nic.cz/knot/knot-resolver"
 documentation = "https://www.knot-resolver.cz/documentation"
 
 packages = [
-    {include = "knot_resolver_manager", from = "manager"}
+    {include = "knot_resolver_manager", from = "python"}
 ]
 
 # See currently open issue about building C extensions here:
