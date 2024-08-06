@@ -65,8 +65,8 @@ breathe = "^4.35.0"
 json-schema-for-humans = "^0.47"
 
 [tool.poetry.scripts]
-kresctl = 'knot_resolver_manager.cli.main:main'
-knot-resolver = 'knot_resolver_manager.__main__:run'
+kresctl = 'knot_resolver_manager.client.main:main'
+knot-resolver = 'knot_resolver_manager.manager.__main__:run'
 
 [tool.poe.tasks]
 # tasks runed through scripts located in 'scripts/poe-tasks/'

@@ -26,4 +26,4 @@ echo The Knot Resolver management API is accessible on http://localhost:5000
 echo -----------------------------------------------------------------------
 
 # run the knot-resolver manager
-python3 -m knot_resolver_manager $@
+python3 -m knot_resolver_manager.manager $@

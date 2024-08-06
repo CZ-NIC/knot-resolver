@@ -4,7 +4,7 @@
 src_dir="$(dirname "$(realpath "$0")")"
 source $src_dir/utils/_env.sh
 
-dirs="python/knot_resolver_manager/ tests/manager scripts/poe-tasks/utils/create_setup.py build_c_extensions.py"
+dirs="python/knot_resolver/ tests/manager scripts/poe-tasks/utils/create_setup.py build_c_extensions.py"
 
 # run black code formater
 black $dirs

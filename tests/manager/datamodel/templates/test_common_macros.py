@@ -1,5 +1,5 @@
-from knot_resolver_manager.datamodel.forward_schema import ForwardServerSchema
-from knot_resolver_manager.datamodel.templates import template_from_str
+from knot_resolver_manager.manager.datamodel.forward_schema import ForwardServerSchema
+from knot_resolver_manager.manager.datamodel.templates import template_from_str
 
 
 def test_boolean():

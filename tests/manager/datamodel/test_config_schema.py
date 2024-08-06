@@ -2,8 +2,8 @@ import inspect
 import json
 from typing import Any, Dict, Type, cast
 
-from knot_resolver_manager.datamodel import KresConfig
-from knot_resolver_manager.datamodel.lua_schema import LuaSchema
+from knot_resolver_manager.manager.datamodel import KresConfig
+from knot_resolver_manager.manager.datamodel.lua_schema import LuaSchema
 from knot_resolver_manager.utils.modeling import BaseSchema
 from knot_resolver_manager.utils.modeling.types import (
     get_generic_type_argument,

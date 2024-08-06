@@ -7,7 +7,7 @@ cd "$(dirname "${0}")/../.."
 pushd python
 ## the following python command should hopefully run without any dependencies except for standard python
 mkdir -p ../doc/_static/
-python3 -m knot_resolver_manager.cli schema > ../doc/_static/config.schema.json
+python3 -m knot_resolver_manager.client schema > ../doc/_static/config.schema.json
 generate-schema-doc --config expand_buttons=true ../doc/_static/config.schema.json ../doc/_static/schema_doc.html
 popd
 
