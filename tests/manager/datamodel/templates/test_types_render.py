@@ -3,7 +3,7 @@ from typing import Any
 import pytest
 from jinja2 import Template
 
-from knot_resolver_manager.datamodel.types import EscapedStr
+from knot_resolver_manager.manager.datamodel.types import EscapedStr
 from knot_resolver_manager.utils.modeling import ConfigSchema
 
 str_template = Template("'{{ string }}'")

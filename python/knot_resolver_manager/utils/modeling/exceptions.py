@@ -1,6 +1,6 @@
 from typing import Iterable, List
 
-from knot_resolver_manager.exceptions import KresManagerException
+from knot_resolver_manager.manager.exceptions import KresManagerException
 
 
 class DataModelingBaseException(KresManagerException):

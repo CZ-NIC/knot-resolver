@@ -1,7 +1,7 @@
 import pytest
 from pytest import raises
 
-from knot_resolver_manager.datamodel.forward_schema import ForwardSchema
+from knot_resolver_manager.manager.datamodel.forward_schema import ForwardSchema
 from knot_resolver_manager.utils.modeling.exceptions import DataValidationError
 
 

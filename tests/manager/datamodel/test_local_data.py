@@ -3,7 +3,7 @@ from typing import Any
 import pytest
 from pytest import raises
 
-from knot_resolver_manager.datamodel.local_data_schema import RuleSchema
+from knot_resolver_manager.manager.datamodel.local_data_schema import RuleSchema
 from knot_resolver_manager.utils.modeling.exceptions import DataValidationError
 
 

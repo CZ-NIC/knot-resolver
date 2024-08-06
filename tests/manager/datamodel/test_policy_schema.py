@@ -3,8 +3,8 @@ from typing import Any, Dict
 import pytest
 from pytest import raises
 
-from knot_resolver_manager.datamodel.policy_schema import ActionSchema, PolicySchema
-from knot_resolver_manager.datamodel.types import PolicyActionEnum
+from knot_resolver_manager.manager.datamodel.policy_schema import ActionSchema, PolicySchema
+from knot_resolver_manager.manager.datamodel.types import PolicyActionEnum
 from knot_resolver_manager.utils.modeling.exceptions import DataValidationError
 from knot_resolver_manager.utils.modeling.types import get_generic_type_arguments
 
