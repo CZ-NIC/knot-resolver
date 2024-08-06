@@ -9,7 +9,7 @@ def build(setup_kwargs: Dict[Any, Any]) -> None:
             "ext_modules": [
                 Extension(
                     name="knot_resolver_manager.kresd_controller.supervisord.plugin.notify",
-                    sources=["manager/knot_resolver_manager/kresd_controller/supervisord/plugin/notifymodule.c"],
+                    sources=["python/knot_resolver_manager/kresd_controller/supervisord/plugin/notifymodule.c"],
                 ),
             ]
         }

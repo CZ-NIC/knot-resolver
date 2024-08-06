@@ -5,4 +5,4 @@ src_dir="$(dirname "$(realpath "$0")")"
 source $src_dir/utils/_env.sh
 
 # run pytest
-env PYTHONPATH=. pytest --junitxml=unit.junit.xml --cov=manager/knot_resolver_manager --show-capture=all tests/manager
+env PYTHONPATH=. pytest --junitxml=unit.junit.xml --cov=python/knot_resolver_manager --show-capture=all tests/manager

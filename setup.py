@@ -2,7 +2,7 @@
 from setuptools import setup
 
 package_dir = \
-{'': 'manager'}
+{'': 'python'}
 
 packages = \
 ['knot_resolver_manager',

@@ -4,7 +4,7 @@ set -o errexit -o nounset
 cd "$(dirname "${0}")/../.."
 
 # generate JSON schema for the manager's declarative config
-pushd manager
+pushd python
 ## the following python command should hopefully run without any dependencies except for standard python
 mkdir -p ../doc/_static/
 python3 -m knot_resolver_manager.cli schema > ../doc/_static/config.schema.json

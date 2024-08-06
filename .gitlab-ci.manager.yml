@@ -4,7 +4,6 @@ stages:
 default:
   image: $IMAGE_PREFIX/manager:$IMAGE_TAG
   before_script:
-    - cd manager
     - poetry --version
     - poetry env use $PYTHON_INTERPRETER
   tags:
@@ -36,15 +35,15 @@ lint:py3.12:
     - mkdir -p /var/cache/knot-resolver
     - poe test
     # the following command makes sure that the source root of the coverage file is at $gitroot
-    - poetry run bash -c "cd ..; coverage combine manager/.coverage; coverage xml"
+    - poetry run bash -c "coverage combine .coverage; coverage xml"
   artifacts:
     reports:
       coverage_report:
         coverage_format: cobertura
         path: coverage.xml
-      junit: manager/unit.junit.xml
+      junit: unit.junit.xml
     paths:
-      - manager/unit.junit.xml
+      - unit.junit.xml
 
 unit:py3.8:
   <<: *unit
