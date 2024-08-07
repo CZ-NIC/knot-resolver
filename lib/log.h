@@ -109,7 +109,7 @@ enum kr_log_group {
 #define LOG_GRP_VALIDATOR_TAG		"valdtr"	/**< ``valdtr``: operations related to validate layer */
 #define LOG_GRP_RESOLVER_TAG		"resolv"	/**< ``resolv``: operations related to resolving */
 #define LOG_GRP_SELECTION_TAG		"select"	/**< ``select``: operations related to server selection */
-#define LOG_GRP_ZCUT_TAG		"zoncut"	/**< ``zonecut``: operations related to zone cut */
+#define LOG_GRP_ZCUT_TAG		"zoncut"	/**< ``zoncut``: operations related to zone cut */
 #define LOG_GRP_COOKIES_TAG		"cookie"	/**< ``cookie``: operations related to cookies */
 #define LOG_GRP_STATISTICS_TAG		"statis"	/**< ``statis``: operations related to statistics */
 #define LOG_GRP_REBIND_TAG		"rebind"	/**< ``rebind``: operations related to rebinding */
