@@ -972,12 +972,15 @@ knot_mm_t *kr_resolve_pool(struct kr_request *request)
 static int ede_priority(int info_code)
 {
 	switch(info_code) {
+	case KNOT_EDNS_EDE_TOO_EARLY:
+		return 910;
 	case KNOT_EDNS_EDE_DNSKEY_BIT:
 	case KNOT_EDNS_EDE_DNSKEY_MISS:
 	case KNOT_EDNS_EDE_SIG_EXPIRED:
 	case KNOT_EDNS_EDE_SIG_NOTYET:
 	case KNOT_EDNS_EDE_RRSIG_MISS:
 	case KNOT_EDNS_EDE_NSEC_MISS:
+	case KNOT_EDNS_EDE_EXPIRED_INV:
 		return 900;  /* Specific DNSSEC failures */
 	case KNOT_EDNS_EDE_BOGUS:
 		return 800;  /* Generic DNSSEC failure */
@@ -990,6 +993,7 @@ static int ede_priority(int info_code)
 		return 600;  /* Policy related */
 	case KNOT_EDNS_EDE_DNSKEY_ALG:
 	case KNOT_EDNS_EDE_DS_DIGEST:
+	case KNOT_EDNS_EDE_NSEC3_ITERS:
 		return 500;  /* Non-critical DNSSEC issues */
 	case KNOT_EDNS_EDE_STALE:
 	case KNOT_EDNS_EDE_STALE_NXD:
@@ -1002,10 +1006,12 @@ static int ede_priority(int info_code)
 	case KNOT_EDNS_EDE_NREACH_AUTH:
 	case KNOT_EDNS_EDE_NETWORK:
 	case KNOT_EDNS_EDE_INV_DATA:
+	case KNOT_EDNS_EDE_SYNTHESIZED:
 		return 200;  /* Assorted codes */
 	case KNOT_EDNS_EDE_OTHER:
 		return 100;  /* Most generic catch-all error */
 	case KNOT_EDNS_EDE_NONE:
+	case KNOT_EDNS_EDE_NONCONF_POLICY:  /* Defined by an expired Internet Draft */
 		return 0;  /* No error - allow overriding */
 	default:
 		kr_assert(false);  /* Unknown info_code */
