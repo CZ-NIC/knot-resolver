@@ -72,6 +72,8 @@ but users unfamiliar with Meson might want to read introductory
 article `Using Meson <https://mesonbuild.com/Quick-guide.html>`_.
 
 
+.. _kresd-dep:
+
 Dependencies
 ============
 
