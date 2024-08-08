@@ -23,7 +23,7 @@ So we try to isolate everything from the system we are running on.
 To start working on the manager, you need to install the following tools:
 
 - Python: One of the supported versions.
-  You can use `pyenv <https://github.com/pyenv/pyenv#installation>`_ to install and manage multiple versions of Python without affecting your system.
+  You may optionally use `pyenv <https://github.com/pyenv/pyenv#installation>`_ to install and manage multiple versions of Python without affecting your system.
   Alternatively, some Linux distributions ship packages for older Python versions as well.
 - `Poetry <https://python-poetry.org/docs/#installation>`_: We use it to manage our dependencies and virtual environments.
   Do not install the package via ``pip``, follow instructions in Poetry's official documentation.
@@ -39,20 +39,48 @@ Running the manager from source for the first time
 ==================================================
 
 1. Clone the Knot Resolver `GitLab repository <https://gitlab.nic.cz/knot/knot-resolver>`_.
-2. In the repository, change to the ``manager/`` directory and  perform all of the following tasks in that directory.
-3. Run ``poetry env use $(which python3.12)`` to configure Poetry to use a Python interpreter other than the system default.
+2. Use ``apkg build-dep`` as described in the :ref:`kresd-dep` section to automatically install development dependencies for the Knot Resolver daemon.
+3. In the repository, change to the ``manager/`` directory and  perform all of the following tasks in that directory.
+4. (Optional) Run ``poetry env use $(which python3.12)`` to configure Poetry to use a Python interpreter other than the system default.
 
-   As mentioned above it is recommended to use ``pyenv`` to manage other Python versions.
+   As mentioned above it is possible to use ``pyenv`` to manage other Python versions.
    Then poetry needs to be told where to look for that version of Python, e.g.:
 
    .. code-block:: bash
 
       $ poetry env use ~/.pyenv/versions/3.12.1/bin/python3.12
 
-4. Run ``poetry install --all-extras`` to install all dependencies including all optional ones (--all-extras flag), in a newly created virtual environment.
+5. Run ``poetry install --all-extras`` to install all dependencies, including all optional ones (omit ``--all-extras`` flag to exclude those), in a newly created virtual environment.
    All dependencies can be seen in ``pyproject.toml``.
-5. Use ``./poe run`` to run the manager in development mode (Ctrl+C to exit).
+6. Use ``./poe configure`` to set up the build directory of the Knot Resolver daemon (``kresd``).
+   This command optionally takes the same arguments as ``meson configure``, but may just as well be run with none to get some sane defaults.
+7. Use ``./poe run`` to run the manager in development mode (Ctrl+C to exit).
    The manager is started with the configuration located in ``manager/etc/knot-resolver/config.dev.yaml``.
+
+
+Advanced workspace directory setup
+==================================
+
+It may get annoying to have to juggle changes to the ``config.dev.yaml`` file in Git while using the setup described above.
+For this reason, we also allow specifying some paths via environment variables so that you can use a specialized separate workspace directory for development and testing:
+
+* ``KRES_MANAGER_RUNTIME`` specifies the working directory containing the cache, unix sockets and more.
+  Since these files are mostly temporary, but relatively frequently written into, it is best to keep them in a ``tmpfs`` filesystem, like ``/dev/shm`` or ``/tmp``.
+* ``KRES_MANAGER_CONFIG`` specifies the path to a ``config.yaml`` to be used by the manager.
+
+You may create a separate workspace directory containing a custom run script,
+which may look something like this, to make your life easier:
+
+.. code-block:: bash
+
+   #!/usr/bin/env bash
+   script_dir="$(dirname $(realpath $BASH_SOURCE[0]))"
+   shm_dir="/dev/shm/kresd6"
+
+   mkdir -p "$shm_dir"
+   export KRES_MANAGER_RUNTIME="$shm_dir"
+   export KRES_MANAGER_CONFIG="$script_dir/config.yaml"
+   exec $path_to_knot_resolver/poe "$@"
 
 
 Commands
@@ -70,6 +98,7 @@ To list all the available commands, you can run ``poe help``.
 The commands are defined in the ``pyproject.toml`` file.
 The most important ones for everyday development are:
 
+- ``poe configure`` to configure the build directory of ``kresd``
 - ``poe run`` to run the manager
 - ``poe docs`` to create HTML documentation
 - ``poe test`` to run unit tests (enforced by our CI)
