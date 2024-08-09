@@ -1321,33 +1321,54 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	return KR_STATE_DONE;
 }
 
-/** Hide RRsets which did not validate from clients. */
-static int hide_bogus(kr_layer_t *ctx) {
-	if (knot_wire_get_cd(ctx->req->qsource.packet->wire)) {
-		return ctx->state;
-	}
-	/* We don't want to send bogus answers to clients, not even in SERVFAIL
-	 * answers, but we cannot drop whole sections. If a CNAME chain
-	 * SERVFAILs somewhere, the steps that were OK should be put into
-	 * answer.
-	 *
-	 * There is one specific issue: currently we follow CNAME *before*
-	 * we validate it, because... iterator comes before validator.
-	 * Therefore some rrsets might be added into req->*_selected before
-	 * we detected failure in validator.
-	 * TODO: better approach, probably during work on parallel queries.
-	 */
-	const ranked_rr_array_t *sel[] = kr_request_selected(ctx->req);
-	for (knot_section_t sect = KNOT_ANSWER; sect <= KNOT_ADDITIONAL; ++sect) {
-		for (size_t i = 0; i < sel[sect]->len; ++i) {
-			ranked_rr_array_entry_t *e = sel[sect]->at[i];
-			e->to_wire = e->to_wire
-				&& !kr_rank_test(e->rank, KR_RANK_INDET)
-				&& !kr_rank_test(e->rank, KR_RANK_BOGUS)
-				&& !kr_rank_test(e->rank, KR_RANK_MISMATCH)
-				&& !kr_rank_test(e->rank, KR_RANK_MISSING);
+/**
+ * Hide RRsets which did not validate from clients and clear Extended
+ * Error if a query failed validation, but later managed to succeed.
+ */
+static int validate_finalize(kr_layer_t *ctx) {
+	if (!knot_wire_get_cd(ctx->req->qsource.packet->wire)) {
+		/* We don't want to send bogus answers to clients, not even in SERVFAIL
+		 * answers, but we cannot drop whole sections. If a CNAME chain
+		 * SERVFAILs somewhere, the steps that were OK should be put into
+		 * answer.
+		 *
+		 * There is one specific issue: currently we follow CNAME *before*
+		 * we validate it, because... iterator comes before validator.
+		 * Therefore some rrsets might be added into req->*_selected before
+		 * we detected failure in validator.
+		 * TODO: better approach, probably during work on parallel queries.
+		 */
+		const ranked_rr_array_t *sel[] = kr_request_selected(ctx->req);
+		for (knot_section_t sect = KNOT_ANSWER; sect <= KNOT_ADDITIONAL; ++sect) {
+			for (size_t i = 0; i < sel[sect]->len; ++i) {
+				ranked_rr_array_entry_t *e = sel[sect]->at[i];
+				e->to_wire = e->to_wire
+					&& !kr_rank_test(e->rank, KR_RANK_INDET)
+					&& !kr_rank_test(e->rank, KR_RANK_BOGUS)
+					&& !kr_rank_test(e->rank, KR_RANK_MISMATCH)
+					&& !kr_rank_test(e->rank, KR_RANK_MISSING);
+			}
 		}
 	}
+
+	/* Clear DNSSEC-related Extended Error in case the request managed to succeed somehow. */
+	if (ctx->state == KR_STATE_DONE) {
+		switch (ctx->req->extended_error.info_code) {
+		case KNOT_EDNS_EDE_BOGUS:
+		case KNOT_EDNS_EDE_NSEC_MISS:
+		case KNOT_EDNS_EDE_RRSIG_MISS:
+		case KNOT_EDNS_EDE_SIG_EXPIRED:
+		case KNOT_EDNS_EDE_SIG_NOTYET:
+			kr_request_set_extended_error(ctx->req, KNOT_EDNS_EDE_NONE, NULL);
+			break;
+		case KNOT_EDNS_EDE_DNSKEY_MISS:
+		case KNOT_EDNS_EDE_DNSKEY_BIT:
+			kr_assert(false);  /* These EDE codes aren't used. */
+			break;
+		default: break;  /* Remaining codes don't indicate hard DNSSEC failure. */
+		}
+	}
+
 	return ctx->state;
 }
 
@@ -1358,24 +1379,6 @@ static int validate_wrapper(kr_layer_t *ctx, knot_pkt_t *pkt) {
 	struct kr_query *qry = req->current_query;
 	if (ret & KR_STATE_FAIL && qry->flags.DNSSEC_BOGUS)
 		qry->server_selection.error(qry, req->upstream.transport, KR_SELECTION_DNSSEC_ERROR);
-	if (ret & KR_STATE_DONE && !qry->flags.DNSSEC_BOGUS) {
-		/* Don't report extended DNS errors related to validation
-		 * when it managed to succeed (e.g. by trying different auth). */
-		switch (req->extended_error.info_code) {
-		case KNOT_EDNS_EDE_BOGUS:
-		case KNOT_EDNS_EDE_NSEC_MISS:
-		case KNOT_EDNS_EDE_RRSIG_MISS:
-		case KNOT_EDNS_EDE_SIG_EXPIRED:
-		case KNOT_EDNS_EDE_SIG_NOTYET:
-			kr_request_set_extended_error(req, KNOT_EDNS_EDE_NONE, NULL);
-			break;
-		case KNOT_EDNS_EDE_DNSKEY_MISS:
-		case KNOT_EDNS_EDE_DNSKEY_BIT:
-			kr_assert(false);  /* These EDE codes aren't used. */
-			break;
-		default: break;  /* Remaining codes don't indicate hard DNSSEC failure. */
-		}
-	}
 	return ret;
 }
 
@@ -1385,7 +1388,7 @@ int validate_init(struct kr_module *self)
 {
 	static const kr_layer_api_t layer = {
 		.consume = &validate_wrapper,
-		.answer_finalize = &hide_bogus,
+		.answer_finalize = &validate_finalize,
 	};
 	self->layer = &layer;
 	return kr_ok();
