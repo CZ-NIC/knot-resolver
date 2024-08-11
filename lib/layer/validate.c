@@ -137,6 +137,7 @@ do_downgrade: // we do this deep inside calls because of having signer name avai
 	VERBOSE_MSG(qry,
 		"<= DNSSEC downgraded due to expensive NSEC3: %d iterations, %d salt length\n",
 		(int)knot_nsec3_iters(rd), (int)knot_nsec3_salt_len(rd));
+	kr_request_set_extended_error(qry->request, KNOT_EDNS_EDE_NSEC3_ITERS, "AUO2");
 	qry->flags.DNSSEC_WANT = false;
 	qry->flags.DNSSEC_INSECURE = true;
 	rank_records(qry, true, KR_RANK_INSECURE, vctx->zone_name);
@@ -242,7 +243,9 @@ static int validate_section(kr_rrset_validation_ctx_t *vctx, struct kr_query *qr
 		} else {
 			kr_rank_set(&entry->rank, KR_RANK_BOGUS);
 			vctx->err_cnt += 1;
-			if (vctx->rrs_counters.expired > 0)
+			if (vctx->rrs_counters.expired_before_inception > 0)
+				kr_request_set_extended_error(req, KNOT_EDNS_EDE_EXPIRED_INV, "XXAP");
+			else if (vctx->rrs_counters.expired > 0)
 				kr_request_set_extended_error(req, KNOT_EDNS_EDE_SIG_EXPIRED, "YFJ2");
 			else if (vctx->rrs_counters.notyet > 0)
 				kr_request_set_extended_error(req, KNOT_EDNS_EDE_SIG_NOTYET, "UBBS");
@@ -368,7 +371,12 @@ static int validate_keyset(struct kr_request *req, knot_pkt_t *answer, bool has_
 			}
 		}
 		if (sig_index < 0) {
-			kr_request_set_extended_error(req, KNOT_EDNS_EDE_RRSIG_MISS, "EZDC");
+			if (!kr_dnssec_key_zonekey_flag(qry->zone_cut.key->rrs.rdata->data)) {
+				kr_request_set_extended_error(req, KNOT_EDNS_EDE_DNSKEY_BIT, "YQEH");
+			} else {
+				kr_request_set_extended_error(req, KNOT_EDNS_EDE_RRSIG_MISS,
+							"EZDC: no valid RRSIGs for DNSKEY");
+			}
 			return kr_error(ENOENT);
 		}
 		const knot_rdataset_t *sig_rds = &req->answ_selected.at[sig_index]->rr->rrs;
@@ -395,15 +403,20 @@ static int validate_keyset(struct kr_request *req, knot_pkt_t *answer, bool has_
 				ret == 0 ? KR_RANK_SECURE : KR_RANK_BOGUS);
 
 		if (ret != 0) {
-			log_bogus_rrsig(&vctx, qry->zone_cut.key, "bogus key");
-			knot_rrset_free(qry->zone_cut.key, qry->zone_cut.pool);
-			qry->zone_cut.key = NULL;
-			if (vctx.rrs_counters.expired > 0)
+			if (!kr_dnssec_key_zonekey_flag(qry->zone_cut.key->rrs.rdata->data))
+				kr_request_set_extended_error(req, KNOT_EDNS_EDE_DNSKEY_BIT, "CYNG");
+			else if (vctx.rrs_counters.expired_before_inception > 0)
+				kr_request_set_extended_error(req, KNOT_EDNS_EDE_EXPIRED_INV, "4UBF");
+			else if (vctx.rrs_counters.expired > 0)
 				kr_request_set_extended_error(req, KNOT_EDNS_EDE_SIG_EXPIRED, "6GJV");
 			else if (vctx.rrs_counters.notyet > 0)
 				kr_request_set_extended_error(req, KNOT_EDNS_EDE_SIG_NOTYET, "4DJQ");
 			else
 				kr_request_set_extended_error(req, KNOT_EDNS_EDE_BOGUS, "EXRU");
+
+			log_bogus_rrsig(&vctx, qry->zone_cut.key, "bogus key");
+			knot_rrset_free(qry->zone_cut.key, qry->zone_cut.pool);
+			qry->zone_cut.key = NULL;
 			return ret;
 		}
 
@@ -1147,10 +1160,19 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 	if (knot_wire_get_aa(pkt->wire) && qtype == KNOT_RRTYPE_DNSKEY) {
 		const knot_rrset_t *ds = qry->zone_cut.trust_anchor;
-		if (ds && !kr_ds_algo_support(ds)) {
-			VERBOSE_MSG(qry, ">< all DS entries use unsupported algorithm pairs, going insecure\n");
-			/* ^ the message is a bit imprecise to avoid being too verbose */
-			kr_request_set_extended_error(req, KNOT_EDNS_EDE_OTHER, "LSLC: unsupported digest/key");
+		ret = ds ? kr_ds_algo_support(ds) : kr_ok();
+		if (ret != kr_ok()) {
+			char *reason = "???";
+			if (ret == DNSSEC_INVALID_KEY_ALGORITHM) {
+				reason = "key";
+				kr_request_set_extended_error(req, KNOT_EDNS_EDE_DNSKEY_ALG, "PBAO");
+			} else if (ret == DNSSEC_INVALID_DIGEST_ALGORITHM) {
+				reason = "digest";
+				kr_request_set_extended_error(req, KNOT_EDNS_EDE_DS_DIGEST, "DDDV");
+			}
+			VERBOSE_MSG(qry,
+				">< all DS entries are unsupported (last error: %s algorithm), going insecure\n",
+				reason);
 			qry->flags.DNSSEC_WANT = false;
 			qry->flags.DNSSEC_INSECURE = true;
 			rank_records(qry, true, KR_RANK_INSECURE, qry->zone_cut.name);
@@ -1367,11 +1389,14 @@ static int validate_finalize(kr_layer_t *ctx) {
 		case KNOT_EDNS_EDE_NSEC_MISS:
 		case KNOT_EDNS_EDE_RRSIG_MISS:
 		case KNOT_EDNS_EDE_SIG_EXPIRED:
+		case KNOT_EDNS_EDE_EXPIRED_INV:
 		case KNOT_EDNS_EDE_SIG_NOTYET:
+		case KNOT_EDNS_EDE_DNSKEY_BIT:
+		case KNOT_EDNS_EDE_DNSKEY_ALG:
+		case KNOT_EDNS_EDE_DS_DIGEST:
 			kr_request_set_extended_error(ctx->req, KNOT_EDNS_EDE_NONE, NULL);
 			break;
 		case KNOT_EDNS_EDE_DNSKEY_MISS:
-		case KNOT_EDNS_EDE_DNSKEY_BIT:
 			kr_assert(false);  /* These EDE codes aren't used. */
 			break;
 		default: break;  /* Remaining codes don't indicate hard DNSSEC failure. */

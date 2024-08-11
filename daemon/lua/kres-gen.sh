@@ -285,6 +285,7 @@ ${CDEFS} ${LIBKRES} functions <<-EOF
 	kr_ta_clear
 # DNSSEC
 	kr_dnssec_key_sep_flag
+	kr_dnssec_key_zonekey_flag
 	kr_dnssec_key_revoked
 	kr_dnssec_key_tag
 	kr_dnssec_key_match
