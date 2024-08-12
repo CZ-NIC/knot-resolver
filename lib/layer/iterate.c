@@ -927,6 +927,7 @@ static int begin(kr_layer_t *ctx)
 		knot_pkt_t *ans = kr_request_ensure_answer(ctx->req);
 		if (!ans)
 			return ctx->req->state;
+		/* This RCODE is explicitly suggested for meta QTYPEs in RFC 8906 sec.7 */
 		knot_wire_set_rcode(ans->wire, KNOT_RCODE_NOTIMPL);
 		kr_request_set_extended_error(ctx->req, KNOT_EDNS_EDE_NOTSUP, "57CK");
 		return KR_STATE_DONE;
