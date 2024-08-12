@@ -10,10 +10,13 @@ Improvements
   The secret is created automatically if the user does not configure their own secret in the configuration.
   This means that the workers will be able to resume each other's TLS sessions, regardless of whether the user has configured it to do so.
 
+- answer NOTIMPL for meta-types and non-IN RR classes (!1589)
+
 Bugfixes
 --------
 
 - daemon/proxyv2: fix informing the engine about TCP/TLS from the actual client (!1578)
+
 
 Knot Resolver 6.0.8 (2024-07-23)
 ================================
