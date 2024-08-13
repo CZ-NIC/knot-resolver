@@ -231,6 +231,11 @@ local const_extended_error = {
 	NREACH_AUTH = 22,
 	NETWORK = 23,
 	INV_DATA = 24,
+	EXPIRED_INV = 25,
+	TOO_EARLY = 26,
+	NSEC3_ITERS = 27,
+	NONCONF_POLICY = 28,
+	SYNTHESIZED = 29,
 }
 
 -- Constant tables
