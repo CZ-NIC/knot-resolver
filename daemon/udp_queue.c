@@ -25,6 +25,9 @@ void udp_queue_push(int fd, const struct sockaddr *sa, char *buf, size_t buf_len
 {
 	abort();
 }
+void udp_queue_send_all(void)
+{
+}
 #else
 
 /* LATER: it might be useful to have this configurable during runtime,
@@ -87,7 +90,8 @@ static void udp_queue_send(int fd)
 }
 
 /** Send all queued packets. */
-void udp_queue_send_all(void) {
+void udp_queue_send_all(void)
+{
 	for (int i = 0; i < state.waiting_fds.len; ++i) {
 		udp_queue_send(state.waiting_fds.at[i]);
 	}
