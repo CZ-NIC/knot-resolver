@@ -63,6 +63,7 @@ static void detect_CPU_avx2(void)
 #else
 
 #include "./kru.h"
+#include "lib/defines.h"
 KR_EXPORT
 const struct kru_api KRU_AVX2 = {NULL};
 
