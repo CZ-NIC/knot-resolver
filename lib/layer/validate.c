@@ -12,6 +12,7 @@
 #include <libknot/rrtype/rdname.h>
 #include <libknot/rrtype/rrsig.h>
 #include <libdnssec/error.h>
+#include <libdnssec/key.h>
 
 #include "lib/dnssec/nsec.h"
 #include "lib/dnssec/nsec3.h"
@@ -403,8 +404,37 @@ static int validate_keyset(struct kr_request *req, knot_pkt_t *answer, bool has_
 				ret == 0 ? KR_RANK_SECURE : KR_RANK_BOGUS);
 
 		if (ret != 0) {
-			if (!kr_dnssec_key_zonekey_flag(qry->zone_cut.key->rrs.rdata->data))
+			const knot_rdataset_t *ds = &qry->zone_cut.trust_anchor->rrs;
+			int sep_keytag = kr_dnssec_key_tag(KNOT_RRTYPE_DS, ds->rdata->data, ds->rdata->len);
+			int dnskey_keytag = -1;
+			bool have_zone_key_bit = true, dnskey_algo_supported = true;
+			knot_rdata_t *rdata_sep = NULL, *rdata_i = qry->zone_cut.key->rrs.rdata;
+			for (uint8_t i = 0; i < qry->zone_cut.key->rrs.count;
+			    ++i, rdata_i = knot_rdataset_next(rdata_i)) {
+				if (dnskey_keytag != sep_keytag) {
+					dnskey_keytag = kr_dnssec_key_tag(KNOT_RRTYPE_DNSKEY, rdata_i->data, rdata_i->len);
+					rdata_sep = rdata_i;
+				}
+
+				if (!kr_dnssec_key_zonekey_flag(rdata_i->data))
+					have_zone_key_bit = false;
+
+				if (!dnssec_algorithm_key_support(knot_dnskey_alg(rdata_i)))
+					dnskey_algo_supported = false;
+			}
+			bool sep_matches_tag_algo = rdata_sep && sep_keytag == dnskey_keytag &&
+				knot_ds_alg(ds->rdata) == knot_dnskey_alg(rdata_sep);
+
+			if (!have_zone_key_bit)
 				kr_request_set_extended_error(req, KNOT_EDNS_EDE_DNSKEY_BIT, "CYNG");
+			else if (!sep_matches_tag_algo)
+				kr_request_set_extended_error(req, KNOT_EDNS_EDE_DNSKEY_MISS, "NMJZ: no matching SEP");
+			else if (kr_dnssec_key_revoked(rdata_sep->data))
+				kr_request_set_extended_error(req, KNOT_EDNS_EDE_DNSKEY_MISS, "DGVI: DNSKEY matching SEP has the Revoke bit set");
+			else if (!dnskey_algo_supported)
+				kr_request_set_extended_error(req, KNOT_EDNS_EDE_DNSKEY_ALG, "H6OO");
+			else if (vctx.rrs_counters.matching_name_type == 0 && vctx.rrs_counters.key_invalid > 0)
+				kr_request_set_extended_error(req, KNOT_EDNS_EDE_RRSIG_MISS, "7N4Z: no valid RRSIGs for DNSKEY");
 			else if (vctx.rrs_counters.expired_before_inception > 0)
 				kr_request_set_extended_error(req, KNOT_EDNS_EDE_EXPIRED_INV, "4UBF");
 			else if (vctx.rrs_counters.expired > 0)
@@ -1394,10 +1424,8 @@ static int validate_finalize(kr_layer_t *ctx) {
 		case KNOT_EDNS_EDE_DNSKEY_BIT:
 		case KNOT_EDNS_EDE_DNSKEY_ALG:
 		case KNOT_EDNS_EDE_DS_DIGEST:
-			kr_request_set_extended_error(ctx->req, KNOT_EDNS_EDE_NONE, NULL);
-			break;
 		case KNOT_EDNS_EDE_DNSKEY_MISS:
-			kr_assert(false);  /* These EDE codes aren't used. */
+			kr_request_set_extended_error(ctx->req, KNOT_EDNS_EDE_NONE, NULL);
 			break;
 		default: break;  /* Remaining codes don't indicate hard DNSSEC failure. */
 		}
