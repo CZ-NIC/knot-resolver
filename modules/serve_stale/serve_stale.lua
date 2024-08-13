@@ -29,6 +29,7 @@ M.layer = {
 		if now > deadline or qry.flags.NO_NS_FOUND then
 			log_debug(ffi.C.LOG_GRP_SRVSTALE, '   => no reachable NS, using stale data')
 			qry.stale_cb = M.callback
+			req.stale_accounted = true
 			-- TODO: probably start the same request that doesn't stale-serve,
 			-- but first we need some detection of non-interactive / internal requests.
 			-- resolve(kres.dname2str(qry.sname), qry.stype, qry.sclass)

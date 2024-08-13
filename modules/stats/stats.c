@@ -43,6 +43,7 @@
 	X(answer,cached) X(answer,1ms) X(answer,10ms) X(answer,50ms) X(answer,100ms) \
 	X(answer,250ms) X(answer,500ms) X(answer,1000ms) X(answer,1500ms) X(answer,slow) \
 	X(answer,sum_ms) \
+	X(answer,sum_stale) \
 	X(answer,aa) X(answer,tc) X(answer,rd) X(answer,ra) X(answer, ad) X(answer,cd) \
 	X(answer,edns0) X(answer,do) \
 	X(query,edns) X(query,dnssec) \
@@ -303,7 +304,8 @@ static int collect(kr_layer_t *ctx)
 		DEPRECATED
 		use new names metric_answer_edns0 and metric_answer_do
 	*/
-	stat_const_add(data, metric_query_edns, knot_pkt_has_edns(param->answer));
+	stat_const_add(data, metric_answer_sum_stale, param->stale_accounted);
+	stat_const_add(data, metric_query_dnssec, knot_pkt_has_dnssec(param->answer));
 	stat_const_add(data, metric_query_dnssec, knot_pkt_has_dnssec(param->answer));
 
 	return ctx->state;
