@@ -14,7 +14,7 @@ struct mmapped {
  * header is copied at its beginning and MMAPPED_WAS_FIRST is returned;
  * you should finish initialization and call mmapped_init_continue to degrade flock to shared.
  * Otherwise, it waits for shared flock, calls mmap, verifies that header is byte-wise identical and returns zero.
- * On header mismatch, kr_error(EUCLEAN) is returned; on a system error, kr_error(errno) is returned. */
+ * On header mismatch, kr_error(ENOTRECOVERABLE) is returned; on a system error, kr_error(errno) is returned. */
 int mmapped_init(struct mmapped *mmapped, const char *mmap_file, size_t size, void *header, size_t header_size);
 
 /* Degrade flock to shared after getting MMAPPED_WAS_FIRST from mmapped_init.
