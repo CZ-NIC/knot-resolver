@@ -55,6 +55,8 @@ Built-in counters keep track of number of queries and answers matching specific 
 +-----------------+----------------------------------+
 | answer.cached   | queries answered from cache      |
 +-----------------+----------------------------------+
+| answer.sum_stale| sum of stale answers             |
++-----------------+----------------------------------+
 
 +-----------------+----------------------------------+
 | **Answers categorized by RCODE**                   |
