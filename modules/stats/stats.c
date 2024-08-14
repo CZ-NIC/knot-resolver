@@ -305,7 +305,7 @@ static int collect(kr_layer_t *ctx)
 		use new names metric_answer_edns0 and metric_answer_do
 	*/
 	stat_const_add(data, metric_answer_sum_stale, param->stale_accounted);
-	stat_const_add(data, metric_query_dnssec, knot_pkt_has_dnssec(param->answer));
+	stat_const_add(data, metric_query_edns, knot_pkt_has_edns(param->answer));
 	stat_const_add(data, metric_query_dnssec, knot_pkt_has_dnssec(param->answer));
 
 	return ctx->state;
