@@ -12,6 +12,7 @@ Improvements
 
 - answer NOTIMPL for meta-types and non-IN RR classes (!1589)
 - views: improve interaction with old-style policies (!1576)
+- stats: add stale answer counter (sum_stale)
 
 Bugfixes
 --------
@@ -61,7 +62,7 @@ Improvements
 - cache: prefetching records
   * predict module: prefetching expiring records moved to prefetch module
   * prefetch module: new module to prefetch expiring records
-- stats: add stale answer counter (sum_stale)
+- stats: add separate metrics for IPv6 and IPv4 (!1545)
 - add the fresh DNSSEC root key "KSK-2024" already, Key ID 38696 (!1556)
 - manager: policy-loader: new component for separate loading of policy rules (!1540)
   The ``policy-loader`` ensures that configured policies are loaded into the rules database
