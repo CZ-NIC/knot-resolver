@@ -29,8 +29,7 @@ extras_require = \
 {'prometheus': ['prometheus-client']}
 
 entry_points = \
-{'console_scripts': ['knot-resolver = '
-                     'knot_resolver_manager.manager.__main__:run',
+{'console_scripts': ['knot-resolver = knot_resolver_manager.manager.main:main',
                      'kresctl = knot_resolver_manager.client.main:main']}
 
 setup_kwargs = {
