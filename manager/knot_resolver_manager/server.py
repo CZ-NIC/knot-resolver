@@ -18,6 +18,7 @@ from aiohttp.web_response import json_response
 from aiohttp.web_runner import AppRunner, TCPSite, UnixSite
 from typing_extensions import Literal
 
+from knot_resolver_manager.datamodel.types.files import ReadableFile, WritableFile
 import knot_resolver_manager.utils.custom_atexit as atexit
 from knot_resolver_manager import log, statistics
 from knot_resolver_manager.compat import asyncio as asyncio_compat
@@ -508,6 +509,7 @@ async def start_server(config: Path = DEFAULT_MANAGER_CONFIG_FILE) -> int:
     # This function is quite long, but it describes how manager runs. So let's silence pylint
     # pylint: disable=too-many-statements
 
+    ReadableFile(config)
     start_time = time()
     working_directory_on_startup = os.getcwd()
     manager: Optional[KresManager] = None
@@ -584,6 +586,11 @@ async def start_server(config: Path = DEFAULT_MANAGER_CONFIG_FILE) -> int:
     except KresManagerException as e:
         # We caught an error with a pretty error message. Just print it and exit.
         logger.error(e)
+        return 1
+
+    except PermissionError as e:
+        logger.error(f"Reading of the configuration file failed: {e}")
+        # logger.error("Insufficient permissions")
         return 1
 
     except BaseException:

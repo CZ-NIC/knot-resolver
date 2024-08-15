@@ -1,5 +1,5 @@
 from .enums import DNSRecordTypeEnum, PolicyActionEnum, PolicyFlagEnum
-from .files import AbsoluteDir, Dir, File, FilePath
+from .files import AbsoluteDir, Dir, File, FilePath, WritableFile, ReadableFile
 from .generic_types import ListOrItem
 from .types import (
     DomainName,
@@ -60,6 +60,8 @@ __all__ = [
     "SizeUnit",
     "TimeUnit",
     "AbsoluteDir",
+    "ReadableFile",
+    "WritableFile",
     "File",
     "FilePath",
     "Dir",
