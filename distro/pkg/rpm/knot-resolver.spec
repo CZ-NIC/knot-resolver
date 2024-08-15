@@ -85,10 +85,14 @@ BuildRequires:  openssl-devel
 %endif
 
 %if 0%{?suse_version}
+# openSUSE specific
 %define NINJA ninja
 BuildRequires:  lmdb-devel
 BuildRequires:  python3-Sphinx
 Requires(pre):  shadow
+
+Provides:   user(knot-resolver)
+Provides:   group(knot-resolver)
 %endif
 
 %if "x%{?rhel}" == "x"
