@@ -7,6 +7,14 @@
 %define repodir %{_builddir}/%{name}-%{version}
 %define NINJA ninja-build
 
+%if 0%{?fedora}
+%define DOCS 1
+%else
+# docs disabled on older distros due to old Sphinx issues
+%define DOCS 0
+%endif
+
+
 Name:           knot-resolver
 Version:        {{ version }}
 Release:        cznic.{{ release }}%{?dist}
@@ -71,7 +79,6 @@ Requires(pre):  shadow-utils
 %endif
 %if 0%{?fedora} || 0%{?rhel} > 7
 BuildRequires:  pkgconfig(lmdb)
-BuildRequires:  python3-sphinx
 Requires:       lua5.1-basexx
 Requires:       lua5.1-cqueues
 Requires:       lua5.1-http
@@ -88,20 +95,21 @@ BuildRequires:  openssl-devel
 # openSUSE specific
 %define NINJA ninja
 BuildRequires:  lmdb-devel
-BuildRequires:  python3-Sphinx
 Requires(pre):  shadow
 
 Provides:   user(knot-resolver)
 Provides:   group(knot-resolver)
 %endif
 
-%if "x%{?rhel}" == "x"
+%if 0%{?DOCS}
 # dependencies for doc package
-# NOTE: doc isn't possible to build on CentOS 7, 8
+# NOTE: doc isn't possible to build on CentOS 7, 8 and openSUSE Leap 15
 #       python2-sphinx is too old and python36-breathe is broken on CentOS 7
 #       python3-breathe isn't available for CentOS 8 (yet? rhbz#1808766)
+#       python3-breathe is broken on openSUSE Leap 15
 BuildRequires:  doxygen
 BuildRequires:  python3-breathe
+BuildRequires:  python3-sphinx
 BuildRequires:  python3-sphinx_rtd_theme
 BuildRequires:  texinfo
 %endif
@@ -123,7 +131,7 @@ Requires:       %{name}%{?_isa} = %{version}-%{release}
 %description devel
 The package contains development headers for Knot Resolver.
 
-%if "x%{?rhel}" == "x"
+%if 0%{?DOCS}
 %package doc
 Summary:        Documentation for Knot Resolver
 BuildArch:      noarch
@@ -174,8 +182,10 @@ gpg2 --verify %{SOURCE1} %{SOURCE0}
 
 %build
 CFLAGS="%{optflags}" LDFLAGS="%{?__global_ldflags}" meson build_rpm \
-%if "x%{?rhel}" == "x"
+%if 0%{?DOCS}
     -Ddoc=enabled \
+%else
+    -Ddoc=disabled \
 %endif
     -Dsystemd_files=enabled \
     -Dclient=enabled \
@@ -196,7 +206,7 @@ CFLAGS="%{optflags}" LDFLAGS="%{?__global_ldflags}" meson build_rpm \
     --sysconfdir="%{_sysconfdir}" \
 
 %{NINJA} -v -C build_rpm
-%if "x%{?rhel}" == "x"
+%if 0%{?DOCS}
 %{NINJA} -v -C build_rpm doc
 %endif
 
@@ -360,7 +370,7 @@ fi
 %{_libdir}/pkgconfig/libkres.pc
 %{_libdir}/libkres.so
 
-%if "x%{?rhel}" == "x"
+%if 0%{?DOCS}
 %files doc
 %dir %{_pkgdocdir}
 %doc %{_pkgdocdir}/html
