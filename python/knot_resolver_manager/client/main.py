@@ -2,12 +2,12 @@ import argparse
 import importlib
 import os
 
-from knot_resolver_manager.client.command import install_commands_parsers
-from knot_resolver_manager.client.kresctl import Kresctl
+from .command import install_commands_parsers
+from .client import KresClient, KRES_CLIENT_NAME
 
 
-def autoimport_commands() -> None:
-    prefix = "knot_resolver_manager.client.commands."
+def auto_import_commands() -> None:
+    prefix = f"{'.'.join(__name__.split('.')[:-1])}.commands."
     for module_name in os.listdir(os.path.dirname(__file__) + "/commands"):
         if module_name[-3:] != ".py":
             continue
@@ -16,15 +16,15 @@ def autoimport_commands() -> None:
 
 def create_main_argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        "kresctl",
-        description="Command-line utility that helps communicate with Knot Resolver's management API."
-        "It also provides tooling to work with declarative configuration (validate, convert).",
+        KRES_CLIENT_NAME,
+        description="Knot Resolver command-line utility that serves as a client for communicating with the Knot Resolver management API."
+        " The utility also provides tools to work with the resolver's declarative configuration (validate, convert, ...).",
     )
     # parser.add_argument(
     #     "-i",
     #     "--interactive",
     #     action="store_true",
-    #     help="Interactive mode of kresctl utility",
+    #     help="Use the utility in interactive mode.",
     #     default=False,
     #     required=False,
     # )
@@ -34,8 +34,8 @@ def create_main_argument_parser() -> argparse.ArgumentParser:
         "--socket",
         action="store",
         type=str,
-        help="Optional, path to Unix-domain socket or network interface of the management API. "
-        "Cannot be used together with '--config'.",
+        help="Optional, path to the resolver's management API, unix-domain socket, or network interface."
+        " Cannot be used together with '--config'.",
         default=[],
         nargs=1,
         required=False,
@@ -45,8 +45,8 @@ def create_main_argument_parser() -> argparse.ArgumentParser:
         "--config",
         action="store",
         type=str,
-        help="Optional, path to Knot Resolver declarative configuration to retrieve Unix-domain socket or "
-        "network interface of the management API from. Cannot be used together with '--socket'.",
+        help="Optional, path to the resolver's declarative configuration to retrieve the management API configuration."
+        " Cannot be used together with '--socket'.",
         default=[],
         nargs=1,
         required=False,
@@ -55,15 +55,15 @@ def create_main_argument_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
-    autoimport_commands()
+    auto_import_commands()
     parser = create_main_argument_parser()
     install_commands_parsers(parser)
 
     namespace = parser.parse_args()
-    kresctl = Kresctl(namespace, parser)
-    kresctl.execute()
+    client = KresClient(namespace, parser)
+    client.execute()
 
     # if namespace.interactive or len(vars(namespace)) == 2:
-    #     kresctl.interactive()
+    #     client.interactive()
     # else:
-    #     kresctl.execute()
+    #     client.execute()

@@ -2,13 +2,15 @@ import argparse
 
 from knot_resolver_manager.client.command import CommandArgs
 
+KRES_CLIENT_NAME = "kresctl"
 
-class Kresctl:
+
+class KresClient:
     def __init__(
         self,
         namespace: argparse.Namespace,
         parser: argparse.ArgumentParser,
-        prompt: str = "kresctl",
+        prompt: str = KRES_CLIENT_NAME,
     ) -> None:
         self.path = None
         self.prompt = prompt

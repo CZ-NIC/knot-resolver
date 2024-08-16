@@ -66,7 +66,7 @@ def get_socket_from_config(config: Path, optional_file: bool) -> Optional[Socket
 
 
 def determine_socket(namespace: argparse.Namespace) -> SocketDesc:
-    # 1) socket from 'kresctl --socket' argument
+    # 1) socket from '--socket' argument
     if len(namespace.socket) > 0:
         return SocketDesc(namespace.socket[0], "--socket argument")
 
@@ -74,7 +74,7 @@ def determine_socket(namespace: argparse.Namespace) -> SocketDesc:
     socket_env = os.getenv(API_SOCK_ENV_VAR)
 
     socket: Optional[SocketDesc] = None
-    # 2) socket from config file ('kresctl --config' argument)
+    # 2) socket from config file ('--config' argument)
     if len(namespace.config) > 0:
         socket = get_socket_from_config(namespace.config[0], False)
     # 3) socket from config file (environment variable)
