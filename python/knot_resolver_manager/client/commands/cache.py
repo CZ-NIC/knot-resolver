@@ -19,7 +19,9 @@ class CacheCommand(Command):
     def __init__(self, namespace: argparse.Namespace) -> None:
         super().__init__(namespace)
         self.operation: Optional[CacheOperations] = namespace.operation if hasattr(namespace, "operation") else None
-        self.out_format: DataFormat = namespace.out_format if hasattr(namespace, "out_format") else DataFormat.YAML
+        self.output_format: DataFormat = (
+            namespace.output_format if hasattr(namespace, "output_format") else DataFormat.YAML
+        )
 
         # CLEAR operation
         self.clear_dict: Dict[str, Any] = {}
@@ -36,29 +38,32 @@ class CacheCommand(Command):
     def register_args_subparser(
         subparser: "argparse._SubParsersAction[argparse.ArgumentParser]",
     ) -> Tuple[argparse.ArgumentParser, "Type[Command]"]:
-        cache_parser = subparser.add_parser("cache", help="Performs operations on the running resolver's cache.")
+        cache_parser = subparser.add_parser("cache", help="Performs operations on the cache of the running resolver.")
 
         config_subparsers = cache_parser.add_subparsers(help="operation type")
 
-        # CLEAR operation
-        clear_subparser = config_subparsers.add_parser("clear", help="Purge cache records matching specified criteria.")
+        # 'clear' operation
+        clear_subparser = config_subparsers.add_parser(
+            "clear", help="Purge cache records that match specified criteria."
+        )
         clear_subparser.set_defaults(operation=CacheOperations.CLEAR, exact_name=False)
         clear_subparser.add_argument(
             "--exact-name",
-            help="If set, only records with the same name are removed.",
+            help="If set, only records with the same name are purged.",
             action="store_true",
             dest="exact_name",
         )
         clear_subparser.add_argument(
             "--rr-type",
-            help="Optional, you may additionally specify the type to remove, but that is only supported with '--exact-name' flag set.",
+            help="Optional, the resource record type to purge. It is supported only with the '--exact-name' flag set.",
             action="store",
             type=str,
         )
         clear_subparser.add_argument(
             "--chunk-size",
-            help="Optional, the number of records to remove in one round; default: 100."
-            " The purpose is not to block the resolver for long. The resolver repeats the command after one millisecond until all matching data are cleared.",
+            help="Optional, the number of records to remove in one round; the default is 100."
+            " The purpose is not to block the resolver for long."
+            " The resolver repeats the cache clearing after one millisecond until all matching data is cleared.",
             action="store",
             type=int,
             default=100,
@@ -67,27 +72,27 @@ class CacheCommand(Command):
             "name",
             type=str,
             nargs="?",
-            help="Optional, subtree to purge; if the name isn't provided, whole cache is purged (and any other parameters are disregarded).",
+            help="Optional, subtree name to purge; if omitted, the entire cache is purged (and all other parameters are ignored).",
             default=None,
         )
 
-        out_format = clear_subparser.add_mutually_exclusive_group()
-        out_format_default = DataFormat.YAML
-        out_format.add_argument(
+        output_format = clear_subparser.add_mutually_exclusive_group()
+        output_format_default = DataFormat.YAML
+        output_format.add_argument(
             "--json",
-            help="Set output format in JSON format, default.",
+            help="Set JSON as the output format.",
             const=DataFormat.JSON,
             action="store_const",
-            dest="out_format",
-            default=out_format_default,
+            dest="output_format",
+            default=output_format_default,
         )
-        out_format.add_argument(
+        output_format.add_argument(
             "--yaml",
-            help="Set configuration data in YAML format.",
+            help="Set YAML as the output format. YAML is the default.",
             const=DataFormat.YAML,
             action="store_const",
-            dest="out_format",
-            default=out_format_default,
+            dest="output_format",
+            default=output_format_default,
         )
 
         return cache_parser, CacheCommand
@@ -115,4 +120,4 @@ class CacheCommand(Command):
         if response.status != 200:
             print(response, file=sys.stderr)
             sys.exit(1)
-        print(self.out_format.dict_dump(body_dict, indent=4))
+        print(self.output_format.dict_dump(body_dict, indent=4))
