@@ -32,42 +32,81 @@ Snippets from Knot Resolver's configuration file **do not start with $ sign** an
 Installation
 ************
 
-As a first step, configure your system to use upstream repositories which have
-the **latest version** of Knot Resolver. Follow the instructions below for your
-distribution.
+We recommend using the latest released Knot Resolver version.
+Our upstream releases undergo extensive automated testing and are suitable for production.
 
-**Debian/Ubuntu**
-
-.. note:: Please note that the packages available in distribution repositories
-   of Debian and Ubuntu are outdated. Make sure to follow these steps to use
-   our upstream repositories.
-
-.. code-block:: bash
-
-    $ wget https://secure.nic.cz/files/knot-resolver/knot-resolver-release.deb
-    $ sudo dpkg -i knot-resolver-release.deb
-    $ sudo apt update
-    $ sudo apt install -y knot-resolver
-
-**CentOS 7+**
-
-.. code-block:: bash
-
-    $ sudo yum install -y epel-release
-    $ sudo yum install -y knot-resolver
-
-**Fedora**
-
-.. code-block:: bash
-
-    $ sudo dnf install -y knot-resolver
-
-**Arch Linux**
-
-.. code-block:: bash
-
-   $ sudo pacman -S knot-resolver
+Packages available in your distribution's may be outdated.
+Follow the instructions below to obtain the latest Knot Resolver version for your distribution.
 
 
-**openSUSE Leap / Tumbleweed**
-Add the `OBS <https://en.opensuse.org/Portal:Build_Service>`_ package repository `home:CZ-NIC:knot-resolver-latest <https://software.opensuse.org/download.html?project=home%3ACZ-NIC%3Aknot-resolver-latest&package=knot-resolver>`_ to your system.
+Debian / Ubuntu
+---------------
+
+Please use our `official repos <https://pkg.labs.nic.cz/doc/?project=knot-resolver>`__
+for Debian and Ubuntu.
+Debian unstable and testing usually contain latest Knot Resolver version.
+
+After that ``apt`` will keep updating knot-resolver 5.x packages from our repositories.
+
+If you used our older repo until now, you may want to also uninstall the helper package
+by ``apt purge knot-resolver-release``.
+
+Enterprise Linux 7, 8, 9
+------------------------
+
+Use Fedora EPEL.
+
+::
+
+   yum install -y epel-release
+   yum install -y knot-resolver
+
+Package updates are delayed by about one week after release. To obtain the
+latest released version early, you can use the epel-testing repository.
+
+::
+
+   yum install -y --enablerepo epel-testing knot-resolver
+
+Fedora
+------
+
+Use the distribution's repositories where we maintain up-to-date packages.
+
+::
+
+   dnf install -y knot-resolver
+
+Package releases are delayed by about a week. To obtain the latest released
+version early, you can use the updates-testing repository.
+
+::
+
+   dnf install -y --enablerepo updates-testing knot-resolver
+
+openSUSE
+--------
+
+Just add our `COPR repository <https://copr.fedorainfracloud.org/coprs/g/cznic/knot-resolver5>`__,
+based on the variant of your openSUSE:
+::
+
+  # Leap 15.5
+  zypper addrepo https://copr.fedorainfracloud.org/coprs/g/cznic/knot-resolver5/repo/opensuse-leap-15.5/group_cznic-knot-resolver5-opensuse-leap-15.5.repo
+
+  # Tumbleweed
+  zypper addrepo https://copr.fedorainfracloud.org/coprs/g/cznic/knot-resolver5/repo/opensuse-tumbleweed/group_cznic-knot-resolver5-opensuse-tumbleweed.repo
+
+Then you can install as usual with
+::
+
+   zypper install knot-resolver
+
+Arch Linux
+----------
+
+::
+
+   pacman -S knot-resolver
+
+
