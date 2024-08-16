@@ -1,8 +1,0 @@
----
-# SPDX-License-Identifier: GPL-3.0-or-later
-- name: udp_test resolve nic.cz
-  tags:
-    - test
-  shell: kdig @127.0.0.1 nic.cz
-  register: res
-  failed_when: '"status: NOERROR" not in res.stdout'

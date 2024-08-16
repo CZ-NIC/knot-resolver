@@ -1,4 +1,0 @@
-# SPDX-License-Identifier: GPL-3.0-or-later
-repos:
-  - knot-resolver-latest
-  - knot-resolver-devel
