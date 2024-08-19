@@ -1320,6 +1320,15 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 	VERBOSE_MSG(qry, "<= answer valid, OK\n");
 	return KR_STATE_DONE;
 }
+static int validate_wrapper(kr_layer_t *ctx, knot_pkt_t *pkt) {
+	// Wrapper for now.
+	int ret = validate(ctx, pkt);
+	struct kr_request *req = ctx->req;
+	struct kr_query *qry = req->current_query;
+	if (ret & KR_STATE_FAIL && qry->flags.DNSSEC_BOGUS)
+		qry->server_selection.error(qry, req->upstream.transport, KR_SELECTION_DNSSEC_ERROR);
+	return ret;
+}
 
 /**
  * Hide RRsets which did not validate from clients and clear Extended
@@ -1370,16 +1379,6 @@ static int validate_finalize(kr_layer_t *ctx) {
 	}
 
 	return ctx->state;
-}
-
-static int validate_wrapper(kr_layer_t *ctx, knot_pkt_t *pkt) {
-	// Wrapper for now.
-	int ret = validate(ctx, pkt);
-	struct kr_request *req = ctx->req;
-	struct kr_query *qry = req->current_query;
-	if (ret & KR_STATE_FAIL && qry->flags.DNSSEC_BOGUS)
-		qry->server_selection.error(qry, req->upstream.transport, KR_SELECTION_DNSSEC_ERROR);
-	return ret;
 }
 
 
