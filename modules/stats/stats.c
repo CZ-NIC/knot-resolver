@@ -37,7 +37,11 @@
  #define UPSTREAMS_COUNT  512 /* Size of recent upstreams */
 #endif
 
-/** @cond internal Fixed-size map of predefined metrics. */
+/** @cond internal Fixed-size map of predefined metrics.
+ *
+ * When changing the list, don't forget _parse_resolver_metrics()
+ * in ../../manager/knot_resolver_manager/statistics.py
+ */
 #define CONST_METRICS(X) \
 	X(answer,total) X(answer,noerror) X(answer,nodata) X(answer,nxdomain) X(answer,servfail) \
 	X(answer,cached) X(answer,1ms) X(answer,10ms) X(answer,50ms) X(answer,100ms) \

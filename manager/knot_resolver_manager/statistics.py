@@ -120,6 +120,12 @@ if _prometheus_support:
             value=metrics["answer"]["cached"],
         )
         yield _counter(
+            "resolver_answer_stale",
+            "number of queries that utilized stale data",
+            label=("instance_id", sid),
+            value=metrics["answer"]["stale"],
+        )
+        yield _counter(
             "resolver_answer_rcode_noerror",
             "number of NOERROR answers",
             label=("instance_id", sid),
