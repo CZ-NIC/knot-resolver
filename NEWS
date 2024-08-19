@@ -12,6 +12,7 @@ Improvements
 
 - answer NOTIMPL for meta-types and non-IN RR classes (!1589)
 - views: improve interaction with old-style policies (!1576)
+- stats: add stale answer counter 'answer.stale' (!1591)
 
 Bugfixes
 --------

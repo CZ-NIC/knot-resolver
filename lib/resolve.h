@@ -260,6 +260,7 @@ struct kr_request {
 	ranked_rr_array_t add_selected;
 	bool answ_validated; /**< internal to validator; beware of caching, etc. */
 	bool auth_validated; /**< see answ_validated ^^ ; TODO */
+	bool stale_accounted;
 
 	/** Overall rank for the request.
 	 *
