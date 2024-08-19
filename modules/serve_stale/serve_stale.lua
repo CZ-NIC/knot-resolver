@@ -8,9 +8,10 @@ local ffi = require('ffi')
 M.timeout = 3*sec
 
 M.callback = ffi.cast("kr_stale_cb",
-	function (ttl) --, name, type, qry)
+	function (ttl, _, _, qry)
 		--log_debug(ffi.C.SRVSTALE, '   => called back with TTL: ' .. tostring(ttl))
 		if ttl + 3600 * 24 > 0 then -- at most one day stale
+			qry.request.stale_accounted = true
 			return 1
 		else
 			return -1
@@ -27,7 +28,9 @@ M.layer = {
 		local now = ffi.C.kr_now()
 		local deadline = qry.creation_time_mono + M.timeout
 		if now > deadline or qry.flags.NO_NS_FOUND then
-			log_debug(ffi.C.LOG_GRP_SRVSTALE, '   => no reachable NS, using stale data')
+			log_qry(qry, ffi.C.LOG_GRP_SRVSTALE,
+				'   => no reachable NS, using stale data "%s"',
+				kres.dname2str(qry:name()))
 			qry.stale_cb = M.callback
 			-- TODO: probably start the same request that doesn't stale-serve,
 			-- but first we need some detection of non-interactive / internal requests.

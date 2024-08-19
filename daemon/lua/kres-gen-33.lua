@@ -248,6 +248,7 @@ struct kr_request {
 	ranked_rr_array_t add_selected;
 	_Bool answ_validated;
 	_Bool auth_validated;
+	_Bool stale_accounted;
 	uint8_t rank;
 	struct kr_rplan rplan;
 	trace_log_f trace_log;
