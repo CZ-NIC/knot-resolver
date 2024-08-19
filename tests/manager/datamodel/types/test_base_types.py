@@ -5,7 +5,7 @@ from typing import List, Optional
 import pytest
 from pytest import raises
 
-from knot_resolver_manager.manager.datamodel.types.base_types import IntRangeBase, StringLengthBase
+from knot_resolver_manager.datamodel.types.base_types import IntRangeBase, StringLengthBase
 from knot_resolver_manager.manager.exceptions import KresManagerException
 
 

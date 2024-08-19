@@ -2,7 +2,7 @@ from typing import Any, Dict, Optional
 
 import pytest
 
-from knot_resolver_manager.manager.datamodel.management_schema import ManagementSchema
+from knot_resolver_manager.datamodel.management_schema import ManagementSchema
 from knot_resolver_manager.utils.modeling.exceptions import DataValidationError
 
 

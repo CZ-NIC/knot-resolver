@@ -6,8 +6,8 @@ from typing import Dict, List, Optional, Tuple, Type, TypeVar
 from urllib.parse import quote
 
 from knot_resolver_manager.manager.constants import API_SOCK_ENV_VAR, CONFIG_FILE_ENV_VAR, DEFAULT_MANAGER_CONFIG_FILE
-from knot_resolver_manager.manager.datamodel.config_schema import DEFAULT_MANAGER_API_SOCK
-from knot_resolver_manager.manager.datamodel.types import IPAddressPort
+from knot_resolver_manager.datamodel.config_schema import DEFAULT_MANAGER_API_SOCK
+from knot_resolver_manager.datamodel.types import IPAddressPort
 from knot_resolver_manager.utils.modeling import parsing
 from knot_resolver_manager.utils.modeling.exceptions import DataValidationError
 from knot_resolver_manager.utils.requests import SocketDesc

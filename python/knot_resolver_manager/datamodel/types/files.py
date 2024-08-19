@@ -7,7 +7,7 @@ from pwd import getpwnam
 from typing import Any, Dict, Tuple, Type, TypeVar
 
 from knot_resolver_manager.manager.constants import kresd_group, kresd_user
-from knot_resolver_manager.manager.datamodel.globals import get_resolve_root, get_strict_validation
+from knot_resolver_manager.datamodel.globals import get_resolve_root, get_strict_validation
 from knot_resolver_manager.utils.modeling.base_value_type import BaseValueType
 
 

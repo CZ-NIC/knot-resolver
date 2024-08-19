@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, Dict, Generator, List, Optional, Tuple
 
 from knot_resolver_manager import compat
 from knot_resolver_manager.manager.config_store import ConfigStore, only_on_real_changes_update
-from knot_resolver_manager.manager.datamodel.config_schema import KresConfig
+from knot_resolver_manager.datamodel.config_schema import KresConfig
 from knot_resolver_manager.controller.registered_workers import (
     command_registered_workers,
     get_registered_workers_kresids,

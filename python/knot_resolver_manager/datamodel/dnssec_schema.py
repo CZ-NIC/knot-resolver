@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from knot_resolver_manager.manager.datamodel.types import DomainName, EscapedStr, IntNonNegative, ReadableFile, TimeUnit
+from knot_resolver_manager.datamodel.types import DomainName, EscapedStr, IntNonNegative, ReadableFile, TimeUnit
 from knot_resolver_manager.utils.modeling import ConfigSchema
 
 

@@ -31,7 +31,7 @@ from knot_resolver_manager.controller.registered_workers import (
 from knot_resolver_manager.utils.functional import Result
 from knot_resolver_manager.utils.modeling.types import NoneType
 
-from .datamodel import KresConfig
+from knot_resolver_manager import KresConfig
 
 logger = logging.getLogger(__name__)
 

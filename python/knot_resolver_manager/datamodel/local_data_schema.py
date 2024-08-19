@@ -2,7 +2,7 @@ from typing import Dict, List, Optional
 
 from typing_extensions import Literal
 
-from knot_resolver_manager.manager.datamodel.types import (
+from knot_resolver_manager.datamodel.types import (
     DomainName,
     EscapedStr,
     IDPattern,

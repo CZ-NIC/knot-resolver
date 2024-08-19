@@ -1,6 +1,6 @@
 from typing import Dict, List, Optional
 
-from knot_resolver_manager.manager.datamodel.types import DomainName, IPAddress, ReadableFile, TimeUnit
+from knot_resolver_manager.datamodel.types import DomainName, IPAddress, ReadableFile, TimeUnit
 from knot_resolver_manager.utils.modeling import ConfigSchema
 
 

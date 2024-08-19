@@ -8,7 +8,7 @@ import supervisor.xmlrpc  # type: ignore[import]
 
 from knot_resolver_manager.compat.asyncio import async_in_a_thread
 from knot_resolver_manager.manager.constants import supervisord_config_file, supervisord_pid_file, supervisord_sock_file
-from knot_resolver_manager.manager.datamodel.config_schema import KresConfig
+from knot_resolver_manager.datamodel.config_schema import KresConfig
 from knot_resolver_manager.manager.exceptions import CancelStartupExecInsteadException, SubprocessControllerException
 from knot_resolver_manager.controller.interface import (
     KresID,

@@ -12,7 +12,7 @@ else:
 
 if TYPE_CHECKING:
     from knot_resolver_manager.manager.config_store import ConfigStore
-    from knot_resolver_manager.manager.datamodel.config_schema import KresConfig
+    from knot_resolver_manager.datamodel.config_schema import KresConfig
     from knot_resolver_manager.controller.interface import KresID
 
 STARTUP_LOG_LEVEL = logging.DEBUG

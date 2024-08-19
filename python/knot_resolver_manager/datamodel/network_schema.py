@@ -2,7 +2,7 @@ from typing import List, Optional, Union
 
 from typing_extensions import Literal
 
-from knot_resolver_manager.manager.datamodel.types import (
+from knot_resolver_manager.datamodel.types import (
     EscapedStr32B,
     WritableFilePath,
     Int0_512,

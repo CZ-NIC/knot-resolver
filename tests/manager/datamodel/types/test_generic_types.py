@@ -3,7 +3,7 @@ from typing import Any, List, Optional, Union
 import pytest
 from pytest import raises
 
-from knot_resolver_manager.manager.datamodel.types import ListOrItem
+from knot_resolver_manager.datamodel.types import ListOrItem
 from knot_resolver_manager.utils.modeling import BaseSchema
 from knot_resolver_manager.utils.modeling.exceptions import DataValidationError
 from knot_resolver_manager.utils.modeling.types import get_generic_type_wrapper_argument

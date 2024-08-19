@@ -12,15 +12,15 @@ packages = \
  'knot_resolver_manager.controller',
  'knot_resolver_manager.controller.supervisord',
  'knot_resolver_manager.controller.supervisord.plugin',
+ 'knot_resolver_manager.datamodel',
+ 'knot_resolver_manager.datamodel.templates',
+ 'knot_resolver_manager.datamodel.types',
  'knot_resolver_manager.manager',
- 'knot_resolver_manager.manager.datamodel',
- 'knot_resolver_manager.manager.datamodel.templates',
- 'knot_resolver_manager.manager.datamodel.types',
  'knot_resolver_manager.utils',
  'knot_resolver_manager.utils.modeling']
 
 package_data = \
-{'': ['*'], 'knot_resolver_manager.manager.datamodel.templates': ['macros/*']}
+{'': ['*'], 'knot_resolver_manager.datamodel.templates': ['macros/*']}
 
 install_requires = \
 ['aiohttp', 'jinja2', 'pyyaml', 'supervisor', 'typing-extensions']

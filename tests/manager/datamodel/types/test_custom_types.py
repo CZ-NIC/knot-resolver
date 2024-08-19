@@ -6,7 +6,7 @@ from typing import Any
 import pytest
 from pytest import raises
 
-from knot_resolver_manager.manager.datamodel.types import (
+from knot_resolver_manager.datamodel.types import (
     Dir,
     DomainName,
     EscapedStr,

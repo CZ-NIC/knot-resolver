@@ -5,13 +5,13 @@ from jinja2 import Environment, FileSystemLoader, Template
 
 
 def _get_templates_dir() -> str:
-    module = sys.modules["knot_resolver_manager.manager.datamodel"].__file__
+    module = sys.modules["knot_resolver_manager.datamodel"].__file__
     if module:
         templates_dir = os.path.join(os.path.dirname(module), "templates")
         if os.path.isdir(templates_dir):
             return templates_dir
         raise NotADirectoryError(f"the templates dir '{templates_dir}' is not a directory or does not exist")
-    raise OSError("package 'knot_resolver_manager.manager.datamodel' cannot be located or loaded")
+    raise OSError("package 'knot_resolver_manager.datamodel' cannot be located or loaded")
 
 
 _TEMPLATES_DIR = _get_templates_dir()

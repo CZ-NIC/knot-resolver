@@ -1,6 +1,6 @@
 from pytest import raises
 
-from knot_resolver_manager.manager.datamodel.lua_schema import LuaSchema
+from knot_resolver_manager.datamodel.lua_schema import LuaSchema
 from knot_resolver_manager.utils.modeling.exceptions import DataValidationError
 
 

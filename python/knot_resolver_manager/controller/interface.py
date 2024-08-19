@@ -11,7 +11,7 @@ from typing import Dict, Iterable, Optional, Type, TypeVar
 from weakref import WeakValueDictionary
 
 from knot_resolver_manager.manager.constants import kresd_config_file, policy_loader_config_file
-from knot_resolver_manager.manager.datamodel.config_schema import KresConfig
+from knot_resolver_manager.datamodel.config_schema import KresConfig
 from knot_resolver_manager.manager.exceptions import SubprocessControllerException
 from knot_resolver_manager.controller.registered_workers import register_worker, unregister_worker
 from knot_resolver_manager.utils.async_utils import writefile

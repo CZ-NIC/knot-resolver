@@ -1,5 +1,5 @@
-from knot_resolver_manager.manager.datamodel.network_schema import ListenSchema
-from knot_resolver_manager.manager.datamodel.templates import template_from_str
+from knot_resolver_manager.datamodel.network_schema import ListenSchema
+from knot_resolver_manager.datamodel.templates import template_from_str
 
 
 def test_network_listen():

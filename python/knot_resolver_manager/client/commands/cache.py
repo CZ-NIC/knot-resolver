@@ -4,7 +4,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple, Type
 
 from knot_resolver_manager.client.command import Command, CommandArgs, CompWords, register_command
-from knot_resolver_manager.manager.datamodel.cache_schema import CacheClearRPCSchema
+from knot_resolver_manager.datamodel.cache_schema import CacheClearRPCSchema
 from knot_resolver_manager.utils.modeling.exceptions import AggregateDataValidationError, DataValidationError
 from knot_resolver_manager.utils.modeling.parsing import DataFormat, parse_json
 from knot_resolver_manager.utils.requests import request

@@ -6,8 +6,8 @@ from typing import Optional
 
 from knot_resolver_manager.manager.config_store import ConfigStore, only_on_real_changes_update
 from knot_resolver_manager.manager.constants import STARTUP_LOG_LEVEL
-from knot_resolver_manager.manager.datamodel.config_schema import KresConfig
-from knot_resolver_manager.manager.datamodel.logging_schema import LogTargetEnum
+from knot_resolver_manager.datamodel.config_schema import KresConfig
+from knot_resolver_manager.datamodel.logging_schema import LogTargetEnum
 
 logger = logging.getLogger(__name__)
 

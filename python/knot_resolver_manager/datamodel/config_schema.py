@@ -6,21 +6,21 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 from typing_extensions import Literal
 
 from knot_resolver_manager.manager.constants import MAX_WORKERS
-from knot_resolver_manager.manager.datamodel.cache_schema import CacheSchema
-from knot_resolver_manager.manager.datamodel.dns64_schema import Dns64Schema
-from knot_resolver_manager.manager.datamodel.dnssec_schema import DnssecSchema
-from knot_resolver_manager.manager.datamodel.forward_schema import ForwardSchema
-from knot_resolver_manager.manager.datamodel.local_data_schema import LocalDataSchema, RPZSchema, RuleSchema
-from knot_resolver_manager.manager.datamodel.logging_schema import LoggingSchema
-from knot_resolver_manager.manager.datamodel.lua_schema import LuaSchema
-from knot_resolver_manager.manager.datamodel.management_schema import ManagementSchema
-from knot_resolver_manager.manager.datamodel.monitoring_schema import MonitoringSchema
-from knot_resolver_manager.manager.datamodel.network_schema import NetworkSchema
-from knot_resolver_manager.manager.datamodel.options_schema import OptionsSchema
-from knot_resolver_manager.manager.datamodel.templates import POLICY_CONFIG_TEMPLATE, WORKER_CONFIG_TEMPLATE
-from knot_resolver_manager.manager.datamodel.types import EscapedStr, IntPositive, WritableDir
-from knot_resolver_manager.manager.datamodel.view_schema import ViewSchema
-from knot_resolver_manager.manager.datamodel.webmgmt_schema import WebmgmtSchema
+from knot_resolver_manager.datamodel.cache_schema import CacheSchema
+from knot_resolver_manager.datamodel.dns64_schema import Dns64Schema
+from knot_resolver_manager.datamodel.dnssec_schema import DnssecSchema
+from knot_resolver_manager.datamodel.forward_schema import ForwardSchema
+from knot_resolver_manager.datamodel.local_data_schema import LocalDataSchema, RPZSchema, RuleSchema
+from knot_resolver_manager.datamodel.logging_schema import LoggingSchema
+from knot_resolver_manager.datamodel.lua_schema import LuaSchema
+from knot_resolver_manager.datamodel.management_schema import ManagementSchema
+from knot_resolver_manager.datamodel.monitoring_schema import MonitoringSchema
+from knot_resolver_manager.datamodel.network_schema import NetworkSchema
+from knot_resolver_manager.datamodel.options_schema import OptionsSchema
+from knot_resolver_manager.datamodel.templates import POLICY_CONFIG_TEMPLATE, WORKER_CONFIG_TEMPLATE
+from knot_resolver_manager.datamodel.types import EscapedStr, IntPositive, WritableDir
+from knot_resolver_manager.datamodel.view_schema import ViewSchema
+from knot_resolver_manager.datamodel.webmgmt_schema import WebmgmtSchema
 from knot_resolver_manager.utils.modeling import ConfigSchema
 from knot_resolver_manager.utils.modeling.base_schema import lazy_default
 from knot_resolver_manager.utils.modeling.exceptions import AggregateDataValidationError, DataValidationError

@@ -2,8 +2,8 @@ from typing import List, Optional, Union
 
 from typing_extensions import Literal
 
-from knot_resolver_manager.manager.datamodel.templates import template_from_str
-from knot_resolver_manager.manager.datamodel.types import (
+from knot_resolver_manager.datamodel.templates import template_from_str
+from knot_resolver_manager.datamodel.types import (
     DNSRecordTypeEnum,
     DomainName,
     EscapedStr,

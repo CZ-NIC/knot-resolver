@@ -3,7 +3,7 @@ from typing import Any, List, Optional, Set, Type, Union, cast
 
 from typing_extensions import Literal
 
-from knot_resolver_manager.manager.datamodel.types import TimeUnit, WritableFilePath
+from knot_resolver_manager.datamodel.types import TimeUnit, WritableFilePath
 from knot_resolver_manager.utils.modeling import ConfigSchema
 from knot_resolver_manager.utils.modeling.base_schema import is_obj_type_valid
 

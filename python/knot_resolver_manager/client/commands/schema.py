@@ -4,7 +4,7 @@ import sys
 from typing import List, Optional, Tuple, Type
 
 from knot_resolver_manager.client.command import Command, CommandArgs, CompWords, register_command
-from knot_resolver_manager.manager.datamodel.config_schema import KresConfig
+from knot_resolver_manager.datamodel.config_schema import KresConfig
 from knot_resolver_manager.utils.requests import request
 
 

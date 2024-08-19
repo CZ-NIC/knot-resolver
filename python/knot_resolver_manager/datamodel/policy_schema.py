@@ -1,8 +1,8 @@
 from typing import List, Optional, Union
 
-from knot_resolver_manager.manager.datamodel.forward_schema import ForwardServerSchema
-from knot_resolver_manager.manager.datamodel.network_schema import AddressRenumberingSchema
-from knot_resolver_manager.manager.datamodel.types import (
+from knot_resolver_manager.datamodel.forward_schema import ForwardServerSchema
+from knot_resolver_manager.datamodel.network_schema import AddressRenumberingSchema
+from knot_resolver_manager.datamodel.types import (
     DNSRecordTypeEnum,
     IPAddressOptionalPort,
     PolicyActionEnum,

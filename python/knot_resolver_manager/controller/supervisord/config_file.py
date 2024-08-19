@@ -19,8 +19,8 @@ from knot_resolver_manager.manager.constants import (
     supervisord_subprocess_log_dir,
     user_constants,
 )
-from knot_resolver_manager.manager.datamodel.config_schema import KresConfig
-from knot_resolver_manager.manager.datamodel.logging_schema import LogTargetEnum
+from knot_resolver_manager.datamodel.config_schema import KresConfig
+from knot_resolver_manager.datamodel.logging_schema import LogTargetEnum
 from knot_resolver_manager.controller.interface import KresID, SubprocessType
 from knot_resolver_manager.utils.async_utils import read_resource, writefile
 

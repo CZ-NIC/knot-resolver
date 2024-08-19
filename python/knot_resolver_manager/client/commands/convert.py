@@ -4,8 +4,8 @@ from pathlib import Path
 from typing import List, Optional, Tuple, Type
 
 from knot_resolver_manager.client.command import Command, CommandArgs, CompWords, register_command
-from knot_resolver_manager.manager.datamodel import KresConfig
-from knot_resolver_manager.manager.datamodel.globals import (
+from knot_resolver_manager.datamodel import KresConfig
+from knot_resolver_manager.datamodel.globals import (
     Context,
     reset_global_validation_context,
     set_global_validation_context,

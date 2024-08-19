@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from knot_resolver_manager.manager.datamodel.types import PolicyActionEnum, PolicyFlagEnum, ReadableFile
+from knot_resolver_manager.datamodel.types import PolicyActionEnum, PolicyFlagEnum, ReadableFile
 from knot_resolver_manager.utils.modeling import ConfigSchema
 
 
