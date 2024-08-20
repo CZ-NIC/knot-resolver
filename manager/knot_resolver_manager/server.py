@@ -585,11 +585,6 @@ async def start_server(config: Path = DEFAULT_MANAGER_CONFIG_FILE) -> int:
         logger.error(e)
         return 1
 
-    except PermissionError as e:
-        logger.error(f"Reading of the configuration file failed: {e}")
-        # logger.error("Insufficient permissions")
-        return 1
-
     except BaseException:
         logger.error("Uncaught generic exception during manager inicialization...", exc_info=True)
         return 1
