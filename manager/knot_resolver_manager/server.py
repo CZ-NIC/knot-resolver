@@ -17,8 +17,6 @@ from aiohttp.web_app import Application
 from aiohttp.web_response import json_response
 from aiohttp.web_runner import AppRunner, TCPSite, UnixSite
 from typing_extensions import Literal
-
-from knot_resolver_manager.datamodel.types.files import ReadableFile, WritableFile
 import knot_resolver_manager.utils.custom_atexit as atexit
 from knot_resolver_manager import log, statistics
 from knot_resolver_manager.compat import asyncio as asyncio_compat
@@ -509,7 +507,6 @@ async def start_server(config: Path = DEFAULT_MANAGER_CONFIG_FILE) -> int:
     # This function is quite long, but it describes how manager runs. So let's silence pylint
     # pylint: disable=too-many-statements
 
-    ReadableFile(config)
     start_time = time()
     working_directory_on_startup = os.getcwd()
     manager: Optional[KresManager] = None

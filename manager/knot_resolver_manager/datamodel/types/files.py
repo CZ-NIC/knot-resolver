@@ -1,8 +1,11 @@
-from logging import debug
-from os import close
 from pathlib import Path
 from typing import Any, Dict, Tuple, Type, TypeVar
+import os
+import stat
+from pwd import getpwnam
+from grp import getgrnam
 
+from knot_resolver_manager.constants import kresd_user, kresd_group
 from knot_resolver_manager.datamodel.globals import get_resolve_root, get_strict_validation
 from knot_resolver_manager.utils.modeling.base_value_type import BaseValueType
 
@@ -135,11 +138,49 @@ class FilePath(UncheckedPath):
         p = self._value.parent
         if self.strict_validation and (not p.exists() or not p.is_dir()):
             raise ValueError(f"path '{self._value}' does not point inside an existing directory")
+
+        # WARNING: is_dir() fails for knot-resolver owned paths when using kresctl to validate config
         if self.strict_validation and self._value.is_dir():
             raise ValueError(f"path '{self._value}' points to a directory when we expected a file")
 
 
-class ReadableFile(UncheckedPath):
+READ_MODE = 0
+WRITE_MODE = 1
+EXECUTE_MODE = 2
+
+def kresd_accesible(dest_path: Path, perm_mode: int) -> bool:
+    chflags = [
+        [stat.S_IRUSR, stat.S_IRGRP, stat.S_IROTH],
+        [stat.S_IWUSR, stat.S_IWGRP, stat.S_IWOTH],
+        [stat.S_IXUSR, stat.S_IXGRP, stat.S_IXOTH],
+    ]
+
+    username = kresd_user()
+    groupname = kresd_group()
+
+    if username is None or groupname is None:
+        return True
+
+    user_uid = getpwnam(username).pw_uid
+    user_gid = getgrnam(groupname).gr_gid
+
+    dest_stat = os.stat(dest_path)
+    dest_uid = dest_stat.st_uid
+    dest_gid = dest_stat.st_gid
+
+    _mode = dest_stat.st_mode
+
+    if user_uid == dest_uid:
+        return bool(_mode & chflags[perm_mode][0])
+
+    b_groups = os.getgrouplist(os.getlogin(), user_gid)
+    if user_gid == dest_gid or dest_gid in b_groups:
+        return bool(_mode & chflags[perm_mode][1])
+
+    return bool(_mode & chflags[perm_mode][2])
+
+
+class ReadableFile(File):
     """
     File, that is enforced to be:
     - readable by kresd
@@ -148,33 +189,20 @@ class ReadableFile(UncheckedPath):
         self, source_value: Any, parents: Tuple["UncheckedPath", ...] = tuple(), object_path: str = "/"
     ) -> None:
         super().__init__(source_value, parents=parents, object_path=object_path)
-        try:
-            f = open(self._value, "r")
-        except IOError as e:
-            if e.args == (13, 'permission denied'):
-                raise ValueError(f"file'{self._value}' isn't readable")
-            raise ValueError(f"Unexpected error '{e}'")
 
-            f.close()
+        if self.strict_validation and not kresd_accesible(self._value, READ_MODE):
+            raise ValueError(f"{kresd_user()}:{kresd_group()} has insuficient permissions to read \"{self._value}\"")
 
 
-class WritableFile(UncheckedPath):
+class WritableDir(Dir):
     """
-    File, that is enforced to be:
-    - writable by kresd
+    Dif, that is enforced to be:
+    - writable to by kresd
     """
     def __init__(
         self, source_value: Any, parents: Tuple["UncheckedPath", ...] = tuple(), object_path: str = "/"
     ) -> None:
-        print(type(self))
         super().__init__(source_value, parents=parents, object_path=object_path)
-        try:
-            f = open(self._value, "w")
-        except IOError as e:
-            if e.args == (13, 'permission denied'):
-                raise ValueError(f"file'{self._value}' isn't readable")
-            raise ValueError(f"Unexpected error '{e}'")
 
-        f.close()
-
-
+        if self.strict_validation and not kresd_accesible(self._value, WRITE_MODE):
+            raise ValueError(f"{kresd_user()}:{kresd_group()} has insuficient permissions to write to \"{self._value}\"")
