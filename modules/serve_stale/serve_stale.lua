@@ -11,7 +11,6 @@ M.callback = ffi.cast("kr_stale_cb",
 	function (ttl, _, _, qry)
 		--log_debug(ffi.C.SRVSTALE, '   => called back with TTL: ' .. tostring(ttl))
 		if ttl + 3600 * 24 > 0 then -- at most one day stale
-			qry.request.stale_accounted = true
 			return 1
 		else
 			return -1
@@ -35,6 +34,23 @@ M.layer = {
 			-- TODO: probably start the same request that doesn't stale-serve,
 			-- but first we need some detection of non-interactive / internal requests.
 			-- resolve(kres.dname2str(qry.sname), qry.stype, qry.sclass)
+		end
+
+		return state
+	end,
+
+	answer_finalize = function (state, req)
+		local qry = req:resolved()
+		if state ~= kres.DONE or qry == nil then
+			return state
+		end
+
+		if req.stale_accounted and qry.stale_cb ~= nil then
+			if req.answer:rcode() == kres.rcode.NOERROR then
+				req:set_extended_error(kres.extended_error.STALE, 'WFAC')
+			elseif req.answer:rcode() == kres.rcode.NXDOMAIN then
+				req:set_extended_error(kres.extended_error.STALE_NXD, 'QSF6')
+			end
 		end
 
 		return state
