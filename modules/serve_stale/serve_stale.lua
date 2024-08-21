@@ -8,7 +8,7 @@ local ffi = require('ffi')
 M.timeout = 3*sec
 
 M.callback = ffi.cast("kr_stale_cb",
-	function (ttl, _, _, qry)
+	function (ttl) --, name, type, qry)
 		--log_debug(ffi.C.SRVSTALE, '   => called back with TTL: ' .. tostring(ttl))
 		if ttl + 3600 * 24 > 0 then -- at most one day stale
 			return 1
