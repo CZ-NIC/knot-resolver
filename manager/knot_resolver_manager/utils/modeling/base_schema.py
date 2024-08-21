@@ -474,8 +474,9 @@ class ObjectMapper:
             return obj
 
         # when the specified type is Any, just return the given value
-        # (pylint does something weird on the following line and it happens only on python 3.10)
-        elif tp == Any:  # pylint: disable=comparison-with-callable
+        # on mypy version 1.11.0 comparison-overlap error started popping up
+        # https://github.com/python/mypy/issues/17665
+        elif tp == Any:  # type: ignore[comparison-overlap]
             return obj
 
         # BaseValueType subclasses
