@@ -17,6 +17,7 @@ from aiohttp.web_app import Application
 from aiohttp.web_response import json_response
 from aiohttp.web_runner import AppRunner, TCPSite, UnixSite
 from typing_extensions import Literal
+
 import knot_resolver_manager.utils.custom_atexit as atexit
 from knot_resolver_manager import log, statistics
 from knot_resolver_manager.compat import asyncio as asyncio_compat

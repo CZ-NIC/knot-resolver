@@ -1,11 +1,11 @@
-from pathlib import Path
-from typing import Any, Dict, Tuple, Type, TypeVar
 import os
 import stat
-from pwd import getpwnam
 from grp import getgrnam
+from pathlib import Path
+from pwd import getpwnam
+from typing import Any, Dict, Tuple, Type, TypeVar
 
-from knot_resolver_manager.constants import kresd_user, kresd_group
+from knot_resolver_manager.constants import kresd_group, kresd_user
 from knot_resolver_manager.datamodel.globals import get_resolve_root, get_strict_validation
 from knot_resolver_manager.utils.modeling.base_value_type import BaseValueType
 
@@ -139,7 +139,6 @@ class FilePath(UncheckedPath):
         if self.strict_validation and (not p.exists() or not p.is_dir()):
             raise ValueError(f"path '{self._value}' does not point inside an existing directory")
 
-        # WARNING: is_dir() fails for knot-resolver owned paths when using kresctl to validate config
         if self.strict_validation and self._value.is_dir():
             raise ValueError(f"path '{self._value}' points to a directory when we expected a file")
 
@@ -186,13 +185,14 @@ class ReadableFile(File):
     File, that is enforced to be:
     - readable by kresd
     """
+
     def __init__(
         self, source_value: Any, parents: Tuple["UncheckedPath", ...] = tuple(), object_path: str = "/"
     ) -> None:
         super().__init__(source_value, parents=parents, object_path=object_path)
 
         if self.strict_validation and not kresd_accesible(self._value, READ_MODE):
-            raise ValueError(f"{kresd_user()}:{kresd_group()} has insuficient permissions to read \"{self._value}\"")
+            raise ValueError(f'{kresd_user()}:{kresd_group()} has insuficient permissions to read "{self._value}"')
 
 
 class WritableDir(Dir):
@@ -200,10 +200,11 @@ class WritableDir(Dir):
     Dif, that is enforced to be:
     - writable to by kresd
     """
+
     def __init__(
         self, source_value: Any, parents: Tuple["UncheckedPath", ...] = tuple(), object_path: str = "/"
     ) -> None:
         super().__init__(source_value, parents=parents, object_path=object_path)
 
         if self.strict_validation and not kresd_accesible(self._value, WRITE_MODE):
-            raise ValueError(f"{kresd_user()}:{kresd_group()} has insuficient permissions to write to \"{self._value}\"")
+            raise ValueError(f'{kresd_user()}:{kresd_group()} has insuficient permissions to write to "{self._value}"')
