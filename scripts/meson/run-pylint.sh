@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 set -o errexit -o nounset
 
-cd "$(dirname ${0})/.."
+cd "$(dirname ${0})/../.."
 
 # Find Python modules and standalone Python scripts
 FILES=$(find ./tests/pytests \

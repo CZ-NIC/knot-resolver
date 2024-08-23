@@ -303,7 +303,7 @@ message('--- lint dependencies ---')
 clangtidy = find_program('clang-tidy', required: false)
 luacheck = find_program('luacheck', required: false)
 flake8 = find_program('flake8', required: false)
-pylint_run = find_program('scripts/run-pylint.sh')
+pylint_run = find_program('scripts/meson/run-pylint.sh')
 message('-------------------------')
 
 if clangtidy.found()

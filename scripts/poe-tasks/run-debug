@@ -2,7 +2,7 @@
 
 # ensure consistent behaviour
 src_dir="$(dirname "$(realpath "$0")")"
-source $src_dir/_env.sh
+source $src_dir/utils/_env.sh
 
 echo The debug server will be listening on port localhost:5678
 echo Use VSCode remote attach feature to connect to the debug server

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
 set -o errexit -o nounset
-cd "$(dirname "${0}")/.."
+cd "$(dirname "${0}")/../.."
 
 # generate JSON schema for the manager's declarative config
 pushd manager

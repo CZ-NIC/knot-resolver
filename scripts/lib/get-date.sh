@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
 set -o nounset
-cd "$(dirname $0)/.."
+cd "$(dirname $0)/../.."
 
 # Get date from NEWS if possible (regular release)
 DATE=$(head -n1 < NEWS | sed 's/.*(\(.*\)).*/\1/' | grep -E '^[0-9]{4}-[0-9]{2}-[0-9]{2}$$')

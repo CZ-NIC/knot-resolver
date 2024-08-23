@@ -10,7 +10,7 @@ config_tests += [
 ]
 
 
-run_configtest = find_program('../../scripts/test-config.sh')
+run_configtest = find_program('../../scripts/meson/test-config.sh')
 
 
 foreach config_test : config_tests

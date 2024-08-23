@@ -2,7 +2,7 @@
 
 # ensure consistent behaviour
 src_dir="$(dirname "$(realpath "$0")")"
-source $src_dir/_env.sh
+source $src_dir/utils/_env.sh
 
 aggregate_rv=0
 function check_rv {
@@ -32,7 +32,7 @@ fi
 
 # check formatting using black
 echo -e "${yellow}Checking formatting using black...${reset}"
-black manager/knot_resolver_manager tests/manager scripts/create_setup.py --check --diff
+black manager/knot_resolver_manager tests/manager scripts/poe-tasks/utils/create_setup.py --check --diff
 check_rv $?
 echo
 
@@ -56,7 +56,7 @@ echo
 
 # check that setup.py is not behind pyproject.toml
 echo -e "${yellow}Checking setup.py${reset}"
-python scripts/create_setup.py | diff - setup.py
+python scripts/poe-tasks/utils/create_setup.py | diff - setup.py
 check_rv $?
 python setup.py --help > /dev/null
 check_rv $?

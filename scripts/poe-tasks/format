@@ -2,9 +2,9 @@
 
 # ensure consistent behaviour
 src_dir="$(dirname "$(realpath "$0")")"
-source $src_dir/_env.sh
+source $src_dir/utils/_env.sh
 
-dirs="manager/knot_resolver_manager/ tests/manager scripts/create_setup.py build_c_extensions.py"
+dirs="manager/knot_resolver_manager/ tests/manager scripts/poe-tasks/utils/create_setup.py build_c_extensions.py"
 
 # run black code formater
 black $dirs

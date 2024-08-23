@@ -20,5 +20,5 @@ bench_lru = executable(
 
 run_target(
   'bench',
-  command: '../scripts/bench.sh',
+  command: '../scripts/meson/bench.sh',
 )

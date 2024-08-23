@@ -2,7 +2,7 @@
 
 # ensure consistent behaviour
 src_dir="$(dirname "$(realpath "$0")")"
-source $src_dir/_env.sh
+source $src_dir/utils/_env.sh
 
 # validate all configuration examples
 for example in $PWD/etc/config/config.example.*.yaml;

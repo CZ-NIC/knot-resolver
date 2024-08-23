@@ -9,7 +9,7 @@
 # * dpkg-buildpackage
 #
 # usage:
-#   ./scripts/make-obs.sh [path.to.archive.xz] [1]
+#   ./scripts/ci/make-obs.sh [path.to.archive.xz] [1]
 #
 # supply archives as optional arguments to build from,
 # otherwise archive will be built from sources by apkg
@@ -18,7 +18,7 @@
 # output at pkg/obs/ (removed on each run)
 set -o errexit -o nounset
 
-pushd "$(dirname ${0})/.."
+pushd "$(dirname ${0})/../.."
 
 OUTDIR="pkg/obs"
 APKG_OPTS="-O $OUTDIR"

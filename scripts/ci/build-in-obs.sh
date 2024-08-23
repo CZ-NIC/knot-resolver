@@ -4,8 +4,8 @@
 # Push packaging files to OBS
 #
 # Example usage:
-# 1. ./scripts/make-obs.sh
-# 2. ./scripts/build-in-obs.sh knot-resolver-latest
+# 1. ./scripts/ci/make-obs.sh
+# 2. ./scripts/ci/build-in-obs.sh knot-resolver-latest
 set -o errexit -o nounset -o xtrace
 
 pkgdir='pkg/obs'
