@@ -5,10 +5,10 @@ from typing import TYPE_CHECKING, Optional
 
 # Install config is semi-optional - only needed to actually run Manager, but not
 # for its unit tests.
-if importlib.util.find_spec("knot_resolver"):
-    import knot_resolver  # type: ignore[import-not-found]
+if importlib.util.find_spec("knot_resolver_build_options"):
+    import knot_resolver_build_options  # type: ignore[import-not-found]
 else:
-    knot_resolver = None
+    knot_resolver_build_options = None
 
 if TYPE_CHECKING:
     from knot_resolver.manager.config_store import ConfigStore
@@ -26,13 +26,13 @@ MAX_WORKERS = 256
 
 
 def kresd_executable() -> Path:
-    assert knot_resolver is not None
-    return knot_resolver.sbin_dir / "kresd"
+    assert knot_resolver_build_options is not None
+    return knot_resolver_build_options.sbin_dir / "kresd"
 
 
 def kres_gc_executable() -> Path:
-    assert knot_resolver is not None
-    return knot_resolver.sbin_dir / "kres-cache-gc"
+    assert knot_resolver_build_options is not None
+    return knot_resolver_build_options.sbin_dir / "kres-cache-gc"
 
 
 def kresd_user():
