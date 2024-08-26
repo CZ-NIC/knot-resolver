@@ -19,7 +19,7 @@ py3_deps += [
   ['yaml', 'PyYAML (for deckard)'],
 ]
 
-prepare_deckard = find_program('../../scripts/test-integration-prepare.sh')
+prepare_deckard = find_program('../../scripts/meson/test-integration-prepare.sh')
 
 deckard_env = environment()
 deckard_env.prepend('PATH', sbin_dir)

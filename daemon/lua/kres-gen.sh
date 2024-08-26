@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 # Run with "ninja kres-gen" to re-generate $1
@@ -6,7 +6,7 @@ set -o pipefail -o errexit -o nounset
 
 cd "$(dirname ${0})"
 OUTNAME="$1"
-CDEFS="../../scripts/gen-cdefs.sh"
+CDEFS="../../scripts/meson/gen-cdefs.sh"
 LIBKRES="${MESON_BUILD_ROOT}/lib/libkres.so"
 KRESD="${MESON_BUILD_ROOT}/daemon/kresd"
 if [ ! -e "$LIBKRES" ]; then

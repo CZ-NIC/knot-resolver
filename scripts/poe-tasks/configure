@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+# ensure consistent behaviour
+src_dir="$(dirname "$(realpath "$0")")"
+source $src_dir/utils/_env.sh
+
+reconfigure=''
+if [ -f .build_kresd/ninja.build ]; then
+	reconfigure='--reconfigure'
+fi
+meson setup .build_kresd "$reconfigure" --prefix=$(realpath .install_kresd) "$@"
+
+build_kresd

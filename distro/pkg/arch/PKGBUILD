@@ -66,9 +66,7 @@ build() {
     pushd build/python
     python -Pm build --wheel --no-isolation
     popd
-    pushd manager
     python -Pm build --wheel --no-isolation
-    popd
 }
 
 check() {
@@ -93,11 +91,7 @@ package() {
     popd
 
     # install knot-resolver-manager
-    pushd manager
     python -Pm installer --destdir="$pkgdir" dist/*.whl
-    install -m 644 -D etc/knot-resolver/config.yaml ${pkgdir}/etc/knot-resolver/config.yaml
-    install -m 644 -D shell-completion/client.bash ${pkgdir}/usr/share/bash-completion/completions/kresctl
-    install -m 644 -D shell-completion/client.fish ${pkgdir}/usr/share/fish/completions/kresctl.fish
-    popd
+    install -m 644 -D etc/config/config.yaml ${pkgdir}/etc/knot-resolver/config.yaml
 
 }

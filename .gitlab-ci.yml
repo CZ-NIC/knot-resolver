@@ -569,7 +569,7 @@ obs:trigger: &obs_trigger
     - pip install --upgrade pip
     - pip install apkg
     - scripts/make-obs.sh
-    - echo y | scripts/build-in-obs.sh $OBS_REPO
+    - echo y | scripts/ci/build-in-obs.sh $OBS_REPO
 
 obs:release:
   <<: *obs_trigger
@@ -596,7 +596,7 @@ obs:odvr:
 
 .enable_repo_build: &enable_repo_build
   before_script:
-    - ./scripts/enable-repo-cznic-labs.sh knot-dns
+    - ./scripts/ci/enable-repo-cznic-labs.sh knot-dns
 
 .pkg_test: &pkg_test
   stage: pkg
