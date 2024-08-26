@@ -1,7 +1,7 @@
 from pytest import raises
 
-from knot_resolver_manager.datamodel.lua_schema import LuaSchema
-from knot_resolver_manager.utils.modeling.exceptions import DataValidationError
+from knot_resolver.datamodel.lua_schema import LuaSchema
+from knot_resolver.utils.modeling.exceptions import DataValidationError
 
 
 def test_invalid():

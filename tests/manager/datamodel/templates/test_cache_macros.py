@@ -2,8 +2,8 @@ from typing import Any
 
 import pytest
 
-from knot_resolver_manager.datamodel.cache_schema import CacheClearRPCSchema
-from knot_resolver_manager.datamodel.templates import template_from_str
+from knot_resolver.datamodel.cache_schema import CacheClearRPCSchema
+from knot_resolver.datamodel.templates import template_from_str
 
 
 @pytest.mark.parametrize(

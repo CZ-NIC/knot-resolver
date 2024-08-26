@@ -1,6 +1,6 @@
 from pytest import raises
 
-from knot_resolver_manager.utils.modeling.json_pointer import json_ptr_resolve
+from knot_resolver.utils.modeling.json_pointer import json_ptr_resolve
 
 # example adopted from https://www.sitepoint.com/json-server-example/
 TEST = {

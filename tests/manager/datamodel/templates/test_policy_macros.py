@@ -1,9 +1,9 @@
 from typing import List
 
-from knot_resolver_manager.datamodel.network_schema import AddressRenumberingSchema
-from knot_resolver_manager.datamodel.policy_schema import AnswerSchema
-from knot_resolver_manager.datamodel.templates import template_from_str
-from knot_resolver_manager.datamodel.types import PolicyFlagEnum
+from knot_resolver.datamodel.network_schema import AddressRenumberingSchema
+from knot_resolver.datamodel.policy_schema import AnswerSchema
+from knot_resolver.datamodel.templates import template_from_str
+from knot_resolver.datamodel.types import PolicyFlagEnum
 
 
 def test_policy_add():

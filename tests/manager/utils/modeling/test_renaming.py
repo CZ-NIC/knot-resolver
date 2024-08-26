@@ -1,4 +1,4 @@
-from knot_resolver_manager.utils.modeling.renaming import renamed
+from knot_resolver.utils.modeling.renaming import renamed
 
 
 def test_all():

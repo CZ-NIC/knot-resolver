@@ -1,4 +1,4 @@
-from knot_resolver_manager import __version__
+from knot_resolver import __version__
 
 
 def test_version():

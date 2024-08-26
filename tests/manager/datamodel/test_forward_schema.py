@@ -1,8 +1,8 @@
 import pytest
 from pytest import raises
 
-from knot_resolver_manager.datamodel.forward_schema import ForwardSchema
-from knot_resolver_manager.utils.modeling.exceptions import DataValidationError
+from knot_resolver.datamodel.forward_schema import ForwardSchema
+from knot_resolver.utils.modeling.exceptions import DataValidationError
 
 
 @pytest.mark.parametrize("port,auth", [(5353, False), (53, True)])

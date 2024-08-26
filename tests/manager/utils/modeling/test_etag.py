@@ -1,6 +1,6 @@
 from pyparsing import empty
 
-from knot_resolver_manager.utils.etag import structural_etag
+from knot_resolver.utils.etag import structural_etag
 
 
 def test_etag():

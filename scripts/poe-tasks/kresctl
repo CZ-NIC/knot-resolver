@@ -5,4 +5,4 @@ src_dir="$(dirname "$(realpath "$0")")"
 source $src_dir/utils/_env.sh
 
 # run knot-resolver client
-python3 -m knot_resolver_manager.client $@
+python3 -m knot_resolver.client $@

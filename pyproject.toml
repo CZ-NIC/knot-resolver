@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "knot-resolver-manager"
+name = "knot-resolver"
 version = "6.0.8"
 description = "Knot Resolver Manager - a Python program that automatically manages the other components of the resolver"
 license = "GPL-3.0-or-later"
@@ -16,7 +16,7 @@ repository = "https://gitlab.nic.cz/knot/knot-resolver"
 documentation = "https://www.knot-resolver.cz/documentation"
 
 packages = [
-    {include = "knot_resolver_manager", from = "python"}
+    {include = "knot_resolver", from = "python"}
 ]
 
 # See currently open issue about building C extensions here:
@@ -65,8 +65,8 @@ breathe = "^4.35.0"
 json-schema-for-humans = "^0.47"
 
 [tool.poetry.scripts]
-kresctl = 'knot_resolver_manager.client.main:main'
-knot-resolver = 'knot_resolver_manager.manager.main:main'
+kresctl = 'knot_resolver.client.main:main'
+knot-resolver = 'knot_resolver.manager.main:main'
 
 [tool.poe.tasks]
 # tasks runed through scripts located in 'scripts/poe-tasks/'

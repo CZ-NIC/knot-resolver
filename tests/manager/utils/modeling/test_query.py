@@ -1,6 +1,6 @@
 from pytest import raises
 
-from knot_resolver_manager.utils.modeling.query import query
+from knot_resolver.utils.modeling.query import query
 
 
 def test_example_from_spec():

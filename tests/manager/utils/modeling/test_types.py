@@ -3,8 +3,8 @@ from typing import Any, Dict, List, Tuple, Union
 import pytest
 from typing_extensions import Literal
 
-from knot_resolver_manager.utils.modeling import BaseSchema
-from knot_resolver_manager.utils.modeling.types import is_list, is_literal
+from knot_resolver.utils.modeling import BaseSchema
+from knot_resolver.utils.modeling.types import is_list, is_literal
 
 types = [
     bool,

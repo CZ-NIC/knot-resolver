@@ -3,8 +3,8 @@ from typing import Any
 import pytest
 from pytest import raises
 
-from knot_resolver_manager.datamodel.local_data_schema import RuleSchema
-from knot_resolver_manager.utils.modeling.exceptions import DataValidationError
+from knot_resolver.datamodel.local_data_schema import RuleSchema
+from knot_resolver.utils.modeling.exceptions import DataValidationError
 
 
 @pytest.mark.parametrize(
