@@ -83,13 +83,11 @@ kresd.amalg.c
 libkres.amalg.c
 luacov.*.out
 **/__pycache__/
-build/
+build*/
 dist/
 .coverage
 .mypy_cache
 .install_kresd/
 .build_kresd/
-build_dist
-build_doc
 poetry.lock
 *.junit.xml
