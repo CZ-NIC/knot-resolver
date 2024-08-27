@@ -80,17 +80,8 @@ examples = { cmd = "scripts/poe-tasks/examples", help = "Validate all configurat
 man = {cmd = "scripts/poe-tasks/man", help = "Display Knot Resolver manpage from sources" }
 gen-setuppy = { cmd = "scripts/poe-tasks/gen-setuppy", help = "Generate 'setup.py' file for backwards compatibility" }
 format = { cmd = "scripts/poe-tasks/format", help = "Run code formatter" }
-# tasks runned directly
-fixdeps = { shell = "poetry install; npm install; npm update", help = "Install/update dependencies according to configuration files"}
 kresctl = { cmd = "scripts/poe-tasks/kresctl", help="Run kresctl utility" }
-clean = """
-  rm -rf .coverage
-         .mypy_cache
-         .pytest_cache
-         ./**/__pycache__
-         build
-         dist
-"""
+clean = { cmd = "scripts/poe-tasks/clean", help="Cleanup build directories and files" }
 
 [tool.black]
 line-length = 120
