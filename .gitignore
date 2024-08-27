@@ -28,6 +28,7 @@
 /ar-lib
 /autom4te.cache/*
 /bench/bench_lru
+/build*/
 /compile
 /compile_commands.json
 /config.guess
@@ -83,13 +84,10 @@ kresd.amalg.c
 libkres.amalg.c
 luacov.*.out
 **/__pycache__/
-build/
 dist/
 .coverage
 .mypy_cache
 .install_kresd/
 .build_kresd/
-build_dist
-build_doc
 poetry.lock
 *.junit.xml
