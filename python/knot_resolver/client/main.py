@@ -2,6 +2,8 @@ import argparse
 import importlib
 import os
 
+from knot_resolver.constants import VERSION
+
 from .command import install_commands_parsers
 from .client import KresClient, KRES_CLIENT_NAME
 
@@ -19,6 +21,13 @@ def create_main_argument_parser() -> argparse.ArgumentParser:
         KRES_CLIENT_NAME,
         description="Knot Resolver command-line utility that serves as a client for communicating with the Knot Resolver management API."
         " The utility also provides tools to work with the resolver's declarative configuration (validate, convert, ...).",
+    )
+    parser.add_argument(
+        "-V",
+        "--version",
+        action="version",
+        version=VERSION,
+        help="Get version",
     )
     # parser.add_argument(
     #     "-i",

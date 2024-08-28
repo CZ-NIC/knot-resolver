@@ -9,6 +9,8 @@ import sys
 from pathlib import Path
 from typing import NoReturn
 
+from knot_resolver.constants import VERSION
+
 from knot_resolver import compat
 from knot_resolver.constants import CONFIG_FILE_PATH_DEFAULT, CONFIG_FILE_PATH_ENV_VAR
 from knot_resolver.manager.log import logger_startup
@@ -17,6 +19,13 @@ from knot_resolver.manager.server import start_server
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Knot Resolver - caching DNS resolver")
+    parser.add_argument(
+        "-V",
+        "--version",
+        help="Get version",
+        action="version",
+        version=VERSION,
+    )
     parser.add_argument(
         "-c",
         "--config",
