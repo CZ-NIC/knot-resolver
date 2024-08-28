@@ -93,7 +93,6 @@ struct args {
 	addr_array_t addrs, addrs_tls;
 	flagged_fd_array_t fds;
 	int control_fd;
-	int forks;
 	config_array_t config;
 	const char *rundir;
 	bool interactive;
