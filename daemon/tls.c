@@ -340,7 +340,6 @@ static void tls_close(struct pl_tls_sess_data *tls, struct session2 *session, bo
 	}
 }
 
-#if TLS_CAN_USE_PINS
 /*
   DNS-over-TLS Out of band key-pinned authentication profile uses the
   same form of pins as HPKP:
@@ -428,12 +427,6 @@ void tls_credentials_log_pins(struct tls_credentials *tls_credentials)
 		gnutls_free(certs);
 	}
 }
-#else
-void tls_credentials_log_pins(struct tls_credentials *tls_credentials)
-{
-	kr_log_debug(TLS, "could not calculate RFC 7858 OOB key-pin; GnuTLS 3.4.0+ required\n");
-}
-#endif
 
 static int str_replace(char **where_ptr, const char *with)
 {
@@ -761,7 +754,6 @@ static int client_verify_pin(const unsigned int cert_list_size,
 {
 	if (kr_fails_assert(params->pins.len > 0))
 		return GNUTLS_E_CERTIFICATE_ERROR;
-#if TLS_CAN_USE_PINS
 	for (int i = 0; i < cert_list_size; i++) {
 		gnutls_x509_crt_t cert;
 		int ret = gnutls_x509_crt_init(&cert);
@@ -798,12 +790,6 @@ static int client_verify_pin(const unsigned int cert_list_size,
 	log_all_pins(params);
 	log_all_certificates(cert_list_size, cert_list);
 	return GNUTLS_E_CERTIFICATE_ERROR;
-
-#else /* TLS_CAN_USE_PINS */
-	kr_log_error(TLSCLIENT, "internal inconsistency: TLS_CAN_USE_PINS\n");
-	kr_assert(false);
-	return GNUTLS_E_CERTIFICATE_ERROR;
-#endif
 }
 
 /**

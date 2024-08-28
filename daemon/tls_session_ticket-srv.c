@@ -33,12 +33,6 @@
 	#define TST_HASH abort()
 #endif
 
-#if GNUTLS_VERSION_NUMBER < 0x030400
-	/* It's of little use anyway.  We may get the secret through lua,
-	 * which creates a copy outside of our control. */
-	#define gnutls_memset memset
-#endif
-
 /** Fields are internal to tst_key_* functions. */
 typedef struct tls_session_ticket_ctx {
 	uv_timer_t timer;	/**< timer for rotation of the key */
