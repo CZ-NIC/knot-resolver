@@ -18,6 +18,7 @@ Bugfixes
 --------
 
 - daemon/proxyv2: fix informing the engine about TCP/TLS from the actual client (!1578)
+- forward: fix wrong pin-sha256 length; also log pins on mismatch (!1601, #813)
 
 
 Knot Resolver 6.0.8 (2024-07-23)
