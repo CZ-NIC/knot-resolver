@@ -775,20 +775,6 @@ static int client_verify_pin(const unsigned int cert_list_size,
 			return ret;
 		}
 
-	#ifdef DEBUG
-		if (kr_log_is_debug(TLS, NULL)) {
-			char pin_base64[TLS_SHA256_BASE64_BUFLEN];
-			/* DEBUG: additionally compute and print the base64 pin.
-			 * Not very efficient, but that's OK for DEBUG. */
-			ret = get_oob_key_pin(cert, pin_base64, sizeof(pin_base64), false);
-			if (ret == GNUTLS_E_SUCCESS) {
-				VERBOSE_MSG(true, "received pin: %s\n", pin_base64);
-			} else {
-				VERBOSE_MSG(true, "failed to convert received pin\n");
-				/* Now we hope that `ret` below can't differ. */
-			}
-		}
-	#endif
 		char cert_pin[TLS_SHA256_RAW_LEN];
 		/* Get raw pin and compare. */
 		ret = get_oob_key_pin(cert, cert_pin, sizeof(cert_pin), true);
