@@ -575,7 +575,12 @@ enum protolayer_event_cb_result {
  *
  * When `PROTOLAYER_EVENT_PROPAGATE` is returned, iteration over the sequence
  * of layers continues. When `PROTOLAYER_EVENT_CONSUME` is returned, iteration
- * stops. */
+ * stops.
+ *
+ * **IMPORTANT:** A well-behaved layer will **ALWAYS** propagate events it knows
+ * nothing about. Only ever consume events you actually have good reason to
+ * consume (like TLS consumes `CONNECT` from TCP, because it needs to perform
+ * its own handshake first). */
 typedef enum protolayer_event_cb_result (*protolayer_event_cb)(
 		enum protolayer_event_type event, void **baton,
 		struct session2 *session, void *sess_data);
