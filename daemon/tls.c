@@ -715,6 +715,41 @@ int tls_client_param_remove(tls_client_params_t *params, const struct sockaddr *
 	return kr_ok();
 }
 
+static void log_all_pins(tls_client_param_t *params)
+{
+	uint8_t buffer[TLS_SHA256_BASE64_BUFLEN + 1];
+	for (int i = 0; i < params->pins.len; i++) {
+		int len = kr_base64_encode(params->pins.at[i], TLS_SHA256_RAW_LEN,
+			     		   buffer, TLS_SHA256_BASE64_BUFLEN);
+		if (!kr_fails_assert(len > 0)) {
+			buffer[len] = '\0';
+			kr_log_error(TLSCLIENT, "pin no.   %d: %s\n", i, buffer);
+		}
+	}
+}
+
+static void log_all_certificates(const unsigned int cert_list_size,
+			  const gnutls_datum_t *cert_list)
+{
+	for (int i = 0; i < cert_list_size; i++) {
+		gnutls_x509_crt_t cert;
+		if (gnutls_x509_crt_init(&cert) != GNUTLS_E_SUCCESS) {
+			return;
+		}
+		if (gnutls_x509_crt_import(cert, &cert_list[i], GNUTLS_X509_FMT_DER) != GNUTLS_E_SUCCESS) {
+			gnutls_x509_crt_deinit(cert);
+			return;
+		}
+		char cert_pin[TLS_SHA256_BASE64_BUFLEN];
+		if (get_oob_key_pin(cert, cert_pin, sizeof(cert_pin), false) != GNUTLS_E_SUCCESS) {
+			gnutls_x509_crt_deinit(cert);
+			return;
+		}
+		kr_log_error(TLSCLIENT, "Certificate: %s\n", cert_pin);
+		gnutls_x509_crt_deinit(cert);
+	}
+}
+
 /**
  * Verify that at least one certificate in the certificate chain matches
  * at least one certificate pin in the non-empty params->pins array.
@@ -774,6 +809,8 @@ static int client_verify_pin(const unsigned int cert_list_size,
 
 	kr_log_error(TLSCLIENT, "no pin matched: %zu pins * %d certificates\n",
 			params->pins.len, cert_list_size);
+	log_all_pins(params);
+	log_all_certificates(cert_list_size, cert_list);
 	return GNUTLS_E_CERTIFICATE_ERROR;
 
 #else /* TLS_CAN_USE_PINS */
