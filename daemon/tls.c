@@ -384,11 +384,11 @@ static int get_oob_key_pin(gnutls_x509_crt_t crt, char *outchar, ssize_t outchar
 	err = kr_base64_encode((uint8_t *)raw_pin, sizeof(raw_pin),
 			    (uint8_t *)outchar, outchar_len);
 	if (err >= 0 && err < outchar_len) {
-		err = GNUTLS_E_SUCCESS;
 		outchar[err] = '\0'; /* kr_base64_encode() doesn't do it */
+		err = GNUTLS_E_SUCCESS;
 	} else if (kr_fails_assert(err < 0)) {
-		err = kr_error(ENOSPC); /* base64 fits but '\0' doesn't */
 		outchar[outchar_len - 1] = '\0';
+		err = kr_error(ENOSPC); /* base64 fits but '\0' doesn't */
 	}
 leave:
 	gnutls_free(datum.data);
