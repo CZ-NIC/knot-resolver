@@ -12,10 +12,10 @@ from knot_resolver.manager.config_store import (
     only_on_real_changes_update,
     only_on_real_changes_verifier,
 )
-from knot_resolver.manager.constants import (
+from knot_resolver.constants import (
+    FIX_COUNTER_ATTEMPTS_MAX,
     FIX_COUNTER_DECREASE_INTERVAL_SEC,
-    MANAGER_FIX_ATTEMPT_MAX_COUNTER,
-    WATCHDOG_INTERVAL,
+    WATCHDOG_INTERVAL_SEC,
 )
 from knot_resolver.manager.exceptions import SubprocessControllerException
 from knot_resolver.controller.interface import (
@@ -58,7 +58,7 @@ class _FixCounter:
         return str(self._counter)
 
     def is_too_high(self) -> bool:
-        return self._counter >= MANAGER_FIX_ATTEMPT_MAX_COUNTER
+        return self._counter >= FIX_COUNTER_ATTEMPTS_MAX
 
 
 async def _deny_max_worker_changes(config_old: KresConfig, config_new: KresConfig) -> Result[None, str]:
@@ -369,7 +369,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
 
     async def _watchdog(self) -> None:  # pylint: disable=too-many-branches
         while True:
-            await asyncio.sleep(WATCHDOG_INTERVAL)
+            await asyncio.sleep(WATCHDOG_INTERVAL_SEC)
 
             self._fix_counter.try_decrease()
 

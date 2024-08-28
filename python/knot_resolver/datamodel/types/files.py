@@ -6,7 +6,7 @@ from pathlib import Path
 from pwd import getpwnam
 from typing import Any, Dict, Tuple, Type, TypeVar
 
-from knot_resolver.manager.constants import kresd_group, kresd_user
+from knot_resolver.constants import USER_DEFAULT, GROUP_DEFAULT
 from knot_resolver.datamodel.globals import get_resolve_root, get_strict_validation
 from knot_resolver.utils.modeling.base_value_type import BaseValueType
 
@@ -157,14 +157,8 @@ def _kres_accessible(dest_path: Path, perm_mode: _PermissionMode) -> bool:
         _PermissionMode.EXECUTE: [stat.S_IXUSR, stat.S_IXGRP, stat.S_IXOTH],
     }
 
-    username = kresd_user()
-    groupname = kresd_group()
-
-    if username is None or groupname is None:
-        return True
-
-    user_uid = getpwnam(username).pw_uid
-    user_gid = getgrnam(groupname).gr_gid
+    user_uid = getpwnam(USER_DEFAULT).pw_uid
+    user_gid = getgrnam(GROUP_DEFAULT).gr_gid
 
     dest_stat = os.stat(dest_path)
     dest_uid = dest_stat.st_uid
@@ -201,7 +195,7 @@ class ReadableFile(File):
         super().__init__(source_value, parents=parents, object_path=object_path)
 
         if self.strict_validation and not _kres_accessible(self._value, _PermissionMode.READ):
-            raise ValueError(f"{kresd_user()}:{kresd_group()} has insufficient permissions to read '{self._value}'")
+            raise ValueError(f"{USER_DEFAULT}:{GROUP_DEFAULT} has insufficient permissions to read '{self._value}'")
 
 
 class WritableDir(Dir):
@@ -220,7 +214,7 @@ class WritableDir(Dir):
             self._value, _PermissionMode.WRITE | _PermissionMode.EXECUTE
         ):
             raise ValueError(
-                f"{kresd_user()}:{kresd_group()} has insufficient permissions to write/execute '{self._value}'"
+                f"{USER_DEFAULT}:{GROUP_DEFAULT} has insufficient permissions to write/execute '{self._value}'"
             )
 
 
@@ -241,5 +235,5 @@ class WritableFilePath(FilePath):
             self._value.parent, _PermissionMode.WRITE | _PermissionMode.EXECUTE
         ):
             raise ValueError(
-                f"{kresd_user()}:{kresd_group()} has insufficient permissions to write/execute'{self._value.parent}'"
+                f"{USER_DEFAULT}:{GROUP_DEFAULT} has insufficient permissions to write/execute'{self._value.parent}'"
             )

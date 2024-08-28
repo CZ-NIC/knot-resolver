@@ -19,10 +19,11 @@ from aiohttp.web_runner import AppRunner, TCPSite, UnixSite
 from typing_extensions import Literal
 
 import knot_resolver.utils.custom_atexit as atexit
+from knot_resolver.constants import CONFIG_FILE_PATH_DEFAULT, PID_FILE_NAME
 from knot_resolver.manager import log, statistics
 from knot_resolver.compat import asyncio as asyncio_compat
 from knot_resolver.manager.config_store import ConfigStore
-from knot_resolver.manager.constants import DEFAULT_MANAGER_CONFIG_FILE, PID_FILE_NAME, init_user_constants
+from knot_resolver.manager.constants import init_user_constants
 from knot_resolver.datamodel.cache_schema import CacheClearRPCSchema
 from knot_resolver.datamodel.config_schema import KresConfig, get_rundir_without_validation
 from knot_resolver.datamodel.globals import Context, set_global_validation_context
@@ -504,7 +505,7 @@ async def _sigterm_while_shutting_down():
     sys.exit(128 + signal.SIGTERM)
 
 
-async def start_server(config: Path = DEFAULT_MANAGER_CONFIG_FILE) -> int:
+async def start_server(config: Path = CONFIG_FILE_PATH_DEFAULT) -> int:
     # This function is quite long, but it describes how manager runs. So let's silence pylint
     # pylint: disable=too-many-statements
 

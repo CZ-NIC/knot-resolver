@@ -5,7 +5,8 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 from typing_extensions import Literal
 
-from knot_resolver.manager.constants import MAX_WORKERS
+from knot_resolver.constants import RUN_DIR_DEFAULT, API_SOCK_PATH_DEFAULT, WORKERS_MAX_DEFAULT
+
 from knot_resolver.datamodel.cache_schema import CacheSchema
 from knot_resolver.datamodel.dns64_schema import Dns64Schema
 from knot_resolver.datamodel.dnssec_schema import DnssecSchema
@@ -25,10 +26,6 @@ from knot_resolver.utils.modeling import ConfigSchema
 from knot_resolver.utils.modeling.base_schema import lazy_default
 from knot_resolver.utils.modeling.exceptions import AggregateDataValidationError, DataValidationError
 
-_DEFAULT_RUNDIR = "/var/run/knot-resolver"
-
-DEFAULT_MANAGER_API_SOCK = _DEFAULT_RUNDIR + "/manager.sock"
-
 logger = logging.getLogger(__name__)
 
 
@@ -47,7 +44,7 @@ def _default_max_worker_count() -> int:
     c = _cpu_count()
     if c:
         return c * 10
-    return MAX_WORKERS
+    return WORKERS_MAX_DEFAULT
 
 
 def _get_views_tags(views: List[ViewSchema]) -> List[str]:
@@ -114,10 +111,10 @@ class KresConfig(ConfigSchema):
         version: int = 1
         nsid: Optional[EscapedStr] = None
         hostname: Optional[EscapedStr] = None
-        rundir: WritableDir = lazy_default(WritableDir, _DEFAULT_RUNDIR)
+        rundir: WritableDir = lazy_default(WritableDir, str(RUN_DIR_DEFAULT))
         workers: Union[Literal["auto"], IntPositive] = IntPositive(1)
         max_workers: IntPositive = IntPositive(_default_max_worker_count())
-        management: ManagementSchema = lazy_default(ManagementSchema, {"unix-socket": DEFAULT_MANAGER_API_SOCK})
+        management: ManagementSchema = lazy_default(ManagementSchema, {"unix-socket": str(API_SOCK_PATH_DEFAULT)})
         webmgmt: Optional[WebmgmtSchema] = None
         options: OptionsSchema = OptionsSchema()
         network: NetworkSchema = NetworkSchema()
@@ -239,4 +236,4 @@ def get_rundir_without_validation(data: Dict[str, Any]) -> WritableDir:
     Used for initial manager startup.
     """
 
-    return WritableDir(data["rundir"] if "rundir" in data else _DEFAULT_RUNDIR, object_path="/rundir")
+    return WritableDir(data["rundir"] if "rundir" in data else RUN_DIR_DEFAULT, object_path="/rundir")

@@ -1,4 +1,4 @@
-from .datamodel.config_schema import KresConfig
+from .datamodel import KresConfig
 
 __version__ = "0.1.0"
 

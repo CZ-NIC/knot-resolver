@@ -4,8 +4,8 @@ import os
 import sys
 from typing import Optional
 
+from knot_resolver.constants import LOGGING_LEVEL_STARTUP
 from knot_resolver.manager.config_store import ConfigStore, only_on_real_changes_update
-from knot_resolver.manager.constants import STARTUP_LOG_LEVEL
 from knot_resolver.datamodel.config_schema import KresConfig
 from knot_resolver.datamodel.logging_schema import LogTargetEnum
 
@@ -99,7 +99,7 @@ async def logger_init(config_store: ConfigStore) -> None:
 
 
 def logger_startup() -> None:
-    logging.getLogger().setLevel(STARTUP_LOG_LEVEL)
+    logging.getLogger().setLevel(LOGGING_LEVEL_STARTUP)
     err_handler = logging.StreamHandler(sys.stderr)
     err_handler.setFormatter(logging.Formatter(logging.BASIC_FORMAT))
     logging.getLogger().addHandler(logging.handlers.MemoryHandler(10_000, logging.ERROR, err_handler))

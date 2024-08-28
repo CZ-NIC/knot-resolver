@@ -6,11 +6,13 @@ from pathlib import Path
 from jinja2 import Template
 from typing_extensions import Literal
 
-from knot_resolver.manager.constants import (
-    kres_gc_executable,
-    kresd_cache_dir,
-    kresd_config_file_supervisord_pattern,
+from knot_resolver.constants import (
+    kres_cache_gc_executable,
     kresd_executable,
+)
+from knot_resolver.manager.constants import (
+    kres_cache_dir,
+    kresd_config_file_supervisord_pattern,
     policy_loader_config_file,
     supervisord_config_file,
     supervisord_config_file_tmp,
@@ -96,7 +98,7 @@ class ProcessTypeConfig:
         return ProcessTypeConfig(  # type: ignore[call-arg]
             logfile=supervisord_subprocess_log_dir(config) / "gc.log",
             workdir=cwd,
-            command=f"{kres_gc_executable()} -c {kresd_cache_dir(config)}{kres_cache_gc_args(config)}",
+            command=f"{kres_cache_gc_executable()} -c {kres_cache_dir(config)}{kres_cache_gc_args(config)}",
             environment="",
         )
 
