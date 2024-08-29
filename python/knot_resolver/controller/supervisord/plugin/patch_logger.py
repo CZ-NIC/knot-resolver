@@ -4,12 +4,11 @@
 import os
 import sys
 import traceback
-from typing import Any
+from typing import Any, Literal
 
 from supervisor.dispatchers import POutputDispatcher
 from supervisor.loggers import LevelsByName, StreamHandler, SyslogHandler
 from supervisor.supervisord import Supervisor
-from typing_extensions import Literal
 
 FORWARD_LOG_LEVEL = LevelsByName.CRIT  # to make sure it's always printed
 

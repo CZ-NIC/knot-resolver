@@ -2,12 +2,10 @@ import errno
 import socket
 import sys
 from http.client import HTTPConnection
-from typing import Any, Optional, Union
+from typing import Any, Literal, Optional, Union
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, unquote, urlparse
 from urllib.request import AbstractHTTPHandler, Request, build_opener, install_opener, urlopen
-
-from typing_extensions import Literal
 
 
 class SocketDesc:

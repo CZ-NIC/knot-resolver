@@ -1,6 +1,4 @@
-from typing import List, Optional, Union
-
-from typing_extensions import Literal
+from typing import List, Literal, Optional, Union
 
 from knot_resolver.datamodel.templates import template_from_str
 from knot_resolver.datamodel.types import (

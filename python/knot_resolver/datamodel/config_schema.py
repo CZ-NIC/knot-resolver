@@ -1,9 +1,7 @@
 import logging
 import os
 import socket
-from typing import Any, Dict, List, Optional, Tuple, Union
-
-from typing_extensions import Literal
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 from knot_resolver.constants import RUN_DIR_DEFAULT, API_SOCK_PATH_DEFAULT, WORKERS_MAX_DEFAULT
 

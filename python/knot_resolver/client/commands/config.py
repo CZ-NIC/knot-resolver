@@ -1,9 +1,7 @@
 import argparse
 import sys
 from enum import Enum
-from typing import List, Optional, Tuple, Type
-
-from typing_extensions import Literal
+from typing import List, Literal, Optional, Tuple, Type
 
 from knot_resolver.client.command import Command, CommandArgs, CompWords, register_command
 from knot_resolver.utils.modeling.parsing import DataFormat, parse_json, try_to_parse

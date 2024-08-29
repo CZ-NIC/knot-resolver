@@ -9,14 +9,13 @@ from functools import partial
 from http import HTTPStatus
 from pathlib import Path
 from time import time
-from typing import Any, Dict, List, Optional, Set, Union, cast
+from typing import Any, Dict, List, Literal, Optional, Set, Union, cast
 
 from aiohttp import web
 from aiohttp.web import middleware
 from aiohttp.web_app import Application
 from aiohttp.web_response import json_response
 from aiohttp.web_runner import AppRunner, TCPSite, UnixSite
-from typing_extensions import Literal
 
 import knot_resolver.utils.custom_atexit as atexit
 from knot_resolver import KresBaseException

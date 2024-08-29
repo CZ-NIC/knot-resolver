@@ -4,9 +4,7 @@
 import enum
 import inspect
 import sys
-from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
-
-from typing_extensions import Literal
+from typing import Any, Dict, List, Literal, Optional, Tuple, Type, TypeVar, Union
 
 from .base_generic_type_wrapper import BaseGenericTypeWrapper
 

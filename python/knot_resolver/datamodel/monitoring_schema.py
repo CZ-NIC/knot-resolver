@@ -1,6 +1,4 @@
-from typing import Union
-
-from typing_extensions import Literal
+from typing import Literal, Union
 
 from knot_resolver.datamodel.types import DomainName, EscapedStr, IPAddress, PortNumber, TimeUnit
 from knot_resolver.utils.modeling import ConfigSchema

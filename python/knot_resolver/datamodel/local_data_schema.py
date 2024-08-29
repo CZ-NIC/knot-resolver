@@ -1,6 +1,4 @@
-from typing import Dict, List, Optional
-
-from typing_extensions import Literal
+from typing import Dict, List, Literal, Optional
 
 from knot_resolver.datamodel.types import (
     DomainName,

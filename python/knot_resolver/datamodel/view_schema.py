@@ -1,6 +1,4 @@
-from typing import List, Optional
-
-from typing_extensions import Literal
+from typing import List, Literal, Optional
 
 from knot_resolver.datamodel.types import IDPattern, IPNetwork
 from knot_resolver.utils.modeling import ConfigSchema

@@ -1,10 +1,10 @@
 import logging
 import os
 
+from typing import Literal
 from dataclasses import dataclass
 from pathlib import Path
 from jinja2 import Template
-from typing_extensions import Literal
 
 from knot_resolver.constants import (
     kres_cache_gc_executable,
