@@ -9,7 +9,7 @@ import supervisor.xmlrpc  # type: ignore[import]
 from knot_resolver.compat.asyncio import async_in_a_thread
 from knot_resolver.manager.constants import supervisord_config_file, supervisord_pid_file, supervisord_sock_file
 from knot_resolver.datamodel.config_schema import KresConfig
-from knot_resolver.manager.exceptions import CancelStartupExecInsteadException, SubprocessControllerException
+from knot_resolver.controller.exceptions import SubprocessControllerExecException, SubprocessControllerException
 from knot_resolver.controller.interface import (
     KresID,
     Subprocess,
@@ -37,7 +37,7 @@ async def _exec_supervisord(config: KresConfig) -> NoReturn:
     logger.debug("Writing supervisord config")
     await write_config_file(config)
     logger.debug("Execing supervisord")
-    raise CancelStartupExecInsteadException(
+    raise SubprocessControllerExecException(
         [
             str(which.which("supervisord")),
             "supervisord",

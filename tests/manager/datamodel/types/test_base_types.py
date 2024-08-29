@@ -6,7 +6,7 @@ import pytest
 from pytest import raises
 
 from knot_resolver.datamodel.types.base_types import IntRangeBase, StringLengthBase
-from knot_resolver.manager.exceptions import KresManagerException
+from knot_resolver import KresBaseException
 
 
 @pytest.mark.parametrize("min,max", [(0, None), (None, 0), (1, 65535), (-65535, -1)])
@@ -34,7 +34,7 @@ def test_int_range_base(min: Optional[int], max: Optional[int]):
     invals.extend([random.randint(-sys.maxsize - 1, rmin - 1) for _ in range(n % 2)] if max else [])
 
     for inval in invals:
-        with raises(KresManagerException):
+        with raises(KresBaseException):
             Test(inval)
 
 
@@ -62,5 +62,5 @@ def test_str_bytes_length_base(min: Optional[int], max: Optional[int]):
     invals.extend(["x" * random.randint(1, rmin - 1) for _ in range(n % 2)] if max else [])
 
     for inval in invals:
-        with raises(KresManagerException):
+        with raises(KresBaseException):
             Test(inval)

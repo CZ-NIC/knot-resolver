@@ -17,7 +17,7 @@ from knot_resolver.constants import (
     FIX_COUNTER_DECREASE_INTERVAL_SEC,
     WATCHDOG_INTERVAL_SEC,
 )
-from knot_resolver.manager.exceptions import SubprocessControllerException
+from knot_resolver.controller.exceptions import SubprocessControllerException
 from knot_resolver.controller.interface import (
     Subprocess,
     SubprocessController,
@@ -31,7 +31,7 @@ from knot_resolver.controller.registered_workers import (
 from knot_resolver.utils.functional import Result
 from knot_resolver.utils.modeling.types import NoneType
 
-from knot_resolver import KresConfig
+from knot_resolver.datamodel import KresConfig
 
 logger = logging.getLogger(__name__)
 
