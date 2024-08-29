@@ -36,6 +36,12 @@ black python/knot_resolver tests/manager scripts/poe-tasks/utils/create_setup.py
 check_rv $?
 echo
 
+# check imports formatting using isort
+echo -e "${yellow}Checking imports formatting using isort...${reset}"
+isort python/knot_resolver tests/manager scripts/poe-tasks/utils/create_setup.py --check --diff
+check_rv $?
+echo
+
 # check code with pylint
 echo -e "${yellow}Linting using pylint...${reset}"
 pylint python/knot_resolver

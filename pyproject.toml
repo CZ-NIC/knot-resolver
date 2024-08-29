@@ -98,6 +98,7 @@ include_trailing_comma=true    # corresponds to -tc flag
 skip_glob = '^((?!py$).)*$'    # isort all Python files
 float_to_top=true
 skip = "setup.py"   # Poetry generates it and we want to keep it unchanged
+known_first_party="knot_resolver"
 
 [tool.pylint."MESSAGES CONTROL"]
 disable= [
