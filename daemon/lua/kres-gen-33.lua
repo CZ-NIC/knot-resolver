@@ -268,7 +268,7 @@ struct kr_request {
 	kr_rule_tags_t rule_tags;
 	struct kr_extended_error extended_error;
 };
-enum kr_rank {KR_RANK_INITIAL, KR_RANK_OMIT, KR_RANK_TRY, KR_RANK_INDET = 4, KR_RANK_BOGUS, KR_RANK_MISMATCH, KR_RANK_MISSING, KR_RANK_INSECURE, KR_RANK_AUTH = 16, KR_RANK_SECURE = 32};
+enum kr_rank {KR_RANK_INITIAL, KR_RANK_OMIT, KR_RANK_TRY, KR_RANK_INDET = 4, KR_RANK_BOGUS, KR_RANK_MISMATCH, KR_RANK_MISSING, KR_RANK_INSECURE, KR_RANK_AUTH = 16, KR_RANK_SECURE = 32, KR_RANK_AUTH_LOCAL = 33};
 typedef struct kr_cdb * kr_cdb_pt;
 struct kr_cdb_stats {
 	uint64_t open;

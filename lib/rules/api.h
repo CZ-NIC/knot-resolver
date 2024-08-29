@@ -57,10 +57,6 @@ int kr_rules_reset(void);
 /** Try answering the query from local data; WIP: otherwise determine data source overrides.
  *
  * \return kr_error() on errors, >0 if answered, 0 otherwise (also when forwarding)
- *
- * FIXME: we probably want to ensure AA flags in answer as appropriate.
- *   Perhaps approach it like AD?  Tweak flags in ranked_rr_array_entry
- *   and at the end decide whether to set AA=1?
  */
 int kr_rule_local_data_answer(struct kr_query *qry, struct knot_pkt *pkt);
 

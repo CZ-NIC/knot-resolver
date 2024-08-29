@@ -479,7 +479,7 @@ static int answer_exact_match(struct kr_query *qry, knot_pkt_t *pkt, uint16_t ty
 	ret = rdataset_materialize(&arrset.set.rr->rrs, data, data_bound, &pkt->mm);
 	CHECK_RET(ret);
 	data += ret;
-	arrset.set.rank = KR_RANK_SECURE | KR_RANK_AUTH; // local data has high trust
+	arrset.set.rank = KR_RANK_OMIT | KR_RANK_AUTH_LOCAL; // Answer authoritatively
 	arrset.set.expiring = false;
 	/* Materialize the RRSIG RRset for the answer in (pseudo-)packet.
 	 * (There will almost never be any RRSIG.) */
@@ -666,7 +666,7 @@ static int answer_zla_empty(val_zla_type_t type, struct kr_query *qry, knot_pkt_
 						sizeof(soa_rdata) - 1, &pkt->mm);
 	}
 	CHECK_RET(ret);
-	arrset.set.rank = KR_RANK_SECURE | KR_RANK_AUTH; // local data has high trust
+	arrset.set.rank = KR_RANK_OMIT | KR_RANK_AUTH_LOCAL; // Answer authoritatively
 	arrset.set.expiring = false;
 
 	/* Small differences if we exactly hit the name or even type. */
@@ -738,7 +738,7 @@ nodata: // Want NODATA answer (or NOERROR if it hits apex SOA).
 	ret = knot_rrset_add_rdata(arrset.set.rr, soa_rdata,
 					sizeof(soa_rdata) - 1, &pkt->mm);
 	CHECK_RET(ret);
-	arrset.set.rank = KR_RANK_SECURE | KR_RANK_AUTH; // local data has high trust
+	arrset.set.rank = KR_RANK_OMIT | KR_RANK_AUTH_LOCAL; // Answer authoritatively
 	arrset.set.expiring = false;
 
 	knot_wire_set_rcode(pkt->wire, KNOT_RCODE_NOERROR);

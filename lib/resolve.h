@@ -118,6 +118,7 @@ enum kr_rank {
 	KR_RANK_AUTH = 16,
 
 	KR_RANK_SECURE = 32,  /**< Verified whole chain of trust from the closest TA. */
+	KR_RANK_AUTH_LOCAL = 33,
 	/* @note Rank must not exceed 6 bits */
 };
 

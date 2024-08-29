@@ -47,7 +47,7 @@ struct kr_context *the_resolver = NULL;
 
 bool kr_rank_check(uint8_t rank)
 {
-	switch (rank & ~KR_RANK_AUTH) {
+	switch (rank & ~(KR_RANK_AUTH|KR_RANK_AUTH_LOCAL)) {
 	case KR_RANK_INITIAL:
 	case KR_RANK_OMIT:
 	case KR_RANK_TRY:
@@ -409,7 +409,55 @@ static void answer_finalize(struct kr_request *request)
 			&& !last->flags.DNSSEC_BOGUS && !last->flags.DNSSEC_INSECURE;
 	}
 
-	if (secure) {
+	/* Determine whether to set the AA bit in response. */
+	bool authoritative = false;
+	const ranked_rr_array_t *selected[] = kr_request_selected(request);
+
+	if (kr_response_classify(answer) == PKT_NOERROR) {
+		const ranked_rr_array_t *rr_array = selected[KNOT_ANSWER];
+		const ranked_rr_array_entry_t *first_towire = NULL;
+		const knot_dname_t *qname = knot_pkt_qname(answer);
+
+		for (size_t i = 0; i < rr_array->len; ++i) {
+			const ranked_rr_array_entry_t *entry = rr_array->at[i];
+			if (!entry->to_wire)
+				continue;
+			if (!first_towire)
+				first_towire = entry;
+
+			/* RFC 1035, section 4.1.1:
+			 * The AA bit corresponds to the name which matches the query name... */
+			if (knot_dname_is_equal(entry->rr->owner, qname)
+			    && kr_rank_test(entry->rank, KR_RANK_AUTH_LOCAL)) {
+				authoritative = true;
+				break;
+			}
+		}
+
+		/* RFC 1035, section 4.1.1: ... or the first owner name in the answer section. */
+		if (!authoritative && first_towire)
+			authoritative = kr_rank_test(first_towire->rank, KR_RANK_AUTH_LOCAL);
+	} else if (kr_response_classify(answer) & (PKT_NODATA|PKT_NXDOMAIN)) {
+		const ranked_rr_array_t *rr_array = selected[KNOT_AUTHORITY];
+		const ranked_rr_array_entry_t *entry = NULL;
+		for (size_t i = 0; i < rr_array->len; ++i) {
+			if (!rr_array->at[i]->to_wire)
+				continue;
+			entry = rr_array->at[i];
+			break;
+		}
+
+		if (entry)
+			authoritative = kr_rank_test(entry->rank, KR_RANK_AUTH_LOCAL);
+	} else if (!knot_wire_get_ad(answer->wire) && knot_wire_get_aa(answer->wire)) {
+		/* Lua modules can answer authoritatively by calling kr_pkt_make_auth_header(),
+		 * which clears AD and sets AA.
+		 * Answer packet would still have AD=0 AA=0 otherwise at this stage. */
+		secure = false;
+		authoritative = true;
+	}
+
+	if (secure && !authoritative) {
 		struct kr_query *cname_parent = last->cname_parent;
 		while (cname_parent != NULL) {
 			if (cname_parent->flags.DNSSEC_OPTOUT) {
@@ -422,13 +470,20 @@ static void answer_finalize(struct kr_request *request)
 
 	/* No detailed analysis ATM, just _SECURE or not.
 	 * LATER: request->rank might better be computed in validator's finish phase. */
-	VERBOSE_MSG(last, "AD: request%s classified as SECURE\n", secure ? "" : " NOT");
+	VERBOSE_MSG(last, "AD: request%s classified as SECURE, AA:%s authoritative\n",
+		secure ? "" : " NOT", authoritative ? "" : " NOT");
 	request->rank = secure ? KR_RANK_SECURE : KR_RANK_INITIAL;
 
 	/* Set AD if secure and AD bit "was requested". */
 	if (secure && !knot_wire_get_cd(q_wire)
 	    && (knot_pkt_has_dnssec(answer) || knot_wire_get_ad(q_wire))) {
+		knot_wire_clear_aa(answer->wire);
 		knot_wire_set_ad(answer->wire);
+	} else if (!secure && authoritative) {
+		/* This is an authoritative response. For flags see RFC 4035, section 3.1.6. */
+		knot_wire_clear_ad(answer->wire);
+		knot_wire_clear_cd(answer->wire);
+		knot_wire_set_aa(answer->wire);
 	}
 }
 
