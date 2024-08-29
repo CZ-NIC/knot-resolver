@@ -394,6 +394,11 @@ static void answer_finalize(struct kr_request *request)
 		return;
 	}
 
+	if (knot_wire_get_ancount(answer->wire) == 0 && knot_wire_get_nscount(answer->wire) == 0) {
+		/* RFC 4035, section 3.2.3 mandates non-empty Answer or Authority. */
+		secure = false;
+	}
+
 	/* AD: "negative answers" need more handling. */
 	if (kr_response_classify(answer) != PKT_NOERROR
 	    /* Additionally check for CNAME chains that "end in NODATA",
