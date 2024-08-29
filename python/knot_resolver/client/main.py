@@ -4,8 +4,8 @@ import os
 
 from knot_resolver.constants import VERSION
 
+from .client import KRES_CLIENT_NAME, KresClient
 from .command import install_commands_parsers
-from .client import KresClient, KRES_CLIENT_NAME
 
 
 def auto_import_commands() -> None:

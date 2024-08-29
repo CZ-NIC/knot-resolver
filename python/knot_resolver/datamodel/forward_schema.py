@@ -1,12 +1,6 @@
 from typing import Any, List, Literal, Optional, Union
 
-from knot_resolver.datamodel.types import (
-    DomainName,
-    IPAddressOptionalPort,
-    ListOrItem,
-    PinSha256,
-    ReadableFile,
-)
+from knot_resolver.datamodel.types import DomainName, IPAddressOptionalPort, ListOrItem, PinSha256, ReadableFile
 from knot_resolver.utils.modeling import ConfigSchema
 
 

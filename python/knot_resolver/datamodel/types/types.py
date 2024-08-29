@@ -2,13 +2,7 @@ import ipaddress
 import re
 from typing import Any, Dict, Optional, Type, Union
 
-from knot_resolver.datamodel.types.base_types import (
-    IntRangeBase,
-    PatternBase,
-    StrBase,
-    StringLengthBase,
-    UnitBase,
-)
+from knot_resolver.datamodel.types.base_types import IntRangeBase, PatternBase, StrBase, StringLengthBase, UnitBase
 from knot_resolver.utils.modeling import BaseValueType
 
 

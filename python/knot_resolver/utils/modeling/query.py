@@ -2,7 +2,6 @@ import copy
 from abc import ABC, abstractmethod  # pylint: disable=[no-name-in-module]
 from typing import Any, List, Literal, Optional, Tuple, Union
 
-
 from knot_resolver.utils.modeling.base_schema import BaseSchema, map_object
 from knot_resolver.utils.modeling.json_pointer import json_ptr_resolve
 

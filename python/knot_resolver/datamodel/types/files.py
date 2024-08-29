@@ -1,12 +1,12 @@
 import os
 import stat
-from enum import auto, Flag
+from enum import Flag, auto
 from grp import getgrnam
 from pathlib import Path
 from pwd import getpwnam
 from typing import Any, Dict, Tuple, Type, TypeVar
 
-from knot_resolver.constants import USER_DEFAULT, GROUP_DEFAULT
+from knot_resolver.constants import GROUP_DEFAULT, USER_DEFAULT
 from knot_resolver.datamodel.globals import get_resolve_root, get_strict_validation
 from knot_resolver.utils.modeling.base_value_type import BaseValueType
 

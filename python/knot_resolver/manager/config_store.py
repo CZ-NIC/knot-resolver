@@ -2,8 +2,8 @@ import asyncio
 from asyncio import Lock
 from typing import Any, Awaitable, Callable, List, Tuple
 
-from knot_resolver.datamodel import KresConfig
 from knot_resolver import KresBaseException
+from knot_resolver.datamodel import KresConfig
 from knot_resolver.utils.functional import Result
 from knot_resolver.utils.modeling.exceptions import DataParsingError
 from knot_resolver.utils.modeling.types import NoneType

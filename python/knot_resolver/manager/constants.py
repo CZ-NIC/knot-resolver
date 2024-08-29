@@ -2,9 +2,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
-    from knot_resolver.manager.config_store import ConfigStore
-    from knot_resolver.datamodel.config_schema import KresConfig
     from knot_resolver.controller.interface import KresID
+    from knot_resolver.datamodel.config_schema import KresConfig
+    from knot_resolver.manager.config_store import ConfigStore
 
 
 def kres_cache_dir(config: "KresConfig") -> Path:

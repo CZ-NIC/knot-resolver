@@ -2,7 +2,6 @@ from typing import List, Literal, Optional, Union
 
 from knot_resolver.datamodel.types import (
     EscapedStr32B,
-    WritableFilePath,
     Int0_512,
     Int0_65535,
     InterfaceOptionalPort,
@@ -15,6 +14,7 @@ from knot_resolver.datamodel.types import (
     PortNumber,
     ReadableFile,
     SizeUnit,
+    WritableFilePath,
 )
 from knot_resolver.utils.modeling import ConfigSchema
 

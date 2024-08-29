@@ -12,8 +12,8 @@ import asyncio
 import logging
 from typing import List, Optional
 
-from knot_resolver.datamodel.config_schema import KresConfig
 from knot_resolver.controller.interface import SubprocessController
+from knot_resolver.datamodel.config_schema import KresConfig
 
 logger = logging.getLogger(__name__)
 

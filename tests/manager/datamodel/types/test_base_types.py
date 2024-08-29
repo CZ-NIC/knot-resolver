@@ -5,8 +5,8 @@ from typing import List, Optional
 import pytest
 from pytest import raises
 
-from knot_resolver.datamodel.types.base_types import IntRangeBase, StringLengthBase
 from knot_resolver import KresBaseException
+from knot_resolver.datamodel.types.base_types import IntRangeBase, StringLengthBase
 
 
 @pytest.mark.parametrize("min,max", [(0, None), (None, 0), (1, 65535), (-65535, -1)])

@@ -10,10 +10,10 @@ from pathlib import Path
 from typing import Dict, Iterable, Optional, Type, TypeVar
 from weakref import WeakValueDictionary
 
-from knot_resolver.manager.constants import kresd_config_file, policy_loader_config_file
-from knot_resolver.datamodel.config_schema import KresConfig
 from knot_resolver.controller.exceptions import SubprocessControllerException
 from knot_resolver.controller.registered_workers import register_worker, unregister_worker
+from knot_resolver.datamodel.config_schema import KresConfig
+from knot_resolver.manager.constants import kresd_config_file, policy_loader_config_file
 from knot_resolver.utils.async_utils import writefile
 
 logger = logging.getLogger(__name__)

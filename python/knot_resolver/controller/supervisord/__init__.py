@@ -7,9 +7,7 @@ from xmlrpc.client import Fault, ServerProxy
 import supervisor.xmlrpc  # type: ignore[import]
 
 from knot_resolver.compat.asyncio import async_in_a_thread
-from knot_resolver.manager.constants import supervisord_config_file, supervisord_pid_file, supervisord_sock_file
-from knot_resolver.datamodel.config_schema import KresConfig
-from knot_resolver.controller.exceptions import SubprocessControllerExecException, SubprocessControllerException
+from knot_resolver.controller.exceptions import SubprocessControllerException, SubprocessControllerExecException
 from knot_resolver.controller.interface import (
     KresID,
     Subprocess,
@@ -18,6 +16,8 @@ from knot_resolver.controller.interface import (
     SubprocessType,
 )
 from knot_resolver.controller.supervisord.config_file import SupervisordKresID, write_config_file
+from knot_resolver.datamodel.config_schema import KresConfig
+from knot_resolver.manager.constants import supervisord_config_file, supervisord_pid_file, supervisord_sock_file
 from knot_resolver.utils import which
 from knot_resolver.utils.async_utils import call, readfile
 

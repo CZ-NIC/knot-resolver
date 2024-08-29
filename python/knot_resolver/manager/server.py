@@ -19,27 +19,23 @@ from aiohttp.web_runner import AppRunner, TCPSite, UnixSite
 
 import knot_resolver.utils.custom_atexit as atexit
 from knot_resolver import KresBaseException
-from knot_resolver.constants import CONFIG_FILE_PATH_DEFAULT, PID_FILE_NAME
-from knot_resolver.manager import log, statistics
 from knot_resolver.compat import asyncio as asyncio_compat
-from knot_resolver.manager.config_store import ConfigStore
-from knot_resolver.manager.constants import init_user_constants
+from knot_resolver.constants import CONFIG_FILE_PATH_DEFAULT, PID_FILE_NAME
+from knot_resolver.controller import get_best_controller_implementation
+from knot_resolver.controller.exceptions import SubprocessControllerExecException
+from knot_resolver.controller.registered_workers import command_single_registered_worker
 from knot_resolver.datamodel.cache_schema import CacheClearRPCSchema
 from knot_resolver.datamodel.config_schema import KresConfig, get_rundir_without_validation
 from knot_resolver.datamodel.globals import Context, set_global_validation_context
 from knot_resolver.datamodel.management_schema import ManagementSchema
-from knot_resolver.controller import get_best_controller_implementation
-from knot_resolver.controller.exceptions import SubprocessControllerExecException
-from knot_resolver.controller.registered_workers import command_single_registered_worker
+from knot_resolver.manager import log, statistics
+from knot_resolver.manager.config_store import ConfigStore
+from knot_resolver.manager.constants import init_user_constants
 from knot_resolver.utils import ignore_exceptions_optional
 from knot_resolver.utils.async_utils import readfile
 from knot_resolver.utils.etag import structural_etag
 from knot_resolver.utils.functional import Result
-from knot_resolver.utils.modeling.exceptions import (
-    AggregateDataValidationError,
-    DataParsingError,
-    DataValidationError,
-)
+from knot_resolver.utils.modeling.exceptions import AggregateDataValidationError, DataParsingError, DataValidationError
 from knot_resolver.utils.modeling.parsing import DataFormat, try_to_parse
 from knot_resolver.utils.modeling.query import query
 from knot_resolver.utils.modeling.types import NoneType

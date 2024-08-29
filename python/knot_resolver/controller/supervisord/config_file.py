@@ -1,15 +1,15 @@
 import logging
 import os
-
-from typing import Literal
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
+
 from jinja2 import Template
 
-from knot_resolver.constants import (
-    kres_cache_gc_executable,
-    kresd_executable,
-)
+from knot_resolver.constants import kres_cache_gc_executable, kresd_executable
+from knot_resolver.controller.interface import KresID, SubprocessType
+from knot_resolver.datamodel.config_schema import KresConfig
+from knot_resolver.datamodel.logging_schema import LogTargetEnum
 from knot_resolver.manager.constants import (
     kres_cache_dir,
     kresd_config_file_supervisord_pattern,
@@ -21,9 +21,6 @@ from knot_resolver.manager.constants import (
     supervisord_subprocess_log_dir,
     user_constants,
 )
-from knot_resolver.datamodel.config_schema import KresConfig
-from knot_resolver.datamodel.logging_schema import LogTargetEnum
-from knot_resolver.controller.interface import KresID, SubprocessType
 from knot_resolver.utils.async_utils import read_resource, writefile
 
 logger = logging.getLogger(__name__)

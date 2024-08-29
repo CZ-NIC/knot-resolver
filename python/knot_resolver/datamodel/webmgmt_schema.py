@@ -1,6 +1,6 @@
 from typing import Optional
 
-from knot_resolver.datamodel.types import WritableFilePath, InterfacePort, ReadableFile
+from knot_resolver.datamodel.types import InterfacePort, ReadableFile, WritableFilePath
 from knot_resolver.utils.modeling import ConfigSchema
 
 

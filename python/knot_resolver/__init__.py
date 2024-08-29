@@ -1,5 +1,5 @@
-from .exceptions import KresBaseException
 from .constants import VERSION
+from .exceptions import KresBaseException
 
 __version__ = VERSION
 

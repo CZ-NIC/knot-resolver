@@ -6,10 +6,10 @@ from typing import Dict, List, Optional, Tuple, Type, TypeVar
 from urllib.parse import quote
 
 from knot_resolver.constants import (
+    API_SOCK_PATH_DEFAULT,
+    API_SOCK_PATH_ENV_VAR,
     CONFIG_FILE_PATH_DEFAULT,
     CONFIG_FILE_PATH_ENV_VAR,
-    API_SOCK_PATH_ENV_VAR,
-    API_SOCK_PATH_DEFAULT,
 )
 from knot_resolver.datamodel.types import IPAddressPort
 from knot_resolver.utils.modeling import parsing

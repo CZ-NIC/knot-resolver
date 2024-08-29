@@ -1,6 +1,6 @@
 from typing import Optional
 
-from knot_resolver.datamodel.types import WritableFilePath, IPAddressPort
+from knot_resolver.datamodel.types import IPAddressPort, WritableFilePath
 from knot_resolver.utils.modeling import ConfigSchema
 
 

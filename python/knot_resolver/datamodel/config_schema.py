@@ -3,8 +3,7 @@ import os
 import socket
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
-from knot_resolver.constants import RUN_DIR_DEFAULT, API_SOCK_PATH_DEFAULT, WORKERS_MAX_DEFAULT
-
+from knot_resolver.constants import API_SOCK_PATH_DEFAULT, RUN_DIR_DEFAULT, WORKERS_MAX_DEFAULT
 from knot_resolver.datamodel.cache_schema import CacheSchema
 from knot_resolver.datamodel.dns64_schema import Dns64Schema
 from knot_resolver.datamodel.dnssec_schema import DnssecSchema

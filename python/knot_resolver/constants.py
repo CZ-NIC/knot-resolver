@@ -1,5 +1,4 @@
 import logging
-
 from importlib.metadata import version
 from importlib.util import find_spec
 from pathlib import Path
