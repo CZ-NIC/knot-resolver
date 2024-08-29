@@ -118,6 +118,11 @@ enum kr_rank {
 	KR_RANK_AUTH = 16,
 
 	KR_RANK_SECURE = 32,  /**< Verified whole chain of trust from the closest TA. */
+
+	/** Authoritative data from the resolver itself (e.g. local data rules).
+	 *  It is meant to be alternative to KR_RANK_AUTH (can't have both),
+	 *  and is normally paired with KR_RANK_OMIT.
+	 *  Its presence determines if the AA bit is set in the response. */
 	KR_RANK_AUTH_LOCAL = 33,
 	/* @note Rank must not exceed 6 bits */
 };
