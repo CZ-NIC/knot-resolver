@@ -28,6 +28,7 @@ Welcome to Knot Resolver's documentation for developers and advanced users!
 
    architecture
    manager-dev-code
+   layered-protocols
 
 .. toctree::
    :caption: Lua configuration
