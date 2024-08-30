@@ -17,8 +17,6 @@ from aiohttp.web_app import Application
 from aiohttp.web_response import json_response
 from aiohttp.web_runner import AppRunner, TCPSite, UnixSite
 
-import knot_resolver.utils.custom_atexit as atexit
-from knot_resolver import KresBaseException
 from knot_resolver.compat import asyncio as asyncio_compat
 from knot_resolver.constants import CONFIG_FILE_PATH_DEFAULT, PID_FILE_NAME
 from knot_resolver.controller import get_best_controller_implementation
@@ -28,9 +26,8 @@ from knot_resolver.datamodel.cache_schema import CacheClearRPCSchema
 from knot_resolver.datamodel.config_schema import KresConfig, get_rundir_without_validation
 from knot_resolver.datamodel.globals import Context, set_global_validation_context
 from knot_resolver.datamodel.management_schema import ManagementSchema
-from knot_resolver.manager import log, statistics
-from knot_resolver.manager.config_store import ConfigStore
-from knot_resolver.manager.constants import init_user_constants
+from knot_resolver.manager import statistics
+from knot_resolver.utils import custom_atexit as atexit
 from knot_resolver.utils import ignore_exceptions_optional
 from knot_resolver.utils.async_utils import readfile
 from knot_resolver.utils.etag import structural_etag
@@ -41,7 +38,11 @@ from knot_resolver.utils.modeling.query import query
 from knot_resolver.utils.modeling.types import NoneType
 from knot_resolver.utils.systemd_notify import systemd_notify
 
-from .kres_manager import KresManager
+from .config_store import ConfigStore
+from .constants import init_user_constants
+from .exceptions import KresManagerException
+from .logging import logger_init
+from .manager import KresManager
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +62,7 @@ async def error_handler(request: web.Request, handler: Any) -> web.Response:
         return web.Response(text=f"validation of configuration failed:\n{e}", status=HTTPStatus.BAD_REQUEST)
     except DataParsingError as e:
         return web.Response(text=f"request processing error:\n{e}", status=HTTPStatus.BAD_REQUEST)
-    except KresBaseException as e:
+    except KresManagerException as e:
         return web.Response(text=f"request processing failed:\n{e}", status=HTTPStatus.INTERNAL_SERVER_ERROR)
 
 
@@ -129,7 +130,7 @@ class Server:
             except (DataParsingError, DataValidationError) as e:
                 logger.error(f"Failed to parse the updated configuration file: {e}")
                 logger.error("Configuration have NOT been changed.")
-            except KresBaseException as e:
+            except KresManagerException as e:
                 logger.error(f"Reloading of the configuration file failed: {e}")
                 logger.error("Configuration have NOT been changed.")
 
@@ -364,7 +365,7 @@ class Server:
                 nsite = web.TCPSite(self.runner, str(mgn.interface.addr), int(mgn.interface.port))
                 logger.info(f"Starting API HTTP server on http://{mgn.interface.addr}:{mgn.interface.port}")
             else:
-                raise KresBaseException("Requested API on unsupported configuration format.")
+                raise KresManagerException("Requested API on unsupported configuration format.")
             await nsite.start()
 
             # stop the old listen
@@ -395,7 +396,7 @@ async def _load_raw_config(config: Union[Path, Dict[str, Any]]) -> Dict[str, Any
     # Initial configuration of the manager
     if isinstance(config, Path):
         if not config.exists():
-            raise KresBaseException(
+            raise KresManagerException(
                 f"Manager is configured to load config file at {config} on startup, but the file does not exist."
             )
         else:
@@ -467,12 +468,12 @@ def _lock_working_directory(attempt: int = 0) -> None:
                     os.unlink(PID_FILE_NAME)
                     _lock_working_directory(attempt=attempt + 1)
                     return
-            raise KresBaseException(
+            raise KresManagerException(
                 "Another manager is running in the same working directory."
                 f" PID file is located at {os.getcwd()}/{PID_FILE_NAME}"
             ) from e
         else:
-            raise KresBaseException(
+            raise KresManagerException(
                 "Another manager is running in the same working directory."
                 f" PID file is located at {os.getcwd()}/{PID_FILE_NAME}"
             ) from e
@@ -550,7 +551,7 @@ async def start_server(config: Path = CONFIG_FILE_PATH_DEFAULT) -> int:
 
         # Up to this point, we have been logging to memory buffer. But now, when we have the configuration loaded, we
         # can flush the buffer into the proper place
-        await log.logger_init(config_store)
+        await logger_init(config_store)
 
         # With configuration on hand, we can initialize monitoring. We want to do this before any subprocesses are
         # started, therefore before initializing manager
@@ -578,7 +579,7 @@ async def start_server(config: Path = CONFIG_FILE_PATH_DEFAULT) -> int:
         # and finally exec what we were told to exec
         os.execl(*e.exec_args)
 
-    except KresBaseException as e:
+    except KresManagerException as e:
         # We caught an error with a pretty error message. Just print it and exit.
         logger.error(e)
         return 1
