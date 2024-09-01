@@ -1415,6 +1415,13 @@ static int validate_finalize(kr_layer_t *ctx) {
 	/* Clear DNSSEC-related Extended Error in case the request managed to succeed somehow. */
 	if (ctx->state == KR_STATE_DONE) {
 		switch (ctx->req->extended_error.info_code) {
+		case KNOT_EDNS_EDE_DNSKEY_ALG:
+		case KNOT_EDNS_EDE_DS_DIGEST:
+		case KNOT_EDNS_EDE_NSEC3_ITERS: ;
+			/* These EDEs are meant to result into _INSECURE success. */
+			const struct kr_query *qry = kr_rplan_resolved(&ctx->req->rplan);
+			if (qry->flags.DNSSEC_INSECURE)
+				break;
 		case KNOT_EDNS_EDE_BOGUS:
 		case KNOT_EDNS_EDE_NSEC_MISS:
 		case KNOT_EDNS_EDE_RRSIG_MISS:
@@ -1422,8 +1429,6 @@ static int validate_finalize(kr_layer_t *ctx) {
 		case KNOT_EDNS_EDE_EXPIRED_INV:
 		case KNOT_EDNS_EDE_SIG_NOTYET:
 		case KNOT_EDNS_EDE_DNSKEY_BIT:
-		case KNOT_EDNS_EDE_DNSKEY_ALG:
-		case KNOT_EDNS_EDE_DS_DIGEST:
 		case KNOT_EDNS_EDE_DNSKEY_MISS:
 			kr_request_set_extended_error(ctx->req, KNOT_EDNS_EDE_NONE, NULL);
 			break;
