@@ -1,6 +1,6 @@
 from typing import Dict, List, Optional
 
-from knot_resolver_manager.datamodel.types import DomainName, File, IPAddress, TimeUnit
+from knot_resolver_manager.datamodel.types import DomainName, IPAddress, ReadableFile, TimeUnit
 from knot_resolver_manager.utils.modeling import ConfigSchema
 
 
@@ -22,6 +22,6 @@ class StaticHintsSchema(ConfigSchema):
     nodata: bool = True
     etc_hosts: bool = False
     root_hints: Optional[Dict[DomainName, List[IPAddress]]] = None
-    root_hints_file: Optional[File] = None
+    root_hints_file: Optional[ReadableFile] = None
     hints: Optional[Dict[DomainName, List[IPAddress]]] = None
-    hints_files: Optional[List[File]] = None
+    hints_files: Optional[List[ReadableFile]] = None

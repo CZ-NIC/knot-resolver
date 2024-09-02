@@ -5,10 +5,10 @@ from typing_extensions import Literal
 from knot_resolver_manager.datamodel.types import (
     DomainName,
     EscapedStr,
-    File,
     IDPattern,
     IPAddress,
     ListOrItem,
+    ReadableFile,
     TimeUnit,
 )
 from knot_resolver_manager.utils.modeling import ConfigSchema
@@ -32,7 +32,7 @@ class RuleSchema(ConfigSchema):
     name: Optional[ListOrItem[DomainName]] = None
     subtree: Optional[Literal["empty", "nxdomain", "redirect"]] = None
     address: Optional[ListOrItem[IPAddress]] = None
-    file: Optional[ListOrItem[File]] = None
+    file: Optional[ListOrItem[ReadableFile]] = None
     records: Optional[EscapedStr] = None
     tags: Optional[List[IDPattern]] = None
     ttl: Optional[TimeUnit] = None
@@ -64,7 +64,7 @@ class RPZSchema(ConfigSchema):
     tags: Tags to link with other policy rules.
     """
 
-    file: File
+    file: ReadableFile
     tags: Optional[List[IDPattern]] = None
 
 
@@ -87,9 +87,9 @@ class LocalDataSchema(ConfigSchema):
     ttl: Optional[TimeUnit] = None
     nodata: bool = True
     root_fallback_addresses: Optional[Dict[DomainName, ListOrItem[IPAddress]]] = None
-    root_fallback_addresses_files: Optional[List[File]] = None
+    root_fallback_addresses_files: Optional[List[ReadableFile]] = None
     addresses: Optional[Dict[DomainName, ListOrItem[IPAddress]]] = None
-    addresses_files: Optional[List[File]] = None
+    addresses_files: Optional[List[ReadableFile]] = None
     records: Optional[EscapedStr] = None
     rules: Optional[List[RuleSchema]] = None
     rpz: Optional[List[RPZSchema]] = None

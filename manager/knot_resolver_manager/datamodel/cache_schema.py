@@ -4,16 +4,16 @@ from typing_extensions import Literal
 
 from knot_resolver_manager.datamodel.templates import template_from_str
 from knot_resolver_manager.datamodel.types import (
-    Dir,
     DNSRecordTypeEnum,
     DomainName,
     EscapedStr,
-    File,
     IntNonNegative,
     IntPositive,
     Percent,
+    ReadableFile,
     SizeUnit,
     TimeUnit,
+    WritableDir,
 )
 from knot_resolver_manager.utils.modeling import ConfigSchema
 from knot_resolver_manager.utils.modeling.base_schema import lazy_default
@@ -51,7 +51,7 @@ class PrefillSchema(ConfigSchema):
     origin: DomainName
     url: EscapedStr
     refresh_interval: TimeUnit = TimeUnit("1d")
-    ca_file: Optional[File] = None
+    ca_file: Optional[ReadableFile] = None
 
     def _validate(self) -> None:
         if str(self.origin) != ".":
@@ -125,7 +125,7 @@ class CacheSchema(ConfigSchema):
     prefetch: These options help keep the cache hot by prefetching expiring records or learning usage patterns and repetitive queries.
     """
 
-    storage: Dir = lazy_default(Dir, "/var/cache/knot-resolver")
+    storage: WritableDir = lazy_default(WritableDir, "/var/cache/knot-resolver")
     size_max: SizeUnit = SizeUnit("100M")
     garbage_collector: Union[GarbageCollectorSchema, Literal[False]] = GarbageCollectorSchema()
     ttl_min: TimeUnit = TimeUnit("5s")

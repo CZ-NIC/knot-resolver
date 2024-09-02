@@ -4,8 +4,7 @@ from typing_extensions import Literal
 
 from knot_resolver_manager.datamodel.types import (
     EscapedStr32B,
-    File,
-    FilePath,
+    WritableFilePath,
     Int0_512,
     Int0_65535,
     InterfaceOptionalPort,
@@ -16,6 +15,7 @@ from knot_resolver_manager.datamodel.types import (
     IPv6Address,
     ListOrItem,
     PortNumber,
+    ReadableFile,
     SizeUnit,
 )
 from knot_resolver_manager.utils.modeling import ConfigSchema
@@ -62,10 +62,10 @@ class TLSSchema(ConfigSchema):
     padding: EDNS(0) padding of queries and answers sent over an encrypted channel.
     """
 
-    cert_file: Optional[File] = None
-    key_file: Optional[File] = None
+    cert_file: Optional[ReadableFile] = None
+    key_file: Optional[ReadableFile] = None
     sticket_secret: Optional[EscapedStr32B] = None
-    sticket_secret_file: Optional[File] = None
+    sticket_secret_file: Optional[ReadableFile] = None
     auto_discovery: bool = False
     padding: Union[bool, Int0_512] = True
 
@@ -88,7 +88,7 @@ class ListenSchema(ConfigSchema):
         """
 
         interface: Optional[ListOrItem[InterfaceOptionalPort]] = None
-        unix_socket: Optional[ListOrItem[FilePath]] = None
+        unix_socket: Optional[ListOrItem[WritableFilePath]] = None
         port: Optional[PortNumber] = None
         kind: KindEnum = "dns"
         freebind: bool = False
@@ -96,7 +96,7 @@ class ListenSchema(ConfigSchema):
     _LAYER = Raw
 
     interface: Optional[ListOrItem[InterfaceOptionalPort]]
-    unix_socket: Optional[ListOrItem[FilePath]]
+    unix_socket: Optional[ListOrItem[WritableFilePath]]
     port: Optional[PortNumber]
     kind: KindEnum
     freebind: bool
