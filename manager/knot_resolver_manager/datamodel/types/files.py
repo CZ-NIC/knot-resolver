@@ -1,6 +1,6 @@
 import os
 import stat
-from enum import Enum
+from enum import auto, Flag
 from grp import getgrnam
 from pathlib import Path
 from pwd import getpwnam
@@ -144,13 +144,13 @@ class FilePath(UncheckedPath):
             raise ValueError(f"path '{self._value}' points to a directory when we expected a file")
 
 
-class _PermissionMode(Enum):
-    READ = 0
-    WRITE = 1
-    EXECUTE = 2
+class _PermissionMode(Flag):
+    READ = auto()
+    WRITE = auto()
+    EXECUTE = auto()
 
 
-def _kresd_accessible(dest_path: Path, perm_mode: _PermissionMode) -> bool:
+def _kres_accessible(dest_path: Path, perm_mode: _PermissionMode) -> bool:
     chflags = {
         _PermissionMode.READ: [stat.S_IRUSR, stat.S_IRGRP, stat.S_IROTH],
         _PermissionMode.WRITE: [stat.S_IWUSR, stat.S_IWGRP, stat.S_IWOTH],
@@ -169,24 +169,27 @@ def _kresd_accessible(dest_path: Path, perm_mode: _PermissionMode) -> bool:
     dest_stat = os.stat(dest_path)
     dest_uid = dest_stat.st_uid
     dest_gid = dest_stat.st_gid
+    dest_mode = dest_stat.st_mode
 
-    _mode = dest_stat.st_mode
+    def accessible(perm: _PermissionMode) -> bool:
+        if user_uid == dest_uid:
+            return bool(dest_mode & chflags[perm][0])
+        b_groups = os.getgrouplist(os.getlogin(), user_gid)
+        if user_gid == dest_gid or dest_gid in b_groups:
+            return bool(dest_mode & chflags[perm][1])
+        return bool(dest_mode & chflags[perm][2])
 
-    if user_uid == dest_uid:
-        return bool(_mode & chflags[perm_mode][0])
-
-    b_groups = os.getgrouplist(os.getlogin(), user_gid)
-    if user_gid == dest_gid or dest_gid in b_groups:
-        return bool(_mode & chflags[perm_mode][1])
-
-    return bool(_mode & chflags[perm_mode][2])
+    for perm in perm_mode:
+        if not accessible(perm):
+            return False
+    return True
 
 
 class ReadableFile(File):
     """
     Path, that is enforced to be:
     - an existing file
-    - readable by kresd
+    - readable by knot-resolver processes
     """
 
     def __init__(
@@ -194,7 +197,7 @@ class ReadableFile(File):
     ) -> None:
         super().__init__(source_value, parents=parents, object_path=object_path)
 
-        if self.strict_validation and not _kresd_accessible(self._value, _PermissionMode.READ):
+        if self.strict_validation and not _kres_accessible(self._value, _PermissionMode.READ):
             raise ValueError(f"{kresd_user()}:{kresd_group()} has insufficient permissions to read '{self._value}'")
 
 
@@ -202,7 +205,7 @@ class WritableDir(Dir):
     """
     Path, that is enforced to be:
     - an existing directory
-    - writable by kresd
+    - writable/executable by knot-resolver processes
     """
 
     def __init__(
@@ -210,5 +213,30 @@ class WritableDir(Dir):
     ) -> None:
         super().__init__(source_value, parents=parents, object_path=object_path)
 
-        if self.strict_validation and not _kresd_accessible(self._value, _PermissionMode.WRITE):
-            raise ValueError(f"{kresd_user()}:{kresd_group()} has insufficient permissions to write to '{self._value}'")
+        if self.strict_validation and not _kres_accessible(
+            self._value, _PermissionMode.WRITE | _PermissionMode.EXECUTE
+        ):
+            raise ValueError(
+                f"{kresd_user()}:{kresd_group()} has insufficient permissions to write/execute '{self._value}'"
+            )
+
+
+class WritableFilePath(FilePath):
+    """
+    Path, that is enforced to be:
+    - parent of the last path segment is an existing directory
+    - it does not point to a dir
+    - writable/executable parent directory by knot-resolver processes
+    """
+
+    def __init__(
+        self, source_value: Any, parents: Tuple["UncheckedPath", ...] = tuple(), object_path: str = "/"
+    ) -> None:
+        super().__init__(source_value, parents=parents, object_path=object_path)
+
+        if self.strict_validation and not _kres_accessible(
+            self._value.parent, _PermissionMode.WRITE | _PermissionMode.EXECUTE
+        ):
+            raise ValueError(
+                f"{kresd_user()}:{kresd_group()} has insufficient permissions to write/execute'{self._value.parent}'"
+            )
