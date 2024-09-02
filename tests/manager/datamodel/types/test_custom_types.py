@@ -97,8 +97,8 @@ def test_checked_path():
 @pytest.mark.parametrize(
     "val",
     [
-        "YmE3ODE2YmY4ZjAx+2ZlYTQxNDE0MGRlNWRhZTIyMjNiMDAzNjFhMzk/MTc3YTljYjQxMGZmNjFmMjAwMTVhZA==",
-        "OTJmODU3ZDMyOWMwOWNlNTU4Y2M0YWNjMjI5NWE2NWJlMzY4MzRmMzY3NGU3NDAwNTI1YjMxZTMxYTgzMzQwMQ==",
+        "d6qzRu9zOECb90Uez27xWltNsj0e1Md7GkYYkVoZWmM=",
+        "E9CZ9INDbd+2eRQozYqqbQ2yXLVKB9+xcprMF+44U1g=",
     ],
 )
 def test_pin_sha256_valid(val: str):
@@ -109,9 +109,10 @@ def test_pin_sha256_valid(val: str):
 @pytest.mark.parametrize(
     "val",
     [
-        "!YmE3ODE2YmY4ZjAxY2ZlYTQxNDE0MGRlNWRhZTIyMjNiMDAzNjFhMzk2MTc3YTljjQxMGZmNjFmMjAwMTVhZA==",
-        "OTJmODU3ZDMyOWMwOWNlNTU4Y2M0YWNjMjI5NWE2NWJlMzY4MzRmMzY3NGU3NDAwNTI1YjMxZTMxYTgzMzQwMQ",
-        "YmFzZTY0IQ",
+        "d6qzRu9zOECb90Uez27xWltNsj0e1Md7GkYYkVoZWmM==",
+        "E9CZ9INDbd+2eRQozYqqbQ2yXLVKB9+xcprMF+44U1g",
+        "!E9CZ9INDbd+2eRQozYqqbQ2yXLVKB9+xcprMF+44U1g=",
+        "d6qzRu9zOE",
     ],
 )
 def test_pin_sha256_invalid(val: str):

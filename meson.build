@@ -27,7 +27,7 @@ lmdb = dependency('lmdb', required: false)
 if not lmdb.found()  # darwin workaround: missing pkgconfig
   lmdb = meson.get_compiler('c').find_library('lmdb')
 endif
-gnutls = dependency('gnutls')
+gnutls = dependency('gnutls', version: '>=3.4')
 luajit = dependency('luajit')
 message('------------------------------')
 

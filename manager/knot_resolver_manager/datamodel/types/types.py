@@ -195,7 +195,7 @@ class PinSha256(PatternBase):
     A string that stores base64 encoded sha256.
     """
 
-    _re = re.compile(r"^[A-Za-z\d+/]{86}==$")
+    _re = re.compile(r"^[A-Za-z\d+/]{43}=$")
 
 
 class InterfacePort(StrBase):

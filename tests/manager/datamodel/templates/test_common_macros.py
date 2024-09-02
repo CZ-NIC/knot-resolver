@@ -75,7 +75,7 @@ def test_tls_servers_table():
         ForwardServerSchema(
             {
                 "address": "192.0.2.1",
-                "pin-sha256": "OTJmODU3ZDMyOWMwOWNlNTU4Y2M0YWNjMjI5NWE2NWJlMzY4MzRmMzY3NGU3NDAwNTI1YjMxZTMxYTgzMzQwMQ==",
+                "pin-sha256": "E9CZ9INDbd+2eRQozYqqbQ2yXLVKB9+xcprMF+44U1g=",
             }
         ),
     ]
