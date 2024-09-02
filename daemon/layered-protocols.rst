@@ -1,5 +1,8 @@
-Layered protocols, or the big I/O rewrite of Knot Resolver 6
-============================================================
+Layered protocols
+=================
+
+Motivation
+----------
 
 One of the bigger changes made in Knot Resolver 6 is the almost complete
 rewrite of its I/O (input/output) system and management of communication
