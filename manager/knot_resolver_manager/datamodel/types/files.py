@@ -1,5 +1,6 @@
 import os
 import stat
+from enum import Enum
 from grp import getgrnam
 from pathlib import Path
 from pwd import getpwnam
@@ -143,17 +144,18 @@ class FilePath(UncheckedPath):
             raise ValueError(f"path '{self._value}' points to a directory when we expected a file")
 
 
-READ_MODE = 0
-WRITE_MODE = 1
-EXECUTE_MODE = 2
+class _PermissionMode(Enum):
+    READ = 0
+    WRITE = 1
+    EXECUTE = 2
 
 
-def kresd_accesible(dest_path: Path, perm_mode: int) -> bool:
-    chflags = [
-        [stat.S_IRUSR, stat.S_IRGRP, stat.S_IROTH],
-        [stat.S_IWUSR, stat.S_IWGRP, stat.S_IWOTH],
-        [stat.S_IXUSR, stat.S_IXGRP, stat.S_IXOTH],
-    ]
+def _kresd_accessible(dest_path: Path, perm_mode: _PermissionMode) -> bool:
+    chflags = {
+        _PermissionMode.READ: [stat.S_IRUSR, stat.S_IRGRP, stat.S_IROTH],
+        _PermissionMode.WRITE: [stat.S_IWUSR, stat.S_IWGRP, stat.S_IWOTH],
+        _PermissionMode.EXECUTE: [stat.S_IXUSR, stat.S_IXGRP, stat.S_IXOTH],
+    }
 
     username = kresd_user()
     groupname = kresd_group()
@@ -182,7 +184,8 @@ def kresd_accesible(dest_path: Path, perm_mode: int) -> bool:
 
 class ReadableFile(File):
     """
-    File, that is enforced to be:
+    Path, that is enforced to be:
+    - an existing file
     - readable by kresd
     """
 
@@ -191,14 +194,15 @@ class ReadableFile(File):
     ) -> None:
         super().__init__(source_value, parents=parents, object_path=object_path)
 
-        if self.strict_validation and not kresd_accesible(self._value, READ_MODE):
-            raise ValueError(f'{kresd_user()}:{kresd_group()} has insuficient permissions to read "{self._value}"')
+        if self.strict_validation and not _kresd_accessible(self._value, _PermissionMode.READ):
+            raise ValueError(f"{kresd_user()}:{kresd_group()} has insufficient permissions to read '{self._value}'")
 
 
 class WritableDir(Dir):
     """
-    Dif, that is enforced to be:
-    - writable to by kresd
+    Path, that is enforced to be:
+    - an existing directory
+    - writable by kresd
     """
 
     def __init__(
@@ -206,5 +210,5 @@ class WritableDir(Dir):
     ) -> None:
         super().__init__(source_value, parents=parents, object_path=object_path)
 
-        if self.strict_validation and not kresd_accesible(self._value, WRITE_MODE):
-            raise ValueError(f'{kresd_user()}:{kresd_group()} has insuficient permissions to write to "{self._value}"')
+        if self.strict_validation and not _kresd_accessible(self._value, _PermissionMode.WRITE):
+            raise ValueError(f"{kresd_user()}:{kresd_group()} has insufficient permissions to write to '{self._value}'")
