@@ -9,7 +9,7 @@ from pathlib import PurePath
 from threading import Thread
 from typing import Any, Dict, Generic, List, Optional, TypeVar, Union
 
-from knot_resolver.compat.asyncio import to_thread
+from knot_resolver.utils.compat.asyncio import to_thread
 
 
 def unblock_signals():

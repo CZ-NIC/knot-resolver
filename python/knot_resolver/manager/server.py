@@ -17,7 +17,6 @@ from aiohttp.web_app import Application
 from aiohttp.web_response import json_response
 from aiohttp.web_runner import AppRunner, TCPSite, UnixSite
 
-from knot_resolver.compat import asyncio as asyncio_compat
 from knot_resolver.constants import CONFIG_FILE_PATH_DEFAULT, PID_FILE_NAME
 from knot_resolver.controller import get_best_controller_implementation
 from knot_resolver.controller.exceptions import SubprocessControllerExecException
@@ -30,6 +29,7 @@ from knot_resolver.manager import statistics
 from knot_resolver.utils import custom_atexit as atexit
 from knot_resolver.utils import ignore_exceptions_optional
 from knot_resolver.utils.async_utils import readfile
+from knot_resolver.utils.compat import asyncio as asyncio_compat
 from knot_resolver.utils.etag import structural_etag
 from knot_resolver.utils.functional import Result
 from knot_resolver.utils.modeling.exceptions import AggregateDataValidationError, DataParsingError, DataValidationError

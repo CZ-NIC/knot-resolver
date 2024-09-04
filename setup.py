@@ -8,7 +8,6 @@ packages = \
 ['knot_resolver',
  'knot_resolver.client',
  'knot_resolver.client.commands',
- 'knot_resolver.compat',
  'knot_resolver.controller',
  'knot_resolver.controller.supervisord',
  'knot_resolver.controller.supervisord.plugin',
@@ -17,6 +16,7 @@ packages = \
  'knot_resolver.datamodel.types',
  'knot_resolver.manager',
  'knot_resolver.utils',
+ 'knot_resolver.utils.compat',
  'knot_resolver.utils.modeling']
 
 package_data = \
