@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from knot_resolver_manager.datamodel.types import DomainName, EscapedStr, File, IntNonNegative, TimeUnit
+from knot_resolver_manager.datamodel.types import DomainName, EscapedStr, IntNonNegative, ReadableFile, TimeUnit
 from knot_resolver_manager.utils.modeling import ConfigSchema
 
 
@@ -14,7 +14,7 @@ class TrustAnchorFileSchema(ConfigSchema):
 
     """
 
-    file: File
+    file: ReadableFile
     read_only: bool = False
 
 

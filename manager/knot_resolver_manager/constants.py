@@ -35,6 +35,14 @@ def kres_gc_executable() -> Path:
     return knot_resolver.sbin_dir / "kres-cache-gc"
 
 
+def kresd_user():
+    return None if knot_resolver is None else knot_resolver.user
+
+
+def kresd_group():
+    return None if knot_resolver is None else knot_resolver.group
+
+
 def kresd_cache_dir(config: "KresConfig") -> Path:
     return config.cache.storage.to_path()
 

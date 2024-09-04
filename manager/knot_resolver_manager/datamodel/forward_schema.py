@@ -2,7 +2,7 @@ from typing import Any, List, Optional, Union
 
 from typing_extensions import Literal
 
-from knot_resolver_manager.datamodel.types import DomainName, File, IPAddressOptionalPort, ListOrItem, PinSha256
+from knot_resolver_manager.datamodel.types import DomainName, IPAddressOptionalPort, ListOrItem, PinSha256, ReadableFile
 from knot_resolver_manager.utils.modeling import ConfigSchema
 
 
@@ -22,7 +22,7 @@ class ForwardServerSchema(ConfigSchema):
     transport: Optional[Literal["tls"]] = None
     pin_sha256: Optional[ListOrItem[PinSha256]] = None
     hostname: Optional[DomainName] = None
-    ca_file: Optional[File] = None
+    ca_file: Optional[ReadableFile] = None
 
     def _validate(self) -> None:
         if self.pin_sha256 and (self.hostname or self.ca_file):

@@ -18,7 +18,7 @@ from knot_resolver_manager.datamodel.monitoring_schema import MonitoringSchema
 from knot_resolver_manager.datamodel.network_schema import NetworkSchema
 from knot_resolver_manager.datamodel.options_schema import OptionsSchema
 from knot_resolver_manager.datamodel.templates import POLICY_CONFIG_TEMPLATE, WORKER_CONFIG_TEMPLATE
-from knot_resolver_manager.datamodel.types import Dir, EscapedStr, IntPositive
+from knot_resolver_manager.datamodel.types import EscapedStr, IntPositive, WritableDir
 from knot_resolver_manager.datamodel.view_schema import ViewSchema
 from knot_resolver_manager.datamodel.webmgmt_schema import WebmgmtSchema
 from knot_resolver_manager.utils.modeling import ConfigSchema
@@ -114,7 +114,7 @@ class KresConfig(ConfigSchema):
         version: int = 1
         nsid: Optional[EscapedStr] = None
         hostname: Optional[EscapedStr] = None
-        rundir: Dir = lazy_default(Dir, _DEFAULT_RUNDIR)
+        rundir: WritableDir = lazy_default(WritableDir, _DEFAULT_RUNDIR)
         workers: Union[Literal["auto"], IntPositive] = IntPositive(1)
         max_workers: IntPositive = IntPositive(_default_max_worker_count())
         management: ManagementSchema = lazy_default(ManagementSchema, {"unix-socket": DEFAULT_MANAGER_API_SOCK})
@@ -135,7 +135,7 @@ class KresConfig(ConfigSchema):
 
     nsid: Optional[EscapedStr]
     hostname: EscapedStr
-    rundir: Dir
+    rundir: WritableDir
     workers: IntPositive
     max_workers: IntPositive
     management: ManagementSchema
@@ -231,7 +231,7 @@ class KresConfig(ConfigSchema):
         return POLICY_CONFIG_TEMPLATE.render(cfg=self, cwd=os.getcwd())
 
 
-def get_rundir_without_validation(data: Dict[str, Any]) -> Dir:
+def get_rundir_without_validation(data: Dict[str, Any]) -> WritableDir:
     """
     Without fully parsing, try to get a rundir from a raw config data, otherwise use default.
     Attempts a dir validation to produce a good error message.
@@ -239,4 +239,4 @@ def get_rundir_without_validation(data: Dict[str, Any]) -> Dir:
     Used for initial manager startup.
     """
 
-    return Dir(data["rundir"] if "rundir" in data else _DEFAULT_RUNDIR, object_path="/rundir")
+    return WritableDir(data["rundir"] if "rundir" in data else _DEFAULT_RUNDIR, object_path="/rundir")

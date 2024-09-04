@@ -9,6 +9,8 @@ python_config.set('etc_dir', etc_dir)
 python_config.set('run_dir', run_dir)
 python_config.set('lib_dir', lib_dir)
 python_config.set('modules_dir', modules_dir)
+python_config.set('user', user)
+python_config.set('group', group)
 
 configure_file(
   input: 'knot_resolver.py.in',

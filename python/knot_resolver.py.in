@@ -8,3 +8,5 @@ etc_dir = Path("@etc_dir@")
 run_dir = Path("@run_dir@")
 lib_dir = Path("@lib_dir@")
 modules_dir = Path("@modules_dir@")
+user = "@user@"
+group = "@group@"

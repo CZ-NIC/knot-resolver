@@ -8,6 +8,6 @@ reconfigure=''
 if [ -f .build_kresd/ninja.build ]; then
 	reconfigure='--reconfigure'
 fi
-meson setup .build_kresd "$reconfigure" --prefix=$(realpath .install_kresd) "$@"
+meson setup .build_kresd "$reconfigure" --prefix=$(realpath .install_kresd) -Duser=$USER -Dgroup=$(id -gn) "$@"
 
 build_kresd
