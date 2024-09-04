@@ -179,9 +179,12 @@ def _kres_accessible(dest_path: Path, perm_mode: _PermissionMode) -> bool:
             return bool(dest_mode & chflags[perm][1])
         return bool(dest_mode & chflags[perm][2])
 
-    for perm in perm_mode:
-        if not accessible(perm):
-            return False
+    # __iter__ for class enum.Flag added in python3.11
+    # 'for perm in perm_mode:' failes for <=python3.11
+    for perm in _PermissionMode:
+        if perm in perm_mode:
+            if not accessible(perm):
+                return False
     return True
 
 
