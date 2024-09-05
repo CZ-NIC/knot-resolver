@@ -25,7 +25,7 @@ from knot_resolver.datamodel.cache_schema import CacheClearRPCSchema
 from knot_resolver.datamodel.config_schema import KresConfig, get_rundir_without_validation
 from knot_resolver.datamodel.globals import Context, set_global_validation_context
 from knot_resolver.datamodel.management_schema import ManagementSchema
-from knot_resolver.manager import statistics
+from knot_resolver.manager import metrics
 from knot_resolver.utils import custom_atexit as atexit
 from knot_resolver.utils import ignore_exceptions_optional
 from knot_resolver.utils.async_utils import readfile
@@ -105,7 +105,7 @@ class Server:
     async def _deny_management_changes(self, config_old: KresConfig, config_new: KresConfig) -> Result[None, str]:
         if config_old.management != config_new.management:
             return Result.err(
-                "/server/management: Changing management API address/unix-socket dynamically is not allowed as it's really dangerous."
+                "/server/management: Changing management API address/uTruenix-socket dynamically is not allowed as it's really dangerous."
                 " If you really need this feature, please contact the developers and explain why. Technically,"
                 " there are no problems in supporting it. We are only blocking the dynamic changes because"
                 " we think the consequences of leaving this footgun unprotected are worse than its usefulness."
@@ -239,15 +239,18 @@ class Server:
         raise web.HTTPMovedPermanently("/metrics/json")
 
     async def _handler_metrics_json(self, _request: web.Request) -> web.Response:
+
+        config = self.config_store.get()
+
         return web.Response(
-            body=await statistics.report_stats(),
+            body=await metrics.report_json(config),
             content_type="application/json",
             charset="utf8",
         )
 
     async def _handler_metrics_prometheus(self, _request: web.Request) -> web.Response:
 
-        metrics_report = await statistics.report_stats(prometheus_format=True)
+        metrics_report = await metrics.report_prometheus()
         if not metrics_report:
             raise web.HTTPNotFound()
 
@@ -555,7 +558,7 @@ async def start_server(config: Path = CONFIG_FILE_PATH_DEFAULT) -> int:
 
         # With configuration on hand, we can initialize monitoring. We want to do this before any subprocesses are
         # started, therefore before initializing manager
-        await statistics.init_monitoring(config_store)
+        await metrics.init_prometheus(config_store)
 
         # prepare instance of the server (no side effects)
         server = Server(config_store, config)
