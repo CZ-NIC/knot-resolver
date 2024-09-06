@@ -2291,9 +2291,6 @@ int worker_init(void)
 	uv_loop_t *loop = uv_default_loop();
 	the_worker->loop = loop;
 
-	static const int worker_count = 1;
-	the_worker->count = worker_count;
-
 	/* Register table for worker per-request variables */
 	struct lua_State *L = the_engine->L;
 	lua_newtable(L);
@@ -2329,8 +2326,6 @@ int worker_init(void)
 
 	lua_pushnumber(L, pid);
 	lua_setfield(L, -2, "pid");
-	lua_pushnumber(L, worker_count);
-	lua_setfield(L, -2, "count");
 
 	char cwd[PATH_MAX];
 	get_workdir(cwd, sizeof(cwd));

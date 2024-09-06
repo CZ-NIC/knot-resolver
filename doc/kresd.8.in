@@ -90,17 +90,6 @@ Option may be passed multiple times to listen on more file descriptors.
 Set the config file with settings for kresd to read instead of reading the
 file at the default location (\fIconfig\fR).
 .TP
-.B \-f\fI N\fR, \fB\-\-forks=\fI<N>
-This option is deprecated since 5.0.0!
-
-With this option, the daemon is started in non-interactive mode and instead creates a
-UNIX socket in \fIrundir\fR that the operator can connect to for interactive session.
-A number greater than 1 forks the daemon N times, all forks will bind to same addresses
-and the kernel will load-balance between them on Linux with \fISO_REUSEPORT\fR support.
-
-If you want multiple concurrent processes supervised in this way,
-they should be supervised independently (see \fBkresd.systemd(7)\fR).
-.TP
 .B \-n\fR, \fB\-\-noninteractive
 Daemon will refrain from entering into read-eval-print loop for stdin+stdout.
 .TP
