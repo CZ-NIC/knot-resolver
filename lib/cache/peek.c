@@ -214,6 +214,7 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 	/* Try the NSEC* parameters in order, until success.
 	 * Let's not mix different parameters for NSEC* RRs in a single proof. */
+	bool is_synthesized = false;
 	for (int i = 0; ;) {
 		int32_t log_new_ttl = -123456789; /* visually recognizable value */
 		ret = nsec_p_ttl(el[i], qry->timestamp.tv_sec, &log_new_ttl);
@@ -234,6 +235,7 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 		/**** 2. and 3. inside */
 		ret = peek_encloser(k, &ans, sname_labels,
 					lowest_rank, qry, cache);
+		is_synthesized = (ret == 0);
 		nsec_p_cleanup(&ans.nsec_p);
 		if (!ret) break;
 		if (ret < 0) return ctx->state;
@@ -316,6 +318,10 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 	qf->CACHED = true;
 	qf->NO_MINIMIZE = true;
 
+	if (is_synthesized && qry == req->rplan.initial) {
+		kr_request_set_extended_error(req, KNOT_EDNS_EDE_SYNTHESIZED,
+				"2NEP: synthesized from aggressive cache");
+	}
 	return KR_STATE_DONE;
 }
 

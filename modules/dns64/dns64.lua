@@ -152,7 +152,7 @@ function M.layer.consume(state, req, pkt)
 		end
 	end
 	ffi.C.kr_ranked_rrarray_finalize(req.answ_selected, qry.uid, req.pool)
-	req:set_extended_error(kres.extended_error.FORGED, "BHD4: DNS64 synthesis")
+	req:set_extended_error(kres.extended_error.SYNTHESIZED, "BHD4: from DNS64")
 end
 
 local function hexchar2int(char)

@@ -738,6 +738,17 @@ int kr_resolve_consume(struct kr_request *request, struct kr_transport **transpo
 					qry->flags.NO_NS_FOUND = true;
 					return KR_STATE_PRODUCE;
 				}
+
+				/* Construct EDE message.  We need it on mempool. */
+				char cut_buf[KR_DNAME_STR_MAXLEN];
+				char *msg = knot_dname_to_str(cut_buf, qry->zone_cut.name, sizeof(cut_buf));
+				if (!kr_fails_assert(msg)) {
+					if (*qry->zone_cut.name != '\0') /* Strip trailing dot. */
+						cut_buf[strlen(cut_buf) - 1] = '\0';
+					msg = kr_strcatdup_pool(&request->pool, 2,
+							"OLX2: delegation ", cut_buf);
+				}
+				kr_request_set_extended_error(request, KNOT_EDNS_EDE_NREACH_AUTH, msg);
 				return KR_STATE_FAIL;
 			}
 		} else {

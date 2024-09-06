@@ -490,6 +490,7 @@ int kr_ta_add(trie_t *, const knot_dname_t *, uint16_t, uint32_t, const uint8_t 
 int kr_ta_del(trie_t *, const knot_dname_t *);
 void kr_ta_clear(trie_t *);
 _Bool kr_dnssec_key_sep_flag(const uint8_t *);
+_Bool kr_dnssec_key_zonekey_flag(const uint8_t *);
 _Bool kr_dnssec_key_revoked(const uint8_t *);
 int kr_dnssec_key_tag(uint16_t, const uint8_t *, size_t);
 int kr_dnssec_key_match(const uint8_t *, size_t, const uint8_t *, size_t);

@@ -170,9 +170,11 @@ typedef struct kr_http_header_array_entry {
 /** Array of HTTP headers for DoH. */
 typedef array_t(kr_http_header_array_entry_t) kr_http_header_array_t;
 
-/** Concatenate N strings. */
+/** Concatenate N strings and put the result into a mempool. */
 KR_EXPORT
-char* kr_strcatdup(unsigned n, ...);
+char* kr_strcatdup_pool(knot_mm_t *pool, unsigned n, ...);
+/** Concatenate N strings. */
+#define kr_strcatdup(n, ...) kr_strcatdup_pool(NULL, n, ## __VA_ARGS__)
 
 /** Construct absolute file path, without resolving symlinks.
  * \return malloc-ed string or NULL (+errno in that case) */

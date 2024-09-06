@@ -107,7 +107,7 @@ static inline int u16tostr(uint8_t *dst, uint16_t num)
 	return 5;
 }
 
-char* kr_strcatdup(unsigned n, ...)
+char* kr_strcatdup_pool(knot_mm_t *pool, unsigned n, ...)
 {
 	if (n < 1) {
 		return NULL;
@@ -132,7 +132,7 @@ char* kr_strcatdup(unsigned n, ...)
 	char *result = NULL;
 	if (total_len > 0) {
 		if (unlikely(total_len == SIZE_MAX)) return NULL;
-		result = malloc(total_len + 1);
+		result = mm_alloc(pool, total_len + 1);
 	}
 	if (result) {
 		char *stream = result;
