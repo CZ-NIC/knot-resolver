@@ -38,7 +38,7 @@ def _cpu_count() -> Optional[int]:
         return cpus
 
 
-def _default_max_worker_count() -> int:
+def _workers_max_count() -> int:
     c = _cpu_count()
     if c:
         return c * 10
@@ -111,7 +111,7 @@ class KresConfig(ConfigSchema):
         hostname: Optional[EscapedStr] = None
         rundir: WritableDir = lazy_default(WritableDir, str(RUN_DIR_DEFAULT))
         workers: Union[Literal["auto"], IntPositive] = IntPositive(1)
-        max_workers: IntPositive = IntPositive(_default_max_worker_count())
+        max_workers: IntPositive = IntPositive(WORKERS_MAX_DEFAULT)
         management: ManagementSchema = lazy_default(ManagementSchema, {"unix-socket": str(API_SOCK_PATH_DEFAULT)})
         webmgmt: Optional[WebmgmtSchema] = None
         options: OptionsSchema = OptionsSchema()
@@ -175,8 +175,11 @@ class KresConfig(ConfigSchema):
 
     def _validate(self) -> None:
         # enforce max-workers config
-        if int(self.workers) > int(self.max_workers):
-            raise ValueError(f"can't run with more workers then the configured maximum {self.max_workers}")
+        workers_max = _workers_max_count()
+        if int(self.workers) > workers_max:
+            raise ValueError(
+                f"can't run with more workers then the recommended maximum {workers_max} or hardcoded {WORKERS_MAX_DEFAULT}"
+            )
 
         # sanity check
         cpu_count = _cpu_count()

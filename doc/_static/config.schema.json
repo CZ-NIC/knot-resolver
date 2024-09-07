@@ -51,7 +51,7 @@
             "type": "integer",
             "minimum": 1,
             "description": "The maximum number of workers allowed. Cannot be changed in runtime.",
-            "default": 120
+            "default": 256
         },
         "management": {
             "description": "Configuration of management HTTP API.",
