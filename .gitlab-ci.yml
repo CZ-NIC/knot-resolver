@@ -381,7 +381,7 @@ manager:
   stage: test
   needs: []
   trigger:
-    include: manager/.gitlab-ci.yml
+    include: .gitlab-ci.manager.yml
     strategy: depend
   except:
     refs:

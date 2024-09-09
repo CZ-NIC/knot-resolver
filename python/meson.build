@@ -13,8 +13,8 @@ python_config.set('user', user)
 python_config.set('group', group)
 
 configure_file(
-  input: 'knot_resolver.py.in',
-  output: 'knot_resolver.py',
+  input: 'knot_resolver_build_options.py.in',
+  output: 'knot_resolver_build_options.py',
   configuration: python_config,
 )
 

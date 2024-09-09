@@ -6,7 +6,7 @@ from typing import Any
 import pytest
 from pytest import raises
 
-from knot_resolver_manager.datamodel.types import (
+from knot_resolver.datamodel.types import (
     Dir,
     DomainName,
     EscapedStr,
@@ -25,7 +25,7 @@ from knot_resolver_manager.datamodel.types import (
     SizeUnit,
     TimeUnit,
 )
-from knot_resolver_manager.utils.modeling import BaseSchema
+from knot_resolver.utils.modeling import BaseSchema
 
 
 def _rand_domain(label_chars: int, levels: int = 1) -> str:

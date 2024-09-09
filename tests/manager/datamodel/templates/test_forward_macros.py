@@ -1,6 +1,6 @@
-from knot_resolver_manager.datamodel.forward_schema import ForwardSchema
-from knot_resolver_manager.datamodel.templates import template_from_str
-from knot_resolver_manager.datamodel.types import IPAddressOptionalPort
+from knot_resolver.datamodel.forward_schema import ForwardSchema
+from knot_resolver.datamodel.templates import template_from_str
+from knot_resolver.datamodel.types import IPAddressOptionalPort
 
 
 def test_policy_rule_forward_add():

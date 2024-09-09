@@ -1,11 +1,10 @@
-from typing import Any, Dict, List, Optional, Tuple, Type, Union
+from typing import Any, Dict, List, Literal, Optional, Tuple, Type, Union
 
 import pytest
 from pytest import raises
-from typing_extensions import Literal
 
-from knot_resolver_manager.utils.modeling import ConfigSchema, parse_json, parse_yaml
-from knot_resolver_manager.utils.modeling.exceptions import DataDescriptionError, DataValidationError
+from knot_resolver.utils.modeling import ConfigSchema, parse_json, parse_yaml
+from knot_resolver.utils.modeling.exceptions import DataDescriptionError, DataValidationError
 
 
 class _TestBool(ConfigSchema):

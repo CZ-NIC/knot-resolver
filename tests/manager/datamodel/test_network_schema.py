@@ -3,9 +3,9 @@ from typing import Any, Dict, Optional
 import pytest
 from pytest import raises
 
-from knot_resolver_manager.datamodel.network_schema import ListenSchema, NetworkSchema
-from knot_resolver_manager.datamodel.types import InterfaceOptionalPort, PortNumber
-from knot_resolver_manager.utils.modeling.exceptions import DataValidationError
+from knot_resolver.datamodel.network_schema import ListenSchema, NetworkSchema
+from knot_resolver.datamodel.types import InterfaceOptionalPort, PortNumber
+from knot_resolver.utils.modeling.exceptions import DataValidationError
 
 
 def test_listen_defaults():

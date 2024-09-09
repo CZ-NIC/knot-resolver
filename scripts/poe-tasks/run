@@ -14,8 +14,8 @@ poetry build
 shopt -s globstar
 shopt -s nullglob
 for d in build/lib*; do
-    for f in "manager/$d/"**/*.so; do
-        cp -v "$f" ${f#"manager/$d/"}
+    for f in "python/$d/"**/*.so; do
+        cp -v "$f" ${f#"python/$d/"}
     done
 done
 shopt -u globstar
@@ -26,4 +26,4 @@ echo The Knot Resolver management API is accessible on http://localhost:5000
 echo -----------------------------------------------------------------------
 
 # run the knot-resolver manager
-python3 -m knot_resolver_manager $@
+python3 -m knot_resolver.manager $@

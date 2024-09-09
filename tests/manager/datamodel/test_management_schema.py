@@ -2,8 +2,8 @@ from typing import Any, Dict, Optional
 
 import pytest
 
-from knot_resolver_manager.datamodel.management_schema import ManagementSchema
-from knot_resolver_manager.utils.modeling.exceptions import DataValidationError
+from knot_resolver.datamodel.management_schema import ManagementSchema
+from knot_resolver.utils.modeling.exceptions import DataValidationError
 
 
 @pytest.mark.parametrize("val", [{"interface": "::1@53"}, {"unix-socket": "/tmp/socket"}])

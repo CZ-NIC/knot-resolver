@@ -1,4 +1,4 @@
-from knot_resolver_manager.utils.functional import all_matches, contains_element_matching, foldl
+from knot_resolver.utils.functional import all_matches, contains_element_matching, foldl
 
 
 def test_foldl():

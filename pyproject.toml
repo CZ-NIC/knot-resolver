@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "knot-resolver-manager"
+name = "knot-resolver"
 version = "6.0.8"
 description = "Knot Resolver Manager - a Python program that automatically manages the other components of the resolver"
 license = "GPL-3.0-or-later"
@@ -16,7 +16,7 @@ repository = "https://gitlab.nic.cz/knot/knot-resolver"
 documentation = "https://www.knot-resolver.cz/documentation"
 
 packages = [
-    {include = "knot_resolver_manager", from = "manager"}
+    {include = "knot_resolver", from = "python"}
 ]
 
 # See currently open issue about building C extensions here:
@@ -47,6 +47,7 @@ debugpy = "^1.8.1"
 pytest = "^8.0.1"
 pytest-cov = "^4.1.0"
 pytest-asyncio = "^0.23.5"
+toml = "^0.10.2"
 
 [tool.poetry.group.lint.dependencies]
 black = "^24.2.0"
@@ -65,8 +66,8 @@ breathe = "^4.35.0"
 json-schema-for-humans = "^0.47"
 
 [tool.poetry.scripts]
-kresctl = 'knot_resolver_manager.cli.main:main'
-knot-resolver = 'knot_resolver_manager.__main__:run'
+kresctl = 'knot_resolver.client.main:main'
+knot-resolver = 'knot_resolver.manager.main:main'
 
 [tool.poe.tasks]
 # tasks runed through scripts located in 'scripts/poe-tasks/'
@@ -80,17 +81,8 @@ examples = { cmd = "scripts/poe-tasks/examples", help = "Validate all configurat
 man = {cmd = "scripts/poe-tasks/man", help = "Display Knot Resolver manpage from sources" }
 gen-setuppy = { cmd = "scripts/poe-tasks/gen-setuppy", help = "Generate 'setup.py' file for backwards compatibility" }
 format = { cmd = "scripts/poe-tasks/format", help = "Run code formatter" }
-# tasks runned directly
-fixdeps = { shell = "poetry install; npm install; npm update", help = "Install/update dependencies according to configuration files"}
 kresctl = { cmd = "scripts/poe-tasks/kresctl", help="Run kresctl utility" }
-clean = """
-  rm -rf .coverage
-         .mypy_cache
-         .pytest_cache
-         ./**/__pycache__
-         build
-         dist
-"""
+clean = { cmd = "scripts/poe-tasks/clean", help="Cleanup build directories and files" }
 
 [tool.black]
 line-length = 120
@@ -106,6 +98,7 @@ include_trailing_comma=true    # corresponds to -tc flag
 skip_glob = '^((?!py$).)*$'    # isort all Python files
 float_to_top=true
 skip = "setup.py"   # Poetry generates it and we want to keep it unchanged
+known_first_party="knot_resolver"
 
 [tool.pylint."MESSAGES CONTROL"]
 disable= [
