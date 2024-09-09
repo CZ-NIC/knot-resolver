@@ -36,16 +36,16 @@ override_dh_auto_build:
 		-Dc_link_args="$${LDFLAGS}"
 	ninja -v -C build_deb
 	PYBUILD_NAME=knot_resolver PYBUILD_DESTDIR="$${PYKRES_DESTDIR}" \
-		dh_auto_build --buildsystem=pybuild --sourcedirectory build_deb/python
-	PYBUILD_NAME=knot_resolver_manager PYBUILD_DESTDIR="$${PYKRES_DESTDIR}" \
 		dh_auto_build --buildsystem=pybuild
+	PYBUILD_NAME=knot_resolver_build_options PYBUILD_DESTDIR="$${PYKRES_DESTDIR}" \
+		dh_auto_build --buildsystem=pybuild --sourcedirectory build_deb/python
 
 override_dh_auto_install:
 	DESTDIR="$(shell pwd)/debian/tmp" ninja -v -C build_deb install
 	PYBUILD_NAME=knot_resolver PYBUILD_DESTDIR="$${PYKRES_DESTDIR}" \
-		dh_auto_install --buildsystem=pybuild --sourcedirectory build_deb/python
-	PYBUILD_NAME=knot_resolver_manager PYBUILD_DESTDIR="$${PYKRES_DESTDIR}" \
 		dh_auto_install --buildsystem=pybuild
+	PYBUILD_NAME=knot_resolver_build_options PYBUILD_DESTDIR="$${PYKRES_DESTDIR}" \
+		dh_auto_install --buildsystem=pybuild --sourcedirectory build_deb/python
 	install -m 644 -D etc/config/config.yaml debian/tmp/etc/knot-resolver/config.yaml
 
 override_dh_auto_test:
