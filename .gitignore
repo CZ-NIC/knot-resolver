@@ -86,7 +86,7 @@ luacov.*.out
 dist/
 .coverage
 .mypy_cache
-.install_kresd/
-.build_kresd/
+.install/
+.build/
 poetry.lock
 *.junit.xml

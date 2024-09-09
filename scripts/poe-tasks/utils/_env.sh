@@ -17,6 +17,10 @@ if test -z "$gitroot"; then
 fi
 cd $gitroot
 
+# build dirs
+build_dir=$gitroot/.build
+install_dir=$gitroot/.install
+
 # ensure consistent environment with virtualenv
 if test -z "$VIRTUAL_ENV" -a "$CI" != "true" -a -z "$KNOT_ENV"; then
 	echo -e "${yellow}You are NOT running the script within the project's virtual environment.${reset}"
@@ -41,31 +45,43 @@ fi
 mkdir -p "$KRES_CONFIG_DIR/runtime" "$KRES_CONFIG_DIR/cache"
 
 # env variables
-if [ -z "${KRES_MANAGER_CONFIG:-}" ]; then
-    KRES_MANAGER_CONFIG="$KRES_CONFIG_DIR/config.dev.yaml"
+if [ -z "${KRES_CONFIG_FILE:-}" ]; then
+    KRES_CONFIG_FILE="$KRES_CONFIG_DIR/config.dev.yaml"
 fi
 
-if [ -z "${KRES_MANAGER_API_SOCK:-}" ]; then
-    KRES_MANAGER_API_SOCK="$KRES_CONFIG_DIR/manager.sock"
+if [ -z "${KRES_API_SOCK_FILE:-}" ]; then
+    KRES_API_SOCK_FILE="$KRES_CONFIG_DIR/kres-api.sock"
 fi
-export KRES_MANAGER_CONFIG
-export KRES_MANAGER_API_SOCK
+export KRES_CONFIG_FILE
+export KRES_API_SOCK_FILE
 
-function build_kresd {
-	if [ -d .build_kresd ]; then
+function kres_meson_configure {
+	reconfigure=''
+	if [ -f .build/ninja.build ]; then
+		reconfigure='--reconfigure'
+	fi
+	echo
+	echo Configuring Knot Resolver Meson
+	echo -------------------------------
+	echo -e "${blue}${reset}"
+	echo
+	meson setup $build_dir $reconfigure --prefix=$install_dir -Duser=$USER -Dgroup=$(id -gn) "$@"
+}
+
+function kres_meson_build {
+	if [ -d .build ]; then
 		echo
-		echo Building Knot Resolver
-		echo ----------------------
+		echo Building Knot Resolver C komponents
+		echo -----------------------------------
 		echo -e "${blue}In case of an compilation error, run this command to try to fix it:${reset}"
-		echo -e "\t${blue}rm -r $(realpath .install_kresd) $(realpath .build_kresd)${reset}"
+		echo -e "\t${blue}rm -r $install_dir $build_dir${reset}"
 		echo
-		ninja -C .build_kresd
-		ninja install -C .build_kresd
-		export PYTHONPATH="$(realpath .build_kresd/python):${PYTHONPATH:-}"
+		ninja -C $build_dir
+		ninja install -C $build_dir
 	else
 		echo
-		echo Knot Resolver daemon is not configured.
-		echo "Please run './poe configure' (optionally with additional Meson arguments)"
+		echo Knot Resolver is not configured for building.
+		echo "Please run './poe configure' (optionally with additional Meson arguments)".
 		echo
 		exit 2
 	fi
