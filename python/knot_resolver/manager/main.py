@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 from typing import NoReturn
 
-from knot_resolver.constants import CONFIG_FILE_PATH_DEFAULT, CONFIG_FILE_PATH_ENV_VAR, VERSION
+from knot_resolver.constants import CONFIG_FILE, CONFIG_FILE_ENV_VAR, VERSION
 from knot_resolver.manager.logging import logger_startup
 from knot_resolver.manager.server import start_server
 from knot_resolver.utils import compat
@@ -27,7 +27,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "-c",
         "--config",
-        help="Config file to load. Overrides default config location at '" + str(CONFIG_FILE_PATH_ENV_VAR) + "'",
+        help="Config file to load. Overrides default config location at '" + str(CONFIG_FILE) + "'",
         type=str,
         nargs=1,
         required=False,
@@ -44,13 +44,13 @@ def main() -> NoReturn:
     args = parse_args()
 
     # where to look for config
-    config_env = os.getenv(CONFIG_FILE_PATH_ENV_VAR)
+    config_env = os.getenv(CONFIG_FILE_ENV_VAR)
     if args.config is not None:
         config_path = Path(args.config[0])
     elif config_env is not None:
         config_path = Path(config_env)
     else:
-        config_path = CONFIG_FILE_PATH_DEFAULT
+        config_path = CONFIG_FILE
 
     exit_code = compat.asyncio.run(start_server(config=config_path))
     sys.exit(exit_code)

@@ -4,10 +4,11 @@ import os
 import sys
 from typing import Optional
 
-from knot_resolver.constants import LOGGING_LEVEL_STARTUP
 from knot_resolver.datamodel.config_schema import KresConfig
 from knot_resolver.datamodel.logging_schema import LogTargetEnum
 from knot_resolver.manager.config_store import ConfigStore, only_on_real_changes_update
+
+from .constants import LOGGING_LEVEL_STARTUP
 
 logger = logging.getLogger(__name__)
 

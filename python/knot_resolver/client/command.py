@@ -5,12 +5,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Type, TypeVar
 from urllib.parse import quote
 
-from knot_resolver.constants import (
-    API_SOCK_PATH_DEFAULT,
-    API_SOCK_PATH_ENV_VAR,
-    CONFIG_FILE_PATH_DEFAULT,
-    CONFIG_FILE_PATH_ENV_VAR,
-)
+from knot_resolver.constants import API_SOCK_FILE, API_SOCK_FILE_ENV_VAR, CONFIG_FILE, CONFIG_FILE_ENV_VAR
 from knot_resolver.datamodel.types import IPAddressPort
 from knot_resolver.utils.modeling import parsing
 from knot_resolver.utils.modeling.exceptions import DataValidationError
@@ -74,8 +69,8 @@ def determine_socket(namespace: argparse.Namespace) -> SocketDesc:
     if len(namespace.socket) > 0:
         return SocketDesc(namespace.socket[0], "--socket argument")
 
-    config_path = os.getenv(CONFIG_FILE_PATH_ENV_VAR)
-    socket_env = os.getenv(API_SOCK_PATH_ENV_VAR)
+    config_path = os.getenv(CONFIG_FILE_ENV_VAR)
+    socket_env = os.getenv(API_SOCK_FILE_ENV_VAR)
 
     socket: Optional[SocketDesc] = None
     # 2) socket from config file ('--config' argument)
@@ -86,15 +81,15 @@ def determine_socket(namespace: argparse.Namespace) -> SocketDesc:
         socket = get_socket_from_config(Path(config_path), False)
     # 4) socket from environment variable
     elif socket_env:
-        socket = SocketDesc(socket_env, f'Environment variable "{API_SOCK_PATH_ENV_VAR}"')
+        socket = SocketDesc(socket_env, f'Environment variable "{API_SOCK_FILE_ENV_VAR}"')
     # 5) socket from config file (default config file constant)
     else:
-        socket = get_socket_from_config(CONFIG_FILE_PATH_DEFAULT, True)
+        socket = get_socket_from_config(CONFIG_FILE, True)
 
     if socket:
         return socket
     # 6) socket default
-    return SocketDesc(str(API_SOCK_PATH_DEFAULT), f'Default value "{API_SOCK_PATH_DEFAULT}"')
+    return SocketDesc(str(API_SOCK_FILE), f'Default value "{API_SOCK_FILE}"')
 
 
 class CommandArgs:
