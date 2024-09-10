@@ -66,6 +66,11 @@ function kres_meson_configure {
 	echo -e "${blue}${reset}"
 	echo
 	meson setup $build_dir $reconfigure --prefix=$install_dir -Duser=$USER -Dgroup=$(id -gn) "$@"
+	echo
+	echo Copying Knot Resolver constants.py module
+	echo -----------------------------------------
+	cp -v $build_dir/python/constants.py $gitroot/python/knot_resolver/constants.py
+	echo
 }
 
 function kres_meson_build {
@@ -78,6 +83,7 @@ function kres_meson_build {
 		echo
 		ninja -C $build_dir
 		ninja install -C $build_dir
+		echo
 	else
 		echo
 		echo Knot Resolver is not configured for building.

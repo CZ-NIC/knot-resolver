@@ -1,25 +1,16 @@
 # python
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-python_config = configuration_data()
-python_config.set('kres_version', meson.project_version())
-python_config.set('sbin_dir', sbin_dir)
-python_config.set('bin_dir', bin_dir)
-python_config.set('etc_dir', etc_dir)
-python_config.set('run_dir', run_dir)
-python_config.set('lib_dir', lib_dir)
-python_config.set('modules_dir', modules_dir)
-python_config.set('user', user)
-python_config.set('group', group)
+constants_config = configuration_data()
+constants_config.set('version', meson.project_version())
+constants_config.set('user', user)
+constants_config.set('group', group)
+constants_config.set('run_dir', run_dir)
+constants_config.set('etc_dir', etc_dir)
+constants_config.set('sbin_dir', sbin_dir)
 
 configure_file(
-  input: 'knot_resolver_build_options.py.in',
-  output: 'knot_resolver_build_options.py',
-  configuration: python_config,
-)
-
-configure_file(
-  input: 'setup.py.in',
-  output: 'setup.py',
-  configuration: python_config,
+  input: 'constants.py.in',
+  output: 'constants.py',
+  configuration: constants_config,
 )
