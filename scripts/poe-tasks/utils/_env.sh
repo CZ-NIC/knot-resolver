@@ -65,7 +65,7 @@ function kres_meson_configure {
 	echo -------------------------------
 	echo -e "${blue}${reset}"
 	echo
-	meson setup $build_dir $reconfigure --prefix=$install_dir -Duser=$USER -Dgroup=$(id -gn) "$@"
+	meson setup $build_dir $reconfigure --prefix=$install_dir -Duser=$(id -un) -Dgroup=$(id -gn) "$@"
 	echo
 	echo Copying Knot Resolver constants.py module
 	echo -----------------------------------------
