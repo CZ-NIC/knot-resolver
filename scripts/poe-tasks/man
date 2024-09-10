@@ -4,6 +4,6 @@
 src_dir="$(dirname "$(realpath "$0")")"
 source $src_dir/utils/_env.sh
 
-build_knot_resolver_c
+kres_meson_build
 
 man -l .install/share/man/man8/$1*

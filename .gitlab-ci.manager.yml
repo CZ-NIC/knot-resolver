@@ -6,6 +6,8 @@ default:
   before_script:
     - poetry --version
     - poetry env use $PYTHON_INTERPRETER
+    - poetry install -E prometheus
+    - poe configure
   tags:
     - docker
     - linux
@@ -14,7 +16,6 @@ default:
 examples:py3.12:
   stage: check
   script:
-    - poetry install --only main,dev
     - poe examples
   variables:
     PYTHON_INTERPRETER: python3.12
@@ -22,7 +23,6 @@ examples:py3.12:
 lint:py3.12:
   stage: check
   script:
-    - poetry install --only main,dev,lint
     - poe check
   variables:
     PYTHON_INTERPRETER: python3.12
@@ -30,7 +30,6 @@ lint:py3.12:
 .unit: &unit
   stage: check
   script:
-    - poetry install --only main,dev,test
     # create required directories that are in default config, otherwise unit tests fail
     - mkdir -p /var/cache/knot-resolver
     - poe test

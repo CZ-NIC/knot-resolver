@@ -73,22 +73,27 @@ function kres_meson_configure {
 	echo
 }
 
-function kres_meson_build {
-	if [ -d .build ]; then
-		echo
-		echo Building Knot Resolver C komponents
-		echo -----------------------------------
-		echo -e "${blue}In case of an compilation error, run this command to try to fix it:${reset}"
-		echo -e "\t${blue}rm -r $install_dir $build_dir${reset}"
-		echo
-		ninja -C $build_dir
-		ninja install -C $build_dir
-		echo
-	else
+function kres_is_meson_configured {
+	if [ ! -d .build ]; then
 		echo
 		echo Knot Resolver is not configured for building.
 		echo "Please run './poe configure' (optionally with additional Meson arguments)".
 		echo
 		exit 2
 	fi
+}
+
+function kres_meson_build {
+
+	kres_is_meson_configured
+
+	echo
+	echo Building Knot Resolver C komponents
+	echo -----------------------------------
+	echo -e "${blue}In case of an compilation error, run this command to try to fix it:${reset}"
+	echo -e "\t${blue}rm -r $install_dir $build_dir${reset}"
+	echo
+	ninja -C $build_dir
+	ninja install -C $build_dir
+	echo
 }
