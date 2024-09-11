@@ -115,6 +115,13 @@ struct network {
 	struct {
 		int snd, rcv;
 	} listen_udp_buflens, listen_tcp_buflens;
+
+	/** Use uv_udp_connect as the transport method for UDP.
+ 	 * Enabling this increases the total number of syscalls, with a variable
+ 	 * impact on the time spent processing them, sometimes resulting in
+ 	 * a slight improvement in syscall processing efficiency.
+ 	 * Note: This does not necessarily lead to overall performance gains. */
+	bool enable_connect_udp;
 };
 
 /** Pointer to the singleton network state. NULL if not initialized. */

@@ -829,10 +829,10 @@ static int transmit(struct qr_task *task)
 	struct comm_info out_comm = {
 		.comm_addr = (struct sockaddr *)choice
 	};
-#if ENABLE_CONNECT_UDP
-	if (session->outgoing && !session->stream) {
+
+	if (the_network->enable_connect_udp && session->outgoing && !session->stream) {
 		uv_udp_t *udp = (uv_udp_t *)session2_get_handle(session);
-		static int connect_tries = 3;
+		int connect_tries = 3;
 
 		do {
 			ret = uv_udp_connect(udp, out_comm.comm_addr);
@@ -843,7 +843,6 @@ static int transmit(struct qr_task *task)
 			return ret;
 		}
 	}
-#endif /* ENABLE_CONNECT_UDP */
 	ret = qr_task_send(task, session, &out_comm, task->pktbuf);
 	if (ret) {
 		session2_close(session);

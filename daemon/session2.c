@@ -1443,28 +1443,18 @@ static int session2_transport_pushv(struct session2 *s,
 						ctx);
 				return kr_ok();
 			} else {
-#if ENABLE_CONNECT_UDP
-				int ret = uv_udp_try_send((uv_udp_t*)handle,
-						(uv_buf_t *)iov, iovcnt, NULL);
-				if (ret == UV_EDESTADDRREQ) {
-					kr_log_error(IO, "Sending data over UDP failed, missing "
-						"an active udp connection: %s\n", uv_strerror(ret));
-					session2_transport_pushv_finished(ret, ctx);
-					return ret;
+				int ret = uv_udp_try_send((uv_udp_t*)handle, (uv_buf_t *)iov, iovcnt,
+					the_network->enable_connect_udp ? NULL : comm->comm_addr);
+
+				if (ret == UV_EAGAIN) {
+					ret = kr_error(ENOBUFS);
+					session2_event(s, PROTOLAYER_EVENT_OS_BUFFER_FULL, NULL);
 				} else if (ret < 0) {
 					kr_log_error(IO, "UDP connected send failed unexpectedly: %s\n",
 						uv_strerror(ret));
 					session2_transport_pushv_finished(ret, ctx);
 					return ret;
 				}
-#else
-				int ret = uv_udp_try_send((uv_udp_t*)handle,
-						(uv_buf_t *)iov, iovcnt, comm->comm_addr);
-				if (ret == UV_EAGAIN) {
-					ret = kr_error(ENOBUFS);
-					session2_event(s, PROTOLAYER_EVENT_OS_BUFFER_FULL, NULL);
-				}
-#endif /* ENABLE_CONNECT_UDP */
 
 				if (false && ret == UV_EAGAIN) { // XXX: see uv_try_write() below
 					uv_udp_send_t *req = malloc(sizeof(*req));
