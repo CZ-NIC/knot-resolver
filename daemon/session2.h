@@ -752,6 +752,13 @@ static inline enum protolayer_iter_cb_result protolayer_async(void)
 }
 
 
+/** Use uv_udp_connect as the transport method for UDP.
+ * Enabling this increases the total number of syscalls, with a variable
+ * impact on the time spent processing them, sometimes resulting in
+ * a slight improvement in syscall processing efficiency.
+ * Note: This does not necessarily lead to overall performance gains. */
+#define ENABLE_CONNECT_UDP 0
+
 /** Indicates how a session sends data in the `wrap` direction and receives
  * data in the `unwrap` direction. */
 enum session2_transport_type {
