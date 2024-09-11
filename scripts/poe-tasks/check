@@ -68,6 +68,12 @@ python setup.py --help > /dev/null
 check_rv $?
 echo
 
+# check that doc/_static/config.schema.json is the latest
+echo -e "${yellow}Checking doc/_static/config.schema.json${reset}"
+python -m knot_resolver.client schema | diff - doc/_static/config.schema.json
+check_rv $?
+echo
+
 # fancy messages at the end :)
 if test "$aggregate_rv" -eq "0"; then
 	echo -e "${green}Everything looks great!${reset}"

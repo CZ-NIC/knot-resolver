@@ -21,6 +21,7 @@ from knot_resolver.constants import CONFIG_FILE_PATH_DEFAULT, PID_FILE_NAME
 from knot_resolver.controller import get_best_controller_implementation
 from knot_resolver.controller.exceptions import SubprocessControllerExecException
 from knot_resolver.controller.registered_workers import command_single_registered_worker
+from knot_resolver.datamodel import kres_config_json_schema
 from knot_resolver.datamodel.cache_schema import CacheClearRPCSchema
 from knot_resolver.datamodel.config_schema import KresConfig, get_rundir_without_validation
 from knot_resolver.datamodel.globals import Context, set_global_validation_context
@@ -282,7 +283,7 @@ class Server:
 
     async def _handler_schema(self, _request: web.Request) -> web.Response:
         return web.json_response(
-            KresConfig.json_schema(), headers={"Access-Control-Allow-Origin": "*"}, dumps=partial(json.dumps, indent=4)
+            kres_config_json_schema(), headers={"Access-Control-Allow-Origin": "*"}, dumps=partial(json.dumps, indent=4)
         )
 
     async def _handle_view_schema(self, _request: web.Request) -> web.Response:

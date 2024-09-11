@@ -50,7 +50,6 @@
 /doc/html
 /doc/kresd.8
 /doc/texinfo
-/doc/_static/config.schema.json
 /doc/_static/schema_doc*
 /doc/config-schema-body.md
 /ephemeral_key.pem

@@ -754,14 +754,31 @@ class BaseSchema(Serializable):
         return True
 
     @classmethod
-    def json_schema(cls: Type["BaseSchema"], include_schema_definition: bool = True) -> Dict[Any, Any]:
+    def json_schema(
+        cls: Type["BaseSchema"],
+        schema_id: Optional[str] = None,
+        title: Optional[str] = None,
+        description: Optional[str] = None,
+        include_schema_definition: bool = True,
+    ) -> Dict[Any, Any]:
         if cls._LAYER is not None:
-            return cls._LAYER.json_schema(include_schema_definition=include_schema_definition)
+            return cls._LAYER.json_schema(
+                schema_id=schema_id,
+                title=title,
+                description=description,
+                include_schema_definition=include_schema_definition,
+            )
 
         schema: Dict[Any, Any] = {}
         if include_schema_definition:
             schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"
-        if cls.__doc__ is not None:
+        if schema_id is not None:
+            schema["$id"] = schema_id
+        if title is not None:
+            schema["title"] = title
+        if description is not None:
+            schema["description"] = description
+        elif cls.__doc__ is not None:
             schema["description"] = _split_docstring(cls.__doc__)[0]
         schema["type"] = "object"
         schema["properties"] = _get_properties_schema(cls)
