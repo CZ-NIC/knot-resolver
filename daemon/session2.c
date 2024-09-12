@@ -1443,13 +1443,15 @@ static int session2_transport_pushv(struct session2 *s,
 						ctx);
 				return kr_ok();
 			} else {
-				int ret = uv_udp_try_send((uv_udp_t*)handle, (uv_buf_t *)iov, iovcnt,
+				int ret;
+				ret = uv_udp_try_send((uv_udp_t*)handle, (uv_buf_t *)iov, iovcnt,
 					the_network->enable_connect_udp ? NULL : comm->comm_addr);
-
-				if (ret == UV_EAGAIN) {
+				if (ret > 0) { // equals buffer size, only confuses us
+					ret = 0;
+				} else if (ret == UV_EAGAIN) {
 					ret = kr_error(ENOBUFS);
 					session2_event(s, PROTOLAYER_EVENT_OS_BUFFER_FULL, NULL);
-				} else if (ret < 0) {
+				} else {
 					kr_log_error(IO, "UDP connected send failed unexpectedly: %s\n",
 						uv_strerror(ret));
 					session2_transport_pushv_finished(ret, ctx);

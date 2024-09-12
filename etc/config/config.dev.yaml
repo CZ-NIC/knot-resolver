@@ -5,7 +5,7 @@ management:
 cache:
   storage: ./cache
 logging:
-  level: debug
+  level: info
   groups:
     - manager
     - supervisord
