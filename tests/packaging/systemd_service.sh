@@ -9,7 +9,8 @@ if test "$(id -u)" -ne 0; then
 	exit 1
 fi
 
-LOGFILE="/tmp/knot-resolver.log"
+LOGFILE="knot-resolver.log"
+touch $LOGFILE
 
 # We will be starting a systemd service, but another tests might do the same
 # so this makes sure there is nothing left after we exit
