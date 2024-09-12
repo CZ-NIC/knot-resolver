@@ -1189,11 +1189,11 @@ int session2_unwrap_after(struct session2 *s, enum protolayer_type protocol,
                           const struct comm_info *comm,
                           protolayer_finished_cb cb, void *baton)
 {
-	ssize_t layer_ix = session2_get_protocol(s, protocol) + 1;
+	ssize_t layer_ix = session2_get_protocol(s, protocol);
 	if (layer_ix < 0)
 		return layer_ix;
 	return session2_submit(s, PROTOLAYER_UNWRAP,
-			layer_ix, payload, comm, cb, baton);
+			layer_ix + 1, payload, comm, cb, baton);
 }
 
 int session2_wrap(struct session2 *s, struct protolayer_payload payload,
@@ -1210,10 +1210,10 @@ int session2_wrap_after(struct session2 *s, enum protolayer_type protocol,
                         const struct comm_info *comm,
                         protolayer_finished_cb cb, void *baton)
 {
-	ssize_t layer_ix = session2_get_protocol(s, protocol) - 1;
+	ssize_t layer_ix = session2_get_protocol(s, protocol);
 	if (layer_ix < 0)
 		return layer_ix;
-	return session2_submit(s, PROTOLAYER_WRAP, layer_ix,
+	return session2_submit(s, PROTOLAYER_WRAP, layer_ix - 1,
 			payload, comm, cb, baton);
 }
 
