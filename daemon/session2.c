@@ -608,18 +608,21 @@ static int session2_submit(
 	if (had_comm_param) {
 		struct comm_addr_storage *addrst = &ctx->comm_addr_storage;
 		if (comm->src_addr) {
-			memcpy(&addrst->src_addr.ip, comm->src_addr,
-				kr_sockaddr_len(comm->src_addr));
+			int len = kr_sockaddr_len(comm->src_addr);
+			kr_require(len > 0 && len <= sizeof(union kr_sockaddr));
+			memcpy(&addrst->src_addr, comm->src_addr, len);
 			ctx->comm_storage.src_addr = &addrst->src_addr.ip;
 		}
 		if (comm->comm_addr) {
-			memcpy(&addrst->comm_addr.ip, comm->comm_addr,
-				kr_sockaddr_len(comm->comm_addr));
+			int len = kr_sockaddr_len(comm->comm_addr);
+			kr_require(len > 0 && len <= sizeof(union kr_sockaddr));
+			memcpy(&addrst->comm_addr, comm->comm_addr, len);
 			ctx->comm_storage.comm_addr = &addrst->comm_addr.ip;
 		}
 		if (comm->dst_addr) {
-			memcpy(&addrst->dst_addr.ip, comm->dst_addr,
-				kr_sockaddr_len(comm->dst_addr));
+			int len = kr_sockaddr_len(comm->dst_addr);
+			kr_require(len > 0 && len <= sizeof(union kr_sockaddr));
+			memcpy(&addrst->dst_addr, comm->dst_addr, len);
 			ctx->comm_storage.dst_addr = &addrst->dst_addr.ip;
 		}
 		ctx->comm = &ctx->comm_storage;
@@ -1189,11 +1192,11 @@ int session2_unwrap_after(struct session2 *s, enum protolayer_type protocol,
                           const struct comm_info *comm,
                           protolayer_finished_cb cb, void *baton)
 {
-	ssize_t layer_ix = session2_get_protocol(s, protocol) + 1;
+	ssize_t layer_ix = session2_get_protocol(s, protocol);
 	if (layer_ix < 0)
 		return layer_ix;
 	return session2_submit(s, PROTOLAYER_UNWRAP,
-			layer_ix, payload, comm, cb, baton);
+			layer_ix + 1, payload, comm, cb, baton);
 }
 
 int session2_wrap(struct session2 *s, struct protolayer_payload payload,
@@ -1210,10 +1213,10 @@ int session2_wrap_after(struct session2 *s, enum protolayer_type protocol,
                         const struct comm_info *comm,
                         protolayer_finished_cb cb, void *baton)
 {
-	ssize_t layer_ix = session2_get_protocol(s, protocol) - 1;
+	ssize_t layer_ix = session2_get_protocol(s, protocol);
 	if (layer_ix < 0)
 		return layer_ix;
-	return session2_submit(s, PROTOLAYER_WRAP, layer_ix,
+	return session2_submit(s, PROTOLAYER_WRAP, layer_ix - 1,
 			payload, comm, cb, baton);
 }
 
