@@ -3,7 +3,7 @@ workers: 2
 cache:
   storage: /var/cache/knot-resolver
 logging:
-  level: info
+  level: debug
 network:
   listen:
     - interface: 127.0.0.1@53
