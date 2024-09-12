@@ -29,7 +29,7 @@
         "rundir": {
             "type": "string",
             "description": "Directory where the resolver can create files and which will be it's cwd.",
-            "default": "/var/run/knot-resolver"
+            "default": "/run/knot-resolver"
         },
         "workers": {
             "anyOf": [
@@ -75,7 +75,7 @@
                 }
             },
             "default": {
-                "unix_socket": "/var/run/knot-resolver/kres-api.sock",
+                "unix_socket": "/run/knot-resolver/kres-api.sock",
                 "interface": null
             }
         },
