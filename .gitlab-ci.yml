@@ -671,6 +671,7 @@ pkg:ubuntu-22.04:
   after_script:
     - chmod +x tests/packaging/systemd_service.sh
     - ./tests/packaging/systemd_service.sh
+    - cat /tmp/knot-resolver.log
 
 pkg:ubuntu-20.04:
   <<: *pkg_test_deb

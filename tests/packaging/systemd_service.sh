@@ -9,6 +9,8 @@ if test "$(id -u)" -ne 0; then
 	exit 1
 fi
 
+LOGFILE="/tmp/knot-resolver.log"
+
 # We will be starting a systemd service, but another tests might do the same
 # so this makes sure there is nothing left after we exit
 trap "systemctl stop knot-resolver.service" EXIT
@@ -28,12 +30,18 @@ if ! systemctl start knot-resolver.service; then
 else
 	set +e
 
+
+
 	# check that the resolvers are actually running
 	kdig @127.0.0.1 +edns nic.cz | tee /dev/stderr | grep -qi 'status: NOERROR'
 	if [ "$?" -ne "0" ]; then
 		echo "Could not 'kdig' the resolvers - are they running?"
 		exit 1
 	fi
+
+	# Log output from the service
+	journalctl -u knot-resolver.service -n 100 -f > "$LOGFILE" &
+	JOURNAL_PID=$!
 
 	echo "Running interactive tests..."
 	exit_code="0"
@@ -46,5 +54,9 @@ else
 		fi
 		echo "[test] $test OK"
 	done
+
+	kill $JOURNAL_PID
+	cat "$LOGFILE"
+
 	exit "$exit_code"
 fi
