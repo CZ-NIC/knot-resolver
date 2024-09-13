@@ -4,11 +4,12 @@
 src_dir="$(dirname "$(realpath "$0")")"
 source $src_dir/utils/_env.sh
 
-kres_meson_build
+ninja_install
 
 echo
-echo Building Knot Resolver Python komponents
-echo ----------------------------------------
+echo ---------------------------------------
+echo Building Python komponents using Poetry
+echo ---------------------------------------
 poetry build
 # copy native modules from build directory to source directory
 shopt -s globstar
@@ -22,8 +23,7 @@ shopt -u globstar
 shopt -u nullglob
 
 echo
-echo The Knot Resolver API is accessible on http://localhost:5000
-echo ------------------------------------------------------------
-
-# run the knot-resolver manager
-python3 -m knot_resolver.manager $@
+echo --------------------------------------
+echo Starting Knot Resolver wit the Manager
+echo --------------------------------------
+python3 -m knot_resolver.manager --config "$KRES_CONFIG_FILE" "$@"

@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+# ensure consistent behaviour
+src_dir="$(dirname "$(realpath "$0")")"
+source $src_dir/utils/_env.sh
+
+echo
+echo -----------------------------------------------------
+echo Configuring documentation build directory using Meson
+echo -----------------------------------------------------
+meson $build_doc_dir -Ddoc=enabled
+echo
+echo ----------------------------------
+echo Building documentation using ninja
+echo ----------------------------------
+ninja -C $build_doc_dir doc
+echo

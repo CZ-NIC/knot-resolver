@@ -88,5 +88,6 @@ dist/
 .mypy_cache
 .install/
 .build/
+.build_doc/
 poetry.lock
 *.junit.xml

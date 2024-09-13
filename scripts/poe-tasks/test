@@ -4,7 +4,7 @@
 src_dir="$(dirname "$(realpath "$0")")"
 source $src_dir/utils/_env.sh
 
-kres_is_meson_configured
+is_buil_dir_configured
 
 # run pytest
 env PYTHONPATH=. pytest --junitxml=unit.junit.xml --cov=python/knot_resolver --show-capture=all tests/manager

@@ -18,8 +18,9 @@ fi
 cd $gitroot
 
 # build dirs
-build_dir=$gitroot/.build
-install_dir=$gitroot/.install
+build_dir="$gitroot/.build"
+build_doc_dir="$gitroot/.build_doc"
+install_dir="$gitroot/.install"
 
 # ensure consistent environment with virtualenv
 if test -z "$VIRTUAL_ENV" -a "$CI" != "true" -a -z "$KNOT_ENV"; then
@@ -38,62 +39,61 @@ PATH="$PATH:$gitroot/node_modules/.bin"
 # fail even on unbound variables
 set -o nounset
 
-# create runtime directories
-if [ -z "${KRES_CONFIG_DIR:-}" ]; then
-	KRES_CONFIG_DIR="$gitroot/etc/config"
+# Set enviromental variables if not
+if [ -z "${KRES_INSTALL_DIR:-}" ]; then
+	KRES_INSTALL_DIR="$install_dir"
 fi
-mkdir -p "$KRES_CONFIG_DIR/runtime" "$KRES_CONFIG_DIR/cache"
-
-# env variables
 if [ -z "${KRES_CONFIG_FILE:-}" ]; then
-    KRES_CONFIG_FILE="$KRES_CONFIG_DIR/config.dev.yaml"
+    KRES_CONFIG_FILE="$gitroot/etc/config/config.dev.yaml"
 fi
-
-if [ -z "${KRES_API_SOCK_FILE:-}" ]; then
-    KRES_API_SOCK_FILE="$KRES_CONFIG_DIR/kres-api.sock"
-fi
+export KRES_INSTALL_DIR
 export KRES_CONFIG_FILE
-export KRES_API_SOCK_FILE
 
-function kres_meson_configure {
+function meson_setup_configure {
 	reconfigure=''
-	if [ -f .build/ninja.build ]; then
+	if [ -d .build ]; then
 		reconfigure='--reconfigure'
 	fi
 	echo
-	echo Configuring Knot Resolver Meson
-	echo -------------------------------
-	echo -e "${blue}${reset}"
+	echo ---------------------------------------
+	echo Configuring build directory using Meson
+	echo ---------------------------------------
+	meson setup \
+		$build_dir \
+		$reconfigure \
+		--prefix=$KRES_INSTALL_DIR \
+		-D user=$(id -un) \
+		-D group=$(id -gn) \
+		"$@"
 	echo
-	meson setup $build_dir $reconfigure --prefix=$install_dir -Duser=$(id -un) -Dgroup=$(id -gn) "$@"
-	echo
-	echo Copying Knot Resolver constants.py module
-	echo -----------------------------------------
+	echo -----------------------------------------------
+	echo Copying constants.py module configured by Meson
+	echo -----------------------------------------------
 	cp -v $build_dir/python/constants.py $gitroot/python/knot_resolver/constants.py
 	echo
 }
 
-function kres_is_meson_configured {
+function is_buil_dir_configured {
 	if [ ! -d .build ]; then
 		echo
-		echo Knot Resolver is not configured for building.
+		echo Knot Resolver build directory is not configured by Meson.
 		echo "Please run './poe configure' (optionally with additional Meson arguments)".
 		echo
 		exit 2
 	fi
 }
 
-function kres_meson_build {
+function ninja_install {
 
-	kres_is_meson_configured
+	is_buil_dir_configured
 
 	echo
-	echo Building Knot Resolver C komponents
-	echo -----------------------------------
-	echo -e "${blue}In case of an compilation error, run this command to try to fix it:${reset}"
-	echo -e "\t${blue}rm -r $install_dir $build_dir${reset}"
-	echo
+	echo --------------------------------------------
+	echo Building/installing C komponents using ninja
+	echo --------------------------------------------
 	ninja -C $build_dir
 	ninja install -C $build_dir
+
+	mkdir -vp $KRES_INSTALL_DIR/run/knot-resolver $KRES_INSTALL_DIR/var/cache/knot-resolver
 	echo
 }

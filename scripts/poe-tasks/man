@@ -4,6 +4,8 @@
 src_dir="$(dirname "$(realpath "$0")")"
 source $src_dir/utils/_env.sh
 
-kres_meson_build
+meson_setup_configure
+
+ninja_install
 
 man -l .install/share/man/man8/$1*

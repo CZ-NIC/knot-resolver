@@ -4,4 +4,4 @@
 src_dir="$(dirname "$(realpath "$0")")"
 source $src_dir/utils/_env.sh
 
-kres_meson_configure
+meson_setup_configure

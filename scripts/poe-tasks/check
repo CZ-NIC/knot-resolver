@@ -14,7 +14,7 @@ function check_rv {
 	aggregate_rv=$(( $aggregate_rv + $1 ))
 }
 
-kres_is_meson_configured
+is_buil_dir_configured
 
 # stop failing early, because we wouldn't do anything else than fail
 set +e
