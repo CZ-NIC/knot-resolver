@@ -1193,8 +1193,9 @@ int session2_unwrap_after(struct session2 *s, enum protolayer_type protocol,
                           protolayer_finished_cb cb, void *baton)
 {
 	ssize_t layer_ix = session2_get_protocol(s, protocol);
-	if (layer_ix < 0)
-		return layer_ix;
+	bool ok = layer_ix >= 0 && layer_ix + 1 < protolayer_grps[s->proto].num_layers;
+	if (kr_fails_assert(ok)) // not found or "last layer"
+		return kr_error(EINVAL);
 	return session2_submit(s, PROTOLAYER_UNWRAP,
 			layer_ix + 1, payload, comm, cb, baton);
 }
@@ -1214,8 +1215,8 @@ int session2_wrap_after(struct session2 *s, enum protolayer_type protocol,
                         protolayer_finished_cb cb, void *baton)
 {
 	ssize_t layer_ix = session2_get_protocol(s, protocol);
-	if (layer_ix < 0)
-		return layer_ix;
+	if (kr_fails_assert(layer_ix > 0)) // not found or "last layer"
+		return kr_error(EINVAL);
 	return session2_submit(s, PROTOLAYER_WRAP, layer_ix - 1,
 			payload, comm, cb, baton);
 }
