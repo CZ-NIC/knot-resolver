@@ -4,12 +4,11 @@ file to allow us to exclude the __main__.py file from black's autoformatting
 """
 
 import argparse
-import os
 import sys
 from pathlib import Path
 from typing import NoReturn
 
-from knot_resolver.constants import CONFIG_FILE, CONFIG_FILE_ENV_VAR, VERSION
+from knot_resolver.constants import CONFIG_FILE, VERSION
 from knot_resolver.manager.logging import logger_startup
 from knot_resolver.manager.server import start_server
 from knot_resolver.utils import compat
@@ -44,11 +43,8 @@ def main() -> NoReturn:
     args = parse_args()
 
     # where to look for config
-    config_env = os.getenv(CONFIG_FILE_ENV_VAR)
     if args.config is not None:
         config_path = Path(args.config[0])
-    elif config_env is not None:
-        config_path = Path(config_env)
     else:
         config_path = CONFIG_FILE
 
