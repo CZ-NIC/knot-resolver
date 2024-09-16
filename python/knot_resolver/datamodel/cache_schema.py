@@ -133,5 +133,5 @@ class CacheSchema(ConfigSchema):
     prefetch: PrefetchSchema = PrefetchSchema()
 
     def _validate(self):
-        if self.ttl_min.seconds() >= self.ttl_max.seconds():
-            raise ValueError("'ttl-max' must be larger then 'ttl-min'")
+        if self.ttl_min.seconds() > self.ttl_max.seconds():
+            raise ValueError("'ttl-max' can't be smaller than 'ttl-min'")
