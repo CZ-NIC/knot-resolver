@@ -2,6 +2,8 @@
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+/* High-level explanation of layered protocols: ./layered-protocols.rst */
+
 /* HINT: If you are looking to implement support for a new transport protocol,
  * start with the doc comment of the `PROTOLAYER_TYPE_MAP` macro and
  * continue from there. */
