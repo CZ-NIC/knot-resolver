@@ -14,8 +14,6 @@ function check_rv {
 	aggregate_rv=$(( $aggregate_rv + $1 ))
 }
 
-is_buil_dir_configured
-
 # stop failing early, because we wouldn't do anything else than fail
 set +e
 
@@ -84,6 +82,7 @@ else
 	echo -e "${red}These commands might help you:${reset}"
 	echo -e "${red}\tpoe format${reset}"
 	echo -e "${red}\tpoe gen-setuppy${reset}"
+	echo -e "${red}\tpoe doc-schema${reset}"
 	echo -e "${red}That's not great. Could you please fix that?${reset} 😲😟"
 fi
 

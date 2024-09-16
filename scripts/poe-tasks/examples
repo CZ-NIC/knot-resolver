@@ -4,8 +4,6 @@
 src_dir="$(dirname "$(realpath "$0")")"
 source $src_dir/utils/_env.sh
 
-is_buil_dir_configured
-
 # validate all configuration examples
 for example in $PWD/etc/config/config.example.*.yaml;
 do
