@@ -18,8 +18,6 @@ Please, follow the instructions for your packaging system:
 
         Please follow https://pkg.labs.nic.cz/doc/?project=knot-resolver
 
-        For Ubuntu it is also possible to use https://launchpad.net/~cz.nic-labs/+archive/ubuntu/knot-resolver.
-
     .. tab:: .rpm
 
         Please follow https://copr.fedorainfracloud.org/coprs/g/cznic/knot-resolver/
