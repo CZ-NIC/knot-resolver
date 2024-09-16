@@ -14,7 +14,7 @@ echo
 echo ------------------------------------------
 echo Removing Meson build directories and files
 echo ------------------------------------------
-rm -vrf "$build_dir" "$KRES_INSTALL_DIR" "$build_doc_dir" build dist 
+rm -vrf "$build_dir" "$KRES_INSTALL_DIR" "$build_schema_dir" "$build_doc_dir" build dist 
 
 echo
 echo ------------------------------------------

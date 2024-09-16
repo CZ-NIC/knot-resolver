@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+# ensure consistent behaviour
+src_dir="$(dirname "$(realpath "$0")")"
+source $src_dir/utils/_env.sh
+
+rm -rf $build_schema_dir > /dev/null
+meson setup \
+    $build_schema_dir \
+    --buildtype=release \
+    --prefix=/usr > /dev/null
+cp -v $build_schema_dir/python/constants.py $gitroot/python/knot_resolver/constants.py
+
+python -m knot_resolver.client schema > $gitroot/doc/_static/config.schema.json
+rm -rf $build_schema_dir

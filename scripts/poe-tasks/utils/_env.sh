@@ -20,6 +20,7 @@ cd $gitroot
 # build dirs
 build_dir="$gitroot/.build"
 build_doc_dir="$gitroot/.build_doc"
+build_schema_dir="$gitroot/.build_schema"
 install_dir="$gitroot/.install"
 
 # ensure consistent environment with virtualenv

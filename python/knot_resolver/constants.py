@@ -7,7 +7,7 @@ GROUP = "knot-resolver"
 # dirs paths
 RUN_DIR = Path("/run/knot-resolver")
 ETC_DIR = Path("/etc/knot-resolver")
-SBIN_DIR = Path("/usr/bin")
+SBIN_DIR = Path("/usr/sbin")
 CACHE_DIR = Path("/var/cache/knot-resolver")
 
 # files paths
