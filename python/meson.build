@@ -5,9 +5,11 @@ constants_config = configuration_data()
 constants_config.set('version', meson.project_version())
 constants_config.set('user', user)
 constants_config.set('group', group)
+constants_config.set('prefix', prefix)
 constants_config.set('run_dir', run_dir)
 constants_config.set('etc_dir', etc_dir)
 constants_config.set('sbin_dir', sbin_dir)
+constants_config.set('cache_dir', systemd_cache_dir)
 
 configure_file(
   input: 'constants.py.in',

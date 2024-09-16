@@ -239,7 +239,7 @@ def get_rundir_without_validation(data: Dict[str, Any]) -> WritableDir:
     Used for initial manager startup.
     """
 
-    return WritableDir(data["rundir"] if "rundir" in data else RUN_DIR, object_path="/rundir")
+    return WritableDir(data["rundir"] if "rundir" in data else str(RUN_DIR), object_path="/rundir")
 
 
 def kres_config_json_schema() -> Dict[str, Any]:
