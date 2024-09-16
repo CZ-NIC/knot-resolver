@@ -5,7 +5,7 @@ USER = "@user@"
 GROUP = "@group@"
 
 # dirs paths
-RUN_DIR = Path("@prefix@@run_dir@")
+RUN_DIR = Path("@run_dir@")
 ETC_DIR = Path("@etc_dir@")
 SBIN_DIR = Path("@sbin_dir@")
 CACHE_DIR = Path("@cache_dir@")

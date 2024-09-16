@@ -33,6 +33,7 @@ message('------------------------------')
 
 
 # Variables
+auto_prefixes = ['/', '/usr', '/usr/local']
 libkres_soversion = 9
 
 libext = '.so'
@@ -54,7 +55,15 @@ modules_dir = lib_dir / 'kres_modules'
 sbin_dir = prefix / get_option('sbindir')
 bin_dir = prefix / get_option('bindir')
 if host_machine.system() == 'linux'
-  run_dir = '/run' / 'knot-resolver'
+  # When installing from sources with a non-standard prefix,
+  # we need to set the correct run directory with the prefix,
+  # otherwise rwx permissions will fail with a validation error
+  # on the run directory
+  if prefix in auto_prefixes
+    run_dir = '/run' / 'knot-resolver'
+  else
+    run_dir = prefix / 'run' / 'knot-resolver'
+  endif
 elif host_machine.system() == 'darwin'
   run_dir = prefix / get_option('localstatedir') / 'run' / 'knot-resolver'
 else
@@ -71,7 +80,6 @@ completion_dir = prefix / 'share'
 # When installing from sources into a non-standard prefix and the library is
 # shared/dynamic, we need to set the executables' RPATH so that they can find
 # `libkresd`, otherwise running them will fail with dynamic linkage errors
-auto_prefixes = ['/', '/usr', '/usr/local']
 rpath_opt = get_option('install_rpath')
 if (get_option('default_library') == 'static' or
     rpath_opt == 'disabled' or
