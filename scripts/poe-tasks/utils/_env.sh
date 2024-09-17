@@ -19,9 +19,8 @@ cd $gitroot
 
 # build dirs
 build_dir="$gitroot/.build"
-build_doc_dir="$gitroot/.build_doc"
-build_schema_dir="$gitroot/.build_schema"
-install_dir="$gitroot/.install"
+build_dev_dir="$gitroot/.build_dev"
+install_dev_dir="$gitroot/.install_dev"
 
 # ensure consistent environment with virtualenv
 if test -z "$VIRTUAL_ENV" -a "$CI" != "true" -a -z "$KNOT_ENV"; then
@@ -41,41 +40,49 @@ PATH="$PATH:$gitroot/node_modules/.bin"
 set -o nounset
 
 # Set enviromental variables if not
-if [ -z "${KRES_INSTALL_DIR:-}" ]; then
-	KRES_INSTALL_DIR="$install_dir"
+if [ -z "${KRES_DEV_INSTALL_DIR:-}" ]; then
+	KRES_DEV_INSTALL_DIR="$install_dev_dir"
 fi
-if [ -z "${KRES_CONFIG_FILE:-}" ]; then
-    KRES_CONFIG_FILE="$gitroot/etc/config/config.dev.yaml"
+if [ -z "${KRES_DEV_CONFIG_FILE:-}" ]; then
+    KRES_DEV_CONFIG_FILE="$gitroot/etc/config/config.dev.yaml"
 fi
-export KRES_INSTALL_DIR
-export KRES_CONFIG_FILE
+export KRES_DEV_INSTALL_DIR
+export KRES_DEV_CONFIG_FILE
 
 function meson_setup_configure {
-	reconfigure=''
-	if [ -d .build ]; then
+	local reconfigure=''
+	if [ -d $build_dir ]; then
 		reconfigure='--reconfigure'
 	fi
-	echo
 	echo ---------------------------------------
 	echo Configuring build directory using Meson
 	echo ---------------------------------------
 	meson setup \
 		$build_dir \
 		$reconfigure \
-		--prefix=$KRES_INSTALL_DIR \
+		--prefix=/usr \
+		"$@"
+}
+
+function meson_setup_configure_dev {
+	local reconfigure=''
+	if [ -d $build_dev_dir ]; then
+		reconfigure='--reconfigure'
+	fi
+	echo ---------------------------------------
+	echo Configuring build directory using Meson
+	echo ---------------------------------------
+	meson setup \
+		$build_dev_dir \
+		$reconfigure \
+		--prefix=$KRES_DEV_INSTALL_DIR \
 		-D user=$(id -un) \
 		-D group=$(id -gn) \
 		"$@"
-	echo
-	echo -----------------------------------------------
-	echo Copying constants.py module configured by Meson
-	echo -----------------------------------------------
-	cp -v $build_dir/python/constants.py $gitroot/python/knot_resolver/constants.py
-	echo
 }
 
-function is_buil_dir_configured {
-	if [ ! -d .build ]; then
+function is_build_dev_dir_configured {
+	if [ ! -d $build_dev_dir ]; then
 		echo
 		echo Knot Resolver build directory is not configured by Meson.
 		echo "Please run './poe configure' (optionally with additional Meson arguments)".
@@ -84,17 +91,14 @@ function is_buil_dir_configured {
 	fi
 }
 
-function ninja_install {
+function ninja_dev_install {
 
-	is_buil_dir_configured
+	is_build_dev_dir_configured
 
 	echo
 	echo --------------------------------------------
-	echo Building/installing C komponents using ninja
+	echo Building/installing C komponents using Ninja
 	echo --------------------------------------------
-	ninja -C $build_dir
-	ninja install -C $build_dir
-
-	mkdir -vp $KRES_INSTALL_DIR/run/knot-resolver $KRES_INSTALL_DIR/var/cache/knot-resolver
-	echo
+	ninja -C $build_dev_dir
+	ninja install -C $build_dev_dir
 }

@@ -4,7 +4,9 @@
 src_dir="$(dirname "$(realpath "$0")")"
 source $src_dir/utils/_env.sh
 
-is_buil_dir_configured
+echo
+is_build_dev_dir_configured
+echo
 
 # run knot-resolver client
-python3 -m knot_resolver.client --config "$KRES_CONFIG_FILE" "$@"
+python3 -m knot_resolver.client --config "$KRES_DEV_CONFIG_FILE" "$@"
