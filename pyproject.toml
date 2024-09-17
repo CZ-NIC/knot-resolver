@@ -79,6 +79,7 @@ doc-schema = { cmd = "scripts/poe-tasks/doc-schema", help = "Generate a JSON sch
 test = { cmd = "scripts/poe-tasks/test", help = "Run pytest unit tests" }
 check = { cmd = "scripts/poe-tasks/check", help = "Check that all dependencies are installed and run static code analysis" }
 examples = { cmd = "scripts/poe-tasks/examples", help = "Validate all configuration examples using 'kresctl validate' utility" }
+gen-constantspy = { cmd = "scripts/poe-tasks/gen-constantspy", help = "Generate 'constants.py' module using Meson configured options" }
 gen-setuppy = { cmd = "scripts/poe-tasks/gen-setuppy", help = "Generate 'setup.py' file for backwards compatibility" }
 format = { cmd = "scripts/poe-tasks/format", help = "Run code formatter" }
 kresctl = { cmd = "scripts/poe-tasks/kresctl", help="Run kresctl utility" }

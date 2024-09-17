@@ -68,6 +68,13 @@ python setup.py --help > /dev/null
 check_rv $?
 echo
 
+# check python/knot_resolver/constants.py
+echo -e "${yellow}python/knot_resolver/constants.py${reset}"
+meson_setup_configure > /dev/null
+diff python/knot_resolver/constants.py $build_dir/python/constants.py
+check_rv $?
+echo
+
 # check that doc/_static/config.schema.json is the latest
 echo -e "${yellow}Checking doc/_static/config.schema.json${reset}"
 python -m knot_resolver.client schema | diff - doc/_static/config.schema.json
@@ -82,6 +89,7 @@ else
 	echo -e "${red}These commands might help you:${reset}"
 	echo -e "${red}\tpoe format${reset}"
 	echo -e "${red}\tpoe gen-setuppy${reset}"
+	echo -e "${red}\tpoe gen-constantspy${reset}"
 	echo -e "${red}\tpoe doc-schema${reset}"
 	echo -e "${red}That's not great. Could you please fix that?${reset} 😲😟"
 fi
