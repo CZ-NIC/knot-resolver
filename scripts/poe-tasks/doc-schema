@@ -7,7 +7,7 @@ source $src_dir/utils/_env.sh
 schema_file="$gitroot/doc/_static/config.schema.json"
 
 meson_setup_configure > /dev/null
-cp $build_dir/python/constants.py $gitroot/python/knot_resolver/constants.py
+cp $build_dir/python/knot_resolver/constants.py $gitroot/python/knot_resolver/constants.py
 python -m knot_resolver.client schema > $schema_file
 
 echo New configuration JSON schem saved to $schema_file

@@ -275,7 +275,7 @@ subdir('lib')
 ## Remaining code
 subdir('daemon')
 subdir('modules')
-subdir('python')
+subdir('python' / 'knot_resolver')
 subdir('utils')
 if get_option('bench') == 'enabled'
   subdir('bench')

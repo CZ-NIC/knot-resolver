@@ -71,7 +71,7 @@ echo
 # check python/knot_resolver/constants.py
 echo -e "${yellow}python/knot_resolver/constants.py${reset}"
 meson_setup_configure > /dev/null
-diff python/knot_resolver/constants.py $build_dir/python/constants.py
+diff python/knot_resolver/constants.py $build_dir/python/knot_resolver/constants.py
 check_rv $?
 echo
 
