@@ -9,6 +9,14 @@ if test "$(id -u)" -ne 0; then
 	exit 1
 fi
 
+# SKIP test when systemd isn't PID 1
+if [[ -d /run/systemd/system ]] ; then
+	echo "systemd detected -> RUN systemd tests"
+else
+	echo "systemd not detected -> SKIP systemd tests"
+	exit 77
+fi
+
 # We will be starting a systemd service, but another tests might do the same
 # so this makes sure there is nothing left after we exit
 trap "systemctl stop knot-resolver.service" EXIT
