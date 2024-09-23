@@ -1,14 +1,17 @@
+import logging
 import os
 import stat
 from enum import Flag, auto
 from grp import getgrnam
 from pathlib import Path
-from pwd import getpwnam
+from pwd import getpwnam, getpwuid
 from typing import Any, Dict, Tuple, Type, TypeVar
 
 from knot_resolver.constants import GROUP, USER
 from knot_resolver.datamodel.globals import get_resolve_root, get_strict_validation
 from knot_resolver.utils.modeling.base_value_type import BaseValueType
+
+logger = logging.Logger(__name__)
 
 
 class UncheckedPath(BaseValueType):
@@ -157,8 +160,23 @@ def _kres_accessible(dest_path: Path, perm_mode: _PermissionMode) -> bool:
         _PermissionMode.EXECUTE: [stat.S_IXUSR, stat.S_IXGRP, stat.S_IXOTH],
     }
 
+    # process working user id
+    pwuid = os.getuid()
+    pwgid = os.getgid()
+
+    # defaults
     user_uid = getpwnam(USER).pw_uid
     user_gid = getgrnam(GROUP).gr_gid
+
+    # if current user do not match intended user
+    # log warning message and check permissions for current user running the manager
+    if pwuid != user_uid:
+        logger.warning(
+            f"Knot Resolver does not run under the intended '{USER}' user, '{getpwuid(pwuid).pw_name}' instead."
+            " This may or may not affect the configuration validation and the proper functioning of the resolver."
+        )
+        user_uid = pwuid
+        user_gid = pwgid
 
     dest_stat = os.stat(dest_path)
     dest_uid = dest_stat.st_uid
@@ -168,13 +186,13 @@ def _kres_accessible(dest_path: Path, perm_mode: _PermissionMode) -> bool:
     def accessible(perm: _PermissionMode) -> bool:
         if user_uid == dest_uid:
             return bool(dest_mode & chflags[perm][0])
-        b_groups = os.getgrouplist(os.getlogin(), user_gid)
+        b_groups = os.getgrouplist(getpwuid(pwuid).pw_name, user_gid)
         if user_gid == dest_gid or dest_gid in b_groups:
             return bool(dest_mode & chflags[perm][1])
         return bool(dest_mode & chflags[perm][2])
 
     # __iter__ for class enum.Flag added in python3.11
-    # 'for perm in perm_mode:' failes for <=python3.11
+    # 'for perm in perm_mode:' fails for <=python3.11
     for perm in _PermissionMode:
         if perm in perm_mode:
             if not accessible(perm):
