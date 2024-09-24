@@ -536,8 +536,10 @@ async def start_server(config: Path = CONFIG_FILE) -> int:
         config_raw = await _load_raw_config(config)
 
         # before processing any configuration, set validation context
-        #  - resolve_root = root against which all relative paths will be resolved
-        set_global_validation_context(Context(config.parent, True))
+        #  - resolve_root: root against which all relative paths will be resolved
+        #  - strict_validation: check for path existence during configuration validation
+        #  - permissions_default: validate dirs/files rwx permissions against default user:group in constants
+        set_global_validation_context(Context(config.parent, True, False))
 
         # We want to change cwd as soon as possible. Some parts of the codebase are using os.getcwd() to get the
         # working directory.
