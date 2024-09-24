@@ -18,6 +18,7 @@ documentation = "https://www.knot-resolver.cz/documentation"
 packages = [
     {include = "knot_resolver", from = "python"}
 ]
+exclude = ["**/*.in", "**/meson.build"]
 
 # See currently open issue about building C extensions here:
 # https://github.com/python-poetry/poetry/issues/2740
