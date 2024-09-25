@@ -46,8 +46,12 @@ static int answer_exact_match(struct kr_query *qry, knot_pkt_t *pkt, uint16_t ty
 		const uint8_t *data, const uint8_t *data_bound);
 static int answer_zla_empty(val_zla_type_t type, struct kr_query *qry, knot_pkt_t *pkt,
 		knot_db_val_t zla_lf, uint32_t ttl);
+static int answer_zla_dname(val_zla_type_t type, struct kr_query *qry, knot_pkt_t *pkt,
+				knot_db_val_t zla_lf, uint32_t ttl, knot_db_val_t *val);
 static int answer_zla_redirect(struct kr_query *qry, knot_pkt_t *pkt, const char *ruleset_name,
 				knot_db_val_t zla_lf, uint32_t ttl);
+static int rule_local_subtree(const knot_dname_t *apex, enum kr_rule_sub_t type,
+			const knot_dname_t *target, uint32_t ttl, kr_rule_tags_t tags);
 
 // LATER: doing tag_names_default() and kr_rule_tag_add() inside a RW transaction would be better.
 static int tag_names_default(void)
@@ -418,25 +422,30 @@ int rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt)
 			uint32_t ttl = KR_RULE_TTL_DEFAULT;
 			if (val.len >= sizeof(ttl)) // allow omitting -> can't kr_assert
 				deserialize_fails_assert(&val, &ttl);
-			if (kr_fails_assert(val.len == 0)) {
-				kr_log_error(RULES, "ERROR: unused bytes: %zu\n", val.len);
-				return kr_error(EILSEQ);
-			}
+
 			// Finally execute the rule.
 			switch (ztype) {
 			case KR_RULE_SUB_EMPTY:
 			case KR_RULE_SUB_NXDOMAIN:
 			case KR_RULE_SUB_NODATA:
 				ret = answer_zla_empty(ztype, qry, pkt, zla_lf, ttl);
-				if (ret == kr_error(EAGAIN))
-					goto shorten;
-				return ret ? ret : RET_ANSWERED;
+				break;
 			case KR_RULE_SUB_REDIRECT:
 				ret = answer_zla_redirect(qry, pkt, ruleset_name, zla_lf, ttl);
-				return ret ? kr_error(ret) : RET_ANSWERED;
+				break;
+			case KR_RULE_SUB_DNAME:
+				ret = answer_zla_dname(ztype, qry, pkt, zla_lf, ttl, &val);
+				break;
 			default:
 				return kr_error(EILSEQ);
 			}
+			if (kr_fails_assert(val.len == 0)) {
+				kr_log_error(RULES, "ERROR: unused bytes: %zu\n", val.len);
+				return kr_error(EILSEQ);
+			}
+			if (ret == kr_error(EAGAIN))
+				goto shorten;
+			return ret ? kr_error(ret) : RET_ANSWERED;
 		} while (true);
 	}
 
@@ -570,7 +579,17 @@ int local_data_ins(knot_db_val_t key, const knot_rrset_t *rrs,
 	int ret = ruledb_op(write, &key, &val, 1); // TODO: overwriting on ==tags?
 	// ENOSPC seems to be the only expectable error.
 	kr_assert(ret == 0 || ret == kr_error(ENOSPC));
-	return ret;
+
+	if (ret || rrs->type != KNOT_RRTYPE_DNAME)
+		return ret;
+	// Now we do special handling for DNAMEs
+	//  - we inserted as usual, so that it works with QTYPE == DNAME
+	//  - now we insert a ZLA to handle generating CNAMEs
+	//  - yes, some edge cases won't work as in real DNS zones (e.g. occlusion)
+	if (kr_fails_assert(rrs->rrs.count))
+		return kr_error(EINVAL);
+	return rule_local_subtree(rrs->owner, KR_RULE_SUB_DNAME,
+				knot_dname_target(rrs->rrs.rdata), rrs->ttl, tags);
 }
 int kr_rule_local_data_del(const knot_rrset_t *rrs, kr_rule_tags_t tags)
 {
@@ -697,6 +716,78 @@ static int answer_zla_empty(val_zla_type_t type, struct kr_query *qry, knot_pkt_
 	return kr_ok();
 }
 
+static int answer_zla_dname(val_zla_type_t type, struct kr_query *qry, knot_pkt_t *pkt,
+				const knot_db_val_t zla_lf, uint32_t ttl, knot_db_val_t *val)
+{
+	if (kr_fails_assert(type == KR_RULE_SUB_DNAME))
+		return kr_error(EINVAL);
+	
+	const knot_dname_t *dname_target = val->data;
+	// Theoretically this check could overread the val->len, but that's OK,
+	// as the policy DB contents wouldn't be directly written by a malicious party.
+	// Moreover, an overread shouldn't cause worse than a clean segfault.
+	if (kr_fails_assert(knot_dname_size(dname_target) == val->len))
+		return kr_error(EILSEQ);
+	{ // update *val; avoiding void* arithmetics complicates this
+		char *tmp = val->data;
+		tmp += val->len;
+		val->data = tmp;
+
+		val->len = 0;
+	}
+
+	knot_dname_t apex_name[KNOT_DNAME_MAXLEN];
+	int ret = knot_dname_lf2wire(apex_name, zla_lf.len, zla_lf.data);
+	CHECK_RET(ret);
+
+	const bool hit_apex = knot_dname_is_equal(qry->sname, apex_name);
+	if (hit_apex && type == KR_RULE_SUB_DNAME)
+		return kr_error(EAGAIN); // LATER: maybe a type that matches apex
+
+	// Start constructing the (pseudo-)packet.
+	ret = pkt_renew(pkt, qry->sname, qry->stype);
+	CHECK_RET(ret);
+	struct answer_rrset arrset;
+	memset(&arrset, 0, sizeof(arrset));
+
+	arrset.set.rr = knot_rrset_new(qry->sname, KNOT_RRTYPE_CNAME,
+					KNOT_CLASS_IN, ttl, &pkt->mm);
+	if (kr_fails_assert(arrset.set.rr))
+		return kr_error(ENOMEM);
+	const knot_dname_t *cname_target = knot_dname_replace_suffix(qry->sname,
+			knot_dname_labels(apex_name, NULL), dname_target, &pkt->mm);
+	const int rdata_len = knot_dname_size(cname_target);
+	const bool cname_fits = rdata_len <= KNOT_DNAME_MAXLEN;
+	if (cname_fits) {
+		ret = knot_rrset_add_rdata(arrset.set.rr, cname_target,
+					  knot_dname_size(cname_target), &pkt->mm);
+		CHECK_RET(ret);
+	}
+
+	arrset.set.rank = KR_RANK_SECURE | KR_RANK_AUTH; // local data has high trust
+	arrset.set.expiring = false;
+
+	if (cname_fits) {
+		knot_wire_set_rcode(pkt->wire, KNOT_RCODE_NOERROR);
+		ret = knot_pkt_begin(pkt, KNOT_ANSWER);
+		CHECK_RET(ret);
+
+		// Put links to the RR into the pkt.
+		ret = pkt_append(pkt, &arrset);
+		CHECK_RET(ret);
+	} else {
+		knot_wire_set_rcode(pkt->wire, KNOT_RCODE_YXDOMAIN);
+	}
+
+	// Finishing touches.
+	qry->flags.EXPIRING = false;
+	qry->flags.CACHED = true;
+	qry->flags.NO_MINIMIZE = true;
+
+	VERBOSE_MSG(qry, "=> satisfied by local data (DNAME)\n");
+	return kr_ok();
+}
+
 static int answer_zla_redirect(struct kr_query *qry, knot_pkt_t *pkt, const char *ruleset_name,
 				const knot_db_val_t zla_lf, uint32_t ttl)
 {
@@ -760,6 +851,11 @@ nodata: // Want NODATA answer (or NOERROR if it hits apex SOA).
 	return kr_ok();
 }
 
+int kr_rule_local_subtree(const knot_dname_t *apex, enum kr_rule_sub_t type,
+			  uint32_t ttl, kr_rule_tags_t tags)
+{
+	return rule_local_subtree(apex, type, NULL, ttl, tags);
+}
 knot_db_val_t zla_key(const knot_dname_t *apex, uint8_t key_data[KEY_MAXLEN])
 {
 	kr_require(the_rules);
@@ -775,11 +871,16 @@ knot_db_val_t zla_key(const knot_dname_t *apex, uint8_t key_data[KEY_MAXLEN])
 	key.len = key_data + KEY_DNAME_END_OFFSET - (uint8_t *)key.data;
 	return key;
 }
-int kr_rule_local_subtree(const knot_dname_t *apex, enum kr_rule_sub_t type,
-			  uint32_t ttl, kr_rule_tags_t tags)
+static int rule_local_subtree(const knot_dname_t *apex, enum kr_rule_sub_t type,
+			const knot_dname_t *target, uint32_t ttl, kr_rule_tags_t tags)
 {
 	// type-check
+	const bool has_target = (type == KR_RULE_SUB_DNAME);
 	switch (type) {
+	case KR_RULE_SUB_DNAME:
+		if (kr_fails_assert(!!target == has_target))
+			return kr_error(EINVAL);
+		break;
 	case KR_RULE_SUB_EMPTY:
 	case KR_RULE_SUB_NXDOMAIN:
 	case KR_RULE_SUB_NODATA:
@@ -797,8 +898,10 @@ int kr_rule_local_subtree(const knot_dname_t *apex, enum kr_rule_sub_t type,
 	knot_db_val_t key = zla_key(apex, key_data);
 
 	// Prepare the data into a temporary buffer.
-	const bool has_ttl = ttl != KR_RULE_TTL_DEFAULT;
-	const int val_len = sizeof(tags) + sizeof(ztype) + (has_ttl ? sizeof(ttl) : 0);
+	const int target_len = has_target ? knot_dname_size(target) : 0;
+	const bool has_ttl = ttl != KR_RULE_TTL_DEFAULT || has_target;
+	const int val_len = sizeof(tags) + sizeof(ztype) + (has_ttl ? sizeof(ttl) : 0)
+			  + target_len;
 	uint8_t buf[val_len], *data = buf;
 	memcpy(data, &tags, sizeof(tags));
 	data += sizeof(tags);
@@ -807,6 +910,10 @@ int kr_rule_local_subtree(const knot_dname_t *apex, enum kr_rule_sub_t type,
 	if (has_ttl) {
 		memcpy(data, &ttl, sizeof(ttl));
 		data += sizeof(ttl);
+	}
+	if (has_target) {
+		memcpy(data, target, target_len);
+		data += target_len;
 	}
 	kr_require(data == buf + val_len);
 
