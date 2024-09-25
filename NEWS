@@ -18,6 +18,7 @@ Improvements
 - views: improve interaction with old-style policies (!1576)
 - stats: add stale answer counter 'answer.stale' (!1591)
 - extended_errors: answer with EDE in more cases (!1585, !1588, !1590, !1592)
+- local-data: make DNAMEs work, i.e. generate CNAMEs (!1609)
 
 Bugfixes
 --------
