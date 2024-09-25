@@ -77,6 +77,13 @@ It provides various input formats described in following subsections.
           34.example.com  AAAA  2001:db8::3
           34.example.com  AAAA  2001:db8::4
 
+   .. warning::
+
+      While you can insert all kinds of records and rules into ``local-data:``,
+      they won't work exactly as in real zones on authoritative servers.
+      For example, wildcards won't get expanded and DNAMEs won't cause occlusion.
+
+
    Response Policy Zones (RPZ)
    ---------------------------
 

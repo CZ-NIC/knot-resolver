@@ -47,8 +47,10 @@ static void rr_scan2trie(zs_scanner_t *s)
 			rr->ttl = s->r_ttl; // we could also warn here
 	} else {
 		rr = *rr_p = mm_alloc(s_data->pool, sizeof(*rr));
-		knot_rrset_init(rr, NULL, s->r_type, KNOT_CLASS_IN, s->r_ttl);
-			// we don't ^^ need owner so save allocation
+		knot_dname_t *owner = NULL; // we only utilize owner for DNAMEs
+		if (s->r_type == KNOT_RRTYPE_DNAME) // Nit: copy could be done a bit faster
+			owner = knot_dname_copy(s->r_owner, s_data->pool);
+		knot_rrset_init(rr, owner, s->r_type, KNOT_CLASS_IN, s->r_ttl);
 	}
 	int ret = knot_rrset_add_rdata(rr, s->r_data, s->r_data_length, s_data->pool);
 	kr_assert(!ret);
