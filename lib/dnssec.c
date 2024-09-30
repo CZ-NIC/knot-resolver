@@ -63,6 +63,10 @@ static int validate_rrsig_rr(int *flags, int cov_labels,
 	if (kr_fails_assert(flags && rrsigs && vctx && vctx->zone_name)) {
 		return kr_error(EINVAL);
 	}
+	if (knot_rrsig_sig_expiration(rrsigs) < knot_rrsig_sig_inception(rrsigs)) {
+		vctx->rrs_counters.expired_before_inception++;
+		return kr_error(EINVAL);
+	}
 	/* bullet 5 */
 	if (knot_rrsig_sig_expiration(rrsigs) < vctx->timestamp) {
 		vctx->rrs_counters.expired++;
@@ -435,25 +439,31 @@ finish:
 	return vctx->result;
 }
 
-bool kr_ds_algo_support(const knot_rrset_t *ta)
+int kr_ds_algo_support(const knot_rrset_t *ta)
 {
 	if (kr_fails_assert(ta && ta->type == KNOT_RRTYPE_DS && ta->rclass == KNOT_CLASS_IN))
-		return false;
+		return kr_error(EINVAL);
 	/* Check if at least one DS has a usable algorithm pair. */
+	int ret = kr_error(ENOENT);
 	knot_rdata_t *rdata_i = ta->rrs.rdata;
 	for (uint16_t i = 0; i < ta->rrs.count;
 			++i, rdata_i = knot_rdataset_next(rdata_i)) {
-		if (dnssec_algorithm_digest_support(knot_ds_digest_type(rdata_i))
-		    && dnssec_algorithm_key_support(knot_ds_alg(rdata_i))) {
-			return true;
-		}
+		if (dnssec_algorithm_digest_support(knot_ds_digest_type(rdata_i))) {
+			if (dnssec_algorithm_key_support(knot_ds_alg(rdata_i)))
+				return kr_ok();
+			else
+				ret = DNSSEC_INVALID_KEY_ALGORITHM;
+		} else
+			ret = DNSSEC_INVALID_DIGEST_ALGORITHM;
 	}
-	return false;
+	return ret;
 }
 
-// Now we instantiate these two as non-inline externally linkable code here (for lua).
+// Now we instantiate these three as non-inline externally linkable code here (for lua).
 KR_EXPORT extern inline KR_PURE
 bool kr_dnssec_key_sep_flag(const uint8_t *dnskey_rdata);
+KR_EXPORT extern inline KR_PURE
+bool kr_dnssec_key_zonekey_flag(const uint8_t *dnskey_rdata);
 KR_EXPORT extern inline KR_PURE
 bool kr_dnssec_key_revoked(const uint8_t *dnskey_rdata);
 

@@ -19,7 +19,7 @@ include /usr/share/dpkg/default.mk
 
 
 %:
-	dh $@ --with python3
+	dh $@ --with python3 --buildsystem pybuild
 
 override_dh_auto_build:
 	meson build_deb \
@@ -35,20 +35,12 @@ override_dh_auto_build:
 		-Dc_args="$${CFLAGS}" \
 		-Dc_link_args="$${LDFLAGS}"
 	ninja -v -C build_deb
-	PYBUILD_NAME=knot_resolver PYBUILD_DESTDIR="$${PYKRES_DESTDIR}" \
-		dh_auto_build --buildsystem=pybuild --sourcedirectory build_deb/python
-	PYBUILD_NAME=knot_resoolver_manager PYBUILD_DESTDIR="$${PYKRES_DESTDIR}" \
-		dh_auto_build --buildsystem=pybuild --sourcedirectory manager
+	PYBUILD_NAME=knot_resolver PYBUILD_DESTDIR="$${PYKRES_DESTDIR}" dh_auto_build
 
 override_dh_auto_install:
 	DESTDIR="$(shell pwd)/debian/tmp" ninja -v -C build_deb install
-	PYBUILD_NAME=knot_resolver PYBUILD_DESTDIR="$${PYKRES_DESTDIR}" \
-		dh_auto_install --buildsystem=pybuild --sourcedirectory build_deb/python
-	PYBUILD_NAME=knot_resolver_manager PYBUILD_DESTDIR="$${PYKRES_DESTDIR}" \
-		dh_auto_install --buildsystem=pybuild --sourcedirectory manager
-	install -m 644 -D manager/etc/knot-resolver/config.yaml debian/tmp/etc/knot-resolver/config.yaml
-	install -m 644 -D manager/shell-completion/client.bash debian/tmp/usr/share/bash-completion/completions/kresctl
-	install -m 644 -D manager/shell-completion/client.fish debian/tmp/usr/share/fish/completions/kresctl.fish
+	PYBUILD_NAME=knot_resolver PYBUILD_DESTDIR="$${PYKRES_DESTDIR}" dh_auto_install
+	install -m 644 -D etc/config/config.yaml debian/tmp/etc/knot-resolver/config.yaml
 
 override_dh_auto_test:
 	meson test -C build_deb

@@ -27,11 +27,30 @@ M.layer = {
 		local now = ffi.C.kr_now()
 		local deadline = qry.creation_time_mono + M.timeout
 		if now > deadline or qry.flags.NO_NS_FOUND then
-			log_debug(ffi.C.LOG_GRP_SRVSTALE, '   => no reachable NS, using stale data')
+			log_qry(qry, ffi.C.LOG_GRP_SRVSTALE,
+				'   => no reachable NS, using stale data "%s"',
+				kres.dname2str(qry:name()))
 			qry.stale_cb = M.callback
 			-- TODO: probably start the same request that doesn't stale-serve,
 			-- but first we need some detection of non-interactive / internal requests.
 			-- resolve(kres.dname2str(qry.sname), qry.stype, qry.sclass)
+		end
+
+		return state
+	end,
+
+	answer_finalize = function (state, req)
+		local qry = req:resolved()
+		if state ~= kres.DONE or qry == nil then
+			return state
+		end
+
+		if req.stale_accounted and qry.stale_cb ~= nil then
+			if req.answer:rcode() == kres.rcode.NOERROR then
+				req:set_extended_error(kres.extended_error.STALE, 'WFAC')
+			elseif req.answer:rcode() == kres.rcode.NXDOMAIN then
+				req:set_extended_error(kres.extended_error.STALE_NXD, 'QSF6')
+			end
 		end
 
 		return state

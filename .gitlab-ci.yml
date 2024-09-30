@@ -20,7 +20,7 @@ variables:
   # IMAGE_TAG is a Git branch/tag name from https://gitlab.nic.cz/knot/knot-resolver-ci
   # In general, keep it pointing to a tag - use a branch only for development.
   # More info in the knot-resolver-ci repository.
-  IMAGE_TAG: 'v20240606'
+  IMAGE_TAG: 'v20240924'
   IMAGE_PREFIX: '$CI_REGISTRY/knot/knot-resolver-ci'
 
 image: $IMAGE_PREFIX/debian12-knot_3_3:$IMAGE_TAG
@@ -130,7 +130,7 @@ build-arch:
 build-stable:
   <<: *build
   script:
-    - meson build_ci_stable --prefix=$PREFIX -Dmalloc=disabled -Dwerror=true -Dextra_tests=enabled
+    - meson build_ci_stable --prefix=$PREFIX -Dmalloc=disabled -Dwerror=true -Dextra_tests=enabled -Dbench=enabled
     - ninja -C build_ci_stable
     - ninja -C build_ci_stable install >/dev/null
     - ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite snowflake
@@ -391,7 +391,7 @@ manager:
   stage: test
   needs: []
   trigger:
-    include: manager/.gitlab-ci.yml
+    include: .gitlab-ci.manager.yml
     strategy: depend
   except:
     refs:
@@ -579,7 +579,7 @@ obs:trigger: &obs_trigger
     - pip install --upgrade pip
     - pip install apkg
     - scripts/make-obs.sh
-    - echo y | scripts/build-in-obs.sh $OBS_REPO
+    - echo y | scripts/ci/build-in-obs.sh $OBS_REPO
 
 obs:release:
   <<: *obs_trigger
@@ -606,7 +606,7 @@ obs:odvr:
 
 .enable_repo_build: &enable_repo_build
   before_script:
-    - ./scripts/enable-repo-cznic-labs.sh knot-dns
+    - ./scripts/ci/enable-repo-cznic-labs.sh knot-dns
 
 .pkg_test: &pkg_test
   stage: pkg
@@ -698,9 +698,14 @@ pkg:alma-9:
 
 pkg:arch:
   <<: *pkg_test_user
-  image: $CI_REGISTRY/packaging/apkg/full/arch
+  image: $CI_REGISTRY/packaging/apkg/test/arch
+  tags:
+    - docker
+    - linux
+    - amd64
   before_script:
     - pacman -Syy
+    - pip install apkg
 
 # RHEL 8 derivatives would need more work due to *default* python being old
 #pkg:rocky-8:

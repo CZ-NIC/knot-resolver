@@ -181,13 +181,7 @@ CFLAGS="%{optflags}" LDFLAGS="%{?__global_ldflags}" meson build_rpm \
 
 %{NINJA} -v -C build_rpm
 
-pushd build_rpm/python
 %py3_build
-popd
-
-pushd manager
-%py3_build
-popd
 
 %install
 DESTDIR="${RPM_BUILD_ROOT}" %{NINJA} -v -C build_rpm install
@@ -215,18 +209,10 @@ install -m 755 -d %{buildroot}/%{_pkgdocdir}
 mv %{buildroot}/%{_datadir}/doc/%{name}/* %{buildroot}/%{_pkgdocdir}/
 %endif
 
-pushd build_rpm/python
+# install knot_resolver python module
 %py3_install
-popd
 
-# install knot-resolver-manager
-pushd manager
-%py3_install
-install -m 644 -D etc/knot-resolver/config.yaml %{buildroot}%{_sysconfdir}/knot-resolver/config.yaml
-install -m 644 -D shell-completion/client.bash %{buildroot}%{_datarootdir}/bash-completion/completions/kresctl
-install -m 644 -D shell-completion/client.fish %{buildroot}%{_datarootdir}/fish/completions/kresctl.fish
-
-popd
+install -m 644 -D etc/config/config.yaml %{buildroot}%{_sysconfdir}/knot-resolver/config.yaml
 
 %pre
 getent group knot-resolver >/dev/null || groupadd -r knot-resolver
@@ -306,18 +292,9 @@ getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysc
 %{_libdir}/knot-resolver/kres_modules/view.lua
 %{_libdir}/knot-resolver/kres_modules/watchdog.lua
 %{_libdir}/knot-resolver/kres_modules/workarounds.lua
-%{python3_sitelib}/knot_resolver.py
-%{python3_sitelib}/knot_resolver-*
-%{python3_sitearch}/knot_resolver_manager*
-%if 0%{?suse_version}
-%pycache_only %{python3_sitelib}/__pycache__/knot_resolver.*
-%else
-%{python3_sitelib}/__pycache__/knot_resolver.*
-%endif
+%{python3_sitearch}/knot_resolver*
 %{_mandir}/man8/kresd.8.gz
 %{_mandir}/man8/kresctl.8.gz
-%{_datarootdir}/bash-completion/completions/kresctl
-%{_datarootdir}/fish/completions/kresctl.fish
 
 %files devel
 %{_includedir}/libkres

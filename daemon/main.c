@@ -138,24 +138,6 @@ end:
  * Server operation.
  */
 
-static int fork_workers(int forks)
-{
-	/* Fork subprocesses if requested */
-	while (--forks > 0) {
-		int pid = fork();
-		if (pid < 0) {
-			perror("[system] fork");
-			return kr_error(errno);
-		}
-
-		/* Forked process */
-		if (pid == 0) {
-			return forks;
-		}
-	}
-	return 0;
-}
-
 static void help(int argc, char *argv[])
 {
 	printf("Usage: %s [parameters] [rundir]\n", argv[0]);
@@ -174,7 +156,7 @@ static void help(int argc, char *argv[])
 }
 
 /** \return exit code for main()  */
-static int run_worker(uv_loop_t *loop, bool leader, struct args *args)
+static int run_worker(uv_loop_t *loop, struct args *args)
 {
 	/* Only some kinds of stdin work with uv_pipe_t.
 	 * Otherwise we would abort() from libuv e.g. with </dev/null */
@@ -227,7 +209,6 @@ static void args_init(struct args *args)
 {
 	memset(args, 0, sizeof(struct args));
 	/* Zeroed arrays are OK. */
-	args->forks = 1;
 	args->control_fd = -1;
 	args->interactive = true;
 	args->quiet = false;
@@ -255,7 +236,6 @@ static int parse_args(int argc, char **argv, struct args *args)
 		{"addr",       required_argument, 0, 'a'},
 		{"tls",        required_argument, 0, 't'},
 		{"config",     required_argument, 0, 'c'},
-		{"forks",      required_argument, 0, 'f'},
 		{"noninteractive",   no_argument, 0, 'n'},
 		{"verbose",          no_argument, 0, 'v'},
 		{"quiet",            no_argument, 0, 'q'},
@@ -279,20 +259,6 @@ static int parse_args(int argc, char **argv, struct args *args)
 			kr_require(optarg);
 			array_push(args->config, optarg);
 			break;
-		case 'f':
-			kr_require(optarg);
-			args->forks = strtol(optarg, NULL, 10);
-			if (args->forks == 1) {
-				kr_log_deprecate(SYSTEM, "use --noninteractive instead of --forks=1\n");
-			} else {
-				kr_log_deprecate(SYSTEM, "support for running multiple --forks will be removed\n");
-			}
-			if (args->forks <= 0) {
-				kr_log_error(SYSTEM, "error '-f' requires a positive"
-						" number, not '%s'\n", optarg);
-				return EXIT_FAILURE;
-			}
-			/* fall through */
 		case 'n':
 			args->interactive = false;
 			break;
@@ -516,12 +482,6 @@ int main(int argc, char **argv)
 				(long)rlim.rlim_cur);
 	}
 
-	/* Fork subprocesses if requested */
-	int fork_id = fork_workers(the_args->forks);
-	if (fork_id < 0) {
-		return EXIT_FAILURE;
-	}
-
 	kr_crypto_init();
 
 	network_init(uv_default_loop(), TCP_BACKLOG_DEFAULT);
@@ -640,7 +600,7 @@ int main(int argc, char **argv)
 	kr_rules_commit(true);
 
 	/* Run the event loop */
-	ret = run_worker(loop, fork_id == 0, the_args);
+	ret = run_worker(loop, the_args);
 
 cleanup:/* Cleanup. */
 	network_unregister();

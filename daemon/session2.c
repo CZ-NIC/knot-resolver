@@ -631,18 +631,21 @@ static int session2_submit(
 	if (had_comm_param) {
 		struct comm_addr_storage *addrst = &ctx->comm_addr_storage;
 		if (comm->src_addr) {
-			memcpy(&addrst->src_addr.ip, comm->src_addr,
-				kr_sockaddr_len(comm->src_addr));
+			int len = kr_sockaddr_len(comm->src_addr);
+			kr_require(len > 0 && len <= sizeof(union kr_sockaddr));
+			memcpy(&addrst->src_addr, comm->src_addr, len);
 			ctx->comm_storage.src_addr = &addrst->src_addr.ip;
 		}
 		if (comm->comm_addr) {
-			memcpy(&addrst->comm_addr.ip, comm->comm_addr,
-				kr_sockaddr_len(comm->comm_addr));
+			int len = kr_sockaddr_len(comm->comm_addr);
+			kr_require(len > 0 && len <= sizeof(union kr_sockaddr));
+			memcpy(&addrst->comm_addr, comm->comm_addr, len);
 			ctx->comm_storage.comm_addr = &addrst->comm_addr.ip;
 		}
 		if (comm->dst_addr) {
-			memcpy(&addrst->dst_addr.ip, comm->dst_addr,
-				kr_sockaddr_len(comm->dst_addr));
+			int len = kr_sockaddr_len(comm->dst_addr);
+			kr_require(len > 0 && len <= sizeof(union kr_sockaddr));
+			memcpy(&addrst->dst_addr, comm->dst_addr, len);
 			ctx->comm_storage.dst_addr = &addrst->dst_addr.ip;
 		}
 		ctx->comm = &ctx->comm_storage;
@@ -1217,11 +1220,12 @@ int session2_unwrap_after(struct session2 *s, enum protolayer_type protocol,
                           const struct comm_info *comm,
                           protolayer_finished_cb cb, void *baton)
 {
-	ssize_t layer_ix = session2_get_protocol(s, protocol) + 1;
-	if (layer_ix < 0)
-		return layer_ix;
+	ssize_t layer_ix = session2_get_protocol(s, protocol);
+	bool ok = layer_ix >= 0 && layer_ix + 1 < protolayer_grps[s->proto].num_layers;
+	if (kr_fails_assert(ok)) // not found or "last layer"
+		return kr_error(EINVAL);
 	return session2_submit(s, PROTOLAYER_UNWRAP,
-			layer_ix, payload, comm, cb, baton);
+			layer_ix + 1, payload, comm, cb, baton);
 }
 
 int session2_wrap(struct session2 *s, struct protolayer_payload payload,
@@ -1238,10 +1242,10 @@ int session2_wrap_after(struct session2 *s, enum protolayer_type protocol,
                         const struct comm_info *comm,
                         protolayer_finished_cb cb, void *baton)
 {
-	ssize_t layer_ix = session2_get_protocol(s, protocol) - 1;
-	if (layer_ix < 0)
-		return layer_ix;
-	return session2_submit(s, PROTOLAYER_WRAP, layer_ix,
+	ssize_t layer_ix = session2_get_protocol(s, protocol);
+	if (kr_fails_assert(layer_ix > 0)) // not found or "last layer"
+		return kr_error(EINVAL);
+	return session2_submit(s, PROTOLAYER_WRAP, layer_ix - 1,
 			payload, comm, cb, baton);
 }
 
@@ -1471,8 +1475,10 @@ static int session2_transport_pushv(struct session2 *s,
 						ctx);
 				return kr_ok();
 			} else {
-				int ret = uv_udp_try_send((uv_udp_t*)handle,
-						(uv_buf_t *)iov, iovcnt, comm->comm_addr);
+				int ret = uv_udp_try_send((uv_udp_t*)handle, (uv_buf_t *)iov, iovcnt,
+					the_network->enable_connect_udp ? NULL : comm->comm_addr);
+				if (ret > 0) // equals buffer size, only confuses us
+					ret = 0;
 				if (ret == UV_EAGAIN) {
 					ret = kr_error(ENOBUFS);
 					session2_event(s, PROTOLAYER_EVENT_OS_BUFFER_FULL, NULL);
@@ -1504,6 +1510,8 @@ static int session2_transport_pushv(struct session2 *s,
 				ret = kr_error(ENOBUFS);
 				session2_event(s, PROTOLAYER_EVENT_OS_BUFFER_FULL, NULL);
 			}
+			else if (ret > 0) // iovec_sum was checked, let's not get confused anymore
+				ret = 0;
 
 			if (false && ret == UV_EAGAIN) {
 				uv_write_t *req = malloc(sizeof(*req));

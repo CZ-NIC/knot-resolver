@@ -248,6 +248,7 @@ struct kr_request {
 	ranked_rr_array_t add_selected;
 	_Bool answ_validated;
 	_Bool auth_validated;
+	_Bool stale_accounted;
 	uint8_t rank;
 	struct kr_rplan rplan;
 	trace_log_f trace_log;
@@ -349,7 +350,7 @@ struct kr_query_data_src {
 	kr_rule_fwd_flags_t flags;
 	knot_db_val_t targets_ptr;
 };
-enum kr_rule_sub_t {KR_RULE_SUB_EMPTY = 1, KR_RULE_SUB_NXDOMAIN, KR_RULE_SUB_NODATA, KR_RULE_SUB_REDIRECT};
+enum kr_rule_sub_t {KR_RULE_SUB_EMPTY = 1, KR_RULE_SUB_NXDOMAIN, KR_RULE_SUB_NODATA, KR_RULE_SUB_REDIRECT, KR_RULE_SUB_DNAME};
 enum kr_proto {KR_PROTO_INTERNAL, KR_PROTO_UDP53, KR_PROTO_TCP53, KR_PROTO_DOT, KR_PROTO_DOH, KR_PROTO_DOQ, KR_PROTO_COUNT};
 typedef unsigned char kr_proto_set;
 kr_layer_t kr_layer_t_static;
@@ -489,6 +490,7 @@ int kr_ta_add(trie_t *, const knot_dname_t *, uint16_t, uint32_t, const uint8_t 
 int kr_ta_del(trie_t *, const knot_dname_t *);
 void kr_ta_clear(trie_t *);
 _Bool kr_dnssec_key_sep_flag(const uint8_t *);
+_Bool kr_dnssec_key_zonekey_flag(const uint8_t *);
 _Bool kr_dnssec_key_revoked(const uint8_t *);
 int kr_dnssec_key_tag(uint16_t, const uint8_t *, size_t);
 int kr_dnssec_key_match(const uint8_t *, size_t, const uint8_t *, size_t);
@@ -542,7 +544,6 @@ struct args {
 	addr_array_t addrs_tls;
 	flagged_fd_array_t fds;
 	int control_fd;
-	int forks;
 	config_array_t config;
 	const char *rundir;
 	_Bool interactive;
@@ -589,6 +590,7 @@ struct network {
 		int snd;
 		int rcv;
 	} listen_tcp_buflens;
+	_Bool enable_connect_udp;
 };
 struct args *the_args;
 struct endpoint {

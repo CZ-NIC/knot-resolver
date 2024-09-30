@@ -78,6 +78,7 @@ void network_init(uv_loop_t *loop, int tcp_backlog)
 	the_network->tcp.tls_handshake_timeout = TLS_MAX_HANDSHAKE_TIME;
 	the_network->tcp.user_timeout = 1000; // 1s should be more than enough
 	the_network->tcp_backlog = tcp_backlog;
+	the_network->enable_connect_udp = true;
 
 	// On Linux, unset means some auto-tuning mechanism also depending on RAM,
 	// which might be OK default (together with the user_timeout above)

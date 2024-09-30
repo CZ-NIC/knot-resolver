@@ -13,7 +13,6 @@ if get_option('unit_tests') != 'disabled'
   message('-------------------------------')
 endif
 
-build_extra_tests = get_option('extra_tests') == 'enabled'
 build_config_tests = get_option('config_tests') == 'enabled'
 if get_option('config_tests') == 'auto'
   build_config_tests = build_extra_tests

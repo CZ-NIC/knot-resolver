@@ -4,7 +4,7 @@
 # man page
 man_config = configuration_data()
 man_config.set('version', meson.project_version())
-man_config.set('date', run_command('../scripts/get-date.sh', check: true).stdout())
+man_config.set('date', run_command('../scripts/lib/get-date.sh', check: true).stdout())
 
 man_config.set('man_seealso_systemd', '')
 if systemd_legacy_units == 'enabled'
@@ -72,7 +72,7 @@ if get_option('doc') == 'enabled'
 endif
 
 
-make_doc = find_program('../scripts/make-doc.sh')
+make_doc = find_program('../scripts/meson/make-doc.sh')
 run_target(
   'doc',
   command: make_doc

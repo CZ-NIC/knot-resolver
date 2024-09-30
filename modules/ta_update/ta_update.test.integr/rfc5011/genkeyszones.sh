@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/usr/bin/env bash
 
 # First, generate DNSSEC keys with timers set to simulate 2017 KSK roll-over.
 # Second, fake system time to pretend that we are at the beginning on time slots

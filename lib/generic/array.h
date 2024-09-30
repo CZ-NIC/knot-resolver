@@ -122,7 +122,7 @@ static inline void array_std_free(void *baton, void *p)
  * @return element index on success, <0 on failure
  */
 #define array_push_mm(array, val, reserve, baton) \
-	(int)((array).len < (array).cap ? ((array).at[(array).len] = (val), (array).len++) \
+	(ssize_t)((array).len < (array).cap ? ((array).at[(array).len] = (val), (array).len++) \
 		: (array_reserve_mm(array, ((array).cap + 1), reserve, baton) < 0 ? -1 \
 			: ((array).at[(array).len] = (val), (array).len++)))
 

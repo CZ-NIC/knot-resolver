@@ -340,7 +340,6 @@ static void tls_close(struct pl_tls_sess_data *tls, struct session2 *session, bo
 	}
 }
 
-#if TLS_CAN_USE_PINS
 /*
   DNS-over-TLS Out of band key-pinned authentication profile uses the
   same form of pins as HPKP:
@@ -384,11 +383,11 @@ static int get_oob_key_pin(gnutls_x509_crt_t crt, char *outchar, ssize_t outchar
 	err = kr_base64_encode((uint8_t *)raw_pin, sizeof(raw_pin),
 			    (uint8_t *)outchar, outchar_len);
 	if (err >= 0 && err < outchar_len) {
-		err = GNUTLS_E_SUCCESS;
 		outchar[err] = '\0'; /* kr_base64_encode() doesn't do it */
+		err = GNUTLS_E_SUCCESS;
 	} else if (kr_fails_assert(err < 0)) {
-		err = kr_error(ENOSPC); /* base64 fits but '\0' doesn't */
 		outchar[outchar_len - 1] = '\0';
+		err = kr_error(ENOSPC); /* base64 fits but '\0' doesn't */
 	}
 leave:
 	gnutls_free(datum.data);
@@ -428,12 +427,6 @@ void tls_credentials_log_pins(struct tls_credentials *tls_credentials)
 		gnutls_free(certs);
 	}
 }
-#else
-void tls_credentials_log_pins(struct tls_credentials *tls_credentials)
-{
-	kr_log_debug(TLS, "could not calculate RFC 7858 OOB key-pin; GnuTLS 3.4.0+ required\n");
-}
-#endif
 
 static int str_replace(char **where_ptr, const char *with)
 {
@@ -715,6 +708,41 @@ int tls_client_param_remove(tls_client_params_t *params, const struct sockaddr *
 	return kr_ok();
 }
 
+static void log_all_pins(tls_client_param_t *params)
+{
+	uint8_t buffer[TLS_SHA256_BASE64_BUFLEN + 1];
+	for (int i = 0; i < params->pins.len; i++) {
+		int len = kr_base64_encode(params->pins.at[i], TLS_SHA256_RAW_LEN,
+			     		   buffer, TLS_SHA256_BASE64_BUFLEN);
+		if (!kr_fails_assert(len > 0)) {
+			buffer[len] = '\0';
+			kr_log_error(TLSCLIENT, "pin no.   %d: %s\n", i, buffer);
+		}
+	}
+}
+
+static void log_all_certificates(const unsigned int cert_list_size,
+			  const gnutls_datum_t *cert_list)
+{
+	for (int i = 0; i < cert_list_size; i++) {
+		gnutls_x509_crt_t cert;
+		if (gnutls_x509_crt_init(&cert) != GNUTLS_E_SUCCESS) {
+			return;
+		}
+		if (gnutls_x509_crt_import(cert, &cert_list[i], GNUTLS_X509_FMT_DER) != GNUTLS_E_SUCCESS) {
+			gnutls_x509_crt_deinit(cert);
+			return;
+		}
+		char cert_pin[TLS_SHA256_BASE64_BUFLEN];
+		if (get_oob_key_pin(cert, cert_pin, sizeof(cert_pin), false) != GNUTLS_E_SUCCESS) {
+			gnutls_x509_crt_deinit(cert);
+			return;
+		}
+		kr_log_error(TLSCLIENT, "Certificate: %s\n", cert_pin);
+		gnutls_x509_crt_deinit(cert);
+	}
+}
+
 /**
  * Verify that at least one certificate in the certificate chain matches
  * at least one certificate pin in the non-empty params->pins array.
@@ -726,7 +754,6 @@ static int client_verify_pin(const unsigned int cert_list_size,
 {
 	if (kr_fails_assert(params->pins.len > 0))
 		return GNUTLS_E_CERTIFICATE_ERROR;
-#if TLS_CAN_USE_PINS
 	for (int i = 0; i < cert_list_size; i++) {
 		gnutls_x509_crt_t cert;
 		int ret = gnutls_x509_crt_init(&cert);
@@ -740,20 +767,6 @@ static int client_verify_pin(const unsigned int cert_list_size,
 			return ret;
 		}
 
-	#ifdef DEBUG
-		if (kr_log_is_debug(TLS, NULL)) {
-			char pin_base64[TLS_SHA256_BASE64_BUFLEN];
-			/* DEBUG: additionally compute and print the base64 pin.
-			 * Not very efficient, but that's OK for DEBUG. */
-			ret = get_oob_key_pin(cert, pin_base64, sizeof(pin_base64), false);
-			if (ret == GNUTLS_E_SUCCESS) {
-				VERBOSE_MSG(true, "received pin: %s\n", pin_base64);
-			} else {
-				VERBOSE_MSG(true, "failed to convert received pin\n");
-				/* Now we hope that `ret` below can't differ. */
-			}
-		}
-	#endif
 		char cert_pin[TLS_SHA256_RAW_LEN];
 		/* Get raw pin and compare. */
 		ret = get_oob_key_pin(cert, cert_pin, sizeof(cert_pin), true);
@@ -774,13 +787,9 @@ static int client_verify_pin(const unsigned int cert_list_size,
 
 	kr_log_error(TLSCLIENT, "no pin matched: %zu pins * %d certificates\n",
 			params->pins.len, cert_list_size);
+	log_all_pins(params);
+	log_all_certificates(cert_list_size, cert_list);
 	return GNUTLS_E_CERTIFICATE_ERROR;
-
-#else /* TLS_CAN_USE_PINS */
-	kr_log_error(TLSCLIENT, "internal inconsistency: TLS_CAN_USE_PINS\n");
-	kr_assert(false);
-	return GNUTLS_E_CERTIFICATE_ERROR;
-#endif
 }
 
 /**

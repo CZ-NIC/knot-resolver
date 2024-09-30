@@ -22,12 +22,12 @@ knot_version = '>=3.3'
 libknot = dependency('libknot', version: knot_version)
 libdnssec = dependency('libdnssec', version: knot_version)
 libzscanner = dependency('libzscanner', version: knot_version)
-libuv = dependency('libuv', version: '>=1.7')
+libuv = dependency('libuv', version: '>=1.27')  # need uv_udp_connect()
 lmdb = dependency('lmdb', required: false)
 if not lmdb.found()  # darwin workaround: missing pkgconfig
   lmdb = meson.get_compiler('c').find_library('lmdb')
 endif
-gnutls = dependency('gnutls')
+gnutls = dependency('gnutls', version: '>=3.4')
 luajit = dependency('luajit')
 # https://mesonbuild.com/howtox.html#add-math-library-lm-portably
 libm = meson.get_compiler('c').find_library('m', required : false)
@@ -35,6 +35,7 @@ message('------------------------------')
 
 
 # Variables
+auto_prefixes = ['/', '/usr', '/usr/local']
 libkres_soversion = 9
 
 libext = '.so'
@@ -56,7 +57,15 @@ modules_dir = lib_dir / 'kres_modules'
 sbin_dir = prefix / get_option('sbindir')
 bin_dir = prefix / get_option('bindir')
 if host_machine.system() == 'linux'
-  run_dir = '/run' / 'knot-resolver'
+  # When installing from sources with a non-standard prefix,
+  # we need to set the correct run directory with the prefix,
+  # otherwise rwx permissions will fail with a validation error
+  # on the run directory
+  if prefix in auto_prefixes
+    run_dir = '/run' / 'knot-resolver'
+  else
+    run_dir = prefix / 'run' / 'knot-resolver'
+  endif
 elif host_machine.system() == 'darwin'
   run_dir = prefix / get_option('localstatedir') / 'run' / 'knot-resolver'
 else
@@ -73,7 +82,6 @@ completion_dir = prefix / 'share'
 # When installing from sources into a non-standard prefix and the library is
 # shared/dynamic, we need to set the executables' RPATH so that they can find
 # `libkresd`, otherwise running them will fail with dynamic linkage errors
-auto_prefixes = ['/', '/usr', '/usr/local']
 rpath_opt = get_option('install_rpath')
 if (get_option('default_library') == 'static' or
     rpath_opt == 'disabled' or
@@ -139,9 +147,15 @@ systemd_files = get_option('systemd_files')
 systemd_legacy_units = get_option('systemd_legacy_units')
 libsystemd = dependency('libsystemd', required: systemd_files == 'enabled')
 
+# Uh, lifted this trivial line from tests/meson.build due to dependency sorting:
+build_extra_tests = get_option('extra_tests') == 'enabled'
+
 ### Allocator
 # use empty name to disable the dependency, but still compile the dependent kresd
-malloc_name = get_option('malloc') == 'disabled' ? '' : 'jemalloc'
+malloc_name = ''
+if get_option('malloc') == 'jemalloc' or (get_option('malloc') == 'auto' and not build_extra_tests)
+  malloc_name = 'jemalloc'
+endif
 malloc = meson.get_compiler('c').find_library(
   malloc_name,
   required: get_option('malloc') == 'jemalloc',
@@ -264,7 +278,7 @@ subdir('lib')
 ## Remaining code
 subdir('daemon')
 subdir('modules')
-subdir('python')
+subdir('python' / 'knot_resolver')
 subdir('utils')
 if get_option('bench') == 'enabled'
   subdir('bench')
@@ -300,7 +314,7 @@ message('--- lint dependencies ---')
 clangtidy = find_program('clang-tidy', required: false)
 luacheck = find_program('luacheck', required: false)
 flake8 = find_program('flake8', required: false)
-pylint_run = find_program('scripts/run-pylint.sh')
+pylint_run = find_program('scripts/meson/run-pylint.sh')
 message('-------------------------')
 
 if clangtidy.found()

@@ -1,0 +1,157 @@
+[tool.poetry]
+name = "knot-resolver"
+version = "6.0.8"
+description = "Knot Resolver Manager - a Python program that automatically manages the other components of the resolver"
+license = "GPL-3.0-or-later"
+authors = [
+    "Aleš Mrázek <ales.mrazek@nic.cz>",
+    "Václav Šraier <vaclav.sraier@nic.cz>"
+]
+maintainers = [
+    "Aleš Mrázek <ales.mrazek@nic.cz>"
+]
+readme = "README.md"
+homepage = "https://www.knot-resolver.cz"
+repository = "https://gitlab.nic.cz/knot/knot-resolver"
+documentation = "https://www.knot-resolver.cz/documentation"
+
+packages = [
+    {include = "knot_resolver", from = "python"}
+]
+exclude = ["**/*.in", "**/meson.build"]
+
+# See currently open issue about building C extensions here:
+# https://github.com/python-poetry/poetry/issues/2740
+[tool.poetry.build]
+script = "build_c_extensions.py"
+generate-setup-file = true
+
+[tool.poetry.dependencies]
+python = "^3.8"
+aiohttp = "*"
+jinja2 = "*"
+pyyaml = "*"
+supervisor = "*"
+typing-extensions = "*"
+prometheus-client = { version = "*", optional = true }
+
+[tool.poetry.extras]
+prometheus = ["prometheus-client"]
+
+[tool.poetry.group.dev.dependencies]
+poetry = "^1.8.3"
+pyparsing = "^3.1.1"
+poethepoet = "^0.24.4"
+debugpy = "^1.8.1"
+
+[tool.poetry.group.test.dependencies]
+pytest = "^8.0.1"
+pytest-cov = "^4.1.0"
+pytest-asyncio = "^0.23.5"
+toml = "^0.10.2"
+
+[tool.poetry.group.lint.dependencies]
+black = "^24.2.0"
+isort = "^5.13.2"
+toml = "^0.10.2"
+mypy = "^1.8.0"
+types-pyyaml = "^6.0.12.12"
+pylint = "^3.0.3"
+flake8 = {version = "*", python = "^3.8.1"}
+
+[tool.poetry.group.docs.dependencies]
+sphinx = "^5.3.0"
+sphinx-tabs = "^3.4.5"
+sphinx-rtd-theme = "^2.0.0"
+breathe = "^4.35.0"
+json-schema-for-humans = "^0.47"
+
+[tool.poetry.scripts]
+kresctl = 'knot_resolver.client.main:main'
+knot-resolver = 'knot_resolver.manager.main:main'
+
+[tool.poe.tasks]
+# tasks runed through scripts located in 'scripts/poe-tasks/'
+configure = { cmd = "scripts/poe-tasks/configure", help = "(Re)configure Meson build directory" }
+run = { cmd = "scripts/poe-tasks/run", help = "Run Knot Resolver" }
+run-debug = { cmd = "scripts/poe-tasks/run-debug", help = "Debug Knot Resolver with debugpy" }
+doc = { cmd = "scripts/poe-tasks/doc", help = "Create Knot Resolver HTML documentation" }
+doc-schema = { cmd = "scripts/poe-tasks/doc-schema", help = "Generate a JSON schema of the Knot Resolver configuration"}
+test = { cmd = "scripts/poe-tasks/test", help = "Run pytest unit tests" }
+check = { cmd = "scripts/poe-tasks/check", help = "Check that all dependencies are installed and run static code analysis" }
+examples = { cmd = "scripts/poe-tasks/examples", help = "Validate all configuration examples using 'kresctl validate' utility" }
+gen-constantspy = { cmd = "scripts/poe-tasks/gen-constantspy", help = "Generate 'constants.py' module using Meson configured options" }
+gen-setuppy = { cmd = "scripts/poe-tasks/gen-setuppy", help = "Generate 'setup.py' file for backwards compatibility" }
+format = { cmd = "scripts/poe-tasks/format", help = "Run code formatter" }
+kresctl = { cmd = "scripts/poe-tasks/kresctl", help="Run kresctl utility" }
+clean = { cmd = "scripts/poe-tasks/clean", help="Cleanup build directories and files" }
+
+[tool.black]
+line-length = 120
+target_version = ['py312']
+include = '\.py$'
+exclude = "setup.py"    # Poetry generates it and we want to keep it unchanged
+
+[tool.isort]
+line_length=120                # corresponds to -w  flag
+profile = "black"
+multi_line_output=3            # corresponds to -m  flag
+include_trailing_comma=true    # corresponds to -tc flag
+skip_glob = '^((?!py$).)*$'    # isort all Python files
+float_to_top=true
+skip = "setup.py"   # Poetry generates it and we want to keep it unchanged
+known_first_party="knot_resolver"
+
+[tool.pylint."MESSAGES CONTROL"]
+disable= [
+    "broad-except",
+    "fixme",
+    "global-statement",
+    "invalid-name",
+    "line-too-long",  # checked by flake8
+    "missing-docstring",
+    "no-else-return",
+    "too-few-public-methods",
+    "unused-import",  # checked by flake8,
+    "too-many-return-statements", # would prevent us from using recursive tree traversals
+    "logging-fstring-interpolation", # see https://github.com/PyCQA/pylint/issues/1788
+    "no-else-raise", # not helpful for readability, when we want explicit branches
+    "raising-bad-type", # handled by type checker
+    "too-many-arguments",  # sure, but how can we change the signatures to take less arguments? artificially create objects with arguments? That's stupid...
+    "invalid-overridden-method",  # hopefully checked by type checkers
+    "no-member",  # pylint does not do it properly
+    "import-error", # pylint does not do it properly
+]
+
+[tool.pylint.SIMILARITIES]
+min-similarity-lines = "6"
+ignore-comments = "yes"
+ignore-docstrings = "yes"
+ignore-imports = "yes"
+
+[tool.pylint.DESIGN]
+max-parents = "10"
+
+[tool.mypy]
+python_version = "3.12"
+# strict = true
+disallow_any_generics = true
+disallow_subclassing_any = true
+disallow_untyped_calls = false
+disallow_untyped_decorators = true
+pretty = true
+show_error_codes = true
+allow_redefinition = true
+disallow_untyped_defs = false
+strict_equality = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+implicit_reexport = false
+no_implicit_optional = true
+
+[build-system]
+requires = [
+    "poetry-core>=1.0.0",
+    "setuptools>=67.8.0"
+]
+build-backend = "poetry.core.masonry.api"

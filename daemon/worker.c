@@ -831,6 +831,17 @@ static int transmit(struct qr_task *task)
 	struct comm_info out_comm = {
 		.comm_addr = (struct sockaddr *)choice
 	};
+
+	if (the_network->enable_connect_udp && session->outgoing && !session->stream) {
+		uv_udp_t *udp = (uv_udp_t *)session2_get_handle(session);
+		int connect_tries = 3;
+
+		do {
+			ret = uv_udp_connect(udp, out_comm.comm_addr);
+		} while (ret == UV_EADDRINUSE && --connect_tries > 0);
+		if (ret < 0)
+			kr_log_error(IO, "Failed to establish udp connection: %s\n", uv_strerror(ret));
+	}
 	ret = qr_task_send(task, session, &out_comm, task->pktbuf);
 	if (ret) {
 		session2_close(session);
@@ -2296,9 +2307,6 @@ int worker_init(void)
 	uv_loop_t *loop = uv_default_loop();
 	the_worker->loop = loop;
 
-	static const int worker_count = 1;
-	the_worker->count = worker_count;
-
 	/* Register table for worker per-request variables */
 	struct lua_State *L = the_engine->L;
 	lua_newtable(L);
@@ -2334,8 +2342,6 @@ int worker_init(void)
 
 	lua_pushnumber(L, pid);
 	lua_setfield(L, -2, "pid");
-	lua_pushnumber(L, worker_count);
-	lua_setfield(L, -2, "count");
 
 	char cwd[PATH_MAX];
 	get_workdir(cwd, sizeof(cwd));

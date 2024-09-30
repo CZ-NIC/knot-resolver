@@ -56,8 +56,9 @@ struct kr_rrset_validation_ctx {
 	const struct kr_query *log_qry; /*!< The query; just for logging purposes. */
 	struct {
 		unsigned int matching_name_type;	/*!< Name + type matches */
-		unsigned int expired;
-		unsigned int notyet;
+		unsigned int expired;			/*!< Number of expired signatures */
+		unsigned int notyet;			/*!< Number of signatures not yet valid (inception > now) */
+		unsigned int expired_before_inception;	/*!< Number of signatures already expired before inception time */
 		unsigned int signer_invalid;		/*!< Signer is not zone apex */
 		unsigned int labels_invalid;		/*!< Number of labels in RRSIG */
 		unsigned int key_invalid;		/*!< Algorithm/keytag/key owner */
@@ -78,10 +79,17 @@ typedef struct kr_rrset_validation_ctx kr_rrset_validation_ctx_t;
 int kr_rrset_validate(kr_rrset_validation_ctx_t *vctx, knot_rrset_t *covered);
 
 /**
- * Return true iff the RRset contains at least one usable DS.  See RFC6840 5.2.
+ * Check whether the RRset contains at least one usable DS.
+ *
+ * See RFC6840 5.2.
+ * @param ta    Pointer to TA RRSet.
+ * @return      kr_ok() if at least one DS is supported
+ *              DNSSEC_INVALID_KEY_ALGORITHM if all DSes are not supported, because of their key algorithm
+ *              DNSSEC_INVALID_DIGEST_ALGORITHM if all DSes are not supported, because of their digest algorithm
+ * @note        Given that entries are iterated until a supported DS is found, the error refers to the last one.
  */
 KR_EXPORT KR_PURE
-bool kr_ds_algo_support(const knot_rrset_t *ta);
+int kr_ds_algo_support(const knot_rrset_t *ta);
 
 /**
  * Check whether the DNSKEY rrset matches the supplied trust anchor RRSet.
@@ -97,11 +105,18 @@ int kr_dnskeys_trusted(kr_rrset_validation_ctx_t *vctx, const knot_rdataset_t *s
 // flags: https://www.iana.org/assignments/dnskey-flags/dnskey-flags.xhtml
 //        https://datatracker.ietf.org/doc/html/rfc4034#section-2.1
 
-/** Return true if the DNSKEY has the SEP flag (normally ignored). */
+/** Return true if the DNSKEY has the SEP flag/bit set (normally ignored). */
 KR_EXPORT inline KR_PURE
 bool kr_dnssec_key_sep_flag(const uint8_t *dnskey_rdata)
 {
 	return dnskey_rdata[1] & 0x01;
+}
+
+/** Return true if the DNSKEY has the Zone Key flag/bit set. */
+KR_EXPORT inline KR_PURE
+bool kr_dnssec_key_zonekey_flag(const uint8_t *dnskey_rdata)
+{
+	return dnskey_rdata[0] & 0x01;
 }
 
 /** Return true if the DNSKEY is revoked. */
@@ -111,11 +126,14 @@ bool kr_dnssec_key_revoked(const uint8_t *dnskey_rdata)
 	return dnskey_rdata[1] & 0x80;
 }
 
-/** Return true if the DNSKEY could be used to validate zone records. */
+/**
+ * Return true if the DNSKEY could be used to validate zone records, meaning
+ * it correctly has the Zone Key flag/bit set to 1 and it is not revoked.
+ */
 static inline KR_PURE
 bool kr_dnssec_key_usable(const uint8_t *dnskey_rdata)
 {
-	return (dnskey_rdata[0] & 0x01) && !kr_dnssec_key_revoked(dnskey_rdata);
+	return kr_dnssec_key_zonekey_flag(dnskey_rdata) && !kr_dnssec_key_revoked(dnskey_rdata);
 }
 
 /** Return DNSKEY tag.

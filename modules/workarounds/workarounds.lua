@@ -4,7 +4,7 @@ if not policy then modules.load('policy') end
 
 local M = {} -- the module
 
-function M.config()
+function M.init()
 	policy.add(policy.suffix(policy.FLAGS('NO_0X20'), {
 		--  https://github.com/DNS-OARC/dns-violations/blob/master/2017/DVE-2017-0003.md
 		todname('avqs.mcafee.com'), todname('avts.mcafee.com'),

@@ -1,3 +1,4 @@
+**/__pycache__/
 *.6
 *.Plo
 *.a
@@ -8,6 +9,7 @@
 *.gcno
 *.gcov
 *.info
+*.junit.xml
 *.la
 *.lo
 *.log
@@ -18,17 +20,20 @@
 *.so.*
 *.swp
 *~
+.coverage
 .deps
 .dirstamp
 .libs
+.mypy_cache
 .pytest_cache
-/.build-depend
+/.build*/
 /.cache
+/.install_dev
 /aclocal.m4
 /ar-lib
 /autom4te.cache/*
 /bench/bench_lru
-/build*
+/build*/
 /compile
 /compile_commands.json
 /config.guess
@@ -44,13 +49,13 @@
 /daemon/lua/*.inc
 /daemon/lua/trust_anchors.lua
 /depcomp
+/dist
 /distro/tests/*/.vagrant
 /doc/**/.doctrees
 /doc/**/doxyxml
 /doc/html
 /doc/kresd.8
 /doc/texinfo
-/doc/_static/config.schema.json
 /doc/_static/schema_doc*
 /doc/config-schema-body.md
 /ephemeral_key.pem
@@ -83,3 +88,4 @@ _obj
 kresd.amalg.c
 libkres.amalg.c
 luacov.*.out
+poetry.lock

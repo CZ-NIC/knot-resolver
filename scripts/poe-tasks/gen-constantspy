@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+
+# ensure consistent behaviour
+src_dir="$(dirname "$(realpath "$0")")"
+source $src_dir/utils/_env.sh
+
+echo
+meson_setup_configure
+echo
+echo -----------------------------------------------
+echo Copying constants.py module configured by Meson
+echo -----------------------------------------------
+cp -v $build_dir/python/knot_resolver/constants.py $gitroot/python/knot_resolver/constants.py
+echo

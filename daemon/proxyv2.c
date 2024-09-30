@@ -308,10 +308,13 @@ static inline bool proxy_header_present(const void* buf, const ssize_t nread)
 }
 
 
-struct pl_proxyv2_dgram_iter_data {
+struct pl_proxyv2_state {
 	struct protolayer_data h;
+	/** Storage for data parsed from PROXY header. */
 	struct proxy_result proxy;
-	bool has_proxy;
+	/** Stream/TCP: Some data has already arrived and we are not expecting
+	 * PROXY header anymore. */
+	bool had_data : 1;
 };
 
 static enum protolayer_iter_cb_result pl_proxyv2_dgram_unwrap(
@@ -324,7 +327,7 @@ static enum protolayer_iter_cb_result pl_proxyv2_dgram_unwrap(
 	}
 
 	struct session2 *s = ctx->session;
-	struct pl_proxyv2_dgram_iter_data *udp = iter_data;
+	struct pl_proxyv2_state *proxy_state = iter_data;
 
 	char *data = ctx->payload.buffer.buf;
 	ssize_t data_len = ctx->payload.buffer.len;
@@ -336,7 +339,7 @@ static enum protolayer_iter_cb_result pl_proxyv2_dgram_unwrap(
 			return protolayer_break(ctx, kr_error(EPERM));
 		}
 
-		ssize_t trimmed = proxy_process_header(&udp->proxy, data, data_len);
+		ssize_t trimmed = proxy_process_header(&proxy_state->proxy, data, data_len);
 		if (trimmed == KNOT_EMALF) {
 			if (kr_log_is_debug(IO, NULL)) {
 				kr_log_debug(IO, "<= ignoring malformed PROXYv2 UDP "
@@ -353,12 +356,10 @@ static enum protolayer_iter_cb_result pl_proxyv2_dgram_unwrap(
 			return protolayer_break(ctx, kr_error(EINVAL));
 		}
 
-		if (udp->proxy.command == PROXY2_CMD_PROXY && udp->proxy.family != AF_UNSPEC) {
-			udp->has_proxy = true;
-
-			comm->src_addr = &udp->proxy.src_addr.ip;
-			comm->dst_addr = &udp->proxy.dst_addr.ip;
-			comm->proxy = &udp->proxy;
+		if (proxy_state->proxy.command == PROXY2_CMD_PROXY && proxy_state->proxy.family != AF_UNSPEC) {
+			comm->src_addr = &proxy_state->proxy.src_addr.ip;
+			comm->dst_addr = &proxy_state->proxy.dst_addr.ip;
+			comm->proxy = &proxy_state->proxy;
 
 			if (kr_log_is_debug(IO, NULL)) {
 				kr_log_debug(IO, "<= UDP query from '%s'\n",
@@ -375,19 +376,11 @@ static enum protolayer_iter_cb_result pl_proxyv2_dgram_unwrap(
 	return protolayer_continue(ctx);
 }
 
-
-struct pl_proxyv2_stream_sess_data {
-	struct protolayer_data h;
-	struct proxy_result proxy;
-	bool had_data : 1;
-	bool has_proxy : 1;
-};
-
 static enum protolayer_iter_cb_result pl_proxyv2_stream_unwrap(
 		void *sess_data, void *iter_data, struct protolayer_iter_ctx *ctx)
 {
 	struct session2 *s = ctx->session;
-	struct pl_proxyv2_stream_sess_data *tcp = sess_data;
+	struct pl_proxyv2_state *proxy_state = sess_data;
 	struct sockaddr *peer = session2_get_peer(s);
 
 	if (kr_fails_assert(ctx->payload.type == PROTOLAYER_PAYLOAD_WIRE_BUF)) {
@@ -398,7 +391,7 @@ static enum protolayer_iter_cb_result pl_proxyv2_stream_unwrap(
 	char *data = wire_buf_data(ctx->payload.wire_buf); /* layer's or session's wirebuf */
 	ssize_t data_len = wire_buf_data_length(ctx->payload.wire_buf);
 	struct comm_info *comm = ctx->comm;
-	if (!s->outgoing && !tcp->had_data && proxy_header_present(data, data_len)) {
+	if (!s->outgoing && !proxy_state->had_data && proxy_header_present(data, data_len)) {
 		if (!proxy_allowed(comm->src_addr)) {
 			if (kr_log_is_debug(IO, NULL)) {
 				kr_log_debug(IO, "<= connection to '%s': PROXYv2 not allowed "
@@ -409,7 +402,7 @@ static enum protolayer_iter_cb_result pl_proxyv2_stream_unwrap(
 			return protolayer_break(ctx, kr_error(ECONNRESET));
 		}
 
-		ssize_t trimmed = proxy_process_header(&tcp->proxy, data, data_len);
+		ssize_t trimmed = proxy_process_header(&proxy_state->proxy, data, data_len);
 		if (trimmed < 0) {
 			if (kr_log_is_debug(IO, NULL)) {
 				if (trimmed == KNOT_EMALF) {
@@ -429,9 +422,10 @@ static enum protolayer_iter_cb_result pl_proxyv2_stream_unwrap(
 			return protolayer_break(ctx, kr_error(ECONNRESET));
 		}
 
-		if (tcp->proxy.command != PROXY2_CMD_LOCAL && tcp->proxy.family != AF_UNSPEC) {
-			comm->src_addr = &tcp->proxy.src_addr.ip;
-			comm->dst_addr = &tcp->proxy.dst_addr.ip;
+		if (proxy_state->proxy.command != PROXY2_CMD_LOCAL && proxy_state->proxy.family != AF_UNSPEC) {
+			comm->src_addr = &proxy_state->proxy.src_addr.ip;
+			comm->dst_addr = &proxy_state->proxy.dst_addr.ip;
+			comm->proxy = &proxy_state->proxy;
 
 			if (kr_log_is_debug(IO, NULL)) {
 				kr_log_debug(IO, "<= TCP stream from '%s'\n",
@@ -444,7 +438,7 @@ static enum protolayer_iter_cb_result pl_proxyv2_stream_unwrap(
 		wire_buf_trim(ctx->payload.wire_buf, trimmed);
 	}
 
-	tcp->had_data = true;
+	proxy_state->had_data = true;
 	return protolayer_continue(ctx);
 }
 
@@ -452,12 +446,12 @@ __attribute__((constructor))
 static void proxy_protolayers_init(void)
 {
 	protolayer_globals[PROTOLAYER_TYPE_PROXYV2_DGRAM] = (struct protolayer_globals){
-		.iter_size = sizeof(struct pl_proxyv2_dgram_iter_data),
+		.iter_size = sizeof(struct pl_proxyv2_state),
 		.unwrap = pl_proxyv2_dgram_unwrap,
 	};
 
 	protolayer_globals[PROTOLAYER_TYPE_PROXYV2_STREAM] = (struct protolayer_globals){
-		.sess_size = sizeof(struct pl_proxyv2_stream_sess_data),
+		.sess_size = sizeof(struct pl_proxyv2_state),
 		.unwrap = pl_proxyv2_stream_unwrap,
 	};
 }

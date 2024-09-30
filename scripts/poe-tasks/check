@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+
+# ensure consistent behaviour
+src_dir="$(dirname "$(realpath "$0")")"
+source $src_dir/utils/_env.sh
+
+aggregate_rv=0
+function check_rv {
+	if test "$1" -eq 0; then
+		echo -e "  ${green}OK${reset}"
+	else
+		echo -e "  ${red}FAIL${reset}"
+	fi
+	aggregate_rv=$(( $aggregate_rv + $1 ))
+}
+
+# stop failing early, because we wouldn't do anything else than fail
+set +e
+
+# check that all dependencies are installed correctly
+echo -e "${yellow}Checking that all dependencies are properly installed...${reset}"
+poetry install --dry-run --only main,dev,lint | grep "0 install" > /dev/null
+check_rv $?
+echo
+
+# early exit when dependencies are not installed
+if test "$aggregate_rv" -ne "0"; then
+	echo -e "${red}Dependencies are not properly installed. Run this command to fix it:${reset}"
+	echo -e "  ${red}poetry install${reset}"
+	exit 1
+fi
+
+# check formatting using black
+echo -e "${yellow}Checking formatting using black...${reset}"
+black python/knot_resolver tests/manager scripts/poe-tasks/utils/create_setup.py --check --diff
+check_rv $?
+echo
+
+# check imports formatting using isort
+echo -e "${yellow}Checking imports formatting using isort...${reset}"
+isort python/knot_resolver tests/manager scripts/poe-tasks/utils/create_setup.py --check --diff
+check_rv $?
+echo
+
+# check code with pylint
+echo -e "${yellow}Linting using pylint...${reset}"
+pylint python/knot_resolver
+check_rv $?
+echo
+
+# check code with flake8
+echo -e "${yellow}Linting using flake8...${reset}"
+flake8 --max-line-length=200 --ignore=E266,W503 --extend-ignore=E203 python/knot_resolver
+check_rv $?
+echo
+
+# check types with mypy
+echo -e "${yellow}Type checking using mypy...${reset}"
+mypy python/knot_resolver
+check_rv $?
+echo
+
+# check that setup.py is not behind pyproject.toml
+echo -e "${yellow}Checking setup.py${reset}"
+python scripts/poe-tasks/utils/create_setup.py | diff - setup.py
+check_rv $?
+python setup.py --help > /dev/null
+check_rv $?
+echo
+
+# check python/knot_resolver/constants.py
+echo -e "${yellow}python/knot_resolver/constants.py${reset}"
+meson_setup_configure > /dev/null
+diff python/knot_resolver/constants.py $build_dir/python/knot_resolver/constants.py
+check_rv $?
+echo
+
+# check that doc/_static/config.schema.json is the latest
+echo -e "${yellow}Checking doc/_static/config.schema.json${reset}"
+python -m knot_resolver.client schema | diff - doc/_static/config.schema.json
+check_rv $?
+echo
+
+# fancy messages at the end :)
+if test "$aggregate_rv" -eq "0"; then
+	echo -e "${green}Everything looks great!${reset}"
+else
+	echo -e "${red}Failure.${reset}"
+	echo -e "${red}These commands might help you:${reset}"
+	echo -e "${red}\tpoe format${reset}"
+	echo -e "${red}\tpoe gen-setuppy${reset}"
+	echo -e "${red}\tpoe gen-constantspy${reset}"
+	echo -e "${red}\tpoe doc-schema${reset}"
+	echo -e "${red}That's not great. Could you please fix that?${reset} 😲😟"
+fi
+
+# exit with the aggregate return value
+exit $aggregate_rv

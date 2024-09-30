@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+
+# ensure consistent behaviour
+src_dir="$(dirname "$(realpath "$0")")"
+source $src_dir/utils/_env.sh
+
+# create setup.py
+python scripts/poe-tasks/utils/create_setup.py > setup.py

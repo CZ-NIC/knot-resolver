@@ -1,12 +1,37 @@
 Knot Resolver 6.0.9 (2024-mm-dd)
 ================================
 
+Incompatible changes
+--------------------
+- -f/--forks is removed (#631, !1602)
+
 Improvements
 ------------
 
 - manager: secret for TLS session resumption via ticket (RFC5077) (!1567)
 
-  The manager creates and sets the secret for all running 'kresd' workers. The secret is created automatically if the user does not configure his own secret in the configuration. This means that the workers will be able to resume each other's TLS sessions, regardless of whether the user has configured it to do so.
+  The manager creates and sets the secret for all running 'kresd' workers.
+  The secret is created automatically if the user does not configure their own secret in the configuration.
+  This means that the workers will be able to resume each other's TLS sessions, regardless of whether the user has configured it to do so.
+
+- answer NOTIMPL for meta-types and non-IN RR classes (!1589)
+- views: improve interaction with old-style policies (!1576)
+- stats: add stale answer counter 'answer.stale' (!1591)
+- extended_errors: answer with EDE in more cases (!1585, !1588, !1590, !1592)
+- local-data: make DNAMEs work, i.e. generate CNAMEs (!1609)
+- daemon: use connected UDP sockets by default (#326, !1618)
+
+Bugfixes
+--------
+
+- daemon/proxyv2: fix informing the engine about TCP/TLS from the actual client (!1578)
+- forward: fix wrong pin-sha256 length; also log pins on mismatch (!1601, #813)
+
+Incompatible changes
+--------------------
+- gnutls < 3.4 support is dropped, released over 9 years ago (!1601)
+- libuv < 1.27 support is dropped, released over 5 years ago (!1618)
+
 
 Knot Resolver 6.0.8 (2024-07-23)
 ================================

@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+
+# ensure consistent behaviour
+src_dir="$(dirname "$(realpath "$0")")"
+source $src_dir/utils/_env.sh
+
+# run pytest
+env PYTHONPATH=. pytest --junitxml=unit.junit.xml --cov=python/knot_resolver --show-capture=all tests/manager
