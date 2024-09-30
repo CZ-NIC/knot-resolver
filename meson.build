@@ -22,7 +22,7 @@ knot_version = '>=3.3'
 libknot = dependency('libknot', version: knot_version)
 libdnssec = dependency('libdnssec', version: knot_version)
 libzscanner = dependency('libzscanner', version: knot_version)
-libuv = dependency('libuv', version: '>=1.7')
+libuv = dependency('libuv', version: '>=1.27')  # need uv_udp_connect()
 lmdb = dependency('lmdb', required: false)
 if not lmdb.found()  # darwin workaround: missing pkgconfig
   lmdb = meson.get_compiler('c').find_library('lmdb')
