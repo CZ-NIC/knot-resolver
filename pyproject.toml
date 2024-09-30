@@ -18,6 +18,7 @@ documentation = "https://www.knot-resolver.cz/documentation"
 packages = [
     {include = "knot_resolver", from = "python"}
 ]
+exclude = ["**/*.in", "**/meson.build"]
 
 # See currently open issue about building C extensions here:
 # https://github.com/python-poetry/poetry/issues/2740
@@ -74,11 +75,12 @@ knot-resolver = 'knot_resolver.manager.main:main'
 configure = { cmd = "scripts/poe-tasks/configure", help = "(Re)configure Meson build directory" }
 run = { cmd = "scripts/poe-tasks/run", help = "Run Knot Resolver" }
 run-debug = { cmd = "scripts/poe-tasks/run-debug", help = "Debug Knot Resolver with debugpy" }
-docs = { cmd = "scripts/poe-tasks/docs", help = "Create Knot Resolver HTML documentation" }
+doc = { cmd = "scripts/poe-tasks/doc", help = "Create Knot Resolver HTML documentation" }
+doc-schema = { cmd = "scripts/poe-tasks/doc-schema", help = "Generate a JSON schema of the Knot Resolver configuration"}
 test = { cmd = "scripts/poe-tasks/test", help = "Run pytest unit tests" }
 check = { cmd = "scripts/poe-tasks/check", help = "Check that all dependencies are installed and run static code analysis" }
 examples = { cmd = "scripts/poe-tasks/examples", help = "Validate all configuration examples using 'kresctl validate' utility" }
-man = {cmd = "scripts/poe-tasks/man", help = "Display Knot Resolver manpage from sources" }
+gen-constantspy = { cmd = "scripts/poe-tasks/gen-constantspy", help = "Generate 'constants.py' module using Meson configured options" }
 gen-setuppy = { cmd = "scripts/poe-tasks/gen-setuppy", help = "Generate 'setup.py' file for backwards compatibility" }
 format = { cmd = "scripts/poe-tasks/format", help = "Run code formatter" }
 kresctl = { cmd = "scripts/poe-tasks/kresctl", help="Run kresctl utility" }

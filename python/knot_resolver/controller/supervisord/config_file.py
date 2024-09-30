@@ -6,7 +6,7 @@ from typing import Literal
 
 from jinja2 import Template
 
-from knot_resolver.constants import kres_cache_gc_executable, kresd_executable
+from knot_resolver.constants import KRES_CACHE_GC_EXECUTABLE, KRESD_EXECUTABLE
 from knot_resolver.controller.interface import KresID, SubprocessType
 from knot_resolver.datamodel.config_schema import KresConfig
 from knot_resolver.datamodel.logging_schema import LogTargetEnum
@@ -95,7 +95,7 @@ class ProcessTypeConfig:
         return ProcessTypeConfig(  # type: ignore[call-arg]
             logfile=supervisord_subprocess_log_dir(config) / "gc.log",
             workdir=cwd,
-            command=f"{kres_cache_gc_executable()} -c {kres_cache_dir(config)}{kres_cache_gc_args(config)}",
+            command=f"{KRES_CACHE_GC_EXECUTABLE} -c {kres_cache_dir(config)}{kres_cache_gc_args(config)}",
             environment="",
         )
 
@@ -105,7 +105,7 @@ class ProcessTypeConfig:
         return ProcessTypeConfig(  # type: ignore[call-arg]
             logfile=supervisord_subprocess_log_dir(config) / "policy-loader.log",
             workdir=cwd,
-            command=f"{kresd_executable()} -c {(policy_loader_config_file(config))} -c - -n",
+            command=f"{KRESD_EXECUTABLE} -c {(policy_loader_config_file(config))} -c - -n",
             environment="X-SUPERVISORD-TYPE=notify",
         )
 
@@ -115,7 +115,7 @@ class ProcessTypeConfig:
         return ProcessTypeConfig(  # type: ignore[call-arg]
             logfile=supervisord_subprocess_log_dir(config) / "kresd%(process_num)d.log",
             workdir=cwd,
-            command=f"{kresd_executable()} -c {kresd_config_file_supervisord_pattern(config)} -n",
+            command=f"{KRESD_EXECUTABLE} -c {kresd_config_file_supervisord_pattern(config)} -n",
             environment='SYSTEMD_INSTANCE="%(process_num)d",X-SUPERVISORD-TYPE=notify',
             max_procs=int(config.max_workers) + 1,  # +1 for the canary process
         )

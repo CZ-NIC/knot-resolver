@@ -4,11 +4,18 @@
 src_dir="$(dirname "$(realpath "$0")")"
 source $src_dir/utils/_env.sh
 
-build_kresd
-
 echo
-echo Building Knot Resolver Manager native extensions
-echo ------------------------------------------------
+ninja_dev_install
+echo
+
+echo ------------------------------------
+echo Creating missing runtime directories
+echo ------------------------------------
+mkdir -vp $KRES_DEV_INSTALL_DIR/run/knot-resolver $KRES_DEV_INSTALL_DIR/var/cache/knot-resolver
+echo
+echo ---------------------------------------
+echo Building Python komponents using Poetry
+echo ---------------------------------------
 poetry build
 # copy native modules from build directory to source directory
 shopt -s globstar
@@ -22,8 +29,7 @@ shopt -u globstar
 shopt -u nullglob
 
 echo
-echo The Knot Resolver management API is accessible on http://localhost:5000
-echo -----------------------------------------------------------------------
-
-# run the knot-resolver manager
-python3 -m knot_resolver.manager $@
+echo --------------------------------------
+echo Starting Knot Resolver wit the Manager
+echo --------------------------------------
+python3 -m knot_resolver.manager --config "$KRES_DEV_CONFIG_FILE" "$@"

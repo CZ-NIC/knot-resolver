@@ -17,7 +17,7 @@ from aiohttp.web_app import Application
 from aiohttp.web_response import json_response
 from aiohttp.web_runner import AppRunner, TCPSite, UnixSite
 
-from knot_resolver.constants import CONFIG_FILE_PATH_DEFAULT, PID_FILE_NAME
+from knot_resolver.constants import CONFIG_FILE
 from knot_resolver.controller import get_best_controller_implementation
 from knot_resolver.controller.exceptions import SubprocessControllerExecException
 from knot_resolver.controller.registered_workers import command_single_registered_worker
@@ -40,7 +40,7 @@ from knot_resolver.utils.modeling.types import NoneType
 from knot_resolver.utils.systemd_notify import systemd_notify
 
 from .config_store import ConfigStore
-from .constants import init_user_constants
+from .constants import PID_FILE_NAME, init_user_constants
 from .exceptions import KresManagerException
 from .logging import logger_init
 from .manager import KresManager
@@ -506,7 +506,7 @@ async def _sigterm_while_shutting_down():
     sys.exit(128 + signal.SIGTERM)
 
 
-async def start_server(config: Path = CONFIG_FILE_PATH_DEFAULT) -> int:
+async def start_server(config: Path = CONFIG_FILE) -> int:
     # This function is quite long, but it describes how manager runs. So let's silence pylint
     # pylint: disable=too-many-statements
 

@@ -20,7 +20,7 @@ variables:
   # IMAGE_TAG is a Git branch/tag name from https://gitlab.nic.cz/knot/knot-resolver-ci
   # In general, keep it pointing to a tag - use a branch only for development.
   # More info in the knot-resolver-ci repository.
-  IMAGE_TAG: 'v20240828'
+  IMAGE_TAG: 'v20240924'
   IMAGE_PREFIX: '$CI_REGISTRY/knot/knot-resolver-ci'
 
 image: $IMAGE_PREFIX/debian12-knot_3_3:$IMAGE_TAG
@@ -688,10 +688,14 @@ pkg:alma-9:
 
 pkg:arch:
   <<: *pkg_test_user
-  image: $CI_REGISTRY/packaging/apkg/full/arch
-  allow_failure: true  # our image not starting up currently
+  image: $CI_REGISTRY/packaging/apkg/test/arch
+  tags:
+    - docker
+    - linux
+    - amd64
   before_script:
     - pacman -Syy
+    - pip install apkg
 
 # RHEL 8 derivatives would need more work due to *default* python being old
 #pkg:rocky-8:

@@ -5,16 +5,18 @@ src_dir="$(dirname "$(realpath "$0")")"
 source $src_dir/utils/_env.sh
 
 echo
+echo --------------------------------------------
 echo Removing mypy, pytest and other cached files 
 echo --------------------------------------------
 rm -vrf .coverage .mypy_cache .pytest_cache
-
 echo
-echo Removing meson build directories and files
 echo ------------------------------------------
-rm -vrf .build_kresd .install_kresd build build_doc dist 
-
+echo Removing Meson build directories and files
+echo ------------------------------------------
+rm -vrf "$build_dir" "$build_dev_dir" "$KRES_DEV_INSTALL_DIR" build dist 
 echo
+echo ------------------------------------------
 echo Removing __pycache__ directories and files
 echo ------------------------------------------
 find . -type d -name '__pycache__' -prune -exec rm -vrf {} +
+echo

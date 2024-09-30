@@ -3,7 +3,7 @@ import os
 import socket
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
-from knot_resolver.constants import API_SOCK_PATH_DEFAULT, RUN_DIR_DEFAULT, VERSION, WORKERS_MAX_DEFAULT
+from knot_resolver.constants import API_SOCK_FILE, RUN_DIR, VERSION
 from knot_resolver.datamodel.cache_schema import CacheSchema
 from knot_resolver.datamodel.dns64_schema import Dns64Schema
 from knot_resolver.datamodel.dnssec_schema import DnssecSchema
@@ -24,6 +24,8 @@ from knot_resolver.utils.modeling import ConfigSchema
 from knot_resolver.utils.modeling.base_schema import lazy_default
 from knot_resolver.utils.modeling.exceptions import AggregateDataValidationError, DataValidationError
 
+WORKERS_MAX = 256
+
 logger = logging.getLogger(__name__)
 
 
@@ -42,7 +44,7 @@ def _workers_max_count() -> int:
     c = _cpu_count()
     if c:
         return c * 10
-    return WORKERS_MAX_DEFAULT
+    return WORKERS_MAX
 
 
 def _get_views_tags(views: List[ViewSchema]) -> List[str]:
@@ -109,10 +111,10 @@ class KresConfig(ConfigSchema):
         version: int = 1
         nsid: Optional[EscapedStr] = None
         hostname: Optional[EscapedStr] = None
-        rundir: WritableDir = lazy_default(WritableDir, str(RUN_DIR_DEFAULT))
+        rundir: WritableDir = lazy_default(WritableDir, str(RUN_DIR))
         workers: Union[Literal["auto"], IntPositive] = IntPositive(1)
-        max_workers: IntPositive = IntPositive(WORKERS_MAX_DEFAULT)
-        management: ManagementSchema = lazy_default(ManagementSchema, {"unix-socket": str(API_SOCK_PATH_DEFAULT)})
+        max_workers: IntPositive = IntPositive(WORKERS_MAX)
+        management: ManagementSchema = lazy_default(ManagementSchema, {"unix-socket": str(API_SOCK_FILE)})
         webmgmt: Optional[WebmgmtSchema] = None
         options: OptionsSchema = OptionsSchema()
         network: NetworkSchema = NetworkSchema()
@@ -178,7 +180,7 @@ class KresConfig(ConfigSchema):
         workers_max = _workers_max_count()
         if int(self.workers) > workers_max:
             raise ValueError(
-                f"can't run with more workers then the recommended maximum {workers_max} or hardcoded {WORKERS_MAX_DEFAULT}"
+                f"can't run with more workers then the recommended maximum {workers_max} or hardcoded {WORKERS_MAX}"
             )
 
         # sanity check
@@ -237,7 +239,7 @@ def get_rundir_without_validation(data: Dict[str, Any]) -> WritableDir:
     Used for initial manager startup.
     """
 
-    return WritableDir(data["rundir"] if "rundir" in data else RUN_DIR_DEFAULT, object_path="/rundir")
+    return WritableDir(data["rundir"] if "rundir" in data else str(RUN_DIR), object_path="/rundir")
 
 
 def kres_config_json_schema() -> Dict[str, Any]:

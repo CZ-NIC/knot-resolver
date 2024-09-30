@@ -17,6 +17,11 @@ if test -z "$gitroot"; then
 fi
 cd $gitroot
 
+# build dirs
+build_dir="$gitroot/.build"
+build_dev_dir="$gitroot/.build_dev"
+install_dev_dir="$gitroot/.install_dev"
+
 # ensure consistent environment with virtualenv
 if test -z "$VIRTUAL_ENV" -a "$CI" != "true" -a -z "$KNOT_ENV"; then
 	echo -e "${yellow}You are NOT running the script within the project's virtual environment.${reset}"
@@ -34,39 +39,66 @@ PATH="$PATH:$gitroot/node_modules/.bin"
 # fail even on unbound variables
 set -o nounset
 
-# create runtime directories
-if [ -z "${KRES_CONFIG_DIR:-}" ]; then
-	KRES_CONFIG_DIR="$gitroot/etc/config"
+# Set enviromental variables if not
+if [ -z "${KRES_DEV_INSTALL_DIR:-}" ]; then
+	KRES_DEV_INSTALL_DIR="$install_dev_dir"
 fi
-mkdir -p "$KRES_CONFIG_DIR/runtime" "$KRES_CONFIG_DIR/cache"
-
-# env variables
-if [ -z "${KRES_MANAGER_CONFIG:-}" ]; then
-    KRES_MANAGER_CONFIG="$KRES_CONFIG_DIR/config.dev.yaml"
+if [ -z "${KRES_DEV_CONFIG_FILE:-}" ]; then
+    KRES_DEV_CONFIG_FILE="$gitroot/etc/config/config.dev.yaml"
 fi
+export KRES_DEV_INSTALL_DIR
+export KRES_DEV_CONFIG_FILE
 
-if [ -z "${KRES_MANAGER_API_SOCK:-}" ]; then
-    KRES_MANAGER_API_SOCK="$KRES_CONFIG_DIR/manager.sock"
-fi
-export KRES_MANAGER_CONFIG
-export KRES_MANAGER_API_SOCK
+function meson_setup_configure {
+	local reconfigure=''
+	if [ -d $build_dir ]; then
+		reconfigure='--reconfigure'
+	fi
+	echo ---------------------------------------
+	echo Configuring build directory using Meson
+	echo ---------------------------------------
+	meson setup \
+		$build_dir \
+		$reconfigure \
+		--prefix=/usr \
+		"$@"
+}
 
-function build_kresd {
-	if [ -d .build_kresd ]; then
+function meson_setup_configure_dev {
+	local reconfigure=''
+	if [ -d $build_dev_dir ]; then
+		reconfigure='--reconfigure'
+	fi
+	echo ---------------------------------------
+	echo Configuring build directory using Meson
+	echo ---------------------------------------
+	meson setup \
+		$build_dev_dir \
+		$reconfigure \
+		--prefix=$KRES_DEV_INSTALL_DIR \
+		-D user=$(id -un) \
+		-D group=$(id -gn) \
+		"$@"
+}
+
+function is_build_dev_dir_configured {
+	if [ ! -d $build_dev_dir ]; then
 		echo
-		echo Building Knot Resolver
-		echo ----------------------
-		echo -e "${blue}In case of an compilation error, run this command to try to fix it:${reset}"
-		echo -e "\t${blue}rm -r $(realpath .install_kresd) $(realpath .build_kresd)${reset}"
-		echo
-		ninja -C .build_kresd
-		ninja install -C .build_kresd
-		export PYTHONPATH="$(realpath .build_kresd/python):${PYTHONPATH:-}"
-	else
-		echo
-		echo Knot Resolver daemon is not configured.
-		echo "Please run './poe configure' (optionally with additional Meson arguments)"
+		echo Knot Resolver build directory is not configured by Meson.
+		echo "Please run './poe configure' (optionally with additional Meson arguments)".
 		echo
 		exit 2
 	fi
+}
+
+function ninja_dev_install {
+
+	is_build_dev_dir_configured
+
+	echo
+	echo --------------------------------------------
+	echo Building/installing C komponents using Ninja
+	echo --------------------------------------------
+	ninja -C $build_dev_dir
+	ninja install -C $build_dev_dir
 }

@@ -6,7 +6,6 @@ from secrets import token_hex
 from subprocess import SubprocessError
 from typing import Any, Callable, List, Optional
 
-from knot_resolver.constants import FIX_COUNTER_ATTEMPTS_MAX, FIX_COUNTER_DECREASE_INTERVAL_SEC, WATCHDOG_INTERVAL_SEC
 from knot_resolver.controller.exceptions import SubprocessControllerException
 from knot_resolver.controller.interface import Subprocess, SubprocessController, SubprocessStatus, SubprocessType
 from knot_resolver.controller.registered_workers import command_registered_workers, get_registered_workers_kresids
@@ -15,6 +14,8 @@ from knot_resolver.manager.config_store import ConfigStore, only_on_real_changes
 from knot_resolver.utils.compat.asyncio import create_task
 from knot_resolver.utils.functional import Result
 from knot_resolver.utils.modeling.types import NoneType
+
+from .constants import FIX_COUNTER_ATTEMPTS_MAX, FIX_COUNTER_DECREASE_INTERVAL_SEC, WATCHDOG_INTERVAL_SEC
 
 logger = logging.getLogger(__name__)
 

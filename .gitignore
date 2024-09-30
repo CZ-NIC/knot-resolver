@@ -1,3 +1,4 @@
+**/__pycache__/
 *.6
 *.Plo
 *.a
@@ -8,6 +9,7 @@
 *.gcno
 *.gcov
 *.info
+*.junit.xml
 *.la
 *.lo
 *.log
@@ -18,12 +20,15 @@
 *.so.*
 *.swp
 *~
+.coverage
 .deps
 .dirstamp
 .libs
+.mypy_cache
 .pytest_cache
-/.build-depend
+/.build*/
 /.cache
+/.install_dev
 /aclocal.m4
 /ar-lib
 /autom4te.cache/*
@@ -44,6 +49,7 @@
 /daemon/lua/*.inc
 /daemon/lua/trust_anchors.lua
 /depcomp
+/dist
 /distro/tests/*/.vagrant
 /doc/**/.doctrees
 /doc/**/doxyxml
@@ -82,11 +88,4 @@ _obj
 kresd.amalg.c
 libkres.amalg.c
 luacov.*.out
-**/__pycache__/
-dist/
-.coverage
-.mypy_cache
-.install_kresd/
-.build_kresd/
 poetry.lock
-*.junit.xml

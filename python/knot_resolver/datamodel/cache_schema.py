@@ -1,5 +1,6 @@
 from typing import List, Literal, Optional, Union
 
+from knot_resolver.constants import CACHE_DIR
 from knot_resolver.datamodel.templates import template_from_str
 from knot_resolver.datamodel.types import (
     DNSRecordTypeEnum,
@@ -123,7 +124,7 @@ class CacheSchema(ConfigSchema):
     prefetch: These options help keep the cache hot by prefetching expiring records or learning usage patterns and repetitive queries.
     """
 
-    storage: WritableDir = lazy_default(WritableDir, "/var/cache/knot-resolver")
+    storage: WritableDir = lazy_default(WritableDir, str(CACHE_DIR))
     size_max: SizeUnit = SizeUnit("100M")
     garbage_collector: Union[GarbageCollectorSchema, Literal[False]] = GarbageCollectorSchema()
     ttl_min: TimeUnit = TimeUnit("5s")
