@@ -829,6 +829,17 @@ static int transmit(struct qr_task *task)
 	struct comm_info out_comm = {
 		.comm_addr = (struct sockaddr *)choice
 	};
+
+	if (the_network->enable_connect_udp && session->outgoing && !session->stream) {
+		uv_udp_t *udp = (uv_udp_t *)session2_get_handle(session);
+		int connect_tries = 3;
+
+		do {
+			ret = uv_udp_connect(udp, out_comm.comm_addr);
+		} while (ret == UV_EADDRINUSE && --connect_tries > 0);
+		if (ret < 0)
+			kr_log_error(IO, "Failed to establish udp connection: %s\n", uv_strerror(ret));
+	}
 	ret = qr_task_send(task, session, &out_comm, task->pktbuf);
 	if (ret) {
 		session2_close(session);

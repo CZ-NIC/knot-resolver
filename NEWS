@@ -19,6 +19,7 @@ Improvements
 - stats: add stale answer counter 'answer.stale' (!1591)
 - extended_errors: answer with EDE in more cases (!1585, !1588, !1590, !1592)
 - local-data: make DNAMEs work, i.e. generate CNAMEs (!1609)
+- daemon: use connected UDP sockets by default (#326, !1618)
 
 Bugfixes
 --------
@@ -29,6 +30,7 @@ Bugfixes
 Incompatible changes
 --------------------
 - gnutls < 3.4 support is dropped, released over 9 years ago (!1601)
+- libuv < 1.27 support is dropped, released over 5 years ago (!1618)
 
 
 Knot Resolver 6.0.8 (2024-07-23)

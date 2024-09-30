@@ -590,6 +590,7 @@ struct network {
 		int snd;
 		int rcv;
 	} listen_tcp_buflens;
+	_Bool enable_connect_udp;
 };
 struct args *the_args;
 struct endpoint {

@@ -67,7 +67,7 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 	if (s->closing || nread <= 0 || comm_addr->sa_family == AF_UNSPEC)
 		return;
 
-	if (s->outgoing) {
+	if (!the_network->enable_connect_udp && s->outgoing) {
 		const struct sockaddr *peer = session2_get_peer(s);
 		if (kr_fails_assert(peer->sa_family != AF_UNSPEC))
 			return;
