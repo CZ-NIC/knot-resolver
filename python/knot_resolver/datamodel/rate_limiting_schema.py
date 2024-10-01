@@ -1,5 +1,5 @@
-from knot_resolver_manager.datamodel.types import Percent
-from knot_resolver_manager.utils.modeling import ConfigSchema
+from knot_resolver.datamodel.types import Percent
+from knot_resolver.utils.modeling import ConfigSchema
 
 
 class RateLimitingSchema(ConfigSchema):
