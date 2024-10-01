@@ -353,6 +353,7 @@ int kr_family_len(int family);
  * Also accepts IPv6 link-local and AF_UNIX starting with "/" (ignoring port) */
 KR_EXPORT
 struct sockaddr * kr_straddr_socket(const char *addr, int port, knot_mm_t *pool);
+/** Like kr_straddr_socket() but use `sa` instead of allocating. */
 KR_EXPORT
 struct sockaddr * kr_straddr_socket_set(struct sockaddr *sa, const char *addr, int port);
 

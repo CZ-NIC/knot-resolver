@@ -562,73 +562,44 @@ int kr_family_len(int family)
 	}
 }
 
-struct sockaddr * kr_straddr_socket(const char *addr, int port, knot_mm_t *pool)
+/// Construct *sa from family + *addr + port.
+static int straddr_socket(struct sockaddr *sa, int family, const char *addr, int port)
 {
-	switch (kr_straddr_family(addr)) {
+	switch (family) {
 	case AF_INET: {
-		struct sockaddr_in *res = mm_alloc(pool, sizeof(*res));
-		if (uv_ip4_addr(addr, port, res) >= 0) {
-			return (struct sockaddr *)res;
-		} else {
-			mm_free(pool, res);
-			return NULL;
-		}
+		return uv_ip4_addr(addr, port, (struct sockaddr_in *)sa);
 	}
 	case AF_INET6: {
-		struct sockaddr_in6 *res = mm_alloc(pool, sizeof(*res));
-		if (uv_ip6_addr(addr, port, res) >= 0) {
-			return (struct sockaddr *)res;
-		} else {
-			mm_free(pool, res);
-			return NULL;
-		}
+		return uv_ip6_addr(addr, port, (struct sockaddr_in6 *)sa);
 	}
 	case AF_UNIX: {
-		struct sockaddr_un *res;
+		struct sockaddr_un *res = (struct sockaddr_un *)sa;
 		const size_t alen = strlen(addr) + 1;
 		if (alen > sizeof(res->sun_path)) {
-			return NULL;
+			return kr_error(ENAMETOOLONG);
 		}
-		res = mm_alloc(pool, sizeof(*res));
 		res->sun_family = AF_UNIX;
 		memcpy(res->sun_path, addr, alen);
-		return (struct sockaddr *)res;
+		return kr_ok();
 	}
 	default:
-		return NULL;
+		return kr_error(EINVAL);
 	}
 }
-
 struct sockaddr * kr_straddr_socket_set(struct sockaddr *sa, const char *addr, int port)
 {
-	switch (kr_straddr_family(addr)) {
-	case AF_INET: {
-		struct sockaddr_in *res = (struct sockaddr_in *) sa;
-		if (uv_ip4_addr(addr, port, res) >= 0) {
-			return sa;
-		} else {
-			return NULL;
-		}
-	}
-	case AF_INET6: {
-		struct sockaddr_in6 *res = (struct sockaddr_in6 *) sa;
-		if (uv_ip6_addr(addr, port, res) >= 0) {
-			return sa;
-		} else {
-			return NULL;
-		}
-	}
-	case AF_UNIX: {
-		struct sockaddr_un *res = (struct sockaddr_un *) sa;
-		const size_t alen = strlen(addr) + 1;
-		if (alen > sizeof(res->sun_path)) {
-			return NULL;
-		}
-		res->sun_family = AF_UNIX;
-		memcpy(res->sun_path, addr, alen);
-		return sa;
-	}
-	default:
+	return straddr_socket(sa, kr_straddr_family(addr), addr, port) >= 0 ? sa : NULL;
+}
+struct sockaddr * kr_straddr_socket(const char *addr, int port, knot_mm_t *pool)
+{
+	int family = kr_straddr_family(addr);
+	if (family < 0) return NULL;
+	struct sockaddr sa = { .sa_family = family };
+	struct sockaddr *res = mm_alloc(pool, kr_sockaddr_len(&sa));
+	if (straddr_socket(res, family, addr, port) >= 0) {
+		return res;
+	} else {
+		mm_free(pool, res);
 		return NULL;
 	}
 }
