@@ -270,7 +270,11 @@ int defer_init(uv_loop_t *loop)
 	for (size_t c = header.capacity - 1; c > 0; c >>= 1) capacity_log++;
 
 	size_t size = offsetof(struct defer, kru) + KRU.get_size(capacity_log);
-	size_t header_size = offsetof(struct defer, kru);
+	size_t header_size = offsetof(struct defer, using_avx2) + sizeof(header.using_avx2);
+	kr_assert(header_size ==
+		sizeof(header.capacity) +
+		sizeof(header.max_decay) +
+		sizeof(header.using_avx2));  // no undefined padding inside
 
 	int ret = mmapped_init(&defer_mmapped, "defer", size, &header, header_size);
 	if (ret == MMAPPED_WAS_FIRST) {

@@ -42,7 +42,6 @@ int ratelimiting_init(const char *mmap_file, size_t capacity, uint32_t instant_l
 	for (size_t c = capacity - 1; c > 0; c >>= 1) capacity_log++;
 
 	size_t size = offsetof(struct ratelimiting, kru) + KRU.get_size(capacity_log);
-	size_t header_size = offsetof(struct ratelimiting, v4_prices);
 
 	struct ratelimiting header = {
 		.capacity = capacity,
@@ -51,6 +50,14 @@ int ratelimiting_init(const char *mmap_file, size_t capacity, uint32_t instant_l
 		.tc_limit = (tc_limit_perc == 100 ? -1 : ((uint32_t)tc_limit_perc << 16) / 100),
 		.using_avx2 = using_avx2()
 	};
+
+	size_t header_size = offsetof(struct ratelimiting, using_avx2) + sizeof(header.using_avx2);
+	kr_assert(header_size ==
+		sizeof(header.capacity) +
+		sizeof(header.instant_limit) +
+		sizeof(header.rate_limit) +
+		sizeof(header.tc_limit) +
+		sizeof(header.using_avx2));  // no undefined padding inside
 
 	int ret = mmapped_init(&ratelimiting_mmapped, mmap_file, size, &header, header_size);
 	if (ret == MMAPPED_WAS_FIRST) {
