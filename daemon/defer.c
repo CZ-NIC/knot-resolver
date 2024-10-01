@@ -29,8 +29,7 @@
 #define IDLE_TIMEOUT       1000000 // ns (THREAD_CPUTIME); if exceeded, continue processing after next poll phase
 #define MAX_WAITING_REQS     10000 // if exceeded, process single deferred request immediatelly in poll phase
 
-#define VERBOSE_LOG(...) kr_log_notice(DEVEL, "defer |  " __VA_ARGS__)
-//#define VERBOSE_LOG(...)
+#define VERBOSE_LOG(...) kr_log_debug(DEFER, " | " __VA_ARGS__)
 
 struct defer {
 	size_t capacity;
