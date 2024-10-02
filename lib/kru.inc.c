@@ -229,7 +229,8 @@ struct query_ctx {
 	struct load_cl *l[TABLE_COUNT];
 	uint32_t time_now;
 	kru_price_t price;
-	uint16_t price16, limit16;
+	uint16_t price16;
+	uint32_t limit16;  // 2^16 has to be representable
 	uint16_t id;
 	uint16_t final_load_value;  // set by kru_limited_update if not blocked
 	uint16_t *load;
@@ -360,7 +361,7 @@ static inline bool kru_limited_fetch(struct kru *kru, struct query_ctx *ctx)
 		const kru_price_t fract = price & ((((kru_price_t)1) << fract_bits) - 1);
 
 		ctx->price16 = price >> fract_bits;
-		ctx->limit16 = -ctx->price16;
+		ctx->limit16 = (1<<16) - ctx->price16;
 
 		if ((fract_bits > 0) && (fract > 0)) {
 			ctx->price16 += (rand_bits(fract_bits) < fract);
@@ -474,7 +475,7 @@ static inline bool kru_limited_update(struct kru *kru, struct query_ctx *ctx, bo
 
 	static_assert(ATOMIC_CHAR16_T_LOCK_FREE == 2, "insufficient atomics");
 	const uint16_t price = ctx->price16;
-	const uint16_t limit = ctx->limit16;
+	const uint32_t limit = ctx->limit16;  // 2^16 has to be representable
 	uint16_t load_orig = atomic_load_explicit(load_at, memory_order_relaxed);
 	uint16_t load_new;
 	do {
