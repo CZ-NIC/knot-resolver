@@ -8,6 +8,7 @@ import sys
 from functools import partial
 from http import HTTPStatus
 from pathlib import Path
+from pwd import getpwuid
 from time import time
 from typing import Any, Dict, List, Literal, Optional, Set, Union, cast
 
@@ -17,7 +18,7 @@ from aiohttp.web_app import Application
 from aiohttp.web_response import json_response
 from aiohttp.web_runner import AppRunner, TCPSite, UnixSite
 
-from knot_resolver.constants import CONFIG_FILE
+from knot_resolver.constants import CONFIG_FILE, USER
 from knot_resolver.controller import get_best_controller_implementation
 from knot_resolver.controller.exceptions import SubprocessControllerExecException
 from knot_resolver.controller.registered_workers import command_single_registered_worker
@@ -517,6 +518,14 @@ async def start_server(config: Path = CONFIG_FILE) -> int:
     # Block signals during initialization to force their processing once everything is ready
     signal.pthread_sigmask(signal.SIG_BLOCK, Server.all_handled_signals())
 
+    # Check if we are running under the intended user, if not, log a warning message
+    pw_username = getpwuid(os.getuid()).pw_name
+    if pw_username != USER:
+        logger.warning(
+            f"Knot Resolver does not run as the default '{USER}' user, but as '{pw_username}' instead."
+            " This may or may not affect the configuration validation and the proper functioning of the resolver."
+        )
+
     # before starting server, initialize the subprocess controller, config store, etc. Any errors during inicialization
     # are fatal
     try:
@@ -527,8 +536,10 @@ async def start_server(config: Path = CONFIG_FILE) -> int:
         config_raw = await _load_raw_config(config)
 
         # before processing any configuration, set validation context
-        #  - resolve_root = root against which all relative paths will be resolved
-        set_global_validation_context(Context(config.parent, True))
+        #  - resolve_root: root against which all relative paths will be resolved
+        #  - strict_validation: check for path existence during configuration validation
+        #  - permissions_default: validate dirs/files rwx permissions against default user:group in constants
+        set_global_validation_context(Context(config.parent, True, False))
 
         # We want to change cwd as soon as possible. Some parts of the codebase are using os.getcwd() to get the
         # working directory.

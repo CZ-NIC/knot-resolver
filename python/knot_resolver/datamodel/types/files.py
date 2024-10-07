@@ -3,11 +3,11 @@ import stat
 from enum import Flag, auto
 from grp import getgrnam
 from pathlib import Path
-from pwd import getpwnam
+from pwd import getpwnam, getpwuid
 from typing import Any, Dict, Tuple, Type, TypeVar
 
 from knot_resolver.constants import GROUP, USER
-from knot_resolver.datamodel.globals import get_resolve_root, get_strict_validation
+from knot_resolver.datamodel.globals import get_permissions_default, get_resolve_root, get_strict_validation
 from knot_resolver.utils.modeling.base_value_type import BaseValueType
 
 
@@ -157,8 +157,14 @@ def _kres_accessible(dest_path: Path, perm_mode: _PermissionMode) -> bool:
         _PermissionMode.EXECUTE: [stat.S_IXUSR, stat.S_IXGRP, stat.S_IXOTH],
     }
 
-    user_uid = getpwnam(USER).pw_uid
-    user_gid = getgrnam(GROUP).gr_gid
+    if get_permissions_default():
+        user_uid = getpwnam(USER).pw_uid
+        user_gid = getgrnam(GROUP).gr_gid
+        username = USER
+    else:
+        user_uid = os.getuid()
+        user_gid = os.getgid()
+        username = getpwuid(user_uid).pw_name
 
     dest_stat = os.stat(dest_path)
     dest_uid = dest_stat.st_uid
@@ -168,13 +174,13 @@ def _kres_accessible(dest_path: Path, perm_mode: _PermissionMode) -> bool:
     def accessible(perm: _PermissionMode) -> bool:
         if user_uid == dest_uid:
             return bool(dest_mode & chflags[perm][0])
-        b_groups = os.getgrouplist(os.getlogin(), user_gid)
+        b_groups = os.getgrouplist(username, user_gid)
         if user_gid == dest_gid or dest_gid in b_groups:
             return bool(dest_mode & chflags[perm][1])
         return bool(dest_mode & chflags[perm][2])
 
     # __iter__ for class enum.Flag added in python3.11
-    # 'for perm in perm_mode:' failes for <=python3.11
+    # 'for perm in perm_mode:' fails for <=python3.11
     for perm in _PermissionMode:
         if perm in perm_mode:
             if not accessible(perm):
