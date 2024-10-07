@@ -1,7 +1,7 @@
 import argparse
 from abc import ABC, abstractmethod  # pylint: disable=[no-name-in-module]
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Type, TypeVar
+from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar
 from urllib.parse import quote
 
 from knot_resolver.constants import API_SOCK_FILE, CONFIG_FILE
@@ -15,6 +15,33 @@ T = TypeVar("T", bound=Type["Command"])
 CompWords = Dict[str, Optional[str]]
 
 _registered_commands: List[Type["Command"]] = []
+
+
+def get_subparsers_words(subparser_actions: List[argparse.Action]) -> CompWords:
+    words: CompWords = {}
+    for action in subparser_actions:
+        if isinstance(action, argparse._SubParsersAction) and action.choices:  # noqa: SLF001
+            for choice, parser in action.choices.items():
+                words[choice] = parser.description
+        else:
+            for opt in action.option_strings:
+                words[opt] = action.help
+    return words
+
+
+def get_subparser_by_name(name: str, parser_actions: List[argparse.Action]) -> Optional[argparse.ArgumentParser]:
+    for action in parser_actions:
+        if isinstance(action, argparse._SubParsersAction):  # noqa: SLF001
+            if action.choices and name in action.choices:
+                return action.choices[name]
+    return None
+
+
+def get_subparser_command(subparser: argparse.ArgumentParser) -> "Command":
+    defaults: Dict[str, Any] = subparser._defaults  # noqa: SLF001
+    if "command" in defaults:
+        return defaults["command"]
+    raise ValueError(f"missing 'command' default for '{subparser.prog}' parser")
 
 
 def register_command(cls: T) -> T:
