@@ -86,6 +86,12 @@ Depends:
  ${misc:Depends},
 Section: libdevel
 Description: Knot Resolver development files
+ Knot Resolver is a caching full resolver implementation
+ written in C and LuaJIT, including both a resolver library and a
+ daemon. Modular architecture of the library keeps the core tiny and
+ efficient, and provides a state-machine like API for
+ extensions.
+ .
  This package provides the development headers for Knot Resolver.
 
 Package: knot-resolver6-module-dnstap
