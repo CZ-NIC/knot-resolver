@@ -8,6 +8,7 @@ from knot_resolver.datamodel.cache_schema import CacheClearRPCSchema
 from knot_resolver.utils.modeling.exceptions import AggregateDataValidationError, DataValidationError
 from knot_resolver.utils.modeling.parsing import DataFormat, parse_json
 from knot_resolver.utils.requests import request
+from argparse import _SubParsersAction
 
 
 class CacheOperations(Enum):
@@ -99,7 +100,16 @@ class CacheCommand(Command):
 
     @staticmethod
     def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
-        return {}
+        words = dict()
+        for action in parser._actions:
+            if isinstance(action, _SubParsersAction):
+                if action.choices is not None:
+                    for choice in action.choices:
+                        words[choice] = action.choices.get(choice)
+            else:
+                for opt in action.option_strings:
+                    words[opt] = action.help
+        return words
 
     def run(self, args: CommandArgs) -> None:
         if not self.operation:
