@@ -10,11 +10,12 @@ int defer_init(uv_loop_t *loop);
 void defer_deinit(void);
 
 /// Increment KRU counters by the given time.
-void defer_account(uint64_t nsec, union kr_sockaddr *addr);
+void defer_account(uint64_t nsec, union kr_sockaddr *addr, bool stream);
 
 typedef struct {
 	int8_t is_accounting; /// whether currently accounting the time to someone; should be 0/1
 	union kr_sockaddr addr; /// request source (to which we account) or AF_UNSPEC if unknown yet
+	bool stream;
 	uint64_t stamp; /// monotonic nanoseconds, probably won't wrap
 } defer_sample_state_t;
 extern defer_sample_state_t defer_sample_state;
@@ -47,7 +48,6 @@ static inline void defer_sample_addr(const union kr_sockaddr *addr, bool stream)
 {
 	if (!defer || kr_fails_assert(addr)) return;
 	if (!defer_sample_state.is_accounting) return;
-	if (!stream) return;  // UDP is not counted
 
 	if (defer_sample_state.addr.ip.sa_family != AF_UNSPEC) {
 		// TODO: this costs performance, so only in some debug mode?
@@ -66,6 +66,7 @@ static inline void defer_sample_addr(const union kr_sockaddr *addr, bool stream)
 		defer_sample_state.addr.ip.sa_family = AF_UNSPEC;
 		break;
 	}
+	defer_sample_state.stream = stream;
 }
 
 /// Stop accounting work - and change the source if applicable.
@@ -84,7 +85,7 @@ static inline void defer_sample_stop(void)
 	// TODO: some queries of internal origin have suspicioiusly high numbers.
 	// We won't be really accounting those, but it might suggest some other issue.
 
-	defer_account(elapsed, &defer_sample_state.addr);
+	defer_account(elapsed, &defer_sample_state.addr, defer_sample_state.stream);
 }
 
 /// Stop accounting if active, then start again. Uses just one stamp.
@@ -96,7 +97,7 @@ static inline void defer_sample_restart(void)
 
 	if (defer_sample_state.is_accounting > 0) {
 		const uint64_t elapsed = stamp - defer_sample_state.stamp;
-		defer_account(elapsed, &defer_sample_state.addr);
+		defer_account(elapsed, &defer_sample_state.addr, defer_sample_state.stream);
 	}
 
 	defer_sample_state.stamp = stamp;
