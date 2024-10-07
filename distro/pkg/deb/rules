@@ -19,10 +19,10 @@ include /usr/share/dpkg/default.mk
 
 
 %:
-	dh $@ --with python3 --buildsystem pybuild
+	dh $@ --with python3 --buildsystem=meson
 
-override_dh_auto_build:
-	meson build_deb \
+override_dh_auto_configure:
+	dh_auto_configure -- \
 		--buildtype=plain \
 		--prefix=/usr \
 		--libdir=lib \
@@ -31,16 +31,15 @@ override_dh_auto_build:
 		-Dkeyfile_default=/usr/share/dns/root.key \
 		-Droot_hints=/usr/share/dns/root.hints \
 		-Dunit_tests=enabled \
-		-Dmalloc=jemalloc \
-		-Dc_args="$${CFLAGS}" \
-		-Dc_link_args="$${LDFLAGS}"
-	ninja -v -C build_deb
-	PYBUILD_NAME=knot_resolver PYBUILD_DESTDIR="$${PYKRES_DESTDIR}" dh_auto_build
+		-Dmalloc=jemalloc
+
+override_dh_auto_build:
+	dh_auto_build
+	PYBUILD_NAME=knot_resolver PYBUILD_DESTDIR="$${PYKRES_DESTDIR}" \
+		dh_auto_build --buildsystem=pybuild
 
 override_dh_auto_install:
-	DESTDIR="$(shell pwd)/debian/tmp" ninja -v -C build_deb install
-	PYBUILD_NAME=knot_resolver PYBUILD_DESTDIR="$${PYKRES_DESTDIR}" dh_auto_install
+	dh_auto_install
+	PYBUILD_NAME=knot_resolver PYBUILD_DESTDIR="$${PYKRES_DESTDIR}" \
+		dh_auto_install --buildsystem=pybuild
 	install -m 644 -D etc/config/config.yaml debian/tmp/etc/knot-resolver/config.yaml
-
-override_dh_auto_test:
-	meson test -C build_deb
