@@ -1,0 +1,10 @@
+# this library is only shared within kresd
+knot-resolver6: package-name-doesnt-match-sonames libkres9
+# this library is only shared within kresd, no need for symbols
+knot-resolver6: no-symbols-control-file usr/lib/libkres.so.9
+# it's a module
+knot-resolver6: shared-library-lacks-prerequisites [usr/lib/knot-resolver/kres_modules/refuse_nord.so]
+# no init.d support
+knot-resolver6: package-supports-alternative-init-but-no-init.d-script
+# UPSTREAM: no docs build yet due to missing deps
+knot-resolver6: no-manual-page

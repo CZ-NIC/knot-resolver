@@ -1,4 +1,4 @@
-# upstream package doesn't include missing-sources for HTTP module static files,
+# UPSTREAM: package doesn't include missing-sources for HTTP module static files,
 # they can be found in individual upstream repos or in Debian package debian/missing-sources
 source: source-is-missing [modules/http/static/bootstrap.min.js]
 source: source-is-missing [modules/http/static/d3.js]
@@ -8,9 +8,17 @@ source: source-is-missing [modules/http/static/epoch.js]
 source: source-is-missing [modules/http/static/jquery.js]
 source: source-is-missing [modules/http/static/selectize.min.js]
 source: source-is-missing [modules/http/static/topojson.js]
-# that's how HTTP module is built upstream
+# UPSTREAM: that's how HTTP module is built upstream
 source: source-contains-prebuilt-javascript-object
-# not relevant in upstream package
+# UPSTREAM: not relevant in upstream package
 source: no-nmu-in-changelog
-# upstream package uses apkg, watch file is redundant
+# UPSTREAM: package uses apkg, watch file is redundant
 source: debian-watch-file-is-missing
+# UPSTREAM: we build cross-distro, Standards-Version rarely matches
+source: newer-standards-version
+# UPSTREAM: old distro compat
+source: package-uses-old-debhelper-compat-version
+# UPSTREAM: old distro compat
+source: uses-debhelper-compat-file
+# UPSTREAM: we use setuptools for now for old distro compat
+source: missing-prerequisite-for-pyproject-backend
