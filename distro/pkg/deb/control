@@ -90,7 +90,6 @@ Description: Knot Resolver development files
 
 Package: knot-resolver6-module-dnstap
 Architecture: any
-Multi-Arch: same
 Depends:
  knot-resolver6 (= ${binary:Version}),
  libfstrm0,
