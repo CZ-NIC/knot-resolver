@@ -2,7 +2,15 @@ import argparse
 from enum import Enum
 from typing import List, Tuple, Type
 
-from knot_resolver.client.command import Command, CommandArgs, CompWords, register_command
+from knot_resolver.client.command import (
+    Command,
+    CommandArgs,
+    CompWords,
+    get_subparser_by_name,
+    get_subparser_command,
+    get_subparsers_words,
+    register_command,
+)
 
 
 class Shells(Enum):
@@ -25,7 +33,10 @@ class CompletionCommand(Command):
     def register_args_subparser(
         subparser: "argparse._SubParsersAction[argparse.ArgumentParser]",
     ) -> Tuple[argparse.ArgumentParser, "Type[Command]"]:
-        completion = subparser.add_parser("completion", help="commands auto-completion")
+        completion = subparser.add_parser(
+            "completion",
+            help="commands auto-completion",
+        )
         completion.add_argument(
             "--space",
             help="space after last word, returns all possible folowing options",
@@ -49,47 +60,41 @@ class CompletionCommand(Command):
 
     @staticmethod
     def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
-        words: CompWords = {}
-        # for action in parser._actions:
-        #     for opt in action.option_strings:
-        #         words[opt] = action.help
-        # return words
-        return words
+        return get_subparsers_words(parser._actions)  # noqa: SLF001
 
     def run(self, args: CommandArgs) -> None:
-        pass
-        # subparsers = args.parser._subparsers
-        # words: CompWords = {}
+        subparsers = args.parser._subparsers  # noqa: SLF001
+        words: CompWords = {}
 
-        # if subparsers:
-        #     words = parser_words(subparsers._actions)
+        if subparsers:
+            words = get_subparsers_words(subparsers._actions)  # noqa: SLF001
 
-        #     uargs = iter(self.comp_args)
-        #     for uarg in uargs:
-        #         subparser = subparser_by_name(uarg, subparsers._actions)  # pylint: disable=W0212
+            uargs = iter(self.comp_args)
+            for uarg in uargs:
+                subparser = get_subparser_by_name(uarg, subparsers._actions)  # noqa: SLF001
 
-        #         if subparser:
-        #             cmd: Command = subparser_command(subparser)
-        #             subparser_args = self.comp_args[self.comp_args.index(uarg) + 1 :]
-        #             if subparser_args:
-        #                 words = cmd.completion(subparser_args, subparser)
-        #             break
-        #         elif uarg in ["-s", "--socket"]:
-        #             # if arg is socket config, skip next arg
-        #             next(uargs)
-        #             continue
-        #         elif uarg in words:
-        #             # uarg is walid arg, continue
-        #             continue
-        #         else:
-        #             raise ValueError(f"unknown argument: {uarg}")
+                if subparser:
+                    cmd: Command = get_subparser_command(subparser)
+                    subparser_args = self.comp_args[self.comp_args.index(uarg) + 1 :]
+                    if subparser_args or self.space:
+                        words = cmd.completion(subparser_args, subparser)
+                    break
+                if uarg in ["-s", "--socket", "-c", "--config"]:
+                    # if arg is socket config, skip next arg
+                    next(uargs)
+                    continue
+                if uarg in words:
+                    # uarg is valid (complete) arg, continue
+                    continue
+                else:
+                    raise ValueError(f"unknown argument: {uarg}")
 
-        # # print completion words
-        # # based on required bash/fish shell format
-        # if self.shell == Shells.BASH:
-        #     print(" ".join(words))
-        # elif self.shell == Shells.FISH:
-        #     # TODO: FISH completion implementation
-        #     pass
-        # else:
-        #     raise ValueError(f"unexpected value of {Shells}: {self.shell}")
+        # print completion words
+        # based on required bash/fish shell format
+        if self.shell == Shells.BASH:
+            print(" ".join(words))
+        elif self.shell == Shells.FISH:
+            # TODO: FISH completion implementation
+            pass
+        else:
+            raise ValueError(f"unexpected value of {Shells}: {self.shell}")
