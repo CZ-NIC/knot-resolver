@@ -1,5 +1,7 @@
 import re
-from typing import Any, Dict, Pattern, Type
+from typing import Any, Dict, Type
+
+from typing_extensions import Pattern
 
 from knot_resolver.utils.modeling import BaseValueType
 
