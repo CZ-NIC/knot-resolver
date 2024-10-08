@@ -3,12 +3,11 @@ import sys
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple, Type
 
-from knot_resolver.client.command import Command, CommandArgs, CompWords, register_command
+from knot_resolver.client.command import Command, CommandArgs, CompWords, get_subparsers_words, register_command
 from knot_resolver.datamodel.cache_schema import CacheClearRPCSchema
 from knot_resolver.utils.modeling.exceptions import AggregateDataValidationError, DataValidationError
 from knot_resolver.utils.modeling.parsing import DataFormat, parse_json
 from knot_resolver.utils.requests import request
-from argparse import _SubParsersAction
 
 
 class CacheOperations(Enum):
@@ -100,16 +99,7 @@ class CacheCommand(Command):
 
     @staticmethod
     def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
-        words = dict()
-        for action in parser._actions:
-            if isinstance(action, _SubParsersAction):
-                if action.choices is not None:
-                    for choice in action.choices:
-                        words[choice] = action.choices.get(choice)
-            else:
-                for opt in action.option_strings:
-                    words[opt] = action.help
-        return words
+        return get_subparsers_words(parser._actions)
 
     def run(self, args: CommandArgs) -> None:
         if not self.operation:
