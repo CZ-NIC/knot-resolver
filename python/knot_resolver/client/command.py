@@ -20,7 +20,7 @@ _registered_commands: List[Type["Command"]] = []
 def get_subparsers_words(subparser_actions: List[argparse.Action]) -> CompWords:
     words: CompWords = {}
     for action in subparser_actions:
-        if isinstance(action, argparse._SubParsersAction) and action.choices:
+        if isinstance(action, argparse._SubParsersAction) and action.choices:  # pylint: disable=protected-access
             for choice, parser in action.choices.items():
                 words[choice] = parser.description
         else:
@@ -31,14 +31,14 @@ def get_subparsers_words(subparser_actions: List[argparse.Action]) -> CompWords:
 
 def get_subparser_by_name(name: str, parser_actions: List[argparse.Action]) -> Optional[argparse.ArgumentParser]:
     for action in parser_actions:
-        if isinstance(action, argparse._SubParsersAction):
+        if isinstance(action, argparse._SubParsersAction):  # pylint: disable=protected-access
             if action.choices and name in action.choices:
                 return action.choices[name]
     return None
 
 
 def get_subparser_command(subparser: argparse.ArgumentParser) -> "Command":
-    defaults: Dict[str, Any] = subparser._defaults
+    defaults: Dict[str, Any] = subparser._defaults  # pylint: disable=protected-access
     if "command" in defaults:
         return defaults["command"]
     raise ValueError(f"missing 'command' default for '{subparser.prog}' parser")
