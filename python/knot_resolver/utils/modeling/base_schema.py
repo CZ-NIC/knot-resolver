@@ -185,13 +185,13 @@ def _describe_type(typ: Type[Any]) -> Dict[Any, Any]:
     elif is_none_type(typ):
         return {"type": "null"}
 
-    elif typ == int:
+    elif typ is int:
         return {"type": "integer"}
 
-    elif typ == bool:
+    elif typ is bool:
         return {"type": "boolean"}
 
-    elif typ == str:
+    elif typ is str:
         return {"type": "string"}
 
     elif is_literal(typ):
@@ -221,7 +221,7 @@ def _describe_type(typ: Type[Any]) -> Dict[Any, Any]:
                 key.__str__ is not BaseValueType.__str__
             ), "To support derived 'BaseValueType', __str__ must be implemented."
         else:
-            assert key == str, "We currently do not support any other keys then strings"
+            assert key is str, "We currently do not support any other keys then strings"
 
         return {"type": "object", "additionalProperties": _describe_type(val)}
 
@@ -428,19 +428,19 @@ class ObjectMapper:
             raise DataValidationError(f"unexpected value 'None' for type {tp}", object_path)
 
         # int
-        elif tp == int:
+        elif tp is int:
             return self._create_int(obj, object_path)
 
         # str
-        elif tp == str:
+        elif tp is str:
             return self._create_str(obj, object_path)
 
         # bool
-        elif tp == bool:
+        elif tp is bool:
             return self._create_bool(obj, object_path)
 
         # float
-        elif tp == float:
+        elif tp is float:
             raise NotImplementedError(
                 "Floating point values are not supported in the object mapper."
                 " Please implement them and be careful with type coercions"
