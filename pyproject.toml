@@ -51,13 +51,9 @@ pytest-asyncio = "^0.23.5"
 toml = "^0.10.2"
 
 [tool.poetry.group.lint.dependencies]
-black = "^24.2.0"
-isort = "^5.13.2"
-toml = "^0.10.2"
+ruff = "^0.6.9"
 mypy = "^1.8.0"
 types-pyyaml = "^6.0.12.12"
-pylint = "^3.0.3"
-flake8 = {version = "*", python = "^3.8.1"}
 
 [tool.poetry.group.docs.dependencies]
 sphinx = "^5.3.0"
@@ -82,59 +78,38 @@ check = { cmd = "scripts/poe-tasks/check", help = "Check that all dependencies a
 examples = { cmd = "scripts/poe-tasks/examples", help = "Validate all configuration examples using 'kresctl validate' utility" }
 gen-constantspy = { cmd = "scripts/poe-tasks/gen-constantspy", help = "Generate 'constants.py' module using Meson configured options" }
 gen-setuppy = { cmd = "scripts/poe-tasks/gen-setuppy", help = "Generate 'setup.py' file for backwards compatibility" }
-format = { cmd = "scripts/poe-tasks/format", help = "Run code formatter" }
+format = { cmd = "scripts/poe-tasks/format", help = "Check and fix code formatting using Ruff." }
 kresctl = { cmd = "scripts/poe-tasks/kresctl", help="Run kresctl utility" }
 clean = { cmd = "scripts/poe-tasks/clean", help="Cleanup build directories and files" }
 
-[tool.black]
+[tool.ruff]
 line-length = 120
-target_version = ['py312']
-include = '\.py$'
-exclude = "setup.py"    # Poetry generates it and we want to keep it unchanged
+target-version = "py38"
+exclude = ["setup.py"]
 
-[tool.isort]
-line_length=120                # corresponds to -w  flag
-profile = "black"
-multi_line_output=3            # corresponds to -m  flag
-include_trailing_comma=true    # corresponds to -tc flag
-skip_glob = '^((?!py$).)*$'    # isort all Python files
-float_to_top=true
-skip = "setup.py"   # Poetry generates it and we want to keep it unchanged
-known_first_party="knot_resolver"
-
-[tool.pylint."MESSAGES CONTROL"]
-disable= [
-    "broad-except",
-    "fixme",
-    "global-statement",
-    "invalid-name",
-    "line-too-long",  # checked by flake8
-    "missing-docstring",
-    "no-else-return",
-    "too-few-public-methods",
-    "unused-import",  # checked by flake8,
-    "too-many-return-statements", # would prevent us from using recursive tree traversals
-    "logging-fstring-interpolation", # see https://github.com/PyCQA/pylint/issues/1788
-    "no-else-raise", # not helpful for readability, when we want explicit branches
-    "raising-bad-type", # handled by type checker
-    "too-many-arguments",  # sure, but how can we change the signatures to take less arguments? artificially create objects with arguments? That's stupid...
-    "invalid-overridden-method",  # hopefully checked by type checkers
-    "no-member",  # pylint does not do it properly
-    "import-error", # pylint does not do it properly
+[tool.ruff.lint]
+# extend default config
+# https://docs.astral.sh/ruff/rules
+extend-select = [
+    "W",   # pycodestyle warnings
+    "A",   # flake8-builtins
+    "B",   # flake8-bugbearp
+    "PL",  # pylint
+    "N",   # pep8-naming
+    "SLF", # flake8-self
+    "RET", # flake8-return
+]
+ignore = [
+    "B009",     # https://docs.astral.sh/ruff/rules/get-attr-with-constant/
+    "PLR2004",  # https://docs.astral.sh/ruff/rules/magic-value-comparison/
+    "PLW0603",  # https://docs.astral.sh/ruff/rules/global-statement/
 ]
 
-[tool.pylint.SIMILARITIES]
-min-similarity-lines = "6"
-ignore-comments = "yes"
-ignore-docstrings = "yes"
-ignore-imports = "yes"
-
-[tool.pylint.DESIGN]
-max-parents = "10"
+[tool.ruff.lint.isort]
+known-first-party=["knot_resolver"]
 
 [tool.mypy]
-python_version = "3.12"
-# strict = true
+python_version = "3.8"
 disallow_any_generics = true
 disallow_subclassing_any = true
 disallow_untyped_calls = false
