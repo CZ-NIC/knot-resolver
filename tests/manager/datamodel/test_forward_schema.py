@@ -36,7 +36,6 @@ def test_forward_valid(port: int, auth: bool):
     [(5353, True, False), (53, True, True)],
 )
 def test_forward_invalid(port: int, auth: bool, tls: bool):
-
     if not tls:
         with raises(DataValidationError):
             ForwardSchema(
