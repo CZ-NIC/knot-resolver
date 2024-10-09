@@ -30,31 +30,25 @@ if test "$aggregate_rv" -ne "0"; then
 	exit 1
 fi
 
-# check formatting using black
-echo -e "${yellow}Checking formatting using black...${reset}"
-black python/knot_resolver tests/manager scripts/poe-tasks/utils/create_setup.py --check --diff
+# check format using ruff
+echo -e "${yellow}Code format checking using ruff...${reset}"
+ruff format --check --diff python/knot_resolver tests/manager scripts/poe-tasks/utils/create_setup.py
 check_rv $?
 echo
 
-# check imports formatting using isort
-echo -e "${yellow}Checking imports formatting using isort...${reset}"
-isort python/knot_resolver tests/manager scripts/poe-tasks/utils/create_setup.py --check --diff
+# check imports using ruff
+echo -e "${yellow}Imports format checking using ruff...${reset}"
+ruff check --select I python/knot_resolver tests/manager scripts/poe-tasks/utils/create_setup.py
 check_rv $?
 echo
 
-# check code with pylint
-echo -e "${yellow}Linting using pylint...${reset}"
-pylint python/knot_resolver
+# check code with ruff
+echo -e "${yellow}Code linting using ruff...${reset}"
+ruff check python/knot_resolver tests/pytests
 check_rv $?
 echo
 
-# check code with flake8
-echo -e "${yellow}Linting using flake8...${reset}"
-flake8 --max-line-length=200 --ignore=E266,W503 --extend-ignore=E203 python/knot_resolver
-check_rv $?
-echo
-
-# check types with mypy
+# check types using mypy
 echo -e "${yellow}Type checking using mypy...${reset}"
 mypy python/knot_resolver
 check_rv $?
