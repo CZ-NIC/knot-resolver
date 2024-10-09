@@ -241,7 +241,6 @@ class Server:
         raise web.HTTPMovedPermanently("/metrics/json")
 
     async def _handler_metrics_json(self, _request: web.Request) -> web.Response:
-
         config = self.config_store.get()
 
         return web.Response(
@@ -251,7 +250,6 @@ class Server:
         )
 
     async def _handler_metrics_prometheus(self, _request: web.Request) -> web.Response:
-
         metrics_report = await metrics.report_prometheus()
         if not metrics_report:
             raise web.HTTPNotFound()

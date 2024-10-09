@@ -233,7 +233,6 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
             await self._collect_already_running_workers()
 
     async def reset_workers_policy_rules(self, _config: KresConfig) -> None:
-
         # command all running 'kresd' workers to reset their old policy rules,
         # unless the workers have already been started with a new config so reset is not needed
         if self._workers_reset_needed and get_registered_workers_kresids():
@@ -249,7 +248,6 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
             )
 
     async def set_new_tls_sticket_secret(self, config: KresConfig) -> None:
-
         if config.network.tls.sticket_secret or config.network.tls.sticket_secret_file:
             logger.debug("User-configured TLS resumption secret found - skipping auto-generation.")
             return
@@ -282,7 +280,9 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
             elif self._fix_counter.is_too_high():
                 logger.error(f"Failed to apply config: {e}")
                 logger.error("There have already been problems recently, refusing to try to fix it.")
-                await self.forced_shutdown()  # possible improvement - the person who requested this change won't get a response this way
+                await (
+                    self.forced_shutdown()
+                )  # possible improvement - the person who requested this change won't get a response this way
             else:
                 logger.error(f"Failed to apply config: {e}")
                 logger.warning("Reloading system state and trying again.")

@@ -208,9 +208,9 @@ class InterfacePort(StrBase):
                 try:
                     self.if_name = InterfaceName(parts[0])
                 except ValueError as e2:
-                    raise ValueError(
-                        f"expected IP address or interface name, got '{parts[0]}'.", object_path
-                    ) from e1 and e2
+                    raise ValueError(f"expected IP address or interface name, got '{parts[0]}'.", object_path) from (
+                        e1 and e2
+                    )
             self.port = PortNumber.from_str(parts[1], object_path)
         else:
             raise ValueError(f"expected '<ip-address|interface-name>@<port>', got '{source_value}'.", object_path)
@@ -232,9 +232,9 @@ class InterfaceOptionalPort(StrBase):
                 try:
                     self.if_name = InterfaceName(parts[0])
                 except ValueError as e2:
-                    raise ValueError(
-                        f"expected IP address or interface name, got '{parts[0]}'.", object_path
-                    ) from e1 and e2
+                    raise ValueError(f"expected IP address or interface name, got '{parts[0]}'.", object_path) from (
+                        e1 and e2
+                    )
             if len(parts) == 2:
                 self.port = PortNumber.from_str(parts[1], object_path)
         else:

@@ -19,11 +19,15 @@ if importlib.util.find_spec("prometheus_client"):
 logger = logging.getLogger(__name__)
 
 if _prometheus_client:
-
     from prometheus_client import exposition  # type: ignore
     from prometheus_client.bridge.graphite import GraphiteBridge  # type: ignore
-    from prometheus_client.core import GaugeMetricFamily  # type: ignore
-    from prometheus_client.core import REGISTRY, CounterMetricFamily, HistogramMetricFamily, Metric
+    from prometheus_client.core import (
+        REGISTRY,
+        CounterMetricFamily,
+        GaugeMetricFamily,  # type: ignore
+        HistogramMetricFamily,
+        Metric,
+    )
 
     _graphite_bridge: Optional[GraphiteBridge] = None
 

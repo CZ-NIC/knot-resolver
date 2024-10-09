@@ -47,8 +47,8 @@ def test_escaped_str_multiline(val: Any, exp: str):
         ('""', r"\"\""),
         ("''", r"\'\'"),
         # fmt: off
-        ('\"\"', r'\"\"'),
-        ("\'\'", r'\'\''),
+        ('""', r"\"\""),
+        ("''", r"\'\'"),
         # fmt: on
     ],
 )
