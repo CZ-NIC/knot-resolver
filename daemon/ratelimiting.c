@@ -112,6 +112,11 @@ bool ratelimiting_request_begin(struct kr_request *req)
 {
 	if (!req->qsource.addr)
 		return false;  // don't consider internal requests
+
+	// We only do this on pure UDP.  (also TODO if cookies get implemented)
+	const bool ip_validated = req->qsource.flags.tcp || req->qsource.flags.tls;
+	if (ip_validated) return false;
+
 	uint8_t limited = 0;  // 0: not limited, 1: truncated, 2: no answer
 	if (ratelimiting) {
 		_Alignas(16) uint8_t key[16] = {0, };
@@ -135,10 +140,6 @@ bool ratelimiting_request_begin(struct kr_request *req)
 	if (!limited) return false;
 
 	if (limited == 1) { // TC=1: return truncated reply to force source IP validation
-		// We only do this on pure UDP.  (also TODO if cookies get implemented)
-		const bool ip_validated = req->qsource.flags.tcp || req->qsource.flags.tls;
-		if (ip_validated) return false;
-
 		knot_pkt_t *answer = kr_request_ensure_answer(req);
 		if (!answer) { // something bad; TODO: perhaps improve recovery from this
 			kr_assert(false);
@@ -152,13 +153,6 @@ bool ratelimiting_request_begin(struct kr_request *req)
 		knot_wire_clear_ad(answer->wire);
 		req->state = KR_STATE_DONE;
 	} else {
-		/*
-		// Example limiting: REFUSED.
-		knot_wire_set_rcode(answer->wire, KNOT_RCODE_REFUSED);
-		kr_request_set_extended_error(req, KNOT_EDNS_EDE_OTHER, "YRAA: rate-limited");
-		req->state = KR_STATE_DONE;
-		*/
-
 		// no answer
 		req->options.NO_ANSWER = true;
 		req->state = KR_STATE_FAIL;
