@@ -245,12 +245,10 @@ trivial_checks: # aggregated to save some processing
     - ci/no_assert_check.sh
     - ci/deckard_commit_check.sh
 
-lint:other:
+lint:luacheck:
   <<: *sanity
   script:
     - meson build_ci_lint &>/dev/null
-    - ninja -C build_ci* pylint
-    - ninja -C build_ci* flake8
     - ninja -C build_ci* luacheck
 
 lint:pedantic:
