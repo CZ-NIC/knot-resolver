@@ -539,6 +539,10 @@ bool protolayer_queue_has_payload(const protolayer_iter_ctx_queue_t *queue);
  * To be used after returning from its callback for async continuation but before calling protolayer_continue. */
 void *protolayer_iter_data_get_current(struct protolayer_iter_ctx *ctx);
 
+/** Gets layer-specific session data for the last processed layer.
+ * To be used after returning from its callback for async continuation but before calling protolayer_continue. */
+void *protolayer_sess_data_get_current(struct protolayer_iter_ctx *ctx);
+
 
 /** Layer-specific data - the generic struct. To be added as the first member of
  * each specific struct. */

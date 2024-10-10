@@ -353,6 +353,11 @@ void *protolayer_iter_data_get_current(struct protolayer_iter_ctx *ctx)
 	return protolayer_iter_data_get(ctx, ctx->layer_ix);
 }
 
+void *protolayer_sess_data_get_current(struct protolayer_iter_ctx *ctx)
+{
+	return protolayer_sess_data_get(ctx->session, ctx->layer_ix);
+}
+
 static inline ssize_t session2_get_protocol(
 		struct session2 *s, enum protolayer_type protocol)
 {
