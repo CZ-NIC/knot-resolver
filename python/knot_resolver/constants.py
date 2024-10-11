@@ -1,14 +1,14 @@
 from pathlib import Path
 
 VERSION = "6.0.8"
-USER = "knot-resolver"
-GROUP = "knot-resolver"
+USER = "ftobias"
+GROUP = "ftobias"
 
 # dirs paths
-RUN_DIR = Path("/run/knot-resolver")
-ETC_DIR = Path("/etc/knot-resolver")
-SBIN_DIR = Path("/usr/sbin")
-CACHE_DIR = Path("/var/cache/knot-resolver")
+RUN_DIR = Path("/home/ftobias/knot_projects/knot-resolver/.install_dev/run/knot-resolver")
+ETC_DIR = Path("/home/ftobias/knot_projects/knot-resolver/.install_dev/etc/knot-resolver")
+SBIN_DIR = Path("/home/ftobias/knot_projects/knot-resolver/.install_dev/sbin")
+CACHE_DIR = Path("/home/ftobias/knot_projects/knot-resolver/.install_dev/var/cache/knot-resolver")
 
 # files paths
 CONFIG_FILE = ETC_DIR / "config.yaml"
