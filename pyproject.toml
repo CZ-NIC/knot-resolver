@@ -72,9 +72,10 @@ configure = { cmd = "scripts/poe-tasks/configure", help = "(Re)configure Meson b
 run = { cmd = "scripts/poe-tasks/run", help = "Run Knot Resolver" }
 run-debug = { cmd = "scripts/poe-tasks/run-debug", help = "Debug Knot Resolver with debugpy" }
 doc = { cmd = "scripts/poe-tasks/doc", help = "Create Knot Resolver HTML documentation" }
-doc-schema = { cmd = "scripts/poe-tasks/doc-schema", help = "Generate a JSON schema of the Knot Resolver configuration"}
+schema = { cmd = "scripts/poe-tasks/schema", help = "Generate a JSON schema of the Knot Resolver configuration"}
 test = { cmd = "scripts/poe-tasks/test", help = "Run pytest unit tests" }
-check = { cmd = "scripts/poe-tasks/check", help = "Check that all dependencies are installed and run static code analysis" }
+lint = { cmd = "scripts/poe-tasks/lint", help = "Run static code analysis (Ruff) and check typing (Mypy)" }
+check = { cmd = "scripts/poe-tasks/check", help = "Check that all dependencies are properly installed and generated files are not behind project." }
 examples = { cmd = "scripts/poe-tasks/examples", help = "Validate all configuration examples using 'kresctl validate' utility" }
 gen-constantspy = { cmd = "scripts/poe-tasks/gen-constantspy", help = "Generate 'constants.py' module using Meson configured options" }
 gen-setuppy = { cmd = "scripts/poe-tasks/gen-setuppy", help = "Generate 'setup.py' file for backwards compatibility" }

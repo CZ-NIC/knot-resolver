@@ -36,6 +36,9 @@ fi
 # update PATH with node_modules
 PATH="$PATH:$gitroot/node_modules/.bin"
 
+# aggregated return value
+aggregated_rv=0
+
 # fail even on unbound variables
 set -o nounset
 
@@ -101,4 +104,27 @@ function ninja_dev_install {
 	echo --------------------------------------------
 	ninja -C $build_dev_dir
 	ninja install -C $build_dev_dir
+}
+
+function check_rv {
+	if test "$1" -eq 0; then
+		echo -e "  ${green}OK${reset}"
+	else
+		echo -e "  ${red}FAIL${reset}"
+	fi
+	aggregated_rv=$(( $aggregated_rv + $1 ))
+}
+
+function fancy_message {
+	if test "$aggregated_rv" -eq "0"; then
+		echo -e "${green}Everything looks great!${reset}"
+	else
+		echo -e "${red}Failure.${reset}"
+		echo -e "${red}These commands might help you:${reset}"
+		echo -e "${red}\tpoe format${reset}"
+		echo -e "${red}\tpoe gen-setuppy${reset}"
+		echo -e "${red}\tpoe gen-constantspy${reset}"
+		echo -e "${red}\tpoe gen-schema${reset}"
+		echo -e "${red}That's not great. Could you please fix that?${reset} 😲😟"
+	fi
 }
