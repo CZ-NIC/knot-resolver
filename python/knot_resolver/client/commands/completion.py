@@ -84,10 +84,9 @@ class CompletionCommand(Command):
                     next(uargs)
                     continue
                 elif uarg in words:
-                    # uarg is valid arg, continue
+                    # uarg is valid (complete) arg, continue
                     continue
-                else:
-                    raise ValueError(f"unknown argument: {uarg}")
+
 
         # print completion words
         # based on required bash/fish shell format
