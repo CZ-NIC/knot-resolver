@@ -13,9 +13,9 @@ _kresctl_completion()
     if [[ -z "$cur" ]]
     then
         # no word to complete, return all posible options
-        opts=$(kresctl completion --bash --space "${COMP_WORDS}")
+        opts=$(kresctl completion --bash --space "${cmd_words[@]:1}")
     else
-        opts=$(kresctl completion --bash "${COMP_WORDS}")
+        opts=$(kresctl completion --bash "${cmd_words[@]:1}")
     fi
 
     # if there is no completion from kresctl
