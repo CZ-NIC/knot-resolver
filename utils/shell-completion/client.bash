@@ -8,14 +8,17 @@ _kresctl_completion()
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
+    # skip kresctl, it is not a valid argument
+    local cmd_words=("${COMP_WORDS[@]:1}")
+
     # check if there is a word is empty
     # that means there is a space after last non-empty word
     if [[ -z "$cur" ]]
     then
         # no word to complete, return all posible options
-        opts=$(kresctl completion --bash --space "${COMP_WORDS}")
+        opts=$(kresctl completion --bash --space "${cmd_words[@]}")
     else
-        opts=$(kresctl completion --bash "${COMP_WORDS}")
+        opts=$(kresctl completion --bash "${cmd_words[@]}")
     fi
 
     # if there is no completion from kresctl
