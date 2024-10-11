@@ -1,9 +1,9 @@
 import argparse
 import sys
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple, Type
+from typing import Any, Dict, Optional, Tuple, Type
 
-from knot_resolver.client.command import Command, CommandArgs, CompWords, get_subparsers_words, register_command
+from knot_resolver.client.command import Command, CommandArgs, register_command
 from knot_resolver.datamodel.cache_schema import CacheClearRPCSchema
 from knot_resolver.utils.modeling.exceptions import AggregateDataValidationError, DataValidationError
 from knot_resolver.utils.modeling.parsing import DataFormat, parse_json
@@ -96,10 +96,6 @@ class CacheCommand(Command):
         )
 
         return cache_parser, CacheCommand
-
-    @staticmethod
-    def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
-        return get_subparsers_words(parser._actions)
 
     def run(self, args: CommandArgs) -> None:
         if not self.operation:

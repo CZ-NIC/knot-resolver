@@ -1,7 +1,7 @@
 import argparse
-from typing import List, Tuple, Type
+from typing import Tuple, Type
 
-from knot_resolver.client.command import Command, CommandArgs, CompWords, register_command
+from knot_resolver.client.command import Command, CommandArgs, register_command
 
 
 @register_command
@@ -11,10 +11,6 @@ class HelpCommand(Command):
 
     def run(self, args: CommandArgs) -> None:
         args.parser.print_help()
-
-    @staticmethod
-    def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
-        return {}
 
     @staticmethod
     def register_args_subparser(

@@ -136,6 +136,5 @@ class Command(ABC):
         raise NotImplementedError()
 
     @staticmethod
-    @abstractmethod
-    def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
-        raise NotImplementedError()
+    def completion(parser: argparse.ArgumentParser) -> CompWords:
+        return get_subparsers_words(parser._actions)  # pylint: disable=W0212

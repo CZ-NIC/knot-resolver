@@ -169,8 +169,9 @@ class ConfigCommand(Command):
         return config, ConfigCommand
 
     @staticmethod
-    def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
-        # words = parser_words(parser._actions)  # pylint: disable=W0212
+    def completion(parser: argparse.ArgumentParser, args: Optional[List[str]] = None) -> CompWords:
+        if args is None:
+            return Command.completion(parser)
 
         # for arg in args:
         #     if arg in words:

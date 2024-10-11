@@ -11,6 +11,7 @@ from knot_resolver.client.command import (
     get_subparsers_words,
     register_command,
 )
+from knot_resolver.client.commands.config import ConfigCommand
 
 
 class Shells(Enum):
@@ -58,10 +59,6 @@ class CompletionCommand(Command):
 
         return completion, CompletionCommand
 
-    @staticmethod
-    def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
-        return get_subparsers_words(parser._actions)
-
     def run(self, args: CommandArgs) -> None:
         subparsers = args.parser._subparsers
         words: CompWords = {}
@@ -77,7 +74,10 @@ class CompletionCommand(Command):
                     cmd: Command = get_subparser_command(subparser)
                     subparser_args = self.comp_args[self.comp_args.index(uarg) + 1 :]
                     if subparser_args or self.space:
-                        words = cmd.completion(subparser_args, subparser)
+                        if isinstance(cmd, ConfigCommand):
+                            words = cmd.completion(subparser, subparser_args)
+                        else:
+                            words = cmd.completion(subparser)
                     break
                 elif uarg in ["-s", "--socket", "-c", "--config"]:
                     # if arg is socket config, skip next arg
@@ -86,7 +86,6 @@ class CompletionCommand(Command):
                 elif uarg in words:
                     # uarg is valid (complete) arg, continue
                     continue
-
 
         # print completion words
         # based on required bash/fish shell format

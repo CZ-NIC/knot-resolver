@@ -1,8 +1,8 @@
 import argparse
 import sys
-from typing import List, Tuple, Type
+from typing import Tuple, Type
 
-from knot_resolver.client.command import Command, CommandArgs, CompWords, register_command
+from knot_resolver.client.command import Command, CommandArgs, register_command
 from knot_resolver.utils.requests import request
 
 
@@ -26,7 +26,3 @@ class StopCommand(Command):
         if response.status != 200:
             print(response, file=sys.stderr)
             sys.exit(1)
-
-    @staticmethod
-    def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
-        return {}

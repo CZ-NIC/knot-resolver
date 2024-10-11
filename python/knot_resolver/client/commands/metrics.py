@@ -1,8 +1,8 @@
 import argparse
 import sys
-from typing import List, Optional, Tuple, Type
+from typing import Optional, Tuple, Type
 
-from knot_resolver.client.command import Command, CommandArgs, CompWords, register_command
+from knot_resolver.client.command import Command, CommandArgs, register_command
 from knot_resolver.utils.modeling.parsing import DataFormat, parse_json
 from knot_resolver.utils.requests import request
 
@@ -41,10 +41,6 @@ class MetricsCommand(Command):
             default=None,
         )
         return metrics, MetricsCommand
-
-    @staticmethod
-    def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
-        return {}
 
     def run(self, args: CommandArgs) -> None:
         response = request(args.socket, "GET", "metrics/prometheus" if self.prometheus else "metrics/json")
