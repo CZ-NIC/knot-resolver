@@ -30,9 +30,12 @@ def get_subparsers_words(subparser_actions: List[argparse.Action]) -> CompWords:
 
 
 def get_subparser_by_name(name: str, parser_actions: List[argparse.Action]) -> Optional[argparse.ArgumentParser]:
+    if name in ["-s", "--socket", "-c", "--config"]:
+        return None
+
     for action in parser_actions:
         if isinstance(action, argparse._SubParsersAction):  # pylint: disable=protected-access
-            if action.choices and name in action.choices:
+            if action.choices and name in action.choices.keys():
                 return action.choices[name]
     return None
 

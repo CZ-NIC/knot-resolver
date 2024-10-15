@@ -78,14 +78,14 @@ class CompletionCommand(Command):
                             words = cmd.completion(subparser, subparser_args)
                         else:
                             words = cmd.completion(subparser)
-                    break
-                elif uarg in ["-s", "--socket", "-c", "--config"]:
-                    # if arg is socket config, skip next arg
-                    next(uargs)
-                    continue
-                elif uarg in words:
-                    # uarg is valid (complete) arg, continue
-                    continue
+                #     break
+                # elif uarg in ["-s", "--socket", "-c", "--config"]:
+                #     # if arg is socket config, skip next arg
+                #     next(uargs)
+                #     continue
+                # elif uarg in words:
+                #     # uarg is valid (complete) arg, continue
+                #     continue
 
         # print completion words
         # based on required bash/fish shell format
