@@ -218,7 +218,7 @@ class KresConfig(ConfigSchema):
         # raise all validation errors
         if len(errs) == 1:
             raise errs[0]
-        elif len(errs) > 1:
+        if len(errs) > 1:
             raise AggregateDataValidationError("/", errs)
 
     def render_lua(self) -> str:

@@ -17,7 +17,7 @@ class Operations(Enum):
 def operation_to_method(operation: Operations) -> Literal["PUT", "GET", "DELETE"]:
     if operation == Operations.SET:
         return "PUT"
-    elif operation == Operations.DELETE:
+    if operation == Operations.DELETE:
         return "DELETE"
     return "GET"
 
@@ -91,10 +91,10 @@ class ConfigCommand(Command):
         config_subparsers = config.add_subparsers(help="operation type")
 
         # GET operation
-        get = config_subparsers.add_parser("get", help="Get current configuration from the resolver.")
-        get.set_defaults(operation=Operations.GET, format=DataFormat.YAML)
+        get_op = config_subparsers.add_parser("get", help="Get current configuration from the resolver.")
+        get_op.set_defaults(operation=Operations.GET, format=DataFormat.YAML)
 
-        get.add_argument(
+        get_op.add_argument(
             "-p",
             "--path",
             help=path_help,
@@ -102,14 +102,14 @@ class ConfigCommand(Command):
             type=str,
             default="",
         )
-        get.add_argument(
+        get_op.add_argument(
             "file",
             help="Optional, path to the file where to save exported configuration data. If not specified, data will be printed.",
             type=str,
             nargs="?",
         )
 
-        get_formats = get.add_mutually_exclusive_group()
+        get_formats = get_op.add_mutually_exclusive_group()
         get_formats.add_argument(
             "--json",
             help="Get configuration data in JSON format.",
@@ -126,10 +126,10 @@ class ConfigCommand(Command):
         )
 
         # SET operation
-        set = config_subparsers.add_parser("set", help="Set new configuration for the resolver.")
-        set.set_defaults(operation=Operations.SET)
+        set_op = config_subparsers.add_parser("set", help="Set new configuration for the resolver.")
+        set_op.set_defaults(operation=Operations.SET)
 
-        set.add_argument(
+        set_op.add_argument(
             "-p",
             "--path",
             help=path_help,
@@ -138,7 +138,7 @@ class ConfigCommand(Command):
             default="",
         )
 
-        value_or_file = set.add_mutually_exclusive_group()
+        value_or_file = set_op.add_mutually_exclusive_group()
         value_or_file.add_argument(
             "file",
             help="Optional, path to file with new configuraion.",
@@ -153,11 +153,11 @@ class ConfigCommand(Command):
         )
 
         # DELETE operation
-        delete = config_subparsers.add_parser(
+        delete_op = config_subparsers.add_parser(
             "delete", help="Delete given configuration property or list item at the given index."
         )
-        delete.set_defaults(operation=Operations.DELETE)
-        delete.add_argument(
+        delete_op.set_defaults(operation=Operations.DELETE)
+        delete_op.add_argument(
             "-p",
             "--path",
             help=path_help,

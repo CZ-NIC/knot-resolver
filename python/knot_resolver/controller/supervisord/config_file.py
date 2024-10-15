@@ -36,21 +36,19 @@ class SupervisordKresID(KresID):
         # the double name is checked because thats how we read it from supervisord
         if val in ("cache-gc", "cache-gc:cache-gc"):
             return SupervisordKresID.new(SubprocessType.GC, 0)
-        elif val in ("policy-loader", "policy-loader:policy-loader"):
+        if val in ("policy-loader", "policy-loader:policy-loader"):
             return SupervisordKresID.new(SubprocessType.POLICY_LOADER, 0)
-        else:
-            val = val.replace("kresd:kresd", "")
-            return SupervisordKresID.new(SubprocessType.KRESD, int(val))
+        val = val.replace("kresd:kresd", "")
+        return SupervisordKresID.new(SubprocessType.KRESD, int(val))
 
     def __str__(self) -> str:
         if self.subprocess_type is SubprocessType.GC:
             return "cache-gc"
-        elif self.subprocess_type is SubprocessType.POLICY_LOADER:
+        if self.subprocess_type is SubprocessType.POLICY_LOADER:
             return "policy-loader"
-        elif self.subprocess_type is SubprocessType.KRESD:
+        if self.subprocess_type is SubprocessType.KRESD:
             return f"kresd:kresd{self._id}"
-        else:
-            raise RuntimeError(f"Unexpected subprocess type {self.subprocess_type}")
+        raise RuntimeError(f"Unexpected subprocess type {self.subprocess_type}")
 
 
 def kres_cache_gc_args(config: KresConfig) -> str:

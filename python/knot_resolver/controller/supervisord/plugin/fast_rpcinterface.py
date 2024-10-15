@@ -73,7 +73,7 @@ class SupervisorNamespaceRPCInterface:
 
     # RPC API methods
 
-    def _getGroupAndProcess(self, name):
+    def _getGroupAndProcess(self, name):  # noqa: N802
         # get process to start from name
         group_name, process_name = split_namespec(name)
 
@@ -90,7 +90,7 @@ class SupervisorNamespaceRPCInterface:
 
         return group, process
 
-    def startProcess(self, name, wait=True):
+    def startProcess(self, name, wait=True):  # noqa: N802
         """Start a process
 
         @param string name Process name (or ``group:name``, or ``group:*``)
@@ -108,10 +108,10 @@ class SupervisorNamespaceRPCInterface:
         # eventually fail
         try:
             filename, argv = process.get_execv_args()
-        except NotFound as why:
-            raise RPCError(Faults.NO_FILE, why.args[0])
+        except NotFound as e:
+            raise RPCError(Faults.NO_FILE, e.args[0]) from e
         except (BadCommand, NotExecutable, NoPermission) as why:
-            raise RPCError(Faults.NOT_EXECUTABLE, why.args[0])
+            raise RPCError(Faults.NOT_EXECUTABLE, why.args[0]) from why
 
         if process.get_state() in RUNNING_STATES:
             raise RPCError(Faults.ALREADY_STARTED, name)

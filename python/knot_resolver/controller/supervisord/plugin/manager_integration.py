@@ -51,7 +51,7 @@ def check_for_runnning_manager(event: ProcessStateRunningEvent) -> None:
         systemd_notify(READY="1", STATUS="Ready")
 
 
-def ServerOptions_get_signal(self):
+def get_server_options_signal(self):
     sig = self.signal_receiver.get_signal()
     if sig == signal.SIGHUP and superd is not None:
         superd.options.logger.info("received SIGHUP, forwarding to the process 'manager'")
@@ -77,7 +77,7 @@ def inject(supervisord: Supervisor, **_config: Any) -> Any:  # pylint: disable=u
     subscribe(ProcessStateRunningEvent, check_for_runnning_manager)
 
     # forward SIGHUP to manager
-    ServerOptions.get_signal = ServerOptions_get_signal
+    ServerOptions.get_signal = get_server_options_signal
 
     # this method is called by supervisord when loading the plugin,
     # it should return XML-RPC object, which we don't care about

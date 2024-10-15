@@ -48,7 +48,7 @@ def get_socket_from_config(config: Path, optional_file: bool) -> Optional[Socket
                     f'http+unix://{quote(management["unix-socket"], safe="")}/',
                     f'Key "/management/unix-socket" in "{config}" file',
                 )
-            elif "interface" in management:
+            if "interface" in management:
                 ip = IPAddressPort(management["interface"], object_path=f"/{mkey}/interface")
                 return SocketDesc(
                     f"http://{ip.addr}:{ip.port}",

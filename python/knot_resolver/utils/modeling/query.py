@@ -48,7 +48,7 @@ class AddOp(Op):
                 assert isinstance(token, int)
                 parent.insert(token, self.value)
         else:
-            assert False, "never happens"
+            raise AssertionError("never happens")
 
         return fakeroot
 
@@ -95,8 +95,7 @@ class MoveOp(Op):
         newobj = copy.deepcopy(obj)
 
         fakeroot = RemoveOp({"op": "remove", "path": self.source}).eval(fakeroot)
-        fakeroot = AddOp({"path": self.path, "value": newobj, "op": "add"}).eval(fakeroot)
-        return fakeroot
+        return AddOp({"path": self.path, "value": newobj, "op": "add"}).eval(fakeroot)
 
 
 class CopyOp(Op):
@@ -113,8 +112,7 @@ class CopyOp(Op):
         _parent, obj, _token = self._resolve_ptr(fakeroot, self.source)
         newobj = copy.deepcopy(obj)
 
-        fakeroot = AddOp({"path": self.path, "value": newobj, "op": "add"}).eval(fakeroot)
-        return fakeroot
+        return AddOp({"path": self.path, "value": newobj, "op": "add"}).eval(fakeroot)
 
 
 class TestOp(Op):
@@ -152,11 +150,11 @@ def query(
         parent, obj, token = json_ptr_resolve(fakeroot, f"/root{ptr}")
         return fakeroot["root"], obj
 
-    elif method == "delete":
+    if method == "delete":
         fakeroot = RemoveOp({"op": "remove", "path": ptr}).eval(fakeroot)
         return fakeroot["root"], None
 
-    elif method == "put":
+    if method == "put":
         parent, obj, token = json_ptr_resolve(fakeroot, f"/root{ptr}")
         assert parent is not None  # we know this due to the fakeroot
         if isinstance(parent, list) and token == "-":
@@ -165,7 +163,7 @@ def query(
             parent[token] = payload
         return fakeroot["root"], None
 
-    elif method == "patch":
+    if method == "patch":
         tp = List[Union[AddOp, RemoveOp, MoveOp, CopyOp, TestOp, ReplaceOp]]
         transaction: tp = map_object(tp, payload)
 
@@ -177,5 +175,4 @@ def query(
 
         return fakeroot["root"], None
 
-    else:
-        assert False, "invalid operation, never happens"
+    raise AssertionError("invalid operation, never happens")
