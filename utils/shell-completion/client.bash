@@ -3,31 +3,22 @@
 _kresctl_completion()
 {
     COMPREPLY=()
-    local cur prev opts
+    local words=""
+    local space_arg=""
+    local cur="${COMP_WORDS[COMP_CWORD]}"
 
-    cur="${COMP_WORDS[COMP_CWORD]}"
-    prev="${COMP_WORDS[COMP_CWORD-1]}"
-
-    # check if there is a word is empty
-    # that means there is a space after last non-empty word
-    if [[ -z "$cur" ]]
-    then
-        # no word to complete, return all posible options
-        opts=$(kresctl completion --bash --space "${cmd_words[@]:1}")
-    else
-        opts=$(kresctl completion --bash "${cmd_words[@]:1}")
+    # if the current word is empty
+    # we need to inform the kresctl client about it
+    if [[ -z "$cur" ]]; then
+        space_arg="--space"
     fi
 
-    # if there is no completion from kresctl
-    # auto-complete just directories and files
-    if [[ -z "$opts" ]]
-    then
-        COMPREPLY=($(compgen -d -f "${cur}"))
-    else
-        COMPREPLY=( $(compgen -W "${opts}" ${cur}) )
-    fi
+    # get words from the kresctl client
+    words=$(kresctl completion --bash ${space_arg} --args "${COMP_WORDS[@]:1}")
+
+    COMPREPLY=($(compgen  -W "${words}" -- "${cur}"))
 
     return 0
 }
 
-complete -o filenames -o dirnames -F _kresctl_completion kresctl
+complete -o filenames -o dirnames -o nosort -F _kresctl_completion kresctl
