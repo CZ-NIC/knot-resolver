@@ -1,8 +1,8 @@
 import asyncio
 import logging
+import os
 import sys
 import time
-import os
 from secrets import token_hex
 from subprocess import SubprocessError
 from typing import Any, Callable, List, Optional

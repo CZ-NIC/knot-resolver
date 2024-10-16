@@ -1515,7 +1515,8 @@
                             "renum",
                             "exterr",
                             "rules",
-                            "prlayr"
+                            "prlayr",
+                            "defer"
                         ]
                     },
                     "description": "List of groups for which 'debug' logging level is set.",
@@ -1666,6 +1667,37 @@
                 "enabled": "lazy",
                 "graphite": false
             }
+        },
+        "rate-limiting": {
+            "description": "Configuration of rate limiting.",
+            "type": [
+                "object",
+                "null"
+            ],
+            "properties": {
+                "capacity": {
+                    "type": "integer",
+                    "description": "Expected maximal number of blocked networks/hosts at the same time.",
+                    "default": 524288
+                },
+                "rate-limit": {
+                    "type": "integer",
+                    "description": "Number of allowed queries per second from a single host."
+                },
+                "instant-limit": {
+                    "type": "integer",
+                    "description": "Number of allowed queries at a single point in time from a single host.",
+                    "default": 50
+                },
+                "tc-limit-perc": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100,
+                    "description": "Percent of rate/instant limit from which responses are sent as truncated.",
+                    "default": 90
+                }
+            },
+            "default": null
         },
         "lua": {
             "description": "Custom Lua configuration.",

@@ -2,7 +2,6 @@ import logging
 import os
 import socket
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
-from knot_resolver.datamodel.rate_limiting_schema import RateLimitingSchema
 
 from knot_resolver.constants import API_SOCK_FILE, RUN_DIR, VERSION
 from knot_resolver.datamodel.cache_schema import CacheSchema
@@ -17,6 +16,7 @@ from knot_resolver.datamodel.management_schema import ManagementSchema
 from knot_resolver.datamodel.monitoring_schema import MonitoringSchema
 from knot_resolver.datamodel.network_schema import NetworkSchema
 from knot_resolver.datamodel.options_schema import OptionsSchema
+from knot_resolver.datamodel.rate_limiting_schema import RateLimitingSchema
 from knot_resolver.datamodel.templates import POLICY_CONFIG_TEMPLATE, WORKER_CONFIG_TEMPLATE
 from knot_resolver.datamodel.types import EscapedStr, IntPositive, WritableDir
 from knot_resolver.datamodel.view_schema import ViewSchema
@@ -107,7 +107,7 @@ class KresConfig(ConfigSchema):
         logging: Logging and debugging configuration.
         monitoring: Metrics exposisition configuration (Prometheus, Graphite)
         lua: Custom Lua configuration.
-        rate_limiting: ... TODO
+        rate_limiting: Configuration of rate limiting.
         """
 
         version: int = 1
