@@ -34,9 +34,11 @@ pyyaml = "*"
 supervisor = "*"
 typing-extensions = "*"
 prometheus-client = { version = "*", optional = true }
+watchdog = { version = "*", python = "^3.9", optional = true }
 
 [tool.poetry.extras]
 prometheus = ["prometheus-client"]
+watchdog = ["watchdog"]
 
 [tool.poetry.group.dev.dependencies]
 poetry = "^1.8.3"
