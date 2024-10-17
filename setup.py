@@ -27,7 +27,8 @@ install_requires = \
 ['aiohttp', 'jinja2', 'pyyaml', 'supervisor', 'typing-extensions']
 
 extras_require = \
-{'prometheus': ['prometheus-client']}
+{'prometheus': ['prometheus-client'],
+ 'watchdog:python_version >= "3.9" and python_version < "4.0"': ['watchdog']}
 
 entry_points = \
 {'console_scripts': ['knot-resolver = knot_resolver.manager.main:main',
