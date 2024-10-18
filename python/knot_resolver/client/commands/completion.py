@@ -60,32 +60,7 @@ class CompletionCommand(Command):
         return completion, CompletionCommand
 
     def run(self, args: CommandArgs) -> None:
-        subparsers = args.parser._subparsers
-        words: CompWords = {}
-
-        if subparsers:
-            words = get_subparsers_words(subparsers._actions)
-
-            uargs = iter(self.comp_args)
-            for uarg in uargs:
-                subparser = get_subparser_by_name(uarg, subparsers._actions)  # pylint: disable=W0212
-
-                if subparser:
-                    cmd: Command = get_subparser_command(subparser)
-                    subparser_args = self.comp_args[self.comp_args.index(uarg) + 1 :]
-                    if subparser_args or self.space:
-                        if isinstance(cmd, ConfigCommand):
-                            words = cmd.completion(subparser, subparser_args)
-                        else:
-                            words = cmd.completion(subparser)
-                #     break
-                # elif uarg in ["-s", "--socket", "-c", "--config"]:
-                #     # if arg is socket config, skip next arg
-                #     next(uargs)
-                #     continue
-                # elif uarg in words:
-                #     # uarg is valid (complete) arg, continue
-                #     continue
+        words = Command.completion(args.parser, self.comp_args)
 
         # print completion words
         # based on required bash/fish shell format

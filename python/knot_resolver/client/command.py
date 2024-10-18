@@ -139,5 +139,36 @@ class Command(ABC):
         raise NotImplementedError()
 
     @staticmethod
-    def completion(parser: argparse.ArgumentParser) -> CompWords:
-        return get_subparsers_words(parser._actions)  # pylint: disable=W0212
+    def completion(parser: argparse.ArgumentParser, args: Optional[List[str]]) -> CompWords:
+        words: CompWords = get_subparsers_words(parser._actions)  # Get subparser words
+        if args is None or args == ['']:
+            return words
+
+        subparsers = parser._subparsers
+
+        if subparsers:
+            words = get_subparsers_words(subparsers._actions)
+
+            for i in range(len(args)):
+                uarg = args[i]
+                subparser = get_subparser_by_name(uarg, subparsers._actions)  # pylint: disable=W0212
+
+                # print(f"uarg: {uarg}, {args}, {words}\n")
+                if subparser:
+                    try:
+                        cmd = get_subparser_command(subparser)
+                        subparser_args = args[i + 1 :]
+                        words = cmd.completion(subparser, subparser_args)
+                    except:
+                        return get_subparsers_words(subparser._actions)
+
+                    break
+                elif uarg in ["-s", "--socket", "-c", "--config"]:
+                    # Skip next argument if a known flag is detected
+                    i += 1
+                    # next(uargs, None)
+                    continue
+                elif uarg in ["--bash", "--space"]:
+                    # Continue if the argument is a valid subparser
+                    continue
+        return words

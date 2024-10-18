@@ -3,9 +3,10 @@ import sys
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional, Tuple, Type
 
-from knot_resolver.client.command import Command, CommandArgs, CompWords, register_command
+from knot_resolver.client.command import Command, CommandArgs, CompWords, register_command, get_subparser_by_name, get_subparsers_words
 from knot_resolver.utils.modeling.parsing import DataFormat, parse_json, try_to_parse
 from knot_resolver.utils.requests import request
+from knot_resolver.datamodel import KresConfig
 
 
 class Operations(Enum):
@@ -152,6 +153,24 @@ class ConfigCommand(Command):
             nargs="?",
         )
 
+        # GET & SET config options
+        prop_words = _properties_words(KresConfig.json_schema()["properties"])
+        for prop_key in prop_words:
+            get.add_argument(
+                prop_key,
+                help=prop_words[prop_key],
+                type=str,
+                nargs="?",
+            )
+
+            set.add_argument(
+                prop_key,
+                help=prop_words[prop_key],
+                action="store",
+                type=str,
+                nargs="?",
+            )
+
         # DELETE operation
         delete = config_subparsers.add_parser(
             "delete", help="Delete given configuration property or list item at the given index."
@@ -170,15 +189,30 @@ class ConfigCommand(Command):
 
     @staticmethod
     def completion(parser: argparse.ArgumentParser, args: Optional[List[str]] = None) -> CompWords:
-        words = Command.completion(parser)
-        if args is None:
-            return words
+        if args is None or len(args) <= 1:
+            return Command.completion(parser, args)
 
-        arg = args[-1]
-        config_path = arg[1:].split("/") if arg.startswith("/") else arg.split("/")
-        schema_props: Dict[str, Any] = KresConfig.json_schema()["properties"]
-        return _path_comp_words(config_path[0], config_path, schema_props)
+        words: CompWords = get_subparsers_words(parser._actions)
+        subparsers = parser._subparsers
 
+        if subparsers:
+            for i in range(len(args)):
+                uarg = args[i]
+                subparser = get_subparser_by_name(uarg, subparsers._actions)  # pylint: disable=W0212
+                if subparser is not None:
+                    subparser_words = get_subparsers_words(subparser._actions)
+                    words = dict()
+                    for action in subparser._actions:
+                        if action.dest not in subparser_words:
+                            subparser_words[action.dest] = action.help or None
+
+                    words.update(subparser_words)
+
+                    subparsers = subparser._subparsers
+                    if not subparsers:
+                        break
+                else:
+                    break
 
         # for arg in args:
         #     if arg in words:
@@ -191,7 +225,9 @@ class ConfigCommand(Command):
         #         return _path_comp_words(config_path[0], config_path, schema_props)
         #     else:
         #         break
-        return {}
+
+        return words
+
 
     def run(self, args: CommandArgs) -> None:
         if not self.operation:
