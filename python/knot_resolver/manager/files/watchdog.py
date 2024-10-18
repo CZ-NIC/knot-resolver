@@ -1,11 +1,13 @@
 import importlib
 import logging
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Union
 
+from knot_resolver.controller.registered_workers import command_registered_workers
 from knot_resolver.datamodel import KresConfig
 from knot_resolver.datamodel.types import File
 from knot_resolver.manager.config_store import ConfigStore, only_on_real_changes_update
+from knot_resolver.utils import compat
 
 _watchdog = False
 if importlib.util.find_spec("watchdog"):
@@ -23,27 +25,54 @@ def files_to_watch(config: KresConfig) -> List[Path]:
 
 
 if _watchdog:
-    from watchdog.events import FileSystemEvent, FileSystemEventHandler
+    from watchdog.events import (
+        DirCreatedEvent,
+        DirDeletedEvent,
+        DirModifiedEvent,
+        FileClosedEvent,
+        FileCreatedEvent,
+        FileDeletedEvent,
+        FileModifiedEvent,
+        FileSystemEvent,
+        FileSystemEventHandler,
+    )
     from watchdog.observers import Observer
 
     _files_watchdog: Optional["FilesWatchDog"] = None
 
-    class MyEventHandler(FileSystemEventHandler):
-        def on_any_event(self, event: FileSystemEvent) -> None:
-            logger.info(event)
+    class CertificatesEventHandler(FileSystemEventHandler):
+
+        def __init__(self, config: KresConfig) -> None:
+            self._config = config
+            self._command = f"net.tls('{config.network.tls.cert_file}', '{config.network.tls.key_file}')"
+
+        # def on_any_event(self, event: FileSystemEvent) -> None:
+        #     pass
+
+        # def on_created(self, event: Union[DirCreatedEvent, FileCreatedEvent]) -> None:
+        #     pass
+
+        # def on_deleted(self, event: Union[DirDeletedEvent, FileDeletedEvent]) -> None:
+        #     pass
+
+        def on_modified(self, event: Union[DirModifiedEvent, FileModifiedEvent]) -> None:
+            if compat.asyncio.is_event_loop_running():
+                compat.asyncio.create_task(command_registered_workers(self._command))
+            else:
+                compat.asyncio.run(command_registered_workers(self._command))
+
+        # def on_closed(self, event: FileClosedEvent) -> None:
+        #     pass
 
     class FilesWatchDog:
-        def __init__(self, files: List[Path]) -> None:
+        def __init__(self, config: KresConfig, files: List[Path]) -> None:
             self._observer = Observer()
-            logger.info("WatchDog init")
-            print(files)
             for file in files:
-                self._observer.schedule(MyEventHandler(), str(file), recursive=False)
-                logger.info(f"Watching {file}")
+                self._observer.schedule(CertificatesEventHandler(config), str(file), recursive=False)
+                logger.info(f"Watching '{file}. file")
 
         def start(self) -> None:
             if self._observer:
-                logger.info("WatchDog start")
                 self._observer.start()
 
         def stop(self) -> None:
@@ -56,7 +85,7 @@ if _watchdog:
         global _files_watchdog
         if _files_watchdog is None:
             logger.info("Starting files WatchDog")
-            _files_watchdog = FilesWatchDog(files_to_watch(config))
+            _files_watchdog = FilesWatchDog(config, files_to_watch(config))
             _files_watchdog.start()
 
 
