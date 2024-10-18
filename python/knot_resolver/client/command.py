@@ -141,7 +141,7 @@ class Command(ABC):
     @staticmethod
     def completion(parser: argparse.ArgumentParser, args: Optional[List[str]]) -> CompWords:
         words: CompWords = get_subparsers_words(parser._actions)  # Get subparser words
-        if args is None or args == ['']:
+        if args is None or args == [""]:
             return words
 
         subparsers = parser._subparsers
@@ -153,13 +153,12 @@ class Command(ABC):
                 uarg = args[i]
                 subparser = get_subparser_by_name(uarg, subparsers._actions)  # pylint: disable=W0212
 
-                # print(f"uarg: {uarg}, {args}, {words}\n")
                 if subparser:
                     try:
                         cmd = get_subparser_command(subparser)
                         subparser_args = args[i + 1 :]
                         words = cmd.completion(subparser, subparser_args)
-                    except:
+                    except ValueError:
                         return get_subparsers_words(subparser._actions)
 
                     break

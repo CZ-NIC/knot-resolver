@@ -2,16 +2,7 @@ import argparse
 from enum import Enum
 from typing import List, Tuple, Type
 
-from knot_resolver.client.command import (
-    Command,
-    CommandArgs,
-    CompWords,
-    get_subparser_by_name,
-    get_subparser_command,
-    get_subparsers_words,
-    register_command,
-)
-from knot_resolver.client.commands.config import ConfigCommand
+from knot_resolver.client.command import Command, CommandArgs, register_command
 
 
 class Shells(Enum):
