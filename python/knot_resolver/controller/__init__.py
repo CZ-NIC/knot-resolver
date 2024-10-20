@@ -86,8 +86,7 @@ async def get_controller_by_name(config: KresConfig, name: str) -> SubprocessCon
     if await controller.is_controller_available(config):
         logger.info("Selected controller '%s'", str(controller))
         return controller
-    else:
-        raise LookupError("The selected subprocess controller is not available for use on this system.")
+    raise LookupError("The selected subprocess controller is not available for use on this system.")
 
 
 # run the imports on module load

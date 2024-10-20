@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Dict, Iterable, Optional, Type, TypeVar
 from weakref import WeakValueDictionary
 
-from knot_resolver.controller.exceptions import SubprocessControllerException
+from knot_resolver.controller.exceptions import SubprocessControllerError
 from knot_resolver.controller.registered_workers import register_worker, unregister_worker
 from knot_resolver.datamodel.config_schema import KresConfig
 from knot_resolver.manager.constants import kresd_config_file, policy_loader_config_file
@@ -47,8 +47,7 @@ class KresID:
         # find free ID closest to zero
         for i in itertools.count(start=0, step=1):
             if i not in cls._used[typ]:
-                res = cls.new(typ, i)
-                return res
+                return cls.new(typ, i)
 
         raise RuntimeError("Reached an end of an infinite loop. How?")
 
@@ -59,10 +58,9 @@ class KresID:
             # typed based on subclass. I am not even sure that it's different between subclasses,
             # it's probably still the same dict. But we don't really care about it
             return cls._used[typ][n]  # type: ignore
-        else:
-            val = cls(typ, n, _i_know_what_i_am_doing=True)
-            cls._used[typ][n] = val
-            return val
+        val = cls(typ, n, _i_know_what_i_am_doing=True)
+        cls._used[typ][n] = val
+        return val
 
     def __init__(self, typ: SubprocessType, n: int, _i_know_what_i_am_doing: bool = False):
         if not _i_know_what_i_am_doing:
@@ -132,7 +130,7 @@ class Subprocess(ABC):
             if self.type is SubprocessType.KRESD:
                 register_worker(self)
                 self._registered_worker = True
-        except SubprocessControllerException as e:
+        except SubprocessControllerError as e:
             if config_file:
                 config_file.unlink()
             raise e

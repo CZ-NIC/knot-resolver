@@ -58,10 +58,9 @@ class DataFormat(Enum):
             # RaiseDuplicatesLoader extends yaml.SafeLoader, so this should be safe
             # https://python.land/data-processing/python-yaml#PyYAML_safe_load_vs_load
             return renamed(yaml.load(text, Loader=_RaiseDuplicatesLoader))  # type: ignore
-        elif self is DataFormat.JSON:
+        if self is DataFormat.JSON:
             return renamed(json.loads(text, object_pairs_hook=_json_raise_duplicates))
-        else:
-            raise NotImplementedError(f"Parsing of format '{self}' is not implemented")
+        raise NotImplementedError(f"Parsing of format '{self}' is not implemented")
 
     def dict_dump(self, data: Union[Dict[str, Any], Renamed], indent: Optional[int] = None) -> str:
         if isinstance(data, Renamed):
@@ -69,10 +68,9 @@ class DataFormat(Enum):
 
         if self is DataFormat.YAML:
             return yaml.safe_dump(data, indent=indent)  # type: ignore
-        elif self is DataFormat.JSON:
+        if self is DataFormat.JSON:
             return json.dumps(data, indent=indent)
-        else:
-            raise NotImplementedError(f"Exporting to '{self}' format is not implemented")
+        raise NotImplementedError(f"Exporting to '{self}' format is not implemented")
 
 
 def parse_yaml(data: str) -> Any:
@@ -96,4 +94,4 @@ def try_to_parse(data: str) -> Any:
             # and we may not know which one is the actual one.
             raise DataParsingError(  # pylint: disable=raise-missing-from
                 f"failed to parse data, JSON: {je}, YAML: {ye}"
-            )
+            ) from ye

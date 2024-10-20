@@ -82,7 +82,7 @@ class Proxy(ContextDecorator):
 class TLSProxy(Proxy):
     EXECUTABLE = 'tlsproxy'
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
                 self,
                 local_ip: str = '127.0.0.1',
                 local_port: Optional[int] = None,
@@ -130,9 +130,9 @@ def kresd_tls_client(
             kresd_fwd_target_kwargs: Optional[Dict[Any, Any]] = None
         ) -> Kresd:
     """kresd_tls_client --(tls)--> tlsproxy --(tcp)--> kresd_fwd_target"""
-    ALLOWED_IPS = {'127.0.0.1', '::1'}
-    assert proxy.local_ip in ALLOWED_IPS, "only localhost IPs supported for proxy"
-    assert proxy.upstream_ip in ALLOWED_IPS, "only localhost IPs are supported for proxy"
+    allowed_ips = {'127.0.0.1', '::1'}
+    assert proxy.local_ip in allowed_ips, "only localhost IPs supported for proxy"
+    assert proxy.upstream_ip in allowed_ips, "only localhost IPs are supported for proxy"
 
     if kresd_tls_client_kwargs is None:
         kresd_tls_client_kwargs = {}

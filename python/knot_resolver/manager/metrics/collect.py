@@ -19,8 +19,7 @@ async def collect_kresd_workers_metrics(config: KresConfig) -> Optional[Dict[Kre
         cmd = "collect_lazy_statistics()"
     logger.debug(f"Collecting stats from all kresd workers using method '{cmd}'")
 
-    metrics_dict = await command_registered_workers(cmd)
-    return metrics_dict
+    return await command_registered_workers(cmd)
 
 
 async def report_json(config: KresConfig) -> bytes:

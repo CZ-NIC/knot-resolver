@@ -40,8 +40,7 @@ def receive_parse_answer(sock):
     if data_answer is None:
         raise BrokenPipeError("kresd closed connection")
 
-    msg_answer = dns.message.from_wire(data_answer, one_rr_per_rrset=True)
-    return msg_answer
+    return dns.message.from_wire(data_answer, one_rr_per_rrset=True)
 
 
 def prepare_wire(

@@ -21,16 +21,15 @@ def get_log_format(config: KresConfig) -> str:
     if os.environ.get("KRES_SUPRESS_LOG_PREFIX") == "true":
         # In this case, we are running under supervisord and it's adding prefixes to our output
         return "[%(levelname)s] %(name)s: %(message)s"
-    else:
-        # In this case, we are running standalone during inicialization and we need to add a prefix to each line
-        # by ourselves to make it consistent
-        assert config.logging.target != "syslog"
-        stream = ""
-        if config.logging.target == "stderr":
-            stream = " (stderr)"
+    # In this case, we are running standalone during inicialization and we need to add a prefix to each line
+    # by ourselves to make it consistent
+    assert config.logging.target != "syslog"
+    stream = ""
+    if config.logging.target == "stderr":
+        stream = " (stderr)"
 
-        pid = os.getpid()
-        return f"%(asctime)s manager[{pid}]{stream}: [%(levelname)s] %(name)s: %(message)s"
+    pid = os.getpid()
+    return f"%(asctime)s manager[{pid}]{stream}: [%(levelname)s] %(name)s: %(message)s"
 
 
 async def _set_log_level(config: KresConfig) -> None:

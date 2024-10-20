@@ -48,7 +48,7 @@ Forward = namedtuple('Forward', ['proto', 'ip', 'port', 'hostname', 'ca_file'])
 
 
 class Kresd(ContextDecorator):
-    def __init__(
+    def __init__(  # noqa: PLR0913
             self, workdir, port=None, tls_port=None, ip=None, ip6=None, certname=None,
             verbose=True, hints=None, forward=None, policy_test_pass=False, rr=False,
             valgrind=False):
@@ -179,7 +179,7 @@ class Kresd(ContextDecorator):
         port = self.tls_port if tls else self.port
         if family == socket.AF_INET:
             return self.ip, port
-        elif family == socket.AF_INET6:
+        if family == socket.AF_INET6:
             return self.ip6, port, 0, 0
         raise RuntimeError("Unsupported socket family: {}".format(family))
 
@@ -237,13 +237,12 @@ class Kresd(ContextDecorator):
             for line in log:
                 if past_startup:
                     partial_log += line
-                else:  # find real start of test log (after initial alive-pings)
-                    if not past_startup_msgid:
-                        if re.match(KRESD_LOG_STARTUP_MSGID, line) is not None:
-                            past_startup_msgid = True
-                    else:
-                        if re.match(KRESD_LOG_IO_CLOSE, line) is not None:
-                            past_startup = True
+                # find real start of test log (after initial alive-pings)
+                elif not past_startup_msgid:
+                    if re.match(KRESD_LOG_STARTUP_MSGID, line) is not None:
+                        past_startup_msgid = True
+                elif re.match(KRESD_LOG_IO_CLOSE, line) is not None:
+                    past_startup = True
         return partial_log
 
 
@@ -263,8 +262,7 @@ def is_port_free(port, ip=None, ip6=None):
     except OSError as exc:
         if exc.errno == 98:  # address already in use
             return False
-        else:
-            raise
+        raise
     return True
 
 

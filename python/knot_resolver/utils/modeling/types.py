@@ -42,8 +42,7 @@ def is_union(tp: Any) -> bool:
 def is_literal(tp: Any) -> bool:
     if sys.version_info.minor == 6:
         return isinstance(tp, type(Literal))
-    else:
-        return getattr(tp, "__origin__", None) == Literal
+    return getattr(tp, "__origin__", None) == Literal
 
 
 def is_generic_type_wrapper(tp: Any) -> bool:
@@ -55,8 +54,7 @@ def get_generic_type_arguments(tp: Any) -> List[Any]:
     default: List[Any] = []
     if sys.version_info.minor == 6 and is_literal(tp):
         return getattr(tp, "__values__")
-    else:
-        return getattr(tp, "__args__", default)
+    return getattr(tp, "__args__", default)
 
 
 def get_generic_type_argument(tp: Any) -> Any:

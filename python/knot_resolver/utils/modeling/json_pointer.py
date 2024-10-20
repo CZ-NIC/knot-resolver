@@ -56,25 +56,24 @@ class _JSONPtr:
                     f"JSON pointer cannot reference nested non-existent object: object at ptr '{current_ptr}' already points to None, cannot nest deeper with token '{token}'"
                 )
 
-            elif isinstance(current, (bool, int, float, str)):
+            if isinstance(current, (bool, int, float, str)):
                 raise ValueError(f"object at '{current_ptr}' is a scalar, JSON pointer cannot point into it")
 
-            else:
-                parent = current
-                if isinstance(current, list):
-                    if token == "-":
-                        current = None
-                    else:
-                        try:
-                            token = int(token)
-                            current = current[token]
-                        except ValueError as e:
-                            raise ValueError(
-                                f"invalid JSON pointer: list '{current_ptr}' require numbers as keys, instead got '{token}'"
-                            ) from e
+            parent = current
+            if isinstance(current, list):
+                if token == "-":
+                    current = None
+                else:
+                    try:
+                        token_num = int(token)
+                        current = current[token_num]
+                    except ValueError as e:
+                        raise ValueError(
+                            f"invalid JSON pointer: list '{current_ptr}' require numbers as keys, instead got '{token}'"
+                        ) from e
 
-                elif isinstance(current, dict):
-                    current = current.get(token, None)
+            elif isinstance(current, dict):
+                current = current.get(token, None)
 
             current_ptr += f"/{token}"
 

@@ -14,12 +14,12 @@ class IntPositive(IntRangeBase):
     _min: int = 1
 
 
-class Int0_512(IntRangeBase):
+class Int0_512(IntRangeBase):  # noqa: N801
     _min: int = 0
     _max: int = 512
 
 
-class Int0_65535(IntRangeBase):
+class Int0_65535(IntRangeBase):  # noqa: N801
     _min: int = 0
     _max: int = 65_535
 
@@ -147,7 +147,7 @@ class DomainName(StrBase):
                 object_path,
             ) from e
 
-        if type(self)._re.match(punycode):
+        if type(self)._re.match(punycode):  # noqa: SLF001
             self._punycode = punycode
         else:
             raise ValueError(
@@ -208,9 +208,9 @@ class InterfacePort(StrBase):
                 try:
                     self.if_name = InterfaceName(parts[0])
                 except ValueError as e2:
-                    raise ValueError(
-                        f"expected IP address or interface name, got '{parts[0]}'.", object_path
-                    ) from e1 and e2
+                    raise ValueError(f"expected IP address or interface name, got '{parts[0]}'.", object_path) from (
+                        e1 and e2
+                    )
             self.port = PortNumber.from_str(parts[1], object_path)
         else:
             raise ValueError(f"expected '<ip-address|interface-name>@<port>', got '{source_value}'.", object_path)
@@ -232,9 +232,9 @@ class InterfaceOptionalPort(StrBase):
                 try:
                     self.if_name = InterfaceName(parts[0])
                 except ValueError as e2:
-                    raise ValueError(
-                        f"expected IP address or interface name, got '{parts[0]}'.", object_path
-                    ) from e1 and e2
+                    raise ValueError(f"expected IP address or interface name, got '{parts[0]}'.", object_path) from (
+                        e1 and e2
+                    )
             if len(parts) == 2:
                 self.port = PortNumber.from_str(parts[1], object_path)
         else:

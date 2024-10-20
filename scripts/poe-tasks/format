@@ -4,10 +4,22 @@
 src_dir="$(dirname "$(realpath "$0")")"
 source $src_dir/utils/_env.sh
 
-dirs="python/knot_resolver/ tests/manager scripts/poe-tasks/utils/create_setup.py build_c_extensions.py"
+dirs="python/knot_resolver/ tests/manager scripts/poe-tasks/utils/create_setup.py"
 
-# run black code formater
-black $dirs
+# sort python import
+echo -e "${yellow}Sorting Python imports using ruff...${reset}"
+ruff check --select I --fix $dirs
+check_rv $?
+echo
 
-# sort python imports
-isort $dirs
+# format python code
+echo -e "${yellow}Formatting Python code using ruff...${reset}"
+ruff format $dirs
+check_rv $?
+echo
+
+# fancy messages at the end :)
+fancy_message
+
+# exit with the aggregate return value
+exit $aggregated_rv

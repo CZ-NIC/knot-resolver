@@ -36,8 +36,8 @@ class DataValidationError(DataModelingBaseException):
             indentation_level += 1
             msg_parts.append("Configuration validation error detected:")
 
-        INDENT = indentation_level * "\t"
-        msg_parts.append(f"{INDENT}{self.msg()}")
+        indent = indentation_level * "\t"
+        msg_parts.append(f"{indent}{self.msg()}")
 
         for c in self._child_exceptions:
             msg_parts.append(c.recursive_msg(indentation_level + 1))

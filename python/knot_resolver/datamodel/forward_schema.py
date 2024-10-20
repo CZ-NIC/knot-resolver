@@ -59,7 +59,7 @@ class ForwardSchema(ConfigSchema):
             for server in servers:
                 if isinstance(server, IPAddressOptionalPort) and server.port:
                     return int(server.port) != 53
-                elif isinstance(server, ForwardServerSchema):
+                if isinstance(server, ForwardServerSchema):
                     return is_port_custom(server.address.to_std())
             return False
 
