@@ -95,25 +95,18 @@ When invoked globally, you don't have to worry about virtual environments and su
 Or, you can create a symlink to the ``./poe`` script without installing PoeThePoet, e.g. ``ln -s path_to_the_repository/manager/poe /usr/bin/poe``.
 
 To list all the available commands, you can run ``poe help``.
-The commands are defined in the ``pyproject.toml`` file.
-The most important ones for everyday development are:
-
-- ``poe configure`` to configure the build directory of ``kresd``
-- ``poe run`` to run the manager
-- ``poe docs`` to create HTML documentation
-- ``poe test`` to run unit tests (enforced by our CI)
-- ``poe check`` to run static code analysis (enforced by our CI)
-- ``poe format`` to autoformat the source code
-- ``poe kresctl`` to run the manager's CLI tool
+The commands are defined in the ``pyproject.toml`` file of the ``tool.poe.tasks
+`` section.
 
 With this environment, **everything else should just work**.
 You can run the same checks that CI runs, all the commands listed below should pass.
 If something fails and you have done all the steps above, please [open a new issue](https://gitlab.nic.cz/knot/knot-resolver-manager/-/issues/new).
 
+
 Contributing
 ============
 
-Before committing, please ensure that both ``poe check`` and ``poe test`` pass.
+Before committing, please ensure that ``poe check``, ``poe lint``, ``poe format`` and ``poe test`` pass.
 Those commands are both run on the CI and if they don't pass, CI fails.
 
 
@@ -184,8 +177,8 @@ Automatically managed dependencies:
   Used for simplifying interactions with the project.
 
 - ``pytest``, ``pytest-cov``: unit testing
-- ``pylint``, ``flake8``: linting
-- ``black``: autoformatter (might be removed in the future if not used in practice)
+- ``ruff``: linting and formatting
+- ``mypy``: type checking
 
 
 Why Poetry? Why should I learn a new tool?

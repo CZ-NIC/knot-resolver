@@ -24,10 +24,14 @@ from typing import Optional
 class Context:
     resolve_root: Optional[Path]
     strict_validation: bool
+    permissions_default: bool
 
-    def __init__(self, resolve_root: Optional[Path], strict_validation: bool = True) -> None:
+    def __init__(
+        self, resolve_root: Optional[Path], strict_validation: bool = True, permissions_default: bool = True
+    ) -> None:
         self.resolve_root = resolve_root
         self.strict_validation = strict_validation
+        self.permissions_default = permissions_default
 
 
 _global_context: Context = Context(None)
@@ -59,3 +63,7 @@ def get_resolve_root() -> Path:
 
 def get_strict_validation() -> bool:
     return _global_context.strict_validation
+
+
+def get_permissions_default() -> bool:
+    return _global_context.permissions_default

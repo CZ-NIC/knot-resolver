@@ -7,7 +7,7 @@ from secrets import token_hex
 from subprocess import SubprocessError
 from typing import Any, Callable, List, Optional
 
-from knot_resolver.controller.exceptions import SubprocessControllerException
+from knot_resolver.controller.exceptions import SubprocessControllerError
 from knot_resolver.controller.interface import Subprocess, SubprocessController, SubprocessStatus, SubprocessType
 from knot_resolver.controller.registered_workers import command_registered_workers, get_registered_workers_kresids
 from knot_resolver.datamodel import KresConfig
@@ -69,7 +69,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                 "Trying to create an instance of KresManager using normal constructor. Please use "
                 "`KresManager.get_instance()` instead"
             )
-            assert False
+            raise AssertionError
 
         self._workers: List[Subprocess] = []
         self._gc: Optional[Subprocess] = None
@@ -93,7 +93,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
         """
 
         inst = KresManager(shutdown_trigger, _i_know_what_i_am_doing=True)
-        await inst._async_init(subprocess_controller, config_store)  # pylint: disable=protected-access
+        await inst._async_init(subprocess_controller, config_store)  # noqa: SLF001
         return inst
 
     async def _async_init(self, subprocess_controller: SubprocessController, config_store: ConfigStore) -> None:
@@ -225,7 +225,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                 #   if it keeps running, the config is valid and others will soon join as well
                 #   if it crashes and the startup fails, then well, it's not running anymore... :)
                 await self._spawn_new_worker(new)
-            except (SubprocessError, SubprocessControllerException):
+            except (SubprocessError, SubprocessControllerError):
                 logger.error("Kresd with the new config failed to start, rejecting config")
                 return Result.err("canary kresd process failed to start. Config might be invalid.")
 
@@ -240,7 +240,6 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
             await self._collect_already_running_workers()
 
     async def reset_workers_policy_rules(self, _config: KresConfig) -> None:
-
         # command all running 'kresd' workers to reset their old policy rules,
         # unless the workers have already been started with a new config so reset is not needed
         if self._workers_reset_needed and get_registered_workers_kresids():
@@ -256,7 +255,6 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
             )
 
     async def set_new_tls_sticket_secret(self, config: KresConfig) -> None:
-
         if config.network.tls.sticket_secret or config.network.tls.sticket_secret_file:
             logger.debug("User-configured TLS resumption secret found - skipping auto-generation.")
             return
@@ -283,13 +281,15 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                     else:
                         logger.debug("Stopping cache GC")
                         await self._stop_gc()
-        except SubprocessControllerException as e:
+        except SubprocessControllerError as e:
             if _noretry:
                 raise
-            elif self._fix_counter.is_too_high():
+            if self._fix_counter.is_too_high():
                 logger.error(f"Failed to apply config: {e}")
                 logger.error("There have already been problems recently, refusing to try to fix it.")
-                await self.forced_shutdown()  # possible improvement - the person who requested this change won't get a response this way
+                await (
+                    self.forced_shutdown()
+                )  # possible improvement - the person who requested this change won't get a response this way
             else:
                 logger.error(f"Failed to apply config: {e}")
                 logger.warning("Reloading system state and trying again.")
@@ -310,7 +310,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                 while not self._is_policy_loader_exited():
                     await asyncio.sleep(1)
 
-        except (SubprocessError, SubprocessControllerException) as e:
+        except (SubprocessError, SubprocessControllerError) as e:
             logger.error(f"Failed to load policy rules: {e}")
             return Result.err("kresd 'policy-loader' process failed to start. Config might be invalid.")
 
@@ -358,7 +358,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
             logger.error("Failed attempting to fix an error. Forcefully shutting down.", exc_info=True)
             await self.forced_shutdown()
 
-    async def _watchdog(self) -> None:  # pylint: disable=too-many-branches
+    async def _watchdog(self) -> None:  # pylint: disable=too-many-branches  # noqa: PLR0912
         while True:
             await asyncio.sleep(WATCHDOG_INTERVAL_SEC)
 

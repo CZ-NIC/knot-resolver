@@ -36,8 +36,8 @@ try:
         from poetry.core.factory import Factory
         from poetry.core.masonry.builders.sdist import SdistBuilder
     except (ImportError, ModuleNotFoundError):
-        from poetry.masonry.builders.sdist import SdistBuilder
         from poetry.factory import Factory
+        from poetry.masonry.builders.sdist import SdistBuilder
     from poetry.__version__ import __version__
 except (ImportError, ModuleNotFoundError) as ee:
     raise ImportError(f"install poetry by doing pip install poetry to use this script: {ee}")

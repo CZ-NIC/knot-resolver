@@ -1,6 +1,9 @@
-import re
-from typing import Any, Dict, Pattern, Type
+# ruff: noqa: SLF001
 
+import re
+from typing import Any, Dict, Type
+
+from knot_resolver.utils.compat.typing import Pattern
 from knot_resolver.utils.modeling import BaseValueType
 
 
@@ -191,7 +194,7 @@ class UnitBase(StrBase):
             val, unit = grouped.groups()
             if unit is None:
                 raise ValueError(f"Missing units. Accepted units are {list(type(self)._units.keys())}", object_path)
-            elif unit not in type(self)._units:
+            if unit not in type(self)._units:
                 raise ValueError(
                     f"Used unexpected unit '{unit}' for {type(self).__name__}."
                     f" Accepted units are {list(type(self)._units.keys())}",

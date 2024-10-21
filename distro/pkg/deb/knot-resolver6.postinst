@@ -8,8 +8,8 @@ fi
 
 if [ "$1" = "configure" ] || [ "$1" = "abort-upgrade" ] || [ "$1" = "abort-deconfigure" ] || [ "$1" = "abort-remove" ] ; then
     systemctl daemon-reload || true
-    systemd-tmpfiles --create /usr/lib/tmpfiles.d/knot-resolver.conf
-    systemctl try-restart knot-resolver.service || true
+    systemd-tmpfiles --create /usr/lib/tmpfiles.d/knot-resolver.conf || true
+    deb-systemd-invoke try-restart knot-resolver.service || true
 fi
 
 #DEBHELPER#

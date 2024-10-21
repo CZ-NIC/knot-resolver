@@ -1,6 +1,7 @@
 # type: ignore
-# pylint: disable=protected-access
+# ruff: noqa: SLF001
 # pylint: disable=c-extension-no-member
+
 import os
 import signal
 import time
@@ -46,7 +47,7 @@ class NotifySocketDispatcher:
 
         res: Optional[Tuple[int, bytes]] = notify.read_message(self.fd)
         if res is None:
-            return None  # there was some junk
+            return  # there was some junk
         pid, data = res
 
         # pylint: disable=undefined-loop-variable
@@ -55,7 +56,7 @@ class NotifySocketDispatcher:
                 break
         else:
             logger.warn(f"ignoring ready notification from unregistered PID={pid}")
-            return None
+            return
 
         if data.startswith(b"READY=1"):
             # handle case, when some process is really ready
@@ -84,7 +85,7 @@ class NotifySocketDispatcher:
         else:
             # handle case, when we got something unexpected
             logger.warn(f"ignoring unrecognized data on $NOTIFY_SOCKET sent from PID={pid}, data='{data!r}'")
-            return None
+            return
 
     def handle_write_event(self):
         raise ValueError("this dispatcher is not writable")
@@ -186,8 +187,7 @@ def chain(first: Callable[..., U], second: Callable[[U], T]) -> Callable[..., T]
         res = first(*args, **kwargs)
         if isinstance(res, tuple):
             return second(*res)
-        else:
-            return second(res)
+        return second(res)
 
     return wrapper
 
@@ -204,7 +204,7 @@ def append(first: Callable[..., T], second: Callable[..., None]) -> Callable[...
 def monkeypatch(supervisord: Supervisor) -> None:
     """Inject ourselves into supervisord code"""
 
-    # append notify socket handler to event loopo
+    # append notify socket handler to event loop
     supervisord.get_process_map = chain(supervisord.get_process_map, partial(supervisord_get_process_map, supervisord))
 
     # prepend timeout handler to transition method

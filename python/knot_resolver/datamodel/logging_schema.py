@@ -129,8 +129,7 @@ class LoggingSchema(ConfigSchema):
             if not is_obj_type_valid(target, cast(Type[Any], LogTargetEnum)):
                 raise ValueError(f"logging target '{target}' read from $KRES_LOGGING_TARGET is invalid")
             return cast(LogTargetEnum, target)
-        else:
-            return raw.target
+        return raw.target
 
     def _validate(self):
         if self.groups is None:

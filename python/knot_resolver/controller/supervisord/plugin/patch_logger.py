@@ -20,7 +20,7 @@ def empty_function(*args, **kwargs):
 FORWARD_MSG_FORMAT: str = "%(name)s[%(pid)d]%(stream)s: %(data)s"
 
 
-def POutputDispatcher_log(self: POutputDispatcher, data: bytearray):
+def p_output_dispatcher_log(self: POutputDispatcher, data: bytearray):
     if data:
         # parse the input
         if not isinstance(data, bytes):
@@ -75,7 +75,7 @@ def inject(supervisord: Supervisor, **config: Any) -> Any:  # pylint: disable=us
         supervisord.options.logger.handlers = supervisord_handlers
 
         # replace output handler for subprocesses
-        POutputDispatcher._log = POutputDispatcher_log
+        POutputDispatcher._log = p_output_dispatcher_log  # noqa: SLF001
 
         # we forward stdio in all cases, even when logging to syslog. This should prevent the unforturtunate
         # case of swallowing an error message leaving the users confused. To make the forwarded lines obvious

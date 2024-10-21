@@ -1,0 +1,4 @@
+# UPSTREAM: intended
+knot-resolver6-module-http: font-in-non-font-package 
+# UPSTREAM: intended
+knot-resolver6-module-http: font-outside-font-dir

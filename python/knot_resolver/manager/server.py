@@ -8,6 +8,7 @@ import sys
 from functools import partial
 from http import HTTPStatus
 from pathlib import Path
+from pwd import getpwuid
 from time import time
 from typing import Any, Dict, List, Literal, Optional, Set, Union, cast
 
@@ -17,9 +18,9 @@ from aiohttp.web_app import Application
 from aiohttp.web_response import json_response
 from aiohttp.web_runner import AppRunner, TCPSite, UnixSite
 
-from knot_resolver.constants import CONFIG_FILE
+from knot_resolver.constants import CONFIG_FILE, USER
 from knot_resolver.controller import get_best_controller_implementation
-from knot_resolver.controller.exceptions import SubprocessControllerExecException
+from knot_resolver.controller.exceptions import SubprocessControllerExecError
 from knot_resolver.controller.registered_workers import command_single_registered_worker
 from knot_resolver.datamodel import kres_config_json_schema
 from knot_resolver.datamodel.cache_schema import CacheClearRPCSchema
@@ -240,7 +241,6 @@ class Server:
         raise web.HTTPMovedPermanently("/metrics/json")
 
     async def _handler_metrics_json(self, _request: web.Request) -> web.Response:
-
         config = self.config_store.get()
 
         return web.Response(
@@ -250,7 +250,6 @@ class Server:
         )
 
     async def _handler_metrics_prometheus(self, _request: web.Request) -> web.Response:
-
         metrics_report = await metrics.report_prometheus()
         if not metrics_report:
             raise web.HTTPNotFound()
@@ -403,9 +402,8 @@ async def _load_raw_config(config: Union[Path, Dict[str, Any]]) -> Dict[str, Any
             raise KresManagerException(
                 f"Manager is configured to load config file at {config} on startup, but the file does not exist."
             )
-        else:
-            logger.info(f"Loading configuration from '{config}' file.")
-            config = try_to_parse(await readfile(config))
+        logger.info(f"Loading configuration from '{config}' file.")
+        config = try_to_parse(await readfile(config))
 
     # validate the initial configuration
     assert isinstance(config, dict)
@@ -413,14 +411,12 @@ async def _load_raw_config(config: Union[Path, Dict[str, Any]]) -> Dict[str, Any
 
 
 async def _load_config(config: Dict[str, Any]) -> KresConfig:
-    config_validated = KresConfig(config)
-    return config_validated
+    return KresConfig(config)
 
 
 async def _init_config_store(config: Dict[str, Any]) -> ConfigStore:
     config_validated = await _load_config(config)
-    config_store = ConfigStore(config_validated)
-    return config_store
+    return ConfigStore(config_validated)
 
 
 async def _init_manager(config_store: ConfigStore, server: Server) -> KresManager:
@@ -476,11 +472,10 @@ def _lock_working_directory(attempt: int = 0) -> None:
                 "Another manager is running in the same working directory."
                 f" PID file is located at {os.getcwd()}/{PID_FILE_NAME}"
             ) from e
-        else:
-            raise KresManagerException(
-                "Another manager is running in the same working directory."
-                f" PID file is located at {os.getcwd()}/{PID_FILE_NAME}"
-            ) from e
+        raise KresManagerException(
+            "Another manager is running in the same working directory."
+            f" PID file is located at {os.getcwd()}/{PID_FILE_NAME}"
+        ) from e
 
     # now we know that we are the only manager running in this directory
 
@@ -506,7 +501,7 @@ async def _sigterm_while_shutting_down():
     sys.exit(128 + signal.SIGTERM)
 
 
-async def start_server(config: Path = CONFIG_FILE) -> int:
+async def start_server(config: Path = CONFIG_FILE) -> int:  # noqa: PLR0915
     # This function is quite long, but it describes how manager runs. So let's silence pylint
     # pylint: disable=too-many-statements
 
@@ -516,6 +511,14 @@ async def start_server(config: Path = CONFIG_FILE) -> int:
 
     # Block signals during initialization to force their processing once everything is ready
     signal.pthread_sigmask(signal.SIG_BLOCK, Server.all_handled_signals())
+
+    # Check if we are running under the intended user, if not, log a warning message
+    pw_username = getpwuid(os.getuid()).pw_name
+    if pw_username != USER:
+        logger.warning(
+            f"Knot Resolver does not run as the default '{USER}' user, but as '{pw_username}' instead."
+            " This may or may not affect the configuration validation and the proper functioning of the resolver."
+        )
 
     # before starting server, initialize the subprocess controller, config store, etc. Any errors during inicialization
     # are fatal
@@ -527,8 +530,10 @@ async def start_server(config: Path = CONFIG_FILE) -> int:
         config_raw = await _load_raw_config(config)
 
         # before processing any configuration, set validation context
-        #  - resolve_root = root against which all relative paths will be resolved
-        set_global_validation_context(Context(config.parent, True))
+        #  - resolve_root: root against which all relative paths will be resolved
+        #  - strict_validation: check for path existence during configuration validation
+        #  - permissions_default: validate dirs/files rwx permissions against default user:group in constants
+        set_global_validation_context(Context(config.parent, True, False))
 
         # We want to change cwd as soon as possible. Some parts of the codebase are using os.getcwd() to get the
         # working directory.
@@ -567,7 +572,7 @@ async def start_server(config: Path = CONFIG_FILE) -> int:
         # After we have loaded the configuration, we can start worring about subprocess management.
         manager = await _init_manager(config_store, server)
 
-    except SubprocessControllerExecException as e:
+    except SubprocessControllerExecError as e:
         # if we caught this exception, some component wants to perform a reexec during startup. Most likely, it would
         # be a subprocess manager like supervisord, which wants to make sure the manager runs under supervisord in
         # the process tree. So now we stop everything, and exec what we are told to. We are assuming, that the thing

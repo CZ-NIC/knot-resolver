@@ -20,11 +20,9 @@ async def to_thread(func: Callable[..., T], *args: Any, **kwargs: Any) -> T:
         return await asyncio.to_thread(func, *args, **kwargs)  # type: ignore[attr-defined]
 
     # earlier versions, run with default executor
-    else:
-        loop = asyncio.get_event_loop()
-        pfunc = functools.partial(func, *args, **kwargs)
-        res = await loop.run_in_executor(None, pfunc)
-        return res
+    loop = asyncio.get_event_loop()
+    pfunc = functools.partial(func, *args, **kwargs)
+    return await loop.run_in_executor(None, pfunc)
 
 
 def async_in_a_thread(func: Callable[..., T]) -> Callable[..., Coroutine[None, None, T]]:
@@ -45,12 +43,11 @@ def create_task(coro: Awaitable[T], name: Optional[str] = None) -> "asyncio.Task
         return asyncio.create_task(coro)  # type: ignore[attr-defined,arg-type]
 
     # earlier versions, use older function
-    else:
-        return asyncio.ensure_future(coro)
+    return asyncio.ensure_future(coro)
 
 
 def is_event_loop_running() -> bool:
-    loop = events._get_running_loop()  # pylint: disable=protected-access
+    loop = events._get_running_loop()  # noqa: SLF001
     return loop is not None and loop.is_running()
 
 
@@ -64,7 +61,7 @@ def run(coro: Awaitable[T], debug: Optional[bool] = None) -> T:
         return asyncio.run(coro, debug=debug)  # type: ignore[attr-defined,arg-type]
 
     # earlier versions, use backported version of the function
-    if events._get_running_loop() is not None:  # pylint: disable=protected-access
+    if events._get_running_loop() is not None:  # noqa: SLF001
         raise RuntimeError("asyncio.run() cannot be called from a running event loop")
 
     if not coroutines.iscoroutine(coro):

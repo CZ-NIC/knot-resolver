@@ -70,20 +70,20 @@ class Serializable(ABC):
         if isinstance(obj, Serializable):
             return obj.to_dict()
 
-        elif isinstance(obj, (BaseValueType, BaseGenericTypeWrapper)):
+        if isinstance(obj, (BaseValueType, BaseGenericTypeWrapper)):
             o = obj.serialize()
             # if Serializable.is_serializable(o):
             return Serializable.serialize(o)
             # return o
 
-        elif isinstance(obj, list):
+        if isinstance(obj, list):
             res: List[Any] = [Serializable.serialize(i) for i in cast(List[Any], obj)]
             return res
 
         return obj
 
 
-class _lazy_default(Generic[T], Serializable):
+class _LazyDefault(Generic[T], Serializable):
     """
     Wrapper for default values BaseSchema classes which deffers their instantiation until the schema
     itself is being instantiated
@@ -104,7 +104,7 @@ class _lazy_default(Generic[T], Serializable):
 
 def lazy_default(constructor: Callable[..., T], *args: Any, **kwargs: Any) -> T:
     """We use a factory function because you can't lie about the return type in `__new__`"""
-    return _lazy_default(constructor, *args, **kwargs)  # type: ignore
+    return _LazyDefault(constructor, *args, **kwargs)  # type: ignore
 
 
 def _split_docstring(docstring: str) -> Tuple[str, Optional[str]]:
@@ -169,51 +169,50 @@ def _get_properties_schema(typ: Type[Any]) -> Dict[Any, Any]:
     return schema
 
 
-def _describe_type(typ: Type[Any]) -> Dict[Any, Any]:
+def _describe_type(typ: Type[Any]) -> Dict[Any, Any]:  # noqa: PLR0911, PLR0912
     # pylint: disable=too-many-branches
 
     if inspect.isclass(typ) and issubclass(typ, BaseSchema):
         return typ.json_schema(include_schema_definition=False)
 
-    elif inspect.isclass(typ) and issubclass(typ, BaseValueType):
+    if inspect.isclass(typ) and issubclass(typ, BaseValueType):
         return typ.json_schema()
 
-    elif is_generic_type_wrapper(typ):
+    if is_generic_type_wrapper(typ):
         wrapped = get_generic_type_wrapper_argument(typ)
         return _describe_type(wrapped)
 
-    elif is_none_type(typ):
+    if is_none_type(typ):
         return {"type": "null"}
 
-    elif typ == int:
+    if typ is int:
         return {"type": "integer"}
 
-    elif typ == bool:
+    if typ is bool:
         return {"type": "boolean"}
 
-    elif typ == str:
+    if typ is str:
         return {"type": "string"}
 
-    elif is_literal(typ):
+    if is_literal(typ):
         lit = get_generic_type_arguments(typ)
         return {"type": "string", "enum": lit}
 
-    elif is_optional(typ):
+    if is_optional(typ):
         desc = _describe_type(get_optional_inner_type(typ))
         if "type" in desc:
             desc["type"] = [desc["type"], "null"]
             return desc
-        else:
-            return {"anyOf": [{"type": "null"}, desc]}
+        return {"anyOf": [{"type": "null"}, desc]}
 
-    elif is_union(typ):
+    if is_union(typ):
         variants = get_generic_type_arguments(typ)
         return {"anyOf": [_describe_type(v) for v in variants]}
 
-    elif is_list(typ):
+    if is_list(typ):
         return {"type": "array", "items": _describe_type(get_generic_type_argument(typ))}
 
-    elif is_dict(typ):
+    if is_dict(typ):
         key, val = get_generic_type_arguments(typ)
 
         if inspect.isclass(key) and issubclass(key, BaseValueType):
@@ -221,11 +220,11 @@ def _describe_type(typ: Type[Any]) -> Dict[Any, Any]:
                 key.__str__ is not BaseValueType.__str__
             ), "To support derived 'BaseValueType', __str__ must be implemented."
         else:
-            assert key == str, "We currently do not support any other keys then strings"
+            assert key is str, "We currently do not support any other keys then strings"
 
         return {"type": "object", "additionalProperties": _describe_type(val)}
 
-    elif inspect.isclass(typ) and issubclass(typ, enum.Enum):  # same as our is_enum(typ), but inlined for type checker
+    if inspect.isclass(typ) and issubclass(typ, enum.Enum):  # same as our is_enum(typ), but inlined for type checker
         return {"type": "string", "enum": [str(v) for v in typ]}
 
     raise NotImplementedError(f"Trying to get JSON schema for type '{typ}', which is not implemented")
@@ -257,7 +256,7 @@ class ObjectMapper:
                 errs.append(e)
         if len(errs) == 1:
             raise errs[0]
-        elif len(errs) > 1:
+        if len(errs) > 1:
             raise AggregateDataValidationError(object_path, child_exceptions=errs)
         return tuple(res)
 
@@ -275,7 +274,7 @@ class ObjectMapper:
                     errs.append(e)
             if len(errs) == 1:
                 raise errs[0]
-            elif len(errs) > 1:
+            if len(errs) > 1:
                 raise AggregateDataValidationError(object_path, child_exceptions=errs)
             return res
         except AttributeError as e:
@@ -303,7 +302,7 @@ class ObjectMapper:
 
         if len(errs) == 1:
             raise errs[0]
-        elif len(errs) > 1:
+        if len(errs) > 1:
             raise AggregateDataValidationError(object_path, child_exceptions=errs)
         return res
 
@@ -311,17 +310,16 @@ class ObjectMapper:
         # we are willing to cast any primitive value to string, but no compound values are allowed
         if is_obj_type(obj, (str, float, int)) or isinstance(obj, BaseValueType):
             return str(obj)
-        elif is_obj_type(obj, bool):
+        if is_obj_type(obj, bool):
             raise DataValidationError(
                 "Expected str, found bool. Be careful, that YAML parsers consider even"
                 ' "no" and "yes" as a bool. Search for the Norway Problem for more'
                 " details. And please use quotes explicitly.",
                 object_path,
             )
-        else:
-            raise DataValidationError(
-                f"expected str (or number that would be cast to string), but found type {type(obj)}", object_path
-            )
+        raise DataValidationError(
+            f"expected str (or number that would be cast to string), but found type {type(obj)}", object_path
+        )
 
     def _create_int(self, obj: Any, object_path: str) -> int:
         # we don't want to make an int out of anything else than other int
@@ -345,21 +343,18 @@ class ObjectMapper:
         inner: Type[Any] = get_optional_inner_type(tp)
         if obj is None:
             return None
-        else:
-            return self.map_object(inner, obj, object_path=object_path)
+        return self.map_object(inner, obj, object_path=object_path)
 
     def _create_bool(self, obj: Any, object_path: str) -> bool:
         if is_obj_type(obj, bool):
             return obj
-        else:
-            raise DataValidationError(f"expected bool, found {type(obj)}", object_path)
+        raise DataValidationError(f"expected bool, found {type(obj)}", object_path)
 
     def _create_literal(self, tp: Type[Any], obj: Any, object_path: str) -> Any:
         expected = get_generic_type_arguments(tp)
         if obj in expected:
             return obj
-        else:
-            raise DataValidationError(f"'{obj}' does not match any of the expected values {expected}", object_path)
+        raise DataValidationError(f"'{obj}' does not match any of the expected values {expected}", object_path)
 
     def _create_base_schema_object(self, tp: Type[Any], obj: Any, object_path: str) -> "BaseSchema":
         if isinstance(obj, (dict, BaseSchema)):
@@ -370,24 +365,22 @@ class ObjectMapper:
         if isinstance(obj, tp):
             # if we already have a custom value type, just pass it through
             return obj
-        else:
-            # no validation performed, the implementation does it in the constuctor
-            try:
-                return tp(obj, object_path=object_path)
-            except ValueError as e:
-                if len(e.args) > 0 and isinstance(e.args[0], str):
-                    msg = e.args[0]
-                else:
-                    msg = f"Failed to validate value against {tp} type"
-                raise DataValidationError(msg, object_path) from e
+        # no validation performed, the implementation does it in the constuctor
+        try:
+            return tp(obj, object_path=object_path)
+        except ValueError as e:
+            if len(e.args) > 0 and isinstance(e.args[0], str):
+                msg = e.args[0]
+            else:
+                msg = f"Failed to validate value against {tp} type"
+            raise DataValidationError(msg, object_path) from e
 
     def _create_default(self, obj: Any) -> Any:
-        if isinstance(obj, _lazy_default):
+        if isinstance(obj, _LazyDefault):
             return obj.instantiate()  # type: ignore
-        else:
-            return obj
+        return obj
 
-    def map_object(
+    def map_object(  # noqa: PLR0911, PLR0912
         self,
         tp: Type[Any],
         obj: Any,
@@ -409,101 +402,98 @@ class ObjectMapper:
             return self._create_default(default)
 
         # NoneType
-        elif is_none_type(tp):
+        if is_none_type(tp):
             if obj is None:
                 return None
-            else:
-                raise DataValidationError(f"expected None, found '{obj}'.", object_path)
+            raise DataValidationError(f"expected None, found '{obj}'.", object_path)
 
         # Optional[T]  (could be technically handled by Union[*variants], but this way we have better error reporting)
-        elif is_optional(tp):
+        if is_optional(tp):
             return self._create_optional(tp, obj, object_path)
 
         # Union[*variants]
-        elif is_union(tp):
+        if is_union(tp):
             return self._create_union(tp, obj, object_path)
 
         # after this, there is no place for a None object
-        elif obj is None:
+        if obj is None:
             raise DataValidationError(f"unexpected value 'None' for type {tp}", object_path)
 
         # int
-        elif tp == int:
+        if tp is int:
             return self._create_int(obj, object_path)
 
         # str
-        elif tp == str:
+        if tp is str:
             return self._create_str(obj, object_path)
 
         # bool
-        elif tp == bool:
+        if tp is bool:
             return self._create_bool(obj, object_path)
 
         # float
-        elif tp == float:
+        if tp is float:
             raise NotImplementedError(
                 "Floating point values are not supported in the object mapper."
                 " Please implement them and be careful with type coercions"
             )
 
         # Literal[T]
-        elif is_literal(tp):
+        if is_literal(tp):
             return self._create_literal(tp, obj, object_path)
 
         # Dict[K,V]
-        elif is_dict(tp):
+        if is_dict(tp):
             return self._create_dict(tp, obj, object_path)
 
         # any Enums (probably used only internally in DataValidator)
-        elif is_enum(tp):
+        if is_enum(tp):
             if isinstance(obj, tp):
                 return obj
-            else:
-                raise DataValidationError(f"unexpected value '{obj}' for enum '{tp}'", object_path)
+            raise DataValidationError(f"unexpected value '{obj}' for enum '{tp}'", object_path)
 
         # List[T]
-        elif is_list(tp):
+        if is_list(tp):
             return self._create_list(tp, obj, object_path)
 
         # Tuple[A,B,C,D,...]
-        elif is_tuple(tp):
+        if is_tuple(tp):
             return self._create_tuple(tp, obj, object_path)
 
         # type of obj and cls type match
-        elif is_obj_type(obj, tp):
+        if is_obj_type(obj, tp):
             return obj
 
         # when the specified type is Any, just return the given value
         # on mypy version 1.11.0 comparison-overlap error started popping up
         # https://github.com/python/mypy/issues/17665
-        elif tp == Any:  # type: ignore[comparison-overlap]
+        if tp == Any:  # type: ignore[comparison-overlap]
             return obj
 
         # BaseValueType subclasses
-        elif inspect.isclass(tp) and issubclass(tp, BaseValueType):
+        if inspect.isclass(tp) and issubclass(tp, BaseValueType):
             return self.create_value_type_object(tp, obj, object_path)
 
         # BaseGenericTypeWrapper subclasses
-        elif is_generic_type_wrapper(tp):
+        if is_generic_type_wrapper(tp):
             inner_type = get_generic_type_wrapper_argument(tp)
             obj_valid = self.map_object(inner_type, obj, object_path)
             return tp(obj_valid, object_path=object_path)  # type: ignore
 
         # nested BaseSchema subclasses
-        elif inspect.isclass(tp) and issubclass(tp, BaseSchema):
+        if inspect.isclass(tp) and issubclass(tp, BaseSchema):
             return self._create_base_schema_object(tp, obj, object_path)
 
         # if the object matches, just pass it through
-        elif inspect.isclass(tp) and isinstance(obj, tp):
+        if inspect.isclass(tp) and isinstance(obj, tp):
             return obj
 
         # default error handler
-        else:
-            raise DataValidationError(
-                f"Type {tp} cannot be parsed. This is a implementation error. "
-                "Please fix your types in the class or improve the parser/validator.",
-                object_path,
-            )
+        raise DataValidationError(
+            f"Type {tp} cannot be parsed. This is a implementation error. "
+            "Please fix your types in the class or improve the parser/validator.",
+            object_path,
+        )
 
     def is_obj_type_valid(self, obj: Any, tp: Type[Any]) -> bool:
         """
@@ -582,7 +572,7 @@ class ObjectMapper:
 
         if len(errs) == 1:
             raise errs[0]
-        elif len(errs) > 1:
+        if len(errs) > 1:
             raise AggregateDataValidationError(object_path, errs)
         return used_keys
 
@@ -596,11 +586,10 @@ class ObjectMapper:
             if argc == 1:
                 # it is a static method
                 return func(source)
-            elif argc == 2:
+            if argc == 2:
                 # it is a instance method
                 return func(_create_untouchable("obj"), source)
-            else:
-                raise RuntimeError("Transformation function has wrong number of arguments")
+            raise RuntimeError("Transformation function has wrong number of arguments")
         except ValueError as e:
             if len(e.args) > 0 and isinstance(e.args[0], str):
                 msg = e.args[0]
@@ -616,15 +605,14 @@ class ObjectMapper:
         worry about a different BaseSchema class, when we want to have dynamically renamed fields.
         """
         # As this is a delegated constructor, we must ignore protected access warnings
-        # pylint: disable=protected-access
 
         # sanity check
         if not isinstance(source, (BaseSchema, dict)):  # type: ignore
             raise DataValidationError(f"expected dict-like object, found '{type(source)}'", object_path)
 
         # construct lower level schema first if configured to do so
-        if obj._LAYER is not None:
-            source = obj._LAYER(source, object_path=object_path)  # pylint: disable=not-callable
+        if obj._LAYER is not None:  # noqa: SLF001
+            source = obj._LAYER(source, object_path=object_path)  # pylint: disable=not-callable  # noqa: SLF001
 
         # assign fields
         used_keys = self._assign_fields(obj, source, object_path)
@@ -641,7 +629,7 @@ class ObjectMapper:
 
         # validate the constructed value
         try:
-            obj._validate()
+            obj._validate()  # noqa: SLF001
         except ValueError as e:
             raise DataValidationError(e.args[0] if len(e.args) > 0 else "Validation error", object_path or "/") from e
 
@@ -723,10 +711,9 @@ class BaseSchema(Serializable):
     def get_unparsed_data(self) -> Dict[str, Any]:
         if isinstance(self.__source, BaseSchema):
             return self.__source.get_unparsed_data()
-        elif isinstance(self.__source, Renamed):
+        if isinstance(self.__source, Renamed):
             return self.__source.original()
-        else:
-            return self.__source
+        return self.__source
 
     def __getitem__(self, key: str) -> Any:
         if not hasattr(self, key):

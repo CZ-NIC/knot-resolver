@@ -3,11 +3,11 @@ from typing import List
 from knot_resolver import KresBaseException
 
 
-class SubprocessControllerException(KresBaseException):
+class SubprocessControllerError(KresBaseException):
     pass
 
 
-class SubprocessControllerExecException(Exception):
+class SubprocessControllerExecError(Exception):
     """
     Exception that is used to deliberately terminate system startup
     and make exec() of something else. This is used by the subprocess controller

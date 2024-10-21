@@ -81,10 +81,9 @@ class RenamedList(List[V], Renamed):  # type: ignore
 def renamed(obj: Any) -> Any:
     if isinstance(obj, dict):
         return RenamedDict(**obj)
-    elif isinstance(obj, list):
+    if isinstance(obj, list):
         return RenamedList(obj)
-    else:
-        return obj
+    return obj
 
 
 __all__ = ["renamed", "Renamed"]

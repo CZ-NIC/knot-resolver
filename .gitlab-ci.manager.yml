@@ -14,23 +14,39 @@ default:
 examples:py3.12:
   stage: check
   script:
-    - poetry install --only main,dev
+    - poetry install --all-extras --only main,dev
     - poe examples
+  variables:
+    PYTHON_INTERPRETER: python3.12
+
+check:py3.12:
+  stage: check
+  script:
+    - poetry install --all-extras --only main,dev,lint
+    - poe check
+  variables:
+    PYTHON_INTERPRETER: python3.12
+
+format:py3.12:
+  stage: check
+  script:
+    - poetry install --all-extras --only main,dev,lint
+    - poe format
   variables:
     PYTHON_INTERPRETER: python3.12
 
 lint:py3.12:
   stage: check
   script:
-    - poetry install --only main,dev,lint
-    - poe check
+    - poetry install --all-extras --only main,dev,lint
+    - poe lint
   variables:
     PYTHON_INTERPRETER: python3.12
 
 .unit: &unit
   stage: check
   script:
-    - poetry install --only main,dev,test
+    - poetry install --all-extras --only main,dev,test
     - poe test
     # the following command makes sure that the source root of the coverage file is at $gitroot
     - poetry run bash -c "coverage combine .coverage; coverage xml"
@@ -67,3 +83,8 @@ unit:py3.12:
   <<: *unit
   variables:
     PYTHON_INTERPRETER: python3.12
+
+unit:py3.13:
+  <<: *unit
+  variables:
+    PYTHON_INTERPRETER: python3.13

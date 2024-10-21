@@ -313,8 +313,6 @@ install_data(
 message('--- lint dependencies ---')
 clangtidy = find_program('clang-tidy', required: false)
 luacheck = find_program('luacheck', required: false)
-flake8 = find_program('flake8', required: false)
-pylint_run = find_program('scripts/meson/run-pylint.sh')
 message('-------------------------')
 
 if clangtidy.found()
@@ -340,22 +338,6 @@ if luacheck.found()
     ],
   )
 endif
-
-if flake8.found()
-  run_target(
-    'flake8',
-    command: [
-      flake8,
-      '--max-line-length=100',
-      meson.source_root() / 'tests' / 'pytests',
-    ],
-  )
-endif
-
-run_target(
-  'pylint',
-  command: pylint_run,
-)
 
 
 # Summary message
