@@ -3,8 +3,13 @@
 #include "lib/utils.h"
 #include "lib/kru.h"
 
-/// Initialize defer, incl. shared memory with KRU.
-int defer_init(uv_loop_t *loop);
+/// Initialize defer, incl. shared memory with KRU, excl. idle.
+/// To be called from Lua; defer is disabled by default otherwise.
+KR_EXPORT
+int defer_init(const char *mmap_file, int cpus);
+
+/// Initialize idle.
+int defer_init_idle(uv_loop_t *loop);
 
 /// Deinitialize shared memory.
 void defer_deinit(void);

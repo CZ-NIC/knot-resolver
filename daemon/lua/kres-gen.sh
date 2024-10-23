@@ -347,6 +347,7 @@ ${CDEFS} ${KRESD} functions <<-EOF
 	zi_zone_import
 	ratelimiting_request_begin
 	ratelimiting_init
+	defer_init
 EOF
 
 echo "struct engine" | ${CDEFS} ${KRESD} types | sed '/module_array_t/,$ d'

@@ -617,6 +617,7 @@ struct qr_task *worker_resolve_start(knot_pkt_t *, struct kr_qflags);
 int zi_zone_import(const zi_config_t);
 _Bool ratelimiting_request_begin(struct kr_request *);
 int ratelimiting_init(const char *, size_t, uint32_t, uint32_t, int);
+int defer_init(const char *, int);
 struct engine {
 	char _stub[];
 };

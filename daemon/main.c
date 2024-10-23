@@ -571,7 +571,7 @@ int main(int argc, char **argv)
 		lua_settop(the_engine->L, 0);
 	}
 
-	if (defer_init(loop) != 0) {
+	if (defer_init_idle(loop) != 0) {
 		ret = EXIT_FAILURE;
 		goto cleanup;
 	}
