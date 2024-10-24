@@ -6,5 +6,5 @@ assert(C.ratelimiting_init(
 	{{ cfg.rate_limiting.capacity }},
 	{{ cfg.rate_limiting.instant_limit }},
 	{{ cfg.rate_limiting.rate_limit }},
-	{{ cfg.rate_limiting.tc_limit_perc }}) == 0)
+	{{ cfg.rate_limiting.slip }}) == 0)
 {%- endif %}

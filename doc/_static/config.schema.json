@@ -1689,12 +1689,10 @@
                     "description": "Number of allowed queries at a single point in time from a single host.",
                     "default": 50
                 },
-                "tc-limit-perc": {
+                "slip": {
                     "type": "integer",
-                    "minimum": 0,
-                    "maximum": 100,
-                    "description": "Percent of rate/instant limit from which responses are sent as truncated.",
-                    "default": 90
+                    "description": "Number of restricted responses out of which one is sent as truncated, the others are dropped.",
+                    "default": 2
                 }
             },
             "default": null

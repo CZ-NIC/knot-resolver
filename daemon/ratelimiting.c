@@ -18,7 +18,7 @@ struct ratelimiting {
 	size_t capacity;
 	uint32_t instant_limit;
 	uint32_t rate_limit;
-	uint16_t tc_limit;
+	uint16_t slip;
 	bool using_avx2;
 	kru_price_t v4_prices[V4_PREFIXES_CNT];
 	kru_price_t v6_prices[V6_PREFIXES_CNT];
@@ -35,7 +35,7 @@ static bool using_avx2(void)
 	return result;
 }
 
-int ratelimiting_init(const char *mmap_file, size_t capacity, uint32_t instant_limit, uint32_t rate_limit, int tc_limit_perc)
+int ratelimiting_init(const char *mmap_file, size_t capacity, uint32_t instant_limit, uint32_t rate_limit, uint16_t slip)
 {
 
 	size_t capacity_log = 0;
@@ -47,7 +47,7 @@ int ratelimiting_init(const char *mmap_file, size_t capacity, uint32_t instant_l
 		.capacity = capacity,
 		.instant_limit = instant_limit,
 		.rate_limit = rate_limit,
-		.tc_limit = (tc_limit_perc == 100 ? -1 : ((uint32_t)tc_limit_perc << 16) / 100),
+		.slip = slip,
 		.using_avx2 = using_avx2()
 	};
 
@@ -56,7 +56,7 @@ int ratelimiting_init(const char *mmap_file, size_t capacity, uint32_t instant_l
 		sizeof(header.capacity) +
 		sizeof(header.instant_limit) +
 		sizeof(header.rate_limit) +
-		sizeof(header.tc_limit) +
+		sizeof(header.slip) +
 		sizeof(header.using_avx2));  // no undefined padding inside
 
 	int ret = mmapped_init(&ratelimiting_mmapped, mmap_file, size, &header, header_size);
@@ -121,21 +121,25 @@ bool ratelimiting_request_begin(struct kr_request *req)
 	if (ratelimiting) {
 		_Alignas(16) uint8_t key[16] = {0, };
 		uint8_t limited_prefix;
-		uint16_t max_final_load = 0;
 		if (req->qsource.addr->sa_family == AF_INET6) {
 			struct sockaddr_in6 *ipv6 = (struct sockaddr_in6 *)req->qsource.addr;
 			memcpy(key, &ipv6->sin6_addr, 16);
 
 			limited_prefix = KRU.limited_multi_prefix_or((struct kru *)ratelimiting->kru, kr_now(),
-					1, key, V6_PREFIXES, ratelimiting->v6_prices, V6_PREFIXES_CNT, &max_final_load);
+					1, key, V6_PREFIXES, ratelimiting->v6_prices, V6_PREFIXES_CNT, NULL);
 		} else {
 			struct sockaddr_in *ipv4 = (struct sockaddr_in *)req->qsource.addr;
 			memcpy(key, &ipv4->sin_addr, 4);  // TODO append port?
 
 			limited_prefix = KRU.limited_multi_prefix_or((struct kru *)ratelimiting->kru, kr_now(),
-					0, key, V4_PREFIXES, ratelimiting->v4_prices, V4_PREFIXES_CNT, &max_final_load);
+					0, key, V4_PREFIXES, ratelimiting->v4_prices, V4_PREFIXES_CNT, NULL);
 		}
-		limited = (limited_prefix ? 2 : (max_final_load > ratelimiting->tc_limit ? 1 : 0));
+		if (limited_prefix) {
+			limited =
+				(ratelimiting->slip > 1) ?
+					((kr_rand_bytes(1) % ratelimiting->slip == 0) ? 1 : 2) :
+					((ratelimiting->slip == 1) ? 1 : 2);
+		}
 	}
 	if (!limited) return false;
 
