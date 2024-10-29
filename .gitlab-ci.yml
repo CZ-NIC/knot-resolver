@@ -207,8 +207,7 @@ build:macOS:
     refs:
       - branches@knot/knot-resolver
   tags:
-    - linux
-    - amd64
+    - docker
     - dind
 
 docker:build:
