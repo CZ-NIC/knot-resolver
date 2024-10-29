@@ -197,25 +197,43 @@ build:macOS:
     - pip3 install -U requests
     - python3 ./ci/gh_actions.py ${CI_COMMIT_REF_NAME} ${CI_COMMIT_SHA}
 
-docker:
+
+.docker: &docker
   <<: *nodep
-  stage: build
   image: docker:latest
-  <<: *multi_platform
+  variables:
+    DOCKER_IMAGE_NAME: cznic/knot-resolverx:dev
   only:
     refs:
       - branches@knot/knot-resolver
   tags:
-    - ${PLATFORM}
+    - linux
+    - amd64
     - dind
-  variables:
-    DOCKER_IMAGE_NAME: knot-resolver-test:${CI_COMMIT_SHA}
+
+docker:build:
+  <<: *docker
+  stage: build
   script:
-    - docker build --no-cache -t ${DOCKER_IMAGE_NAME} .
-    # TODO: perhaps try if the running image answers queries
+    - 
+    - docker buildx create --name container-builder --driver docker-container --bootstrap --use
+    - docker buildx build --platform linux/amd64,linux/arm64 . -t ${DOCKER_IMAGE_NAME}
   after_script:  # remove dangling images to avoid running out of disk space
     - docker rmi ${DOCKER_IMAGE_NAME}
     - docker rmi $(docker images -f "dangling=true" -q)
+
+# docker:push:
+#   <<: *docker
+#   stage: deploy
+#   needs:
+#     - docker:build
+#   script:
+#     - DOCKER_IMAGE_NAME
+#   after_script:  # remove dangling images to avoid running out of disk space
+#     - docker rmi ${DOCKER_IMAGE_NAME}
+#     - docker rmi $(docker images -f "dangling=true" -q)
+#   when: manual
+
 # }}}
 
 # sanity {{{
