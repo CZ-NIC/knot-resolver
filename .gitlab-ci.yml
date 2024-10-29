@@ -215,7 +215,6 @@ docker:build:
   <<: *docker
   stage: build
   script:
-    - 
     - docker buildx create --name container-builder --driver docker-container --bootstrap --use
     - docker buildx build --platform linux/amd64,linux/arm64 . -t ${DOCKER_IMAGE_NAME}
   after_script:  # remove dangling images to avoid running out of disk space
