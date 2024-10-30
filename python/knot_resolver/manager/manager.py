@@ -127,6 +127,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                 config.logging,
                 config.monitoring,
                 config.lua,
+                config.rate_limiting,
             ]
 
         # register and immediately call a verifier that validates config with 'canary' kresd process
@@ -215,7 +216,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
             if _old.rate_limiting != new.rate_limiting:
                 logger.debug("Unlinking shared RRL memory")
                 try:
-                    os.unlink(str(_old.rundir) + "/rrl")
+                    os.unlink(str(_old.rundir) + "/ratelimiting")
                 except FileNotFoundError:
                     pass
             logger.debug("Testing the new config with a canary process")
