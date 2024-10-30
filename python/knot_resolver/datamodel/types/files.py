@@ -1,3 +1,4 @@
+import logging
 import os
 import stat
 from enum import Flag, auto
@@ -9,6 +10,8 @@ from typing import Any, Dict, Tuple, Type, TypeVar
 from knot_resolver.constants import GROUP, USER
 from knot_resolver.datamodel.globals import get_permissions_default, get_resolve_root, get_strict_validation
 from knot_resolver.utils.modeling.base_value_type import BaseValueType
+
+logger = logging.getLogger(__name__)
 
 
 class UncheckedPath(BaseValueType):
@@ -157,33 +160,42 @@ def _kres_accessible(dest_path: Path, perm_mode: _PermissionMode) -> bool:
         _PermissionMode.EXECUTE: [stat.S_IXUSR, stat.S_IXGRP, stat.S_IXOTH],
     }
 
-    if get_permissions_default():
-        user_uid = getpwnam(USER).pw_uid
-        user_gid = getgrnam(GROUP).gr_gid
-        username = USER
-    else:
-        user_uid = os.getuid()
-        user_gid = os.getgid()
-        username = getpwuid(user_uid).pw_name
-
     dest_stat = os.stat(dest_path)
     dest_uid = dest_stat.st_uid
     dest_gid = dest_stat.st_gid
     dest_mode = dest_stat.st_mode
 
-    def accessible(perm: _PermissionMode) -> bool:
-        if user_uid == dest_uid:
-            return bool(dest_mode & chflags[perm][0])
+    def accessible(user_uid: int, user_gid: int, perm: _PermissionMode) -> bool:
+        username = getpwuid(user_uid).pw_name
+
+        if user_uid == dest_uid and bool(dest_mode & chflags[perm][0]):
+            return True
         b_groups = os.getgrouplist(username, user_gid)
-        if user_gid == dest_gid or dest_gid in b_groups:
-            return bool(dest_mode & chflags[perm][1])
+        if user_gid == dest_gid or dest_gid in b_groups and bool(dest_mode & chflags[perm][1]):
+            return True
         return bool(dest_mode & chflags[perm][2])
 
     # __iter__ for class enum.Flag added in python3.11
     # 'for perm in perm_mode:' fails for <=python3.11
+    access = True
     for perm in _PermissionMode:
         if perm in perm_mode:
-            if not accessible(perm):
+            if not accessible(getpwnam(USER).pw_uid, getgrnam(GROUP).gr_gid, perm):
+                access = False
+    if access:
+        return True
+
+    username = getpwuid(os.getuid()).pw_name
+    if get_permissions_default() and USER != username:
+        logger.warning(
+            f"Knot Resolver is running under '{username}'"
+            f" which is not the default user '{USER}' designed to be started under."
+            " This can cause the resolver processes to not have proper access to certain files and directories."
+        )
+
+    for perm in _PermissionMode:
+        if perm in perm_mode:
+            if not accessible(os.getuid(), os.getgid(), perm):
                 return False
     return True
 
