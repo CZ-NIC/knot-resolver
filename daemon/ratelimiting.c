@@ -1,3 +1,7 @@
+/*  Copyright (C) CZ.NIC, z.s.p.o. <knot-resolver@labs.nic.cz>
+ *  SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 #include "daemon/ratelimiting.h"
 #include "daemon/mmapped.h"
 #include "lib/kru.h"

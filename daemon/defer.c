@@ -1,3 +1,7 @@
+/*  Copyright (C) CZ.NIC, z.s.p.o. <knot-resolver@labs.nic.cz>
+ *  SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 #include "daemon/defer.h"
 #include "daemon/mmapped.h"
 #include "daemon/session2.h"
@@ -113,7 +117,6 @@ struct pl_defer_sess_data {
 struct pl_defer_iter_data {
 	struct protolayer_data h;
 	uint64_t req_stamp;   // time when request was received, uses get_stamp()
-		// TODO use different clock than CLOCK_THREAD_CPUTIME_ID?
 };
 
 /// Return whether we're using optimized variant right now.

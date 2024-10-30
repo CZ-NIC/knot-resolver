@@ -1682,11 +1682,11 @@
                 },
                 "rate-limit": {
                     "type": "integer",
-                    "description": "Number of allowed queries per second from a single host."
+                    "description": "Maximal number of allowed queries per second from a single host."
                 },
                 "instant-limit": {
                     "type": "integer",
-                    "description": "Number of allowed queries at a single point in time from a single host.",
+                    "description": "Maximal number of allowed queries at a single point in time from a single host.",
                     "default": 50
                 },
                 "slip": {

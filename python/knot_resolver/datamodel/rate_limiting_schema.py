@@ -7,8 +7,8 @@ class RateLimitingSchema(ConfigSchema):
 
     ---
     capacity: Expected maximal number of blocked networks/hosts at the same time.
-    rate_limit: Number of allowed queries per second from a single host.
-    instant_limit: Number of allowed queries at a single point in time from a single host.
+    rate_limit: Maximal number of allowed queries per second from a single host.
+    instant_limit: Maximal number of allowed queries at a single point in time from a single host.
     slip: Number of restricted responses out of which one is sent as truncated, the others are dropped.
     """
 

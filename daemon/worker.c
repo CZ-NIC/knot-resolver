@@ -72,7 +72,6 @@ struct request_ctx
 	} source;
 };
 
-
 /** Query resolution task. */
 struct qr_task
 {

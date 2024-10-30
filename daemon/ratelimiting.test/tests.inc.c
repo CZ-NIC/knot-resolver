@@ -94,7 +94,7 @@ static void test_rrl(void **state) {
 	/* create rrl table */
 	const char *tmpdir = test_tmpdir_create();
 	char mmap_file[64];
-	stpcpy(stpcpy(mmap_file, tmpdir), "/rrl");
+	stpcpy(stpcpy(mmap_file, tmpdir), "/ratelimiting");
 	ratelimiting_init(mmap_file, RRL_TABLE_SIZE, RRL_INSTANT_LIMIT, RRL_RATE_LIMIT, 0);
 
 	if (KRU.initialize == KRU_GENERIC.initialize) {

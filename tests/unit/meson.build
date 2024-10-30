@@ -28,8 +28,7 @@ foreach unit_test : unit_tests
       libuv,
       lmdb,
       libdnssec,
-      # https://mesonbuild.com/howtox.html#add-math-library-lm-portably
-      (meson.get_compiler('c').find_library('m', required : false)),
+      libm,
     ],
   )
 

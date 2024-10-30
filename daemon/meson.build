@@ -68,6 +68,7 @@ kresd_deps = [
 
 subdir('lua')
 
+
 kresd = executable(
   'kresd',
   kresd_src,

@@ -328,6 +328,11 @@ static inline struct protolayer_data *protolayer_sess_data_get(
 	return (struct protolayer_data *)(pl_data_beg + offset);
 }
 
+void *protolayer_sess_data_get_current(struct protolayer_iter_ctx *ctx)
+{
+	return protolayer_sess_data_get(ctx->session, ctx->layer_ix);
+}
+
 /** Gets layer-specific iteration data for the layer with the specified index
  * from the context. */
 static inline struct protolayer_data *protolayer_iter_data_get(
@@ -351,11 +356,6 @@ static inline struct protolayer_data *protolayer_iter_data_get(
 void *protolayer_iter_data_get_current(struct protolayer_iter_ctx *ctx)
 {
 	return protolayer_iter_data_get(ctx, ctx->layer_ix);
-}
-
-void *protolayer_sess_data_get_current(struct protolayer_iter_ctx *ctx)
-{
-	return protolayer_sess_data_get(ctx->session, ctx->layer_ix);
 }
 
 static inline ssize_t session2_get_protocol(
@@ -612,8 +612,6 @@ static int session2_submit(
 	if ((direction == PROTOLAYER_UNWRAP) && (layer_ix == 0))
 		defer_sample_start();
 
-	int ret;
-
 	struct protolayer_iter_ctx *ctx = malloc(session->iter_ctx_size);
 	kr_require(ctx);
 
@@ -672,7 +670,7 @@ static int session2_submit(
 			globals->iter_init(ctx, iter_data);
 	}
 
-	ret = protolayer_step(ctx);
+	int ret = protolayer_step(ctx);
 	if ((direction == PROTOLAYER_UNWRAP) && (layer_ix == 0))
 		defer_sample_stop();
 	return ret;

@@ -1,3 +1,7 @@
+/*  Copyright (C) CZ.NIC, z.s.p.o. <knot-resolver@labs.nic.cz>
+ *  SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 #include <stdbool.h>
 
 #define MMAPPED_WAS_FIRST 1
