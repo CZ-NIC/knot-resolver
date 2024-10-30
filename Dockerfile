@@ -25,6 +25,7 @@ RUN cd /source && \
 	git submodule update --init --recursive && \
 	git config --global user.name "Docker Build" && \
 	git config --global user.email docker-build@knot-resolver && \
+	sed s/knot-resolver/root/g -i meson_options.txt && git commit -a -m TMP && \
 	/root/.local/bin/apkg build-dep -y && \
 	/root/.local/bin/apkg build
 
