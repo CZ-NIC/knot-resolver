@@ -9,6 +9,7 @@ from knot_resolver.client.command import (
     CompWords,
     get_subparser_by_name,
     get_subparsers_words,
+    get_subparser_command,
     register_command,
 )
 from knot_resolver.datamodel import KresConfig
@@ -35,6 +36,10 @@ def _properties_words(props: Dict[str, Any]) -> CompWords:
     for name, prop in props.items():
         words[name] = prop["description"] if "description" in prop else None
     return words
+
+
+def get_config_path_options():
+    return _properties_words(KresConfig.json_schema()["properties"])
 
 
 def _path_comp_words(node: str, nodes: List[str], props: Dict[str, Any]) -> CompWords:
@@ -160,24 +165,6 @@ class ConfigCommand(Command):
             nargs="?",
         )
 
-        # GET & SET config options
-        prop_words = _properties_words(KresConfig.json_schema()["properties"])
-        for prop_key in prop_words:
-            get.add_argument(
-                prop_key,
-                help=prop_words[prop_key],
-                type=str,
-                nargs="?",
-            )
-
-            set.add_argument(
-                prop_key,
-                help=prop_words[prop_key],
-                action="store",
-                type=str,
-                nargs="?",
-            )
-
         # DELETE operation
         delete = config_subparsers.add_parser(
             "delete", help="Delete given configuration property or list item at the given index."
@@ -199,41 +186,39 @@ class ConfigCommand(Command):
         if args is None or len(args) <= 1:
             return Command.completion(parser, args)
 
-        words: CompWords = get_subparsers_words(parser._actions)
+        words: CompWords = get_subparsers_words(parser._actions)  # Get subparser words
+
         subparsers = parser._subparsers
+        schema_props: Dict[str, Any] = KresConfig.json_schema()["properties"]
 
         if subparsers:
+            words = get_subparsers_words(subparsers._actions)
+
             for i in range(len(args)):
                 uarg = args[i]
+                if uarg == "conf_get_path_subst" and \
+                    (uarg == args[-2] or (uarg == args[-3] and args[-2] not in schema_props)):
+                    return get_config_path_options()
+
                 subparser = get_subparser_by_name(uarg, subparsers._actions)  # pylint: disable=W0212
-                if subparser is not None:
-                    subparser_words = get_subparsers_words(subparser._actions)
-                    words = dict()
-                    for action in subparser._actions:
-                        if action.dest not in subparser_words:
-                            subparser_words[action.dest] = action.help or None
 
-                    words.update(subparser_words)
+                if subparser:
+                    try:
+                        cmd = get_subparser_command(subparser)
+                        subparser_args = args[i + 1 :]
+                        words = cmd.completion(subparser, subparser_args)
+                    except ValueError:
+                        subparser_words = get_subparsers_words(subparser._actions)
 
-                    subparsers = subparser._subparsers
-                    if not subparsers:
-                        break
-                else:
-                    break
+                        words = dict()
+                        for action in subparser._actions:
+                            if action.dest not in subparser_words:
+                                subparser_words[action.dest] = action.help or None
 
-        # for arg in args:
-        #     if arg in words:
-        #         continue
-        #     elif arg.startswith("-"):
-        #         return words
-        #     elif arg == args[-1]:
-        #         config_path = arg[1:].split("/") if arg.startswith("/") else arg.split("/")
-        #         schema_props: Dict[str, Any] = KresConfig.json_schema()["properties"]
-        #         return _path_comp_words(config_path[0], config_path, schema_props)
-        #     else:
-        #         break
+                        words.update(subparser_words)
 
         return words
+
 
     def run(self, args: CommandArgs) -> None:
         if not self.operation:

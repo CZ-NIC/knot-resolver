@@ -149,25 +149,21 @@ class Command(ABC):
         if subparsers:
             words = get_subparsers_words(subparsers._actions)
 
-            for i in range(len(args)):
+            i = 0
+            while i < len(args):
                 uarg = args[i]
                 subparser = get_subparser_by_name(uarg, subparsers._actions)  # pylint: disable=W0212
 
                 if subparser:
-                    try:
-                        cmd = get_subparser_command(subparser)
-                        subparser_args = args[i + 1 :]
-                        words = cmd.completion(subparser, subparser_args)
-                    except ValueError:
-                        return get_subparsers_words(subparser._actions)
+                    cmd = get_subparser_command(subparser)
+                    subparser_args = args[i + 1 :]
+                    words = cmd.completion(subparser, subparser_args)
 
-                    break
                 elif uarg in ["-s", "--socket", "-c", "--config"]:
                     # Skip next argument if a known flag is detected
                     i += 1
                     # next(uargs, None)
-                    continue
-                elif uarg in ["--bash", "--space"]:
+                # elif uarg in ["--bash", "--space"]:
                     # Continue if the argument is a valid subparser
-                    continue
+                i += 1
         return words

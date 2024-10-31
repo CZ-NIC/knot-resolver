@@ -18,6 +18,8 @@ _kresctl_filter_switches()
                 new_words[count]="$WORD"
                 ((count++))
             else
+                new_words[count]=" "
+                ((count++))
                 _kresctl_skip_next=1
             fi
         else
@@ -36,8 +38,15 @@ _kresctl_completion()
     COMPREPLY=()
     local cur opts cmp_words
 
-    cur="${COMP_WORDS[COMP_CWORD]}"
+    for (( i=2; i<${#COMP_WORDS[@]}; i++ )); do
+        if [[ "${COMP_WORDS[i-2]}" == "config" ]] &&
+           ([[ "${COMP_WORDS[i]}" == "-p" ]] || [[ "${COMP_WORDS[i]}" == "--path" ]]); then
+            COMP_WORDS[i]="conf_get_path_subst"
+            break
+        fi
+    done
 
+    cur="${COMP_WORDS[COMP_CWORD]}"
     cmp_words=($(_kresctl_filter_switches))
 
     # check if there is a word is empty
@@ -47,7 +56,7 @@ _kresctl_completion()
         # no word to complete, return all posible options
         opts=$(kresctl completion --bash --space "${cmp_words[@]}")
     else
-        opts=$(kresctl completion --bash "${cmp_words[@]}")
+        opts=$(kresctl completion --bash --space "${cmp_words[@]}")
     fi
 
     # if there is no completion from kresctl

@@ -22,8 +22,8 @@ class KresClient:
             args = CommandArgs(self.namespace, self.parser)
             command = args.command(self.namespace)
             command.run(args)
-        else:
-            self.parser.print_help()
+        # else:
+        #     self.parser.print_help()
 
     def _prompt_format(self) -> str:
         bolt = "\033[1m"

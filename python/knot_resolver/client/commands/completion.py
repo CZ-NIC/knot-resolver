@@ -52,7 +52,7 @@ class CompletionCommand(Command):
         return completion, CompletionCommand
 
     def run(self, args: CommandArgs) -> None:
-        words = Command.completion(args.parser, self.comp_args)
+        words = Command.completion(args.parser, self.args)
 
         # print completion words
         # based on required bash/fish shell format

@@ -68,7 +68,8 @@ def main() -> None:
     parser = create_main_argument_parser()
     install_commands_parsers(parser)
 
-    namespace = parser.parse_args()
+    namespace, _ = parser.parse_known_args()
+    # namespace = parser.parse_args()
     client = KresClient(namespace, parser)
     client.execute()
 
