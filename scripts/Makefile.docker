@@ -12,10 +12,13 @@ RELTAG		= $(shell [ -n "${RELEASE}" ] && echo "-t ${BASETAG}:${RELEASE}" || echo
 BUILDXDETECT	= ${HOME}/.docker/cli-plugins/docker-buildx
 QEMUDETECT	= /proc/sys/fs/binfmt_misc/qemu-m68k
 
+# https://stackoverflow.com/a/324782
+ROOT_DIR:=$(dir $(realpath $(lastword $(MAKEFILE_LIST))))/..
+
 docker-multiarch: qemu buildx docker-multiarch-builder
 	docker login
 	docker buildx build --no-cache --builder docker-multiarch --pull --push \
-	                    --platform ${PLATFORMS} ${RELTAG} ..
+	                    --platform ${PLATFORMS} ${RELTAG} ${ROOT_DIR}
 
 qemu: ${QEMUDETECT}
 ${QEMUDETECT}:
