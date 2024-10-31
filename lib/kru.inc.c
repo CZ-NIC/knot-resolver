@@ -112,7 +112,8 @@ struct kru {
 	struct load_cl load_cls[][TABLE_COUNT];
 };
 
-inline static uint64_t rand_bits(unsigned int bits) {
+inline static uint64_t rand_bits(unsigned int bits)
+{
 	static _Thread_local uint64_t state = 3723796604792068981ull;
 	const uint64_t prime1 = 11737314301796036329ull;
 	const uint64_t prime2 = 3107264277052274849ull;
@@ -137,7 +138,7 @@ static inline void update_time(struct load_cl *l, const uint32_t time_now,
 			const struct decay_config *decay)
 {
 	uint32_t ticks;
-	uint32_t time_last = atomic_load_explicit(&l->time,memory_order_relaxed);
+	uint32_t time_last = atomic_load_explicit(&l->time, memory_order_relaxed);
 	do {
 		ticks = time_now - time_last;
 		if (__builtin_expect(!ticks, true)) // we optimize for time not advancing
@@ -271,7 +272,6 @@ static inline void kru_limited_prefetch(struct kru *kru, uint32_t time_now, uint
 	ctx->price = price;
 	ctx->id = hash;
 }
-
 
 /// Phase 1/3 of a query -- hash, prefetch, ctx init. Based on a bit prefix of one 16-byte key.
 static inline void kru_limited_prefetch_prefix(struct kru *kru, uint32_t time_now, uint8_t namespace, uint8_t key[static 16], uint8_t prefix, kru_price_t price, struct query_ctx *ctx)
