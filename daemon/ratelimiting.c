@@ -2,6 +2,7 @@
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#include <stdatomic.h>
 #include "daemon/ratelimiting.h"
 #include "daemon/mmapped.h"
 #include "lib/kru.h"
@@ -22,8 +23,11 @@ struct ratelimiting {
 	size_t capacity;
 	uint32_t instant_limit;
 	uint32_t rate_limit;
+	uint32_t log_period;
 	uint16_t slip;
+	bool dry_run;
 	bool using_avx2;
+	_Atomic uint32_t log_time;
 	kru_price_t v4_prices[V4_PREFIXES_CNT];
 	kru_price_t v6_prices[V6_PREFIXES_CNT];
 	_Alignas(64) uint8_t kru[];
@@ -39,7 +43,8 @@ static bool using_avx2(void)
 	return result;
 }
 
-int ratelimiting_init(const char *mmap_file, size_t capacity, uint32_t instant_limit, uint32_t rate_limit, uint16_t slip)
+int ratelimiting_init(const char *mmap_file, size_t capacity, uint32_t instant_limit,
+		uint32_t rate_limit, uint16_t slip, uint32_t log_period, bool dry_run)
 {
 
 	size_t capacity_log = 0;
@@ -51,7 +56,9 @@ int ratelimiting_init(const char *mmap_file, size_t capacity, uint32_t instant_l
 		.capacity = capacity,
 		.instant_limit = instant_limit,
 		.rate_limit = rate_limit,
+		.log_period = log_period,
 		.slip = slip,
+		.dry_run = dry_run,
 		.using_avx2 = using_avx2()
 	};
 
@@ -60,7 +67,9 @@ int ratelimiting_init(const char *mmap_file, size_t capacity, uint32_t instant_l
 		sizeof(header.capacity) +
 		sizeof(header.instant_limit) +
 		sizeof(header.rate_limit) +
+		sizeof(header.log_period) +
 		sizeof(header.slip) +
+		sizeof(header.dry_run) +
 		sizeof(header.using_avx2));  // no undefined padding inside
 
 	int ret = mmapped_init(&ratelimiting_mmapped, mmap_file, size, &header, header_size);
@@ -79,6 +88,8 @@ int ratelimiting_init(const char *mmap_file, size_t capacity, uint32_t instant_l
 			ret = kr_error(EINVAL);
 			goto fail;
 		}
+
+		ratelimiting->log_time = kr_now() - log_period;
 
 		for (size_t i = 0; i < V4_PREFIXES_CNT; i++) {
 			ratelimiting->v4_prices[i] = base_price / V4_RATE_MULT[i];
@@ -114,6 +125,7 @@ void ratelimiting_deinit(void)
 
 bool ratelimiting_request_begin(struct kr_request *req)
 {
+	if (!ratelimiting) return false;
 	if (!req->qsource.addr)
 		return false;  // don't consider internal requests
 
@@ -121,33 +133,51 @@ bool ratelimiting_request_begin(struct kr_request *req)
 	const bool ip_validated = req->qsource.flags.tcp || req->qsource.flags.tls;
 	if (ip_validated) return false;
 
-	uint8_t limited = 0;  // 0: not limited, 1: truncated, 2: no answer
-	if (ratelimiting) {
-		_Alignas(16) uint8_t key[16] = {0, };
-		uint8_t limited_prefix;
-		if (req->qsource.addr->sa_family == AF_INET6) {
-			struct sockaddr_in6 *ipv6 = (struct sockaddr_in6 *)req->qsource.addr;
-			memcpy(key, &ipv6->sin6_addr, 16);
+	const uint32_t time_now = kr_now();
 
-			limited_prefix = KRU.limited_multi_prefix_or((struct kru *)ratelimiting->kru, kr_now(),
-					1, key, V6_PREFIXES, ratelimiting->v6_prices, V6_PREFIXES_CNT, NULL);
-		} else {
-			struct sockaddr_in *ipv4 = (struct sockaddr_in *)req->qsource.addr;
-			memcpy(key, &ipv4->sin_addr, 4);  // TODO append port?
+	// classify
+	_Alignas(16) uint8_t key[16] = {0, };
+	uint8_t limited_prefix;
+	if (req->qsource.addr->sa_family == AF_INET6) {
+		struct sockaddr_in6 *ipv6 = (struct sockaddr_in6 *)req->qsource.addr;
+		memcpy(key, &ipv6->sin6_addr, 16);
 
-			limited_prefix = KRU.limited_multi_prefix_or((struct kru *)ratelimiting->kru, kr_now(),
-					0, key, V4_PREFIXES, ratelimiting->v4_prices, V4_PREFIXES_CNT, NULL);
-		}
-		if (limited_prefix) {
-			limited =
-				(ratelimiting->slip > 1) ?
-					((kr_rand_bytes(1) % ratelimiting->slip == 0) ? 1 : 2) :
-					((ratelimiting->slip == 1) ? 1 : 2);
+		limited_prefix = KRU.limited_multi_prefix_or((struct kru *)ratelimiting->kru, time_now,
+				1, key, V6_PREFIXES, ratelimiting->v6_prices, V6_PREFIXES_CNT, NULL);
+	} else {
+		struct sockaddr_in *ipv4 = (struct sockaddr_in *)req->qsource.addr;
+		memcpy(key, &ipv4->sin_addr, 4);  // TODO append port?
+
+		limited_prefix = KRU.limited_multi_prefix_or((struct kru *)ratelimiting->kru, time_now,
+				0, key, V4_PREFIXES, ratelimiting->v4_prices, V4_PREFIXES_CNT, NULL);
+	}
+	if (!limited_prefix) return false;  // not limited
+
+	// slip: truncating vs dropping
+	bool tc =
+		(ratelimiting->slip > 1) ?
+			((kr_rand_bytes(1) % ratelimiting->slip == 0) ? true : false) :
+			((ratelimiting->slip == 1) ? true : false);
+
+	// logging
+	uint32_t log_time_orig = atomic_load_explicit(&ratelimiting->log_time, memory_order_relaxed);
+	if (ratelimiting->log_period) {
+		while (time_now - log_time_orig + 1024 >= ratelimiting->log_period + 1024) {
+			if (atomic_compare_exchange_weak_explicit(&ratelimiting->log_time, &log_time_orig, time_now,
+					memory_order_relaxed, memory_order_relaxed)) {
+				kr_log_notice(SYSTEM, "address %s rate-limited on /%d (%s%s)\n",
+						kr_straddr(req->qsource.addr), limited_prefix,
+						ratelimiting->dry_run ? "dry-run, " : "",
+						tc ? "truncated" : "dropped");
+				break;
+			}
 		}
 	}
-	if (!limited) return false;
 
-	if (limited == 1) { // TC=1: return truncated reply to force source IP validation
+	if (ratelimiting->dry_run) return false;
+
+	// perform limiting
+	if (tc) { // TC=1: return truncated reply to force source IP validation
 		knot_pkt_t *answer = kr_request_ensure_answer(req);
 		if (!answer) { // something bad; TODO: perhaps improve recovery from this
 			kr_assert(false);

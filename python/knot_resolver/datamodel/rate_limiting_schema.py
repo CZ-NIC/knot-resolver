@@ -10,12 +10,16 @@ class RateLimitingSchema(ConfigSchema):
     rate_limit: Maximal number of allowed queries per second from a single host.
     instant_limit: Maximal number of allowed queries at a single point in time from a single host.
     slip: Number of restricted responses out of which one is sent as truncated, the others are dropped.
+    log_period: Minimal time in msec between two log messages, or zero to disable.
+    dry_run: Perform only classification and logging but no restrictions.
     """
 
     capacity: int = 524288
     rate_limit: int
     instant_limit: int = 50
     slip: int = 2
+    log_period: int = 0
+    dry_run: bool = False
 
     def _validate(self) -> None:
         max_instant_limit = int(2**32 / 768 - 1)
@@ -27,3 +31,5 @@ class RateLimitingSchema(ConfigSchema):
             raise ValueError("'capacity' has to be positive")
         if not 0 <= self.slip <= 100:
             raise ValueError("'slip' has to be in range 0..100")
+        if not 0 <= self.log_period:
+            raise ValueError("'log-period' has to be non-negative")

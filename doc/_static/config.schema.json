@@ -1693,6 +1693,16 @@
                     "type": "integer",
                     "description": "Number of restricted responses out of which one is sent as truncated, the others are dropped.",
                     "default": 2
+                },
+                "log-period": {
+                    "type": "integer",
+                    "description": "Minimal time in msec between two log messages, or zero to disable.",
+                    "default": 0
+                },
+                "dry-run": {
+                    "type": "boolean",
+                    "description": "Perform only classification and logging but no restrictions.",
+                    "default": false
                 }
             },
             "default": null
