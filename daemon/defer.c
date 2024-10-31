@@ -458,11 +458,12 @@ int defer_init(const char *mmap_file, int cpus)
 
 	size_t size = offsetof(struct defer, kru) + KRU.get_size(capacity_log);
 	size_t header_size = offsetof(struct defer, using_avx2) + sizeof(header.using_avx2);
-	kr_assert(header_size ==
-		sizeof(header.capacity) +
-		sizeof(header.max_decay) +
-		sizeof(header.cpus) +
-		sizeof(header.using_avx2));  // no undefined padding inside
+	static_assert(  // no padding up to .using_avx2
+		offsetof(struct defer, using_avx2) ==
+			sizeof(header.capacity) +
+			sizeof(header.max_decay) +
+			sizeof(header.cpus),
+		"detected padding with undefined data inside mmapped header");
 
 	ret = mmapped_init(&defer_mmapped, mmap_file, size, &header, header_size);
 	if (ret == MMAPPED_WAS_FIRST) {

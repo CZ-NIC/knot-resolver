@@ -63,14 +63,15 @@ int ratelimiting_init(const char *mmap_file, size_t capacity, uint32_t instant_l
 	};
 
 	size_t header_size = offsetof(struct ratelimiting, using_avx2) + sizeof(header.using_avx2);
-	kr_assert(header_size ==
-		sizeof(header.capacity) +
-		sizeof(header.instant_limit) +
-		sizeof(header.rate_limit) +
-		sizeof(header.log_period) +
-		sizeof(header.slip) +
-		sizeof(header.dry_run) +
-		sizeof(header.using_avx2));  // no undefined padding inside
+	static_assert(  // no padding up to .using_avx2
+		offsetof(struct ratelimiting, using_avx2) ==
+			sizeof(header.capacity) +
+			sizeof(header.instant_limit) +
+			sizeof(header.rate_limit) +
+			sizeof(header.log_period) +
+			sizeof(header.slip) +
+			sizeof(header.dry_run),
+		"detected padding with undefined data inside mmapped header");
 
 	int ret = mmapped_init(&ratelimiting_mmapped, mmap_file, size, &header, header_size);
 	if (ret == MMAPPED_WAS_FIRST) {
