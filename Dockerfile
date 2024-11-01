@@ -67,5 +67,8 @@ LABEL maintainer="knot-resolver-users@lists.nic.cz"
 # Export plain DNS, DoT, DoH and management interface
 EXPOSE 53/UDP 53/TCP 443/TCP 853/TCP 5000/TCP
 
+# Prepare shared config
+VOLUME /etc/knot-resolver
+
 ENTRYPOINT ["/usr/bin/knot-resolver"]
 CMD ["-c", "/etc/knot-resolver/config.yaml"]
