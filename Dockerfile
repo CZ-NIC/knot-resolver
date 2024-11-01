@@ -57,10 +57,9 @@ RUN apt-get install -y /pkg/*/*.deb && \
 	apt-get remove -y -qq curl gnupg2 && \
 	apt-get autoremove -y && \
 	apt-get clean && \
-	rm -rf /var/lib/apt/lists/* && \
-	mkdir /config
+	rm -rf /var/lib/apt/lists/*
 
-COPY etc/config/config.example.docker.yaml /config/config.yaml
+COPY etc/config/config.example.docker.yaml /etc/knot-resolver/config.yaml
 
 LABEL cz.knot-resolver.vendor="CZ.NIC"
 LABEL maintainer="knot-resolver-users@lists.nic.cz"
@@ -69,4 +68,4 @@ LABEL maintainer="knot-resolver-users@lists.nic.cz"
 EXPOSE 53/UDP 53/TCP 443/TCP 853/TCP 5000/TCP
 
 ENTRYPOINT ["/usr/bin/knot-resolver"]
-CMD ["-c", "/config/config.yaml"]
+CMD ["-c", "/etc/knot-resolver/config.yaml"]
