@@ -6,7 +6,6 @@ FROM debian:12 AS build
 ENV OBS_REPO=knot-resolver-latest
 ENV DISTROTEST_REPO=Debian_12
 
-
 RUN apt-get update -qq && \
 	apt-get -qqq -y install \
 		apt-transport-https ca-certificates wget \
@@ -25,10 +24,18 @@ RUN cd /source && \
 	git submodule update --init --recursive && \
 	git config --global user.name "Docker Build" && \
 	git config --global user.email docker-build@knot-resolver && \
-	sed s/knot-resolver/root/g -i meson_options.txt && git commit -a -m TMP && \
+	\
+	# Replace 'knot-resolver' user and group with 'root'
+	# in meson_options.tx and python/knot_resolver/constants.py.
+	# This is needed for the file/directory permissions validation
+	# and then for the proper functioning of the resolver.
+	sed s/knot-resolver/root/g -i meson_options.txt && \
+	sed 's/USER.*/USER = "root"/g' -i python/knot_resolver/constants.py && \
+	sed 's/GROUP.*/GROUP = "root"/g' -i python/knot_resolver/constants.py && \
+	git commit -a -m TMP && \
+	\
 	/root/.local/bin/apkg build-dep -y && \
 	/root/.local/bin/apkg build
-
 
 # Real container
 FROM debian:12-slim AS runtime
