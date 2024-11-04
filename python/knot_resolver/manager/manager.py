@@ -214,9 +214,15 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
     async def validate_config(self, _old: KresConfig, new: KresConfig) -> Result[NoneType, str]:
         async with self._manager_lock:
             if _old.rate_limiting != new.rate_limiting:
-                logger.debug("Unlinking shared RRL memory")
+                logger.debug("Unlinking shared ratelimiting memory")
                 try:
                     os.unlink(str(_old.rundir) + "/ratelimiting")
+                except FileNotFoundError:
+                    pass
+            if _old.workers != new.workers or _old.defer != new.defer:
+                logger.debug("Unlinking shared defer memory")
+                try:
+                    os.unlink(str(_old.rundir) + "/defer")
                 except FileNotFoundError:
                     pass
             logger.debug("Testing the new config with a canary process")

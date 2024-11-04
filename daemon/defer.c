@@ -69,6 +69,7 @@ struct defer {
 	_Alignas(64) uint8_t kru[];
 };
 struct defer *defer = NULL;
+bool defer_initialized = false;
 struct mmapped defer_mmapped = {0};
 
 defer_sample_state_t defer_sample_state = {
@@ -440,6 +441,12 @@ static void defer_queues_idle(uv_idle_t *handle)
 /// Initialize shared memory, queues. To be called from Lua.
 int defer_init(const char *mmap_file, int cpus)
 {
+	defer_initialized = true;
+	if (mmap_file == NULL) {
+		// defer explicitly disabled
+		return 0;
+	}
+
 	int ret = 0;
 	if (cpus < 1) {
 		ret = EINVAL;

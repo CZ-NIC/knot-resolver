@@ -35,6 +35,11 @@ cache.open({{ cfg.cache.size_max.bytes() }}, 'lmdb://{{ cfg.cache.storage }}')
 -- FORWARD section ----------------------------------
 {% include "forward.lua.j2" %}
 
+-- DEFER section ------------------------------------
+{% set disable_defer = true %}
+{% include "defer.lua.j2" %}
+
+
 {% endif %}
 
 quit()

@@ -8,7 +8,6 @@
 #include "lib/kru.h"
 
 /// Initialize defer, incl. shared memory with KRU, excl. idle.
-/// To be called from Lua; defer is disabled by default otherwise.
 KR_EXPORT
 int defer_init(const char *mmap_file, int cpus);
 
@@ -30,6 +29,7 @@ typedef struct {
 extern defer_sample_state_t defer_sample_state;
 
 extern struct defer *defer;  /// skip sampling/deferring if NULL
+extern bool defer_initialized; /// defer_init was called, possibly keeping defer disabled
 
 
 // TODO: reconsider `static inline` cases below

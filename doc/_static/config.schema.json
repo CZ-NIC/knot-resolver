@@ -1707,6 +1707,20 @@
             },
             "default": null
         },
+        "defer": {
+            "description": "Configuration of request prioritization (defer).",
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "description": "Use request prioritization.",
+                    "default": true
+                }
+            },
+            "default": {
+                "enabled": true
+            }
+        },
         "lua": {
             "description": "Custom Lua configuration.",
             "type": "object",
