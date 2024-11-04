@@ -66,7 +66,7 @@ int mmapped_init(struct mmapped *mmapped, const char *mmap_file, size_t size, vo
 
 
 fail_header_mismatch:
-	kr_log_crit(SYSTEM, "Another instance of kresd uses file %s with different configuration.", mmap_file);
+	kr_log_crit(SYSTEM, "Another instance of kresd uses file %s with different configuration.\n", mmap_file);
 	errno = ENOTRECOVERABLE;
 
 fail_errno:
