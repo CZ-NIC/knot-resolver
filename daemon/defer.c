@@ -3,10 +3,10 @@
  */
 
 #include "daemon/defer.h"
-#include "daemon/mmapped.h"
 #include "daemon/session2.h"
 #include "daemon/udp_queue.h"
 #include "lib/kru.h"
+#include "lib/mmapped.h"
 #include "lib/utils.h"
 
 #define V4_PREFIXES  (uint8_t[])       {  18,  20, 24, 32 }

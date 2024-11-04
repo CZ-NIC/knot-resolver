@@ -7,7 +7,7 @@
 #include <errno.h>
 #include <string.h>
 
-#include "daemon/mmapped.h"
+#include "lib/mmapped.h"
 #include "lib/utils.h"
 
 static inline bool fcntl_flock_whole(int fd, short int type, bool wait)

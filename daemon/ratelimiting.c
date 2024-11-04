@@ -4,8 +4,8 @@
 
 #include <stdatomic.h>
 #include "daemon/ratelimiting.h"
-#include "daemon/mmapped.h"
 #include "lib/kru.h"
+#include "lib/mmapped.h"
 #include "lib/utils.h"
 #include "lib/resolve.h"
 
