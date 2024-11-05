@@ -24,10 +24,10 @@ class CompletionCommand(Command):
         super().__init__(namespace)
         self.shell: Shells = namespace.shell
         self.space = namespace.space
-        self.comp_args: List[str] = namespace.comp_args
+        self.args: List[str] = namespace.args
 
         if self.space:
-            self.comp_args.append("")
+            self.args.append("")
 
     @staticmethod
     def register_args_subparser(
@@ -44,17 +44,18 @@ class CompletionCommand(Command):
             action="store_true",
             default=False,
         )
-        completion.add_argument(
-            "comp_args",
-            type=str,
-            help="arguments to complete",
-            nargs="*",
-        )
 
         shells_dest = "shell"
         shells = completion.add_mutually_exclusive_group()
         shells.add_argument("--bash", action="store_const", dest=shells_dest, const=Shells.BASH, default=Shells.BASH)
         shells.add_argument("--fish", action="store_const", dest=shells_dest, const=Shells.FISH)
+
+        completion.add_argument(
+            "--args",
+            help="arguments to complete",
+            nargs=argparse.REMAINDER,
+            default=[]
+        )
 
         return completion, CompletionCommand
 
@@ -69,13 +70,13 @@ class CompletionCommand(Command):
         if subparsers:
             words = get_subparsers_words(subparsers._actions)
 
-            uargs = iter(self.comp_args)
+            uargs = iter(self.args)
             for uarg in uargs:
                 subparser = get_subparser_by_name(uarg, subparsers._actions)  # pylint: disable=W0212
 
                 if subparser:
                     cmd: Command = get_subparser_command(subparser)
-                    subparser_args = self.comp_args[self.comp_args.index(uarg) + 1 :]
+                    subparser_args = self.args[self.args.index(uarg) + 1 :]
                     if subparser_args or self.space:
                         words = cmd.completion(subparser_args, subparser)
                     break
@@ -86,8 +87,6 @@ class CompletionCommand(Command):
                 elif uarg in words:
                     # uarg is valid arg, continue
                     continue
-                else:
-                    raise ValueError(f"unknown argument: {uarg}")
 
         # print completion words
         # based on required bash/fish shell format
