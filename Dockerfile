@@ -6,7 +6,6 @@ FROM debian:12 AS build
 ENV OBS_REPO=knot-resolver-latest
 ENV DISTROTEST_REPO=Debian_12
 
-
 RUN apt-get update -qq && \
 	apt-get -qqq -y install \
 		apt-transport-https ca-certificates wget \
@@ -25,10 +24,18 @@ RUN cd /source && \
 	git submodule update --init --recursive && \
 	git config --global user.name "Docker Build" && \
 	git config --global user.email docker-build@knot-resolver && \
-	sed s/knot-resolver/root/g -i meson_options.txt && git commit -a -m TMP && \
+	\
+	# Replace 'knot-resolver' user and group with 'root'
+	# in meson_options.tx and python/knot_resolver/constants.py.
+	# This is needed for the file/directory permissions validation
+	# and then for the proper functioning of the resolver.
+	sed s/knot-resolver/root/g -i meson_options.txt && \
+	sed 's/USER.*/USER = "root"/g' -i python/knot_resolver/constants.py && \
+	sed 's/GROUP.*/GROUP = "root"/g' -i python/knot_resolver/constants.py && \
+	git commit -a -m TMP && \
+	\
 	/root/.local/bin/apkg build-dep -y && \
 	/root/.local/bin/apkg build
-
 
 # Real container
 FROM debian:12-slim AS runtime
@@ -57,10 +64,9 @@ RUN apt-get install -y /pkg/*/*.deb && \
 	apt-get remove -y -qq curl gnupg2 && \
 	apt-get autoremove -y && \
 	apt-get clean && \
-	rm -rf /var/lib/apt/lists/* && \
-	mkdir /config
+	rm -rf /var/lib/apt/lists/*
 
-COPY etc/config/config.example.docker.yaml /config/config.yaml
+COPY etc/config/config.example.docker.yaml /etc/knot-resolver/config.yaml
 
 LABEL cz.knot-resolver.vendor="CZ.NIC"
 LABEL maintainer="knot-resolver-users@lists.nic.cz"
@@ -68,5 +74,8 @@ LABEL maintainer="knot-resolver-users@lists.nic.cz"
 # Export plain DNS, DoT, DoH and management interface
 EXPOSE 53/UDP 53/TCP 443/TCP 853/TCP 5000/TCP
 
+# Prepare shared config
+VOLUME /etc/knot-resolver
+
 ENTRYPOINT ["/usr/bin/knot-resolver"]
-CMD ["-c", "/config/config.yaml"]
+CMD ["-c", "/etc/knot-resolver/config.yaml"]
