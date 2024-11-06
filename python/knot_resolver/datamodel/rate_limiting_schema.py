@@ -1,9 +1,9 @@
-from knot_resolver.utils.modeling import ConfigSchema
 from knot_resolver.datamodel.types import (
+    Int0_32,
     IntPositive,
-    IntNonNegative,
     TimeUnit,
 )
+from knot_resolver.utils.modeling import ConfigSchema
 
 
 class RateLimitingSchema(ConfigSchema):
@@ -22,15 +22,13 @@ class RateLimitingSchema(ConfigSchema):
     capacity: IntPositive = IntPositive(524288)
     rate_limit: IntPositive
     instant_limit: IntPositive = IntPositive(50)
-    slip: IntNonNegative = IntNonNegative(2)
+    slip: Int0_32 = Int0_32(2)
     log_period: TimeUnit = TimeUnit("0s")
     dry_run: bool = False
 
     def _validate(self) -> None:
-        max_instant_limit = IntPositive(2^32 // 768 - 1)
-        if self.instant_limit <= max_instant_limit:
+        max_instant_limit = 2 ^ 32 // 768 - 1
+        if int(self.instant_limit) <= max_instant_limit:
             raise ValueError(f"'instant-limit' has to be in range 1..{max_instant_limit}")
-        if self.rate_limit <= 1000 * self.instant_limit:
+        if int(self.rate_limit) <= 1000 * int(self.instant_limit):
             raise ValueError("'rate-limit' has to be in range 1..(1000 * instant-limit)")
-        if self.slip <= 32:
-            raise ValueError("'slip' has to be in range 0..32")
