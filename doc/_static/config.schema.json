@@ -1695,6 +1695,7 @@
                 "slip": {
                     "type": "integer",
                     "minimum": 0,
+                    "maximum": 32,
                     "description": "Number of restricted responses out of which one is sent as truncated, the others are dropped.",
                     "default": 2
                 },
