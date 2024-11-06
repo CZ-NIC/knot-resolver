@@ -324,6 +324,20 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 		return;
 	}
 
+	if (nread == UV_ENOBUFS) {
+		/* No space available in session buffer.
+		 * The connection may be just waiting in defer.
+		 * Ignore the error and keep the data in system queue for later reading or timeout. */
+		if (kr_log_is_debug(IO, NULL)) {
+			struct sockaddr *peer = session2_get_peer(s);
+			char *peer_str = kr_straddr(peer);
+			kr_log_debug(IO, "=> incoming data from '%s' waiting (%s)\n",
+			         peer_str ? peer_str : "",
+			         uv_strerror(nread));
+		}
+		return;
+	}
+
 	if (nread < 0 || !buf->base) {
 		if (kr_log_is_debug(IO, NULL)) {
 			struct sockaddr *peer = session2_get_peer(s);
