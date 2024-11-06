@@ -28,7 +28,7 @@ class RateLimitingSchema(ConfigSchema):
 
     def _validate(self) -> None:
         max_instant_limit = 2 ^ 32 // 768 - 1
-        if int(self.instant_limit) <= max_instant_limit:
+        if not int(self.instant_limit) <= max_instant_limit:
             raise ValueError(f"'instant-limit' has to be in range 1..{max_instant_limit}")
-        if int(self.rate_limit) <= 1000 * int(self.instant_limit):
+        if not int(self.rate_limit) <= 1000 * int(self.instant_limit):
             raise ValueError("'rate-limit' has to be in range 1..(1000 * instant-limit)")
