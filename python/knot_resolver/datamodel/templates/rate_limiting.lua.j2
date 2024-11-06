@@ -7,6 +7,6 @@ assert(C.ratelimiting_init(
 	{{ cfg.rate_limiting.instant_limit }},
 	{{ cfg.rate_limiting.rate_limit }},
 	{{ cfg.rate_limiting.slip }},
-	{{ cfg.rate_limiting.log_period }},
+	{{ cfg.rate_limiting.log_period.millis() }},
 	{{ boolean(cfg.rate_limiting.dry_run) }}) == 0)
 {%- endif %}
