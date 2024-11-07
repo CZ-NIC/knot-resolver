@@ -32,3 +32,4 @@ impact than cache settings and number of instances.
    config-rfc7706
    config-priming
    config-edns-keepalive
+   config-rate-limiting
