@@ -34,6 +34,7 @@
 #include "lib/layer.h"
 #include "lib/layer/iterate.h" /* kr_response_classify */
 #include "lib/utils.h"
+#include "daemon/defer.h"
 
 
 /* Magic defaults for the worker. */
@@ -1209,6 +1210,9 @@ static int tcp_task_step(struct qr_task *task,
 static int qr_task_step(struct qr_task *task,
 			const struct sockaddr *packet_source, knot_pkt_t *packet)
 {
+	if (task && task->ctx->source.session)
+		defer_sample_addr(&task->ctx->source.addr, task->ctx->source.session->stream);
+
 	/* No more steps after we're finished. */
 	if (!task || task->finished) {
 		return kr_error(ESTALE);

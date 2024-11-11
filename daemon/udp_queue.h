@@ -17,3 +17,5 @@ int udp_queue_init_global(uv_loop_t *loop);
 void udp_queue_push(int fd, const struct sockaddr *sa, char *buf, size_t buf_len,
                     udp_queue_cb cb, void *baton);
 
+/** Send all queued packets immediatelly. */
+void udp_queue_send_all(void);

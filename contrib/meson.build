@@ -10,7 +10,8 @@ contrib_src = files([
   'murmurhash3/murmurhash3.c',
   'base32hex.c',
   'base64.c',
-  'base64url.c'
+  'base64url.c',
+  'openbsd/siphash.c',
 ])
 
 contrib_inc = include_directories('.', '..')

@@ -58,6 +58,7 @@ LogGroupsEnum = Literal[
     "exterr",
     "rules",
     "prlayr",
+    "defer",
     # "reqdbg",... (non-displayed section of the enum)
 ]
 

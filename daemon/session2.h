@@ -242,7 +242,9 @@ static inline size_t wire_buf_free_space_length(const struct wire_buf *wb)
 	XX(DNS_MULTI_STREAM) /**< Multiple packets WITH prepended sizes in a
 	                      * stream (may span multiple (un)wraps). */\
 	XX(DNS_SINGLE_STREAM) /**< Singular packet WITH prepended size in a
-	                       * stream (may span multiple (un)wraps). */
+	                       * stream (may span multiple (un)wraps). */\
+	/* Prioritization of requests */\
+	XX(DEFER)
 
 /** The identifiers of protocol layer types. */
 enum protolayer_type {
@@ -533,6 +535,14 @@ size_t protolayer_queue_count_payload(const protolayer_iter_ctx_queue_t *queue);
  * queue iterators, as it does not need to iterate through the whole queue. */
 bool protolayer_queue_has_payload(const protolayer_iter_ctx_queue_t *queue);
 
+/** Gets layer-specific session data for the last processed layer.
+ * To be used after returning from its callback for async continuation but before calling protolayer_continue. */
+void *protolayer_sess_data_get_current(struct protolayer_iter_ctx *ctx);
+
+/** Gets layer-specific iteration data for the last processed layer.
+ * To be used after returning from its callback for async continuation but before calling protolayer_continue. */
+void *protolayer_iter_data_get_current(struct protolayer_iter_ctx *ctx);
+
 /** Layer-specific data - the generic struct. To be added as the first member of
  * each specific struct. */
 struct protolayer_data {
@@ -642,7 +652,7 @@ struct protolayer_data_param {
 /** Global data for a specific layered protocol. This is to be initialized in
  * the `protolayer_globals` global array (below) during the the resolver's
  * startup. It contains pointers to functions implementing a particular
- * protocol, as well as other importand data.
+ * protocol, as well as other important data.
  *
  * Every member of this struct is allowed to be zero/NULL if a particular
  * protocol has no use for it. */
@@ -807,8 +817,8 @@ struct session2 {
 	struct wire_buf wire_buf;
 	uint32_t log_id; /**< Session ID for logging. */
 
-	int uv_count; /**< Number of unclosed libUV handles owned by this
-	               * session. */
+	int ref_count; /**< Number of unclosed libUV handles owned by this
+	               * session + iteration contexts referencing the session. */
 
 	/** Communication information. Typically written into by one of the
 	 * first layers facilitating transport protocol processing.
@@ -908,7 +918,7 @@ static inline struct session2 *session2_new_io(uv_handle_t *handle,
 			layer_param, layer_param_count, outgoing);
 	s->transport.io.handle = handle;
 	handle->data = s;
-	s->uv_count++; /* Session owns the handle */
+	s->ref_count++; /* Session owns the handle */
 	return s;
 }
 

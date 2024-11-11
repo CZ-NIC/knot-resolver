@@ -8,12 +8,14 @@ kresd_src = files([
   'bindings/modules.c',
   'bindings/net.c',
   'bindings/worker.c',
+  'defer.c',
   'engine.c',
   'ffimodule.c',
   'io.c',
   'main.c',
   'network.c',
   'proxyv2.c',
+  'ratelimiting.c',
   'session2.c',
   'tls.c',
   'tls_ephemeral_credentials.c',
@@ -28,6 +30,13 @@ if nghttp2.found()
 endif
 
 c_src_lint += kresd_src
+
+unit_tests += [
+  ['ratelimiting', files('ratelimiting.test/tests.c') + libkres_src ],
+
+  # parallel tests timeouts under valgrind; they checks mainly for race conditions, which is not needed there
+  ['ratelimiting-parallel', files('ratelimiting.test/tests-parallel.c') + libkres_src, ['skip_valgrind']]
+]
 
 config_tests += [
   ['cache.clear', files('cache.test/clear.test.lua')],

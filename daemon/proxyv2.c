@@ -132,9 +132,7 @@ static inline void next_tlv(struct proxy2_tlv **tlv)
 }
 
 
-/** Checks whether the use of PROXYv2 protocol is allowed for the specified
- * address. */
-static bool proxy_allowed(const struct sockaddr *saddr)
+bool proxy_allowed(const struct sockaddr *saddr)
 {
 	union kr_in_addr addr;
 	trie_t *trie;

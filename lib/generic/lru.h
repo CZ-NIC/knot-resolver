@@ -172,11 +172,7 @@ enum lru_apply_do {
 	enum lru_apply_do (*(name))(const char *key, uint len, val_type *val, void *baton)
 typedef lru_apply_fun_g(lru_apply_fun, void);
 
-#if __GNUC__ >= 4
-	#define CACHE_ALIGNED __attribute__((aligned(64)))
-#else
-	#define CACHE_ALIGNED
-#endif
+#define CACHE_ALIGNED _Alignas(64)
 
 struct lru;
 void lru_free_items_impl(struct lru *lru);
@@ -198,10 +194,11 @@ struct lru_item;
 #define LRU_TRACKED ((64 - sizeof(size_t) * LRU_ASSOC) / 4 - 1)
 
 struct lru_group {
+	CACHE_ALIGNED
 	uint16_t counts[LRU_TRACKED+1]; /*!< Occurrence counters; the last one is special. */
 	uint16_t hashes[LRU_TRACKED+1]; /*!< Top halves of hashes; the last one is unused. */
 	struct lru_item *items[LRU_ASSOC]; /*!< The full items. */
-} CACHE_ALIGNED;
+};
 
 /* The sizes are chosen so lru_group just fits into a single x86 cache line. */
 static_assert(64 == sizeof(struct lru_group)
@@ -213,7 +210,7 @@ struct lru {
 		*mm_array; /**< Memory context to use for this structure itself. */
 	uint log_groups; /**< Logarithm of the number of LRU groups. */
 	uint val_alignment; /**< Alignment for the values. */
-	struct lru_group groups[] CACHE_ALIGNED; /**< The groups of items. */
+	CACHE_ALIGNED struct lru_group groups[]; /**< The groups of items. */
 };
 
 /** @internal See lru_free. */

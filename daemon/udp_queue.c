@@ -25,6 +25,9 @@ void udp_queue_push(int fd, const struct sockaddr *sa, char *buf, size_t buf_len
 {
 	abort();
 }
+void udp_queue_send_all(void)
+{
+}
 #else
 
 /* LATER: it might be useful to have this configurable during runtime,
@@ -86,13 +89,19 @@ static void udp_queue_send(int fd)
 	q->len = 0;
 }
 
-/** Periodical callback to send all queued packets. */
-static void udp_queue_check(uv_check_t *handle)
+/** Send all queued packets. */
+void udp_queue_send_all(void)
 {
 	for (int i = 0; i < state.waiting_fds.len; ++i) {
 		udp_queue_send(state.waiting_fds.at[i]);
 	}
 	state.waiting_fds.len = 0;
+}
+
+/** Periodical callback to send all queued packets. */
+static void udp_queue_check(uv_check_t *handle)
+{
+	udp_queue_send_all();
 }
 
 int udp_queue_init_global(uv_loop_t *loop)

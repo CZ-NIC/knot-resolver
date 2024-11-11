@@ -1515,7 +1515,8 @@
                             "renum",
                             "exterr",
                             "rules",
-                            "prlayr"
+                            "prlayr",
+                            "defer"
                         ]
                     },
                     "description": "List of groups for which 'debug' logging level is set.",
@@ -1666,6 +1667,51 @@
                 "enabled": "lazy",
                 "graphite": false
             }
+        },
+        "rate-limiting": {
+            "description": "Configuration of rate limiting.",
+            "type": [
+                "object",
+                "null"
+            ],
+            "properties": {
+                "capacity": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Expected maximal number of blocked networks/hosts at the same time.",
+                    "default": 524288
+                },
+                "rate-limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Maximal number of allowed queries per second from a single host."
+                },
+                "instant-limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Maximal number of allowed queries at a single point in time from a single host.",
+                    "default": 50
+                },
+                "slip": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 32,
+                    "description": "Number of restricted responses out of which one is sent as truncated, the others are dropped.",
+                    "default": 2
+                },
+                "log-period": {
+                    "type": "string",
+                    "pattern": "^(\\d+)(us|ms|s|m|h|d)$",
+                    "description": "Minimal time between two log messages, or '0s' to disable.",
+                    "default": "0s"
+                },
+                "dry-run": {
+                    "type": "boolean",
+                    "description": "Perform only classification and logging but no restrictions.",
+                    "default": false
+                }
+            },
+            "default": null
         },
         "lua": {
             "description": "Custom Lua configuration.",

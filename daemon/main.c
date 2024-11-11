@@ -11,6 +11,8 @@
 #include "daemon/network.h"
 #include "daemon/udp_queue.h"
 #include "daemon/worker.h"
+#include "daemon/ratelimiting.h"
+#include "daemon/defer.h"
 
 #include "lib/defines.h"
 #include "lib/dnssec.h"
@@ -569,6 +571,11 @@ int main(int argc, char **argv)
 		lua_settop(the_engine->L, 0);
 	}
 
+	if (defer_init_idle(loop) != 0) {
+		ret = EXIT_FAILURE;
+		goto cleanup;
+	}
+
 	ret = kr_rules_init_ensure();
 	if (ret) {
 		kr_log_error(RULES, "failed to initialize policy rule engine: %s\n",
@@ -598,10 +605,12 @@ int main(int argc, char **argv)
 cleanup:/* Cleanup. */
 	network_unregister();
 
+	ratelimiting_deinit();
 	kr_resolver_deinit();
 	worker_deinit();
 	engine_deinit();
 	network_deinit();
+	defer_deinit();
 	kr_rules_commit(false);
 	kr_rules_deinit();
 	if (loop != NULL) {

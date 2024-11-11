@@ -311,7 +311,7 @@ struct sockaddr *kr_sockaddr_from_key(struct sockaddr_storage *dst,
 KR_EXPORT
 bool kr_sockaddr_key_same_addr(const char *key_a, const char *key_b);
 
-/** Compare two given sockaddr.
+/** Compare two given sockaddr.  (only address and port)
  * return 0 - addresses are equal, error code otherwise.
  */
 KR_EXPORT KR_PURE
@@ -353,6 +353,9 @@ int kr_family_len(int family);
  * Also accepts IPv6 link-local and AF_UNIX starting with "/" (ignoring port) */
 KR_EXPORT
 struct sockaddr * kr_straddr_socket(const char *addr, int port, knot_mm_t *pool);
+/** Like kr_straddr_socket() but use `sa` instead of allocating. */
+KR_EXPORT
+struct sockaddr * kr_straddr_socket_set(struct sockaddr *sa, const char *addr, int port);
 
 /** Parse address and return subnet length (bits).
   * @warning 'dst' must be at least `sizeof(struct in6_addr)` long. */

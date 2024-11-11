@@ -29,6 +29,8 @@ if not lmdb.found()  # darwin workaround: missing pkgconfig
 endif
 gnutls = dependency('gnutls', version: '>=3.4')
 luajit = dependency('luajit')
+# https://mesonbuild.com/howtox.html#add-math-library-lm-portably
+libm = meson.get_compiler('c').find_library('m', required : false)
 message('------------------------------')
 
 
@@ -209,7 +211,8 @@ c_src_lint = files()
 # These lists are added to from subdir() and finally used in tests/*
 
 unit_tests = [
-  # [test_name, files(test)]
+  # [name, files(test)]
+  # [name, files(test), [extra_suites]]
 ]
 
 config_tests = [

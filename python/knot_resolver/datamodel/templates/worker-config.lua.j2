@@ -43,6 +43,9 @@ nsid.name('{{ cfg.nsid }}' .. worker.id)
 -- DNS64 section ------------------------------------
 {% include "dns64.lua.j2" %}
 
+-- RATE-LIMITING section ------------------------------------
+{% include "rate_limiting.lua.j2" %}
+
 {% endif %}
 
 -- LUA section --------------------------------------

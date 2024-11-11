@@ -30,3 +30,7 @@ struct proxy_result {
 	 * the proxy is unencrypted. */
 	bool has_tls : 1;
 };
+
+/** Checks whether the use of PROXYv2 protocol is allowed for the specified
+ * address. */
+bool proxy_allowed(const struct sockaddr *saddr);

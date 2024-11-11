@@ -16,6 +16,8 @@
 #include "daemon/io.h"
 #include "daemon/udp_queue.h"
 #include "daemon/worker.h"
+#include "daemon/defer.h"
+#include "daemon/proxyv2.h"
 
 #include "daemon/session2.h"
 
@@ -36,18 +38,21 @@ struct protolayer_globals protolayer_globals[PROTOLAYER_TYPE_COUNT] = {{0}};
 static const enum protolayer_type protolayer_grp_udp53[] = {
 	PROTOLAYER_TYPE_UDP,
 	PROTOLAYER_TYPE_PROXYV2_DGRAM,
+	PROTOLAYER_TYPE_DEFER,
 	PROTOLAYER_TYPE_DNS_DGRAM,
 };
 
 static const enum protolayer_type protolayer_grp_tcp53[] = {
 	PROTOLAYER_TYPE_TCP,
 	PROTOLAYER_TYPE_PROXYV2_STREAM,
+	PROTOLAYER_TYPE_DEFER,
 	PROTOLAYER_TYPE_DNS_MULTI_STREAM,
 };
 
 static const enum protolayer_type protolayer_grp_dot[] = {
 	PROTOLAYER_TYPE_TCP,
 	PROTOLAYER_TYPE_PROXYV2_STREAM,
+	PROTOLAYER_TYPE_DEFER,
 	PROTOLAYER_TYPE_TLS,
 	PROTOLAYER_TYPE_DNS_MULTI_STREAM,
 };
@@ -55,6 +60,7 @@ static const enum protolayer_type protolayer_grp_dot[] = {
 static const enum protolayer_type protolayer_grp_doh[] = {
 	PROTOLAYER_TYPE_TCP,
 	PROTOLAYER_TYPE_PROXYV2_STREAM,
+	PROTOLAYER_TYPE_DEFER,
 	PROTOLAYER_TYPE_TLS,
 	PROTOLAYER_TYPE_HTTP,
 	PROTOLAYER_TYPE_DNS_UNSIZED_STREAM,
@@ -322,6 +328,11 @@ static inline struct protolayer_data *protolayer_sess_data_get(
 	return (struct protolayer_data *)(pl_data_beg + offset);
 }
 
+void *protolayer_sess_data_get_current(struct protolayer_iter_ctx *ctx)
+{
+	return protolayer_sess_data_get(ctx->session, ctx->layer_ix);
+}
+
 /** Gets layer-specific iteration data for the layer with the specified index
  * from the context. */
 static inline struct protolayer_data *protolayer_iter_data_get(
@@ -340,6 +351,11 @@ static inline struct protolayer_data *protolayer_iter_data_get(
 		return NULL;
 
 	return (struct protolayer_data *)(ctx->data + offset);
+}
+
+void *protolayer_iter_data_get_current(struct protolayer_iter_ctx *ctx)
+{
+	return protolayer_iter_data_get(ctx, ctx->layer_ix);
 }
 
 static inline ssize_t session2_get_protocol(
@@ -413,6 +429,7 @@ static int protolayer_iter_ctx_finish(struct protolayer_iter_ctx *ctx, int ret)
 
 	mm_ctx_delete(&ctx->pool);
 	free(ctx);
+	session2_unhandle(s);
 
 	return ret;
 }
@@ -579,13 +596,21 @@ static int session2_submit(
 {
 	if (session->closing)
 		return kr_error(ECANCELED);
-
+	if (session->ref_count >= INT_MAX)
+		return kr_error(ETOOMANYREFS);
 	if (kr_fails_assert(session->proto < KR_PROTO_COUNT))
 		return kr_error(EFAULT);
 
 	bool had_comm_param = (comm != NULL);
 	if (!had_comm_param)
 		comm = &session->comm_storage;
+
+	// DEFER: at this point we might start doing nontrivial work,
+	// but we may not know the client's IP yet.
+	// Note two cases: incoming session (new request)
+	// vs. outgoing session (resuming work on some request)
+	if ((direction == PROTOLAYER_UNWRAP) && (layer_ix == 0))
+		defer_sample_start();
 
 	struct protolayer_iter_ctx *ctx = malloc(session->iter_ctx_size);
 	kr_require(ctx);
@@ -605,6 +630,7 @@ static int session2_submit(
 		.finished_cb = cb,
 		.finished_cb_baton = baton
 	};
+	session->ref_count++;
 	if (had_comm_param) {
 		struct comm_addr_storage *addrst = &ctx->comm_addr_storage;
 		if (comm->src_addr) {
@@ -644,7 +670,10 @@ static int session2_submit(
 			globals->iter_init(ctx, iter_data);
 	}
 
-	return protolayer_step(ctx);
+	int ret = protolayer_step(ctx);
+	if ((direction == PROTOLAYER_UNWRAP) && (layer_ix == 0))
+		defer_sample_stop();
+	return ret;
 }
 
 static void *get_init_param(enum protolayer_type p,
@@ -826,7 +855,7 @@ struct session2 *session2_new(enum session2_transport_type transport_type,
 	ret = uv_timer_init(uv_default_loop(), &s->timer);
 	kr_require(!ret);
 	s->timer.data = s;
-	s->uv_count++; /* Session owns the timer */
+	s->ref_count++; /* Session owns the timer */
 
 	/* Initialize the layer's session data */
 	for (size_t i = 0; i < grp->num_layers; i++) {
@@ -868,13 +897,13 @@ static void session2_free(struct session2 *s)
 
 void session2_unhandle(struct session2 *s)
 {
-	if (kr_fails_assert(s->uv_count > 0)) {
+	if (kr_fails_assert(s->ref_count > 0)) {
 		session2_free(s);
 		return;
 	}
 
-	s->uv_count--;
-	if (s->uv_count <= 0)
+	s->ref_count--;
+	if (s->ref_count <= 0)
 		session2_free(s);
 }
 
@@ -930,8 +959,10 @@ uv_handle_t *session2_get_handle(struct session2 *s)
 
 static void session2_on_timeout(uv_timer_t *timer)
 {
+	defer_sample_start();
 	struct session2 *s = timer->data;
 	session2_event(s, s->timer_event, NULL);
+	defer_sample_stop();
 }
 
 int session2_timer_start(struct session2 *s, enum protolayer_event_type event, uint64_t timeout, uint64_t repeat)
