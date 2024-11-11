@@ -41,8 +41,8 @@ Security
 --------
 - reduce buffering of transmitted data, especially TCP-based in userspace
   Also expose some of the new tweaks in lua:
-   (require 'ffi').C.the_worker.engine.net.tcp.user_timeout = 1000
-   (require 'ffi').C.the_worker.engine.net.listen_{tcp,udp}_buflens.{snd,rcv}
+  - (require 'ffi').C.the_worker.engine.net.tcp.user_timeout = 1000
+  - (require 'ffi').C.the_worker.engine.net.listen_{tcp,udp}_buflens.{snd,rcv}
 
 Packaging
 ---------
@@ -70,12 +70,11 @@ Improvements
 ------------
 - TLS (DoT, DoH): respect crypto policy overrides in OS (!1526)
 - manager: export metrics to JSON via management HTTP API (!1527)
-  * JSON is the new default metrics output format
-  * the ``prometheus-client`` Python package is now an optional dependency,
-    required only for Prometheus export to work
+  - JSON is the new default metrics output format
+  - the ``prometheus-client`` Python package is now an optional dependency, required only for Prometheus export to work
 - cache: prefetching records
-  * predict module: prefetching expiring records moved to prefetch module
-  * prefetch module: new module to prefetch expiring records
+  - predict module: prefetching expiring records moved to prefetch module
+  - prefetch module: new module to prefetch expiring records
 - stats: add separate metrics for IPv6 and IPv4 (!1545)
 - add the fresh DNSSEC root key "KSK-2024" already, Key ID 38696 (!1556)
 - manager: policy-loader: new component for separate loading of policy rules (!1540)
