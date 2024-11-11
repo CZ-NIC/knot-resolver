@@ -603,7 +603,7 @@ static int session2_submit(
 {
 	if (session->closing)
 		return kr_error(ECANCELED);
-	if (session->ref_count >= INT_MAX)
+	if (session->ref_count >= INT_MAX - 1)
 		return kr_error(ETOOMANYREFS);
 	if (kr_fails_assert(session->proto < KR_PROTO_COUNT))
 		return kr_error(EFAULT);
