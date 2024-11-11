@@ -576,7 +576,7 @@ obs:trigger: &obs_trigger
     - source ./venv/bin/activate
     - pip install --upgrade pip
     - pip install apkg
-    - scripts/make-obs.sh
+    - scripts/ci/make-obs.sh
     - echo y | scripts/ci/build-in-obs.sh $OBS_REPO
 
 obs:release:
