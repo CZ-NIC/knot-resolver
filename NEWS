@@ -6,7 +6,7 @@ Improvements
 
 - manager: secret for TLS session resumption via ticket (RFC5077) (!1567)
 
-  The manager creates and sets the secret for all running 'kresd' workers.
+  The manager creates and sets the secret for all running ``kresd`` workers.
   The secret is created automatically if the user does not configure their own secret in the configuration.
   This means that the workers will be able to resume each other's TLS sessions, regardless of whether the user has configured it to do so.
 
@@ -16,7 +16,10 @@ Improvements
 - extended_errors: answer with EDE in more cases (!1585, !1588, !1590, !1592)
 - local-data: make DNAMEs work, i.e. generate CNAMEs (!1609)
 - daemon: use connected UDP sockets by default (#326, !1618)
-- docker: multiplatform builds (#922, !1623, !1625)
+- docker: multiplatform builds (#922, !1623)
+- docker: shared VOLUMEs are prepared for configuration and cache (!1625, !1627)
+  
+  Configuration path was changed to standard ``/etc/knot-resolver/config.yaml``.
 
 Bugfixes
 --------
