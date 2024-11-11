@@ -76,6 +76,8 @@ EXPOSE 53/UDP 53/TCP 443/TCP 853/TCP 5000/TCP
 
 # Prepare shared config
 VOLUME /etc/knot-resolver
+# Prepare shared cache
+VOLUME /var/cache/knot-resolver
 
 ENTRYPOINT ["/usr/bin/knot-resolver"]
 CMD ["-c", "/etc/knot-resolver/config.yaml"]
