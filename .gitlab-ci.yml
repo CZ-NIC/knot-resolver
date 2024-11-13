@@ -220,12 +220,12 @@ docker:build:native:
     - ${PLATFORM}
     - dind
 
-docker:build:cross-platform:
+docker:build:
   <<: *docker
   stage: build  
-  only:
-    - tags
-    - master@knot/knot-resolver
+  # only:
+  #   - tags
+  #   - master@knot/knot-resolver
   before_script:
     - >
       docker buildx create
@@ -243,6 +243,42 @@ docker:build:cross-platform:
       --push
       --tag ${GITLAB_REGISTRY}:${CI_COMMIT_REF_NAME}
       .
+
+docker:test:
+  <<: *docker
+  <<: *multi_platform
+  # needs:
+  #   - docker:build
+  image:
+    name: ${GITLAB_REGISTRY}:${CI_COMMIT_REF_NAME}
+    entrypoint: [""]
+  before_script:
+    - apt-get update
+    - apt-get -y install knot-dnsutils curl git
+    - /usr/bin/knot-resolver -c /etc/knot-resolver/config.yaml > knot-resolver.log &
+  script:
+    # check that the resolver responds to queries
+    - kdig nic.cz @localhost#53
+    - kdig +tcp nic.cz @localhost#53
+    - kdig +tls nic.cz @localhost#853
+    - kdig +https nic.cz @localhost#443
+    # run some packaging tests
+    - tests/packaging/kresctl.sh
+    - tests/packaging/interactive/etag.sh
+    - tests/packaging/interactive/schema.sh
+    - tests/packaging/interactive/reload.sh
+    - tests/packaging/interactive/metrics.sh
+    - tests/packaging/interactive/cache-clear.sh
+    - tests/packaging/interactive/workers.sh
+    - kresctl stop
+  artifacts:
+    when: always
+    paths:
+      - knot-resolver.log
+  tags:
+    - docker
+    - ${PLATFORM}
+
   
 docker:deploy:
   <<: *docker
@@ -251,7 +287,7 @@ docker:deploy:
   only:
     - tags
   needs:
-    - docker:build:cross-platform
+    - docker:test
   before_script:
     - echo "$DOCKER_HUB_TOKEN" | docker login -u $DOCKER_HUB_USER --password-stdin
   script:
