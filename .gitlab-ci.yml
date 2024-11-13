@@ -197,25 +197,69 @@ build:macOS:
     - pip3 install -U requests
     - python3 ./ci/gh_actions.py ${CI_COMMIT_REF_NAME} ${CI_COMMIT_SHA}
 
-docker:
+.docker: &docker
   <<: *nodep
-  stage: build
   image: docker:latest
+  variables:
+    DOCKER_HUB_REGISTRY: "knotcznic/knot-resolver-testing"
+    GITLAB_REGISTRY: "${CI_REGISTRY}/knot/knot-resolver/cross-platform"
+  tags:
+    - amd64
+    - dind
+
+docker:build:native:
+  <<: *docker
   <<: *multi_platform
-  only:
-    refs:
-      - branches@knot/knot-resolver
+  stage: build
+  script:
+    - docker buildx build --no-cache -t knot-resolver:${PLATFORM} .
+  after_script:
+    - docker rmi knot-resolver:${PLATFORM}
+    - docker rmi $(docker images -f "dangling=true" -q)
   tags:
     - ${PLATFORM}
     - dind
-  variables:
-    DOCKER_IMAGE_NAME: knot-resolver-test:${CI_COMMIT_SHA}
+
+docker:build:cross-platform:
+  <<: *docker
+  stage: build  
+  only:
+    - tags
+    - master@knot/knot-resolver
+  before_script:
+    - >
+      docker buildx create
+      --name kres-builder
+      --driver docker-container
+      --bootstrap --use
+    - echo "$CI_REGISTRY_PASSWORD" | docker login $CI_REGISTRY -u $CI_REGISTRY_USER --password-stdin
   script:
-    - docker build --no-cache -t ${DOCKER_IMAGE_NAME} .
-    # TODO: perhaps try if the running image answers queries
-  after_script:  # remove dangling images to avoid running out of disk space
-    - docker rmi ${DOCKER_IMAGE_NAME}
-    - docker rmi $(docker images -f "dangling=true" -q)
+    - > 
+      docker buildx build
+      --no-cache
+      --platform linux/amd64,linux/arm64/v8,linux/arm/v7
+      --provenance=false
+      --pull
+      --push
+      --tag ${GITLAB_REGISTRY}:${CI_COMMIT_REF_NAME}
+      .
+  
+docker:deploy:
+  <<: *docker
+  stage: deploy
+  when: manual
+  only:
+    - tags
+  needs:
+    - docker:build:cross-platform
+  before_script:
+    - echo "$DOCKER_HUB_TOKEN" | docker login -u $DOCKER_HUB_USER --password-stdin
+  script:
+    - >
+      docker buildx imagetools create
+      -t ${DOCKER_HUB_REGISTRY}:${CI_COMMIT_REF_NAME}
+      -t ${DOCKER_HUB_REGISTRY}:6
+      ${GITLAB_REGISTRY}:${CI_COMMIT_REF_NAME}
 # }}}
 
 # sanity {{{
