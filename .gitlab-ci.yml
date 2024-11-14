@@ -201,16 +201,18 @@ build:macOS:
   <<: *nodep
   image: docker:latest
   variables:
-    DOCKER_HUB_REGISTRY: "knotcznic/knot-resolver-testing"
+    DOCKER_HUB_REGISTRY: "cznic/knot-resolver"
     GITLAB_REGISTRY: "${CI_REGISTRY}/knot/knot-resolver/cross-platform"
   tags:
     - amd64
     - dind
 
-docker:build:native:
+docker:build:
   <<: *docker
   <<: *multi_platform
   stage: build
+  except:
+    - tags
   script:
     - docker buildx build --no-cache -t knot-resolver:${PLATFORM} .
   after_script:
@@ -220,12 +222,12 @@ docker:build:native:
     - ${PLATFORM}
     - dind
 
-docker:build:
+docker:build:cross-platform:
   <<: *docker
   stage: build  
-  # only:
-  #   - tags
-  #   - master@knot/knot-resolver
+  only:
+    - tags
+    - master@knot/knot-resolver
   before_script:
     - >
       docker buildx create
@@ -234,7 +236,7 @@ docker:build:
       --bootstrap --use
     - echo "$CI_REGISTRY_PASSWORD" | docker login $CI_REGISTRY -u $CI_REGISTRY_USER --password-stdin
   script:
-    - > 
+    - >
       docker buildx build
       --no-cache
       --platform linux/amd64,linux/arm64/v8,linux/arm/v7
@@ -244,11 +246,15 @@ docker:build:
       --tag ${GITLAB_REGISTRY}:${CI_COMMIT_REF_NAME}
       .
 
-docker:test:
+docker:test:cross-platform:
   <<: *docker
   <<: *multi_platform
-  # needs:
-  #   - docker:build
+  stage: test
+  only:
+    - tags
+    - master@knot/knot-resolver
+  needs:
+    - docker:build:cross-platform
   image:
     name: ${GITLAB_REGISTRY}:${CI_COMMIT_REF_NAME}
     entrypoint: [""]
@@ -279,15 +285,14 @@ docker:test:
     - docker
     - ${PLATFORM}
 
-  
-docker:deploy:
+dockerhub:deploy:
   <<: *docker
   stage: deploy
   when: manual
   only:
     - tags
   needs:
-    - docker:test
+    - docker:test:cross-platform
   before_script:
     - echo "$DOCKER_HUB_TOKEN" | docker login -u $DOCKER_HUB_USER --password-stdin
   script:
