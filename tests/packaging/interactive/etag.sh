@@ -2,7 +2,7 @@
 
 set -e
 
-socket_opt="--unix-socket /var/run/knot-resolver/manager.sock"
+socket_opt="--unix-socket /run/knot-resolver/kres-api.sock"
 
 echo "  etag"
 etag="$(curl --silent $socket_opt --fail http://localhost:5000/v1/config -o /dev/null -v 2>&1 | grep ETag | sed 's/< ETag: //;s/\s//')"

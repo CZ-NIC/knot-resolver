@@ -32,7 +32,7 @@ The available options are:
 .B \-s\fI <api_socket>\fR, \fB\-\-socket \fI<api_socket>
 
 Specify how to connect to a running Knot Resolver. Accepts path to Unix-domain
-socket  or \fIhost:port\fR. Defaults to \fI/var/run/knot-resolver/manager.sock\fR
+socket  or \fIhost:port\fR. Defaults to \fI/var/run/knot-resolver/kres-api.sock\fR
 
 Some commands do not require communication with the running resolver. In such
 cases, the value of this option is ignored and the command may succeed even
