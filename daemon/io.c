@@ -338,6 +338,18 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 		return;
 	}
 
+	// allow deferring EOF for incoming connections to send answer even if half-closed
+	if (!s->outgoing && (nread == UV_EOF)) {
+		if (kr_log_is_debug(IO, NULL)) {
+			struct sockaddr *peer = session2_get_peer(s);
+			char *peer_str = kr_straddr(peer);
+			kr_log_debug(IO, "=> connection to '%s' half-closed by peer (EOF)\n",
+				       peer_str ? peer_str : "");
+		}
+		session2_event(s, PROTOLAYER_EVENT_EOF, NULL);
+		return;
+	}
+
 	if (nread < 0 || !buf->base) {
 		if (kr_log_is_debug(IO, NULL)) {
 			struct sockaddr *peer = session2_get_peer(s);

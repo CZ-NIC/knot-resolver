@@ -1325,6 +1325,12 @@ static enum protolayer_event_cb_result pl_tls_event_unwrap(
 		return PROTOLAYER_EVENT_PROPAGATE;
 	}
 
+	if (event == PROTOLAYER_EVENT_EOF) {
+		// TCP half-closed state not allowed
+		session2_force_close(s);
+		return PROTOLAYER_EVENT_CONSUME;
+	}
+
 	if (tls->client_side) {
 		if (event == PROTOLAYER_EVENT_CONNECT)
 			return pl_tls_client_connect_start(tls, s);

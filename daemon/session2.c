@@ -307,6 +307,18 @@ bool protolayer_queue_has_payload(const protolayer_iter_ctx_queue_t *queue)
 	return false;
 }
 
+static inline ssize_t session2_get_protocol(
+		struct session2 *s, enum protolayer_type protocol)
+{
+	const struct protolayer_grp *grp = &protolayer_grps[s->proto];
+	for (ssize_t i = 0; i < grp->num_layers; i++) {
+		enum protolayer_type found = grp->layers[i];
+		if (protocol == found)
+			return i;
+	}
+
+	return -1;
+}
 
 /** Gets layer-specific session data for the layer with the specified index
  * from the manager. */
@@ -333,6 +345,14 @@ void *protolayer_sess_data_get_current(struct protolayer_iter_ctx *ctx)
 	return protolayer_sess_data_get(ctx->session, ctx->layer_ix);
 }
 
+void *protolayer_sess_data_get_proto(struct session2 *s, enum protolayer_type protocol) {
+	ssize_t layer_ix = session2_get_protocol(s, protocol);
+	if (layer_ix < 0)
+		return NULL;
+
+	return protolayer_sess_data_get(s, layer_ix);
+}
+
 /** Gets layer-specific iteration data for the layer with the specified index
  * from the context. */
 static inline struct protolayer_data *protolayer_iter_data_get(
@@ -356,19 +376,6 @@ static inline struct protolayer_data *protolayer_iter_data_get(
 void *protolayer_iter_data_get_current(struct protolayer_iter_ctx *ctx)
 {
 	return protolayer_iter_data_get(ctx, ctx->layer_ix);
-}
-
-static inline ssize_t session2_get_protocol(
-		struct session2 *s, enum protolayer_type protocol)
-{
-	const struct protolayer_grp *grp = &protolayer_grps[s->proto];
-	for (ssize_t i = 0; i < grp->num_layers; i++) {
-		enum protolayer_type found = grp->layers[i];
-		if (protocol == found)
-			return i;
-	}
-
-	return -1;
 }
 
 static inline bool protolayer_iter_ctx_is_last(struct protolayer_iter_ctx *ctx)
@@ -1683,6 +1690,12 @@ static int session2_transport_event(struct session2 *s,
 {
 	if (s->closing)
 		return kr_ok();
+
+	if (event == PROTOLAYER_EVENT_EOF) {
+		// no layer wanted to retain TCP half-closed state
+		session2_force_close(s);
+		return kr_ok();
+	}
 
 	bool is_close_event = (event == PROTOLAYER_EVENT_CLOSE ||
 			event == PROTOLAYER_EVENT_FORCE_CLOSE);

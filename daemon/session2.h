@@ -334,6 +334,8 @@ typedef void (*protolayer_finished_cb)(int status, struct session2 *session,
 	XX(MALFORMED) \
 	/** Signal that a connection has ended. */\
 	XX(DISCONNECT) \
+	/** Signal EOF from peer (e.g. half-closed TCP connection). */\
+	XX(EOF) \
 	/** Failed task send - update stats. */\
 	XX(STATS_SEND_ERR) \
 	/** Outgoing query submission - update stats. */\
@@ -534,6 +536,10 @@ size_t protolayer_queue_count_payload(const protolayer_iter_ctx_queue_t *queue);
  * `protolayer_queue_count_payload` would be non-zero). This optimizes calls to
  * queue iterators, as it does not need to iterate through the whole queue. */
 bool protolayer_queue_has_payload(const protolayer_iter_ctx_queue_t *queue);
+
+/** Gets layer-specific session data for the specified protocol layer.
+ * Returns NULL if the layer is not present in the session. */
+void *protolayer_sess_data_get_proto(struct session2 *s, enum protolayer_type protocol);
 
 /** Gets layer-specific session data for the last processed layer.
  * To be used after returning from its callback for async continuation but before calling protolayer_continue. */

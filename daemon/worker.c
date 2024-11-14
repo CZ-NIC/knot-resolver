@@ -103,6 +103,14 @@ struct qr_task
 			qr_task_free((task)); \
 	} while (0)
 
+struct pl_dns_stream_sess_data {
+	struct protolayer_data h;
+	bool single : 1; /**< True: Stream only allows a single packet */
+	bool produced : 1; /**< True: At least one packet has been produced */
+	bool connected : 1; /**< True: The stream is connected */
+	bool half_closed : 1; /**< True: EOF was received, the stream is half-closed */
+};
+
 /* Forward decls */
 static void qr_task_free(struct qr_task *task);
 static int qr_task_step(struct qr_task *task,
@@ -121,7 +129,6 @@ static int worker_del_tcp_waiting(const struct sockaddr* addr);
 static struct session2* worker_find_tcp_waiting(const struct sockaddr* addr);
 
 static void subreq_finalize(struct qr_task *task, const struct sockaddr *packet_source, knot_pkt_t *pkt);
-
 
 struct worker_ctx the_worker_value; /**< Static allocation is suitable for the singleton. */
 struct worker_ctx *the_worker = NULL;
@@ -995,6 +1002,18 @@ static int qr_task_finalize(struct qr_task *task, int state)
 		session2_close(source_session);
 	}
 
+	if (source_session->stream && !source_session->closing) {
+		struct pl_dns_stream_sess_data *stream =
+			protolayer_sess_data_get_proto(source_session, PROTOLAYER_TYPE_DNS_MULTI_STREAM);
+		if (!stream)
+			stream = protolayer_sess_data_get_proto(source_session, PROTOLAYER_TYPE_DNS_UNSIZED_STREAM);
+		if (!stream)
+			stream = protolayer_sess_data_get_proto(source_session, PROTOLAYER_TYPE_DNS_SINGLE_STREAM);
+		if (stream && stream->half_closed) {
+			session2_force_close(source_session);
+		}
+	}
+
 	qr_task_unref(task);
 
 	if (ret != kr_ok() || state != KR_STATE_DONE)
@@ -1804,13 +1823,6 @@ static enum protolayer_iter_cb_result pl_dns_dgram_unwrap(
 	}
 }
 
-struct pl_dns_stream_sess_data {
-	struct protolayer_data h;
-	bool single : 1; /**< True: Stream only allows a single packet */
-	bool produced : 1; /**< True: At least one packet has been produced */
-	bool connected : 1; /**< True: The stream is connected */
-};
-
 static int pl_dns_stream_sess_init(struct session2 *session,
                                    void *sess_data, void *param)
 {
@@ -2015,6 +2027,16 @@ static enum protolayer_event_cb_result pl_dns_stream_disconnected(
 	return PROTOLAYER_EVENT_PROPAGATE;
 }
 
+static enum protolayer_event_cb_result pl_dns_stream_eof(
+		struct session2 *session, struct pl_dns_stream_sess_data *stream)
+{
+	if (!session2_is_empty(session)) {
+		stream->half_closed = true;
+		return PROTOLAYER_EVENT_CONSUME;
+	}
+	return PROTOLAYER_EVENT_PROPAGATE;
+}
+
 static enum protolayer_event_cb_result pl_dns_stream_event_unwrap(
 		enum protolayer_event_type event, void **baton,
 		struct session2 *session, void *sess_data)
@@ -2045,6 +2067,9 @@ static enum protolayer_event_cb_result pl_dns_stream_event_unwrap(
 	case PROTOLAYER_EVENT_CLOSE:
 	case PROTOLAYER_EVENT_FORCE_CLOSE:
 		return pl_dns_stream_disconnected(session, stream);
+
+	case PROTOLAYER_EVENT_EOF:
+		return pl_dns_stream_eof(session, stream);
 
 	default:
 		return PROTOLAYER_EVENT_PROPAGATE;
