@@ -42,12 +42,7 @@ class CompletionCommand(Command):
         shells.add_argument("--bash", action="store_const", dest=shells_dest, const=Shells.BASH, default=Shells.BASH)
         shells.add_argument("--fish", action="store_const", dest=shells_dest, const=Shells.FISH)
 
-        completion.add_argument(
-            "--args",
-            help="arguments to complete",
-            nargs=argparse.REMAINDER,
-            default=[]
-        )
+        completion.add_argument("--args", help="arguments to complete", nargs=argparse.REMAINDER, default=[])
 
         return completion, CompletionCommand
 

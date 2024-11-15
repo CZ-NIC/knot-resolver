@@ -3,15 +3,7 @@ import sys
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional, Tuple, Type
 
-from knot_resolver.client.command import (
-    Command,
-    CommandArgs,
-    CompWords,
-    get_subparser_by_name,
-    get_subparsers_words,
-    get_subparser_command,
-    register_command,
-)
+from knot_resolver.client.command import Command, CommandArgs, CompWords, register_command
 from knot_resolver.datamodel import KresConfig
 from knot_resolver.utils.modeling.parsing import DataFormat, parse_json, try_to_parse
 from knot_resolver.utils.requests import request

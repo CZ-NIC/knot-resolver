@@ -140,37 +140,37 @@ class Command(ABC):
         if args is None or len(args) == 0:
             return {}
 
-        words: CompWords = get_subparsers_words(parser._actions)
+        words: CompWords = get_subparsers_words(parser._actions)  # pylint: disable=protected-access
 
-        subparsers = parser._subparsers
+        subparsers = parser._subparsers  # pylint: disable=protected-access
 
         if subparsers:
             while curr_index < len(args):
                 uarg = args[curr_index]
-                subparser = get_subparser_by_name(uarg, subparsers._actions)  # pylint: disable=W0212
+                subpar = get_subparser_by_name(uarg, subparsers._actions)  # pylint: disable=W0212
 
                 curr_index += 1
-                if subparser and curr_index < len(args):
-                    cmd = get_subparser_command(subparser)
-                    if cmd is None:
-                        subparser_words = get_subparsers_words(subparser._actions)
-                        words = dict()
-                        for action in subparser._actions:
-                            if action.dest not in subparser_words:
-                                subparser_words[action.dest] = action.help or None
-                        words.update(subparser_words)
+                if subpar:
+                    cmd = get_subparser_command(subpar)
+                    if cmd is not None:
+                        if len(args) > curr_index:
+                            words = cmd.completion(subpar, args, curr_index)
 
-                    elif len(args) > curr_index:
-                        new_words = cmd.completion(subparser, args, curr_index)
+                        return words
 
-                        if new_words is None:
-                            words = new_words
+                    subpar_actions = subpar._actions  # pylint: disable=protected-access
+                    subparser_words = get_subparsers_words(subpar_actions)
+                    words = {}
+                    for action in subpar_actions:
+                        if action.dest not in subparser_words:
+                            subparser_words[action.dest] = action.help or None
 
-                    # return words
+                    words.update(subparser_words)
+                    return words
 
                 elif uarg in ["-s", "--socket", "-c", "--config"]:
-                    # folowing word shall not be a kresctl command, switch to path completion
-                    if uarg == args[-1] or uarg == args[-2]:
+                    # following word shall not be a kresctl command, switch to path completion
+                    if uarg in (args[-1], args[-2]):
                         words = {}
                     curr_index += 1
 
