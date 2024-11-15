@@ -1,8 +1,8 @@
 import argparse
 import sys
-from typing import List, Tuple, Type
+from typing import Tuple, Type
 
-from knot_resolver.client.command import Command, CommandArgs, CompWords, register_command
+from knot_resolver.client.command import Command, CommandArgs, register_command
 from knot_resolver.utils.requests import request
 
 
@@ -23,10 +23,6 @@ class ReloadCommand(Command):
         )
 
         return reload, ReloadCommand
-
-    @staticmethod
-    def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
-        return {}
 
     def run(self, args: CommandArgs) -> None:
         response = request(args.socket, "POST", "reload")

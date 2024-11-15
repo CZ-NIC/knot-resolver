@@ -1,9 +1,9 @@
 import argparse
 import json
 import sys
-from typing import List, Optional, Tuple, Type
+from typing import Optional, Tuple, Type
 
-from knot_resolver.client.command import Command, CommandArgs, CompWords, register_command
+from knot_resolver.client.command import Command, CommandArgs, register_command
 from knot_resolver.datamodel import kres_config_json_schema
 from knot_resolver.utils.requests import request
 
@@ -32,11 +32,6 @@ class SchemaCommand(Command):
         schema.add_argument("file", help="Optional, file where to export JSON-schema.", nargs="?", default=None)
 
         return schema, SchemaCommand
-
-    @staticmethod
-    def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
-        return {}
-        # return parser_words(parser._actions)  # pylint: disable=W0212
 
     def run(self, args: CommandArgs) -> None:
         if self.live:

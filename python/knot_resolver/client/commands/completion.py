@@ -2,15 +2,7 @@ import argparse
 from enum import Enum
 from typing import List, Tuple, Type
 
-from knot_resolver.client.command import (
-    Command,
-    CommandArgs,
-    CompWords,
-    get_subparser_by_name,
-    get_subparser_command,
-    get_subparsers_words,
-    register_command,
-)
+from knot_resolver.client.command import Command, CommandArgs, register_command
 
 
 class Shells(Enum):
@@ -59,34 +51,8 @@ class CompletionCommand(Command):
 
         return completion, CompletionCommand
 
-    @staticmethod
-    def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
-        return get_subparsers_words(parser._actions)
-
     def run(self, args: CommandArgs) -> None:
-        subparsers = args.parser._subparsers
-        words: CompWords = {}
-
-        if subparsers:
-            words = get_subparsers_words(subparsers._actions)
-
-            uargs = iter(self.args)
-            for uarg in uargs:
-                subparser = get_subparser_by_name(uarg, subparsers._actions)  # pylint: disable=W0212
-
-                if subparser:
-                    cmd: Command = get_subparser_command(subparser)
-                    subparser_args = self.args[self.args.index(uarg) + 1 :]
-                    if subparser_args or self.space:
-                        words = cmd.completion(subparser_args, subparser)
-                    break
-                elif uarg in ["-s", "--socket", "-c", "--config"]:
-                    # if arg is socket config, skip next arg
-                    next(uargs)
-                    continue
-                elif uarg in words:
-                    # uarg is valid arg, continue
-                    continue
+        words = Command.completion(args.parser, self.comp_args)
 
         # print completion words
         # based on required bash/fish shell format
