@@ -1,62 +1,39 @@
 #/usr/bin/env bash
 
-_kresctl_skip_next=0
-
-_kresctl_filter_switches()
+_kresctl_filter_double_dash()
 {
-    # skip kresctl, it is not a valid argument
-    local words=("${COMP_WORDS[@]:1}")
+    local words=("$@")
     local new_words=()
     local count=0
 
     for WORD in "${words[@]}"
     do
-        if [[ $_kresctl_skip_next -eq 0 ]]
+        if [[ "$WORD" != "--" ]]
         then
-            if [[ ! $WORD =~ ^-{1,2} ]]
-            then
-                new_words[count]="$WORD"
-                ((count++))
-            else
-                new_words[count]=" "
-                ((count++))
-                _kresctl_skip_next=1
-            fi
-        else
-            _kresctl_skip_next=0
+            new_words[count]="$WORD"
+            ((count++))
         fi
-
     done
 
     printf "%s\n" "${new_words[@]}"
-    return $count
 }
-
 
 _kresctl_completion()
 {
     COMPREPLY=()
     local cur opts cmp_words
 
-    for (( i=2; i<${#COMP_WORDS[@]}; i++ )); do
-        if [[ "${COMP_WORDS[i-2]}" == "config" ]] &&
-           ([[ "${COMP_WORDS[i]}" == "-p" ]] || [[ "${COMP_WORDS[i]}" == "--path" ]]); then
-            COMP_WORDS[i]="conf_get_path_subst"
-            break
-        fi
-    done
-
     cur="${COMP_WORDS[COMP_CWORD]}"
-    cmp_words=($(_kresctl_filter_switches))
+    local line="${COMP_LINE:0:$COMP_POINT}"
+    local words_up_to_cursor=($line)
 
-    # check if there is a word is empty
-    # that means there is a space after last non-empty word
-    if [[ -z "$cur" ]]
+    cmp_words=($(_kresctl_filter_double_dash "${words_up_to_cursor[@]}"))
+
+    if [[ -z "$cur" && "$COMP_POINT" -gt 0 && "${line: -1}" == " " ]]
     then
-        # no word to complete, return all posible options
-        opts=$(kresctl completion --bash --space "${cmp_words[@]}")
+        opts=$(kresctl completion --bash --space --args "${cmp_words[@]}")
     else
-        opts=$(kresctl completion --bash --space "${cmp_words[@]}")
+        opts=$(kresctl completion --bash --args "${cmp_words[@]}")
     fi
 
     # if there is no completion from kresctl
@@ -65,7 +42,7 @@ _kresctl_completion()
     then
         COMPREPLY=($(compgen -d -f -- "${cur}"))
     else
-        COMPREPLY=($(compgen -W "${opts}" -- ${cur}))
+        COMPREPLY=($(compgen -W "${opts}" -- "${cur}"))
     fi
 
     return 0
