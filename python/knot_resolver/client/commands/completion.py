@@ -16,10 +16,10 @@ class CompletionCommand(Command):
         super().__init__(namespace)
         self.shell: Shells = namespace.shell
         self.space = namespace.space
-        self.comp_args: List[str] = namespace.comp_args
+        self.args: List[str] = namespace.args
 
         if self.space:
-            self.comp_args.append("")
+            self.args.append("")
 
     @staticmethod
     def register_args_subparser(
@@ -36,17 +36,18 @@ class CompletionCommand(Command):
             action="store_true",
             default=False,
         )
-        completion.add_argument(
-            "comp_args",
-            type=str,
-            help="arguments to complete",
-            nargs="*",
-        )
 
         shells_dest = "shell"
         shells = completion.add_mutually_exclusive_group()
         shells.add_argument("--bash", action="store_const", dest=shells_dest, const=Shells.BASH, default=Shells.BASH)
         shells.add_argument("--fish", action="store_const", dest=shells_dest, const=Shells.FISH)
+
+        completion.add_argument(
+            "--args",
+            help="arguments to complete",
+            nargs=argparse.REMAINDER,
+            default=[]
+        )
 
         return completion, CompletionCommand
 
