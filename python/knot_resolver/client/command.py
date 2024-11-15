@@ -30,9 +30,6 @@ def get_subparsers_words(subparser_actions: List[argparse.Action]) -> CompWords:
 
 
 def get_subparser_by_name(name: str, parser_actions: List[argparse.Action]) -> Optional[argparse.ArgumentParser]:
-    if name in ["-s", "--socket", "-c", "--config"]:
-        return None
-
     for action in parser_actions:
         if isinstance(action, argparse._SubParsersAction):  # pylint: disable=protected-access
             if action.choices and name in action.choices.keys():
@@ -40,11 +37,11 @@ def get_subparser_by_name(name: str, parser_actions: List[argparse.Action]) -> O
     return None
 
 
-def get_subparser_command(subparser: argparse.ArgumentParser) -> "Command":
+def get_subparser_command(subparser: argparse.ArgumentParser) -> Optional["Command"]:
     defaults: Dict[str, Any] = subparser._defaults  # pylint: disable=protected-access
     if "command" in defaults:
         return defaults["command"]
-    raise ValueError(f"missing 'command' default for '{subparser.prog}' parser")
+    return None
 
 
 def register_command(cls: T) -> T:
@@ -139,31 +136,42 @@ class Command(ABC):
         raise NotImplementedError()
 
     @staticmethod
-    def completion(parser: argparse.ArgumentParser, args: Optional[List[str]]) -> CompWords:
-        words: CompWords = get_subparsers_words(parser._actions)  # Get subparser words
-        if args is None or args == [""]:
-            return words
+    def completion(parser: argparse.ArgumentParser, args: Optional[List[str]] = None, curr_index: int = 0) -> CompWords:
+        if args is None or len(args) == 0:
+            return {}
+
+        words: CompWords = get_subparsers_words(parser._actions)
 
         subparsers = parser._subparsers
 
         if subparsers:
-            words = get_subparsers_words(subparsers._actions)
-
-            i = 0
-            while i < len(args):
-                uarg = args[i]
+            while curr_index < len(args):
+                uarg = args[curr_index]
                 subparser = get_subparser_by_name(uarg, subparsers._actions)  # pylint: disable=W0212
 
-                if subparser:
+                curr_index += 1
+                if subparser and curr_index < len(args):
                     cmd = get_subparser_command(subparser)
-                    subparser_args = args[i + 1 :]
-                    words = cmd.completion(subparser, subparser_args)
+                    if cmd is None:
+                        subparser_words = get_subparsers_words(subparser._actions)
+                        words = dict()
+                        for action in subparser._actions:
+                            if action.dest not in subparser_words:
+                                subparser_words[action.dest] = action.help or None
+                        words.update(subparser_words)
+
+                    elif len(args) > curr_index:
+                        new_words = cmd.completion(subparser, args, curr_index)
+
+                        if new_words is None:
+                            words = new_words
+
+                    # return words
 
                 elif uarg in ["-s", "--socket", "-c", "--config"]:
-                    # Skip next argument if a known flag is detected
-                    i += 1
-                    # next(uargs, None)
-                # elif uarg in ["--bash", "--space"]:
-                    # Continue if the argument is a valid subparser
-                i += 1
+                    # folowing word shall not be a kresctl command, switch to path completion
+                    if uarg == args[-1] or uarg == args[-2]:
+                        words = {}
+                    curr_index += 1
+
         return words
