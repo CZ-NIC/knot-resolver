@@ -34,55 +34,51 @@ def operation_to_method(operation: Operations) -> Literal["PUT", "GET", "DELETE"
 def _properties_words(props: Dict[str, Any]) -> CompWords:
     words: CompWords = {}
     for name, prop in props.items():
-        words[name] = prop["description"] if "description" in prop else None
+        words["/" + name] = prop["description"] if "description" in prop else None
     return words
 
 
-def get_config_path_options():
-    return _properties_words(KresConfig.json_schema()["properties"])
-
-
-def _path_comp_words(node: str, nodes: List[str], props: Dict[str, Any]) -> CompWords:
-    i = nodes.index(node)
-    ln = len(nodes[i:])
-
-    # if node is last in path, return all possible words on thi level
-    if ln == 1:
-        return _properties_words(props)
-    # if node is valid
-    elif node in props:
-        node_schema = props[node]
-
-        if "anyOf" in node_schema:
-            for item in node_schema["anyOf"]:
-                print(item)
-
-        elif "type" not in node_schema:
-            pass
-
-        elif node_schema["type"] == "array":
-            if ln > 2:
-                # skip index for item in array
-                return _path_comp_words(nodes[i + 2], nodes, node_schema["items"]["properties"])
-            if "enum" in node_schema["items"]:
-                print(node_schema["items"]["enum"])
-            return {"0": "first array item", "-": "last array item"}
-        elif node_schema["type"] == "object":
-            if "additionalProperties" in node_schema:
-                print(node_schema)
-            return _path_comp_words(nodes[i + 1], nodes, node_schema["properties"])
-        # return {}
-
-        # arrays/lists must be handled sparately
-        if node_schema["type"] == "array":
-            if ln > 2:
-                # skip index for item in array
-                return _path_comp_words(nodes[i + 2], nodes, node_schema["items"]["properties"])
-            return {"0": "first array item", "-": "last array item"}
-        return _path_comp_words(nodes[i + 1], nodes, node_schema["properties"])
-    else:
-        # if node is not last or valid, value error
-        raise ValueError(f"unknown config path node: {node}")
+# def _path_comp_words(node: str, nodes: List[str], props: Dict[str, Any]) -> CompWords:
+#     i = nodes.index(node)
+#     ln = len(nodes[i:])
+#
+#     # if node is last in path, return all possible words on thi level
+#     if ln == 1:
+#         return _properties_words(props)
+#     # if node is valid
+#     elif node in props:
+#         node_schema = props[node]
+#
+#         if "anyOf" in node_schema:
+#             for item in node_schema["anyOf"]:
+#                 print(item)
+#
+#         elif "type" not in node_schema:
+#             pass
+#
+#         elif node_schema["type"] == "array":
+#             if ln > 2:
+#                 # skip index for item in array
+#                 return _path_comp_words(nodes[i + 2], nodes, node_schema["items"]["properties"])
+#             if "enum" in node_schema["items"]:
+#                 print(node_schema["items"]["enum"])
+#             return {"0": "first array item", "-": "last array item"}
+#         elif node_schema["type"] == "object":
+#             if "additionalProperties" in node_schema:
+#                 print(node_schema)
+#             return _path_comp_words(nodes[i + 1], nodes, node_schema["properties"])
+#         # return {}
+#
+#         # arrays/lists must be handled sparately
+#         if node_schema["type"] == "array":
+#             if ln > 2:
+#                 # skip index for item in array
+#                 return _path_comp_words(nodes[i + 2], nodes, node_schema["items"]["properties"])
+#             return {"0": "first array item", "-": "last array item"}
+#         return _path_comp_words(nodes[i + 1], nodes, node_schema["properties"])
+#     else:
+#         # if node is not last or valid, value error
+#         raise ValueError(f"unknown config path node: {node}")
 
 
 @register_command
@@ -182,43 +178,11 @@ class ConfigCommand(Command):
         return config, ConfigCommand
 
     @staticmethod
-    def completion(parser: argparse.ArgumentParser, args: Optional[List[str]] = None) -> CompWords:
-        if args is None or len(args) <= 1:
-            return Command.completion(parser, args)
+    def completion(parser: argparse.ArgumentParser, args: Optional[List[str]] = None, curr_index: int = 0) -> CompWords:
+        if args is not None and (len(args) - curr_index) > 1 and args[-2] in ["-p", "--path"]:
+            return _properties_words(KresConfig.json_schema()["properties"])
 
-        words: CompWords = get_subparsers_words(parser._actions)  # Get subparser words
-
-        subparsers = parser._subparsers
-        schema_props: Dict[str, Any] = KresConfig.json_schema()["properties"]
-
-        if subparsers:
-            words = get_subparsers_words(subparsers._actions)
-
-            for i in range(len(args)):
-                uarg = args[i]
-                if uarg == "conf_get_path_subst" and \
-                    (uarg == args[-2] or (uarg == args[-3] and args[-2] not in schema_props)):
-                    return get_config_path_options()
-
-                subparser = get_subparser_by_name(uarg, subparsers._actions)  # pylint: disable=W0212
-
-                if subparser:
-                    try:
-                        cmd = get_subparser_command(subparser)
-                        subparser_args = args[i + 1 :]
-                        words = cmd.completion(subparser, subparser_args)
-                    except ValueError:
-                        subparser_words = get_subparsers_words(subparser._actions)
-
-                        words = dict()
-                        for action in subparser._actions:
-                            if action.dest not in subparser_words:
-                                subparser_words[action.dest] = action.help or None
-
-                        words.update(subparser_words)
-
-        return words
-
+        return Command.completion(parser, args, curr_index)
 
     def run(self, args: CommandArgs) -> None:
         if not self.operation:
