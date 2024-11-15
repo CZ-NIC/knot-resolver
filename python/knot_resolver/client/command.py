@@ -152,20 +152,12 @@ class Command(ABC):
                 curr_index += 1
                 if subpar:
                     cmd = get_subparser_command(subpar)
-                    if cmd is not None:
-                        if len(args) > curr_index:
-                            words = cmd.completion(subpar, args, curr_index)
+                    if cmd is None:
+                        return get_subparsers_words(subpar._actions)  # pylint: disable=protected-access
 
-                        return words
+                    if len(args) > curr_index:
+                        return cmd.completion(subpar, args, curr_index)
 
-                    subpar_actions = subpar._actions  # pylint: disable=protected-access
-                    subparser_words = get_subparsers_words(subpar_actions)
-                    words = {}
-                    for action in subpar_actions:
-                        if action.dest not in subparser_words:
-                            subparser_words[action.dest] = action.help or None
-
-                    words.update(subparser_words)
                     return words
 
                 elif uarg in ["-s", "--socket", "-c", "--config"]:
