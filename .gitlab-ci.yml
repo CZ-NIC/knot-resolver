@@ -204,6 +204,9 @@ build:macOS:
   variables:
     DOCKER_HUB_REGISTRY: cznic/knot-resolver
     GITLAB_REGISTRY: ${CI_REGISTRY}/knot/knot-resolver/cross-platform
+  tags:
+    - docker
+    - dind
 
 docker:build:
   <<: *docker
@@ -222,7 +225,7 @@ docker:build:
 
 docker:build:cross-platform:
   <<: *docker
-  stage: build  
+  stage: build
   only:
     - master@knot/knot-resolver
     - tags
