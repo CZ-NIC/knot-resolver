@@ -196,25 +196,106 @@ build:macOS:
     - pip3 install -U requests
     - python3 ./ci/gh_actions.py ${CI_COMMIT_REF_NAME} ${CI_COMMIT_SHA}
 
-docker:
+.docker: &docker
   <<: *nodep
-  stage: build
+  except: null
   image: docker:latest
-  <<: *multi_platform
-  only:
-    refs:
-      - branches@knot/knot-resolver
+  variables:
+    # DOCKER_HUB_REGISTRY: cznic/knot-resolver
+    DOCKER_HUB_REGISTRY: knotcznic/knot-resolver-testing
+    GITLAB_REGISTRY: ${CI_REGISTRY}/knot/knot-resolver/cross-platform
   tags:
-    - ${PLATFORM}
+    - docker
     - dind
+
+docker:build:
+  <<: *docker
+  <<: *multi_platform
+  stage: build
+  except:
+    - tags
   variables:
     DOCKER_IMAGE_NAME: knot-resolver-test:${CI_COMMIT_SHA}
-  script:
+ script:
     - docker build --no-cache -t ${DOCKER_IMAGE_NAME} .
     - echo "quit()" | docker run -i ${DOCKER_IMAGE_NAME}
   after_script:  # remove dangling images to avoid running out of disk space
     - docker rmi ${DOCKER_IMAGE_NAME}
     - docker rmi $(docker images -f "dangling=true" -q)
+  tags:
+    - ${PLATFORM}
+    - dind
+
+docker:build:cross-platform:
+  <<: *docker
+  stage: build
+  # only:
+  #   - master-5@knot/knot-resolver
+  #   - tags
+  before_script:
+    - >
+      docker buildx create
+      --name kres-builder
+      --driver docker-container
+      --bootstrap --use
+    - echo "$CI_REGISTRY_PASSWORD" | docker login $CI_REGISTRY -u $CI_REGISTRY_USER --password-stdin
+  script:
+    - >
+      docker buildx build
+      --no-cache
+      --platform linux/amd64,linux/arm64/v8,linux/arm/v7
+      --provenance=false
+      --pull
+      --push
+      --tag ${GITLAB_REGISTRY}:${CI_COMMIT_REF_NAME}
+      .
+
+docker:test:cross-platform:
+  <<: *docker
+  <<: *multi_platform
+  stage: test
+  # only:
+  #   - tags
+  #   - master-5@knot/knot-resolver
+  needs:
+    - docker:build:cross-platform
+  image:
+    name: ${GITLAB_REGISTRY}:${CI_COMMIT_REF_NAME}
+    entrypoint: [""]
+  before_script:
+    - apt-get update
+    - apt-get -y install knot-dnsutils
+    - /usr/sbin/kresd -c /etc/knot-resolver/kresd.conf > kresd.log &
+  script:
+    # check that the resolver responds to queries
+    - kdig nic.cz @localhost#53
+    - kdig +tcp nic.cz @localhost#53
+    - kdig +tls nic.cz @localhost#853
+    - kdig +https nic.cz @localhost#443
+  artifacts:
+    when: always
+    paths:
+      - kresd.log
+  tags:
+    - docker
+    - ${PLATFORM}
+
+dockerhub:deploy:
+  <<: *docker
+  stage: deploy
+  when: manual
+  # only:
+  #   - tags
+  needs:
+    - docker:test:cross-platform
+  before_script:
+    - echo "$DOCKER_HUB_TOKEN" | docker login -u $DOCKER_HUB_USER --password-stdin
+  script:
+    - >
+      docker buildx imagetools create
+      -t ${DOCKER_HUB_REGISTRY}:${CI_COMMIT_REF_NAME}
+      -t ${DOCKER_HUB_REGISTRY}:latest
+      ${GITLAB_REGISTRY}:${CI_COMMIT_REF_NAME}
 # }}}
 
 # sanity {{{
