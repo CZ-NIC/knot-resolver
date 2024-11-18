@@ -2,7 +2,7 @@
 
 set -e
 
-curl --silent --fail --unix-socket /var/run/knot-resolver/manager.sock http://localhost/metrics > /dev/null
+curl --silent --fail --unix-socket /run/knot-resolver/kres-api.sock http://localhost/metrics > /dev/null
 
 kresctl metrics
 if [ "$?" -ne "0" ]; then
