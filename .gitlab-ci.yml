@@ -199,6 +199,7 @@ build:macOS:
 
 .docker: &docker
   <<: *nodep
+  except: null
   image: docker:latest
   variables:
     DOCKER_HUB_REGISTRY: cznic/knot-resolver
@@ -223,8 +224,8 @@ docker:build:cross-platform:
   <<: *docker
   stage: build  
   only:
-    - tags
     - master@knot/knot-resolver
+    - tags
   before_script:
     - >
       docker buildx create
