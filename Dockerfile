@@ -1,7 +1,7 @@
 # Intermediate container for Knot DNS build (not persistent)
 # SPDX-License-Identifier: GPL-3.0-or-later
-FROM debian:11 AS knot-dns-build
-ARG KNOT_DNS_VERSION=v3.1.1
+FROM debian:12 AS knot-dns-build
+ARG KNOT_DNS_VERSION=v3.2.9
 
 # Build dependencies
 ENV KNOT_DNS_BUILD_DEPS git-core build-essential libtool autoconf pkg-config \
@@ -31,7 +31,7 @@ RUN mkdir -p /tmp/root/usr/local/include /tmp/root/usr/local/lib /tmp/root/usr/l
 
 
 # Intermediate container with runtime dependencies
-FROM debian:11-slim AS runtime
+FROM debian:12-slim AS runtime
 
 # Install runtime dependencies
 ENV KNOT_DNS_RUNTIME_DEPS libgnutls30
