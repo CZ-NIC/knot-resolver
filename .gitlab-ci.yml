@@ -205,7 +205,7 @@ build:macOS:
     DOCKER_HUB_REGISTRY: cznic/knot-resolver
     GITLAB_REGISTRY: ${CI_REGISTRY}/knot/knot-resolver/cross-platform
   tags:
-    - docker
+    - amd64
     - dind
 
 docker:build:
