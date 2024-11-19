@@ -214,13 +214,11 @@ docker:build:
   stage: build
   except:
     - tags
-  variables:
-    DOCKER_IMAGE_NAME: knot-resolver-test:${CI_COMMIT_SHA}
   script:
-    - docker build --no-cache -t ${DOCKER_IMAGE_NAME} .
-    - echo "quit()" | docker run -i ${DOCKER_IMAGE_NAME}
+    - docker build --no-cache -t knot-resolver:${PLATFORM} .
+    - echo "quit()" | docker run -i knot-resolver:${PLATFORM}
   after_script:  # remove dangling images to avoid running out of disk space
-    - docker rmi ${DOCKER_IMAGE_NAME}
+    - docker rmi knot-resolver:${PLATFORM}
     - docker rmi $(docker images -f "dangling=true" -q)
   tags:
     - ${PLATFORM}
