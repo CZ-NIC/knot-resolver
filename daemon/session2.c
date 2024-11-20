@@ -378,6 +378,19 @@ void *protolayer_iter_data_get_current(struct protolayer_iter_ctx *ctx)
 	return protolayer_iter_data_get(ctx, ctx->layer_ix);
 }
 
+size_t protolayer_sess_size_est(struct session2 *s)
+{
+	return s->session_size + s->wire_buf.size;
+}
+
+size_t protolayer_iter_size_est(struct protolayer_iter_ctx *ctx, bool incl_payload)
+{
+	size_t size = ctx->session->iter_ctx_size;
+	if (incl_payload)
+		size += protolayer_payload_size(&ctx->payload);
+	return size;
+}
+
 static inline bool protolayer_iter_ctx_is_last(struct protolayer_iter_ctx *ctx)
 {
 	unsigned int last_ix = (ctx->direction == PROTOLAYER_UNWRAP)
@@ -852,6 +865,7 @@ struct session2 *session2_new(enum session2_transport_type transport_type,
 
 		.proto = proto,
 		.iter_ctx_size = iter_ctx_size,
+		.session_size = session_size,
 	};
 
 	memcpy(&s->layer_data, offsets, sizeof(offsets));

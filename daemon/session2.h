@@ -549,6 +549,13 @@ void *protolayer_sess_data_get_current(struct protolayer_iter_ctx *ctx);
  * To be used after returning from its callback for async continuation but before calling protolayer_continue. */
 void *protolayer_iter_data_get_current(struct protolayer_iter_ctx *ctx);
 
+/** Gets rough memory footprint estimate of session/iteration for use in defer.
+ * Different, hopefully minor, allocations are not counted here;
+ * tasks and subsessions are also not counted;
+ * read the code before using elsewhere. */
+size_t protolayer_sess_size_est(struct session2 *s);
+size_t protolayer_iter_size_est(struct protolayer_iter_ctx *ctx, bool incl_payload);
+
 /** Layer-specific data - the generic struct. To be added as the first member of
  * each specific struct. */
 struct protolayer_data {
@@ -873,6 +880,9 @@ struct session2 {
 	/** The size of a single iteration context
 	 * (`struct protolayer_iter_ctx`), including layer-specific data. */
 	size_t iter_ctx_size;
+
+	/** The size of this session struct. */
+	size_t session_size;
 
 	/** The following flexible array has basically this structure:
 	 *
