@@ -788,7 +788,8 @@ pkg:arch:
   <<: *pkg_test_user
   image: $CI_REGISTRY/packaging/apkg/full/arch
   before_script:
-    - pacman -Syy
+    # prometheus is an optional dependency, but our `apkg test` needs it
+    - pacman -Syu --noconfirm python-prometheus_client
 
 # RHEL 8 derivatives would need more work due to *default* python being old
 #pkg:rocky-8:
