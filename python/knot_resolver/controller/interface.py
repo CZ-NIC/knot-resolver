@@ -14,7 +14,6 @@ from knot_resolver.controller.exceptions import SubprocessControllerError
 from knot_resolver.controller.registered_workers import register_worker, unregister_worker
 from knot_resolver.datamodel.config_schema import KresConfig
 from knot_resolver.manager.constants import kresd_config_file, policy_loader_config_file
-from knot_resolver.utils.async_utils import writefile
 
 logger = logging.getLogger(__name__)
 
@@ -111,19 +110,33 @@ class Subprocess(ABC):
         self._config = config
         self._registered_worker: bool = False
 
+        self._config_file: Optional[Path] = None
+        if self.type is SubprocessType.KRESD:
+            self._config_file = kresd_config_file(self._config, self.id)
+        elif self.type is SubprocessType.POLICY_LOADER:
+            self._config_file = policy_loader_config_file(self._config)
+
+    def _render_lua(self) -> Optional[str]:
+        if self.type is SubprocessType.KRESD:
+            return self._config.render_lua()
+        if self.type is SubprocessType.POLICY_LOADER:
+            return self._config.render_lua_policy()
+        return None
+
+    def _write_config(self) -> None:
+        config_lua = self._render_lua()
+        if config_lua and self._config_file:
+            with open(self._config_file, "w", encoding="utf8") as file:
+                file.write(config_lua)
+
+    def _unlink_config(self) -> None:
+        if self._config_file:
+            self._config_file.unlink(missing_ok=True)
+
     async def start(self, new_config: Optional[KresConfig] = None) -> None:
         if new_config:
             self._config = new_config
-
-        config_file: Optional[Path] = None
-        if self.type is SubprocessType.KRESD:
-            config_lua = self._config.render_lua()
-            config_file = kresd_config_file(self._config, self.id)
-            await writefile(config_file, config_lua)
-        elif self.type is SubprocessType.POLICY_LOADER:
-            config_lua = self._config.render_lua_policy()
-            config_file = policy_loader_config_file(self._config)
-            await writefile(config_file, config_lua)
+        self._write_config()
 
         try:
             await self._start()
@@ -131,8 +144,7 @@ class Subprocess(ABC):
                 register_worker(self)
                 self._registered_worker = True
         except SubprocessControllerError as e:
-            if config_file:
-                config_file.unlink()
+            self._unlink_config()
             raise e
 
     async def apply_new_config(self, new_config: KresConfig) -> None:
@@ -140,16 +152,7 @@ class Subprocess(ABC):
 
         # update config file
         logger.debug(f"Writing config file for {self.id}")
-
-        config_file: Optional[Path] = None
-        if self.type is SubprocessType.KRESD:
-            config_lua = self._config.render_lua()
-            config_file = kresd_config_file(self._config, self.id)
-            await writefile(config_file, config_lua)
-        elif self.type is SubprocessType.POLICY_LOADER:
-            config_lua = self._config.render_lua_policy()
-            config_file = policy_loader_config_file(self._config)
-            await writefile(config_file, config_lua)
+        self._write_config()
 
         # update runtime status
         logger.debug(f"Restarting {self.id}")
@@ -166,13 +169,7 @@ class Subprocess(ABC):
         Remove temporary files and all traces of this instance running. It is NOT SAFE to call this while
         the kresd is running, because it will break automatic restarts (at the very least).
         """
-
-        if self.type is SubprocessType.KRESD:
-            config_file = kresd_config_file(self._config, self.id)
-            config_file.unlink()
-        elif self.type is SubprocessType.POLICY_LOADER:
-            config_file = policy_loader_config_file(self._config)
-            config_file.unlink()
+        self._unlink_config()
 
     def __eq__(self, o: object) -> bool:
         return isinstance(o, type(self)) and o.type == self.type and o.id == self.id
