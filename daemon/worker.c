@@ -879,26 +879,32 @@ static void subreq_finalize(struct qr_task *task, const struct sockaddr *packet_
 		kr_assert(ret == KNOT_EOK && val_deleted == task);
 	}
 	/* Notify waiting tasks. */
-	struct kr_query *leader_qry = array_tail(task->ctx->req.rplan.pending);
-	for (size_t i = task->waiting.len; i > 0; i--) {
-		struct qr_task *follower = task->waiting.at[i - 1];
-		/* Reuse MSGID and 0x20 secret */
-		if (follower->ctx->req.rplan.pending.len > 0) {
-			struct kr_query *qry = array_tail(follower->ctx->req.rplan.pending);
-			qry->id = leader_qry->id;
-			qry->secret = leader_qry->secret;
+	if (task->waiting.len > 0) {
+		struct kr_query *leader_qry = array_tail(task->ctx->req.rplan.pending);
+		defer_sample_state_t defer_prev_sample_state;
+		defer_sample_start(&defer_prev_sample_state);
+		for (size_t i = task->waiting.len; i > 0; i--) {
+			struct qr_task *follower = task->waiting.at[i - 1];
+			/* Reuse MSGID and 0x20 secret */
+			if (follower->ctx->req.rplan.pending.len > 0) {
+				struct kr_query *qry = array_tail(follower->ctx->req.rplan.pending);
+				qry->id = leader_qry->id;
+				qry->secret = leader_qry->secret;
 
-			// Note that this transport may not be present in `leader_qry`'s server selection
-			follower->transport = task->transport;
-			if(follower->transport) {
-				follower->transport->deduplicated = true;
+				// Note that this transport may not be present in `leader_qry`'s server selection
+				follower->transport = task->transport;
+				if(follower->transport) {
+					follower->transport->deduplicated = true;
+				}
+				leader_qry->secret = 0; /* Next will be already decoded */
 			}
-			leader_qry->secret = 0; /* Next will be already decoded */
+			qr_task_step(follower, packet_source, pkt);
+			qr_task_unref(follower);
+			defer_sample_restart();
 		}
-		qr_task_step(follower, packet_source, pkt);
-		qr_task_unref(follower);
+		defer_sample_stop(&defer_prev_sample_state, true);
+		task->waiting.len = 0;
 	}
-	task->waiting.len = 0;
 	task->leading = false;
 }
 

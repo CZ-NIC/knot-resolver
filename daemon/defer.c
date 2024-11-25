@@ -102,7 +102,7 @@ static inline void phase_set(enum phase p)
 		phase = p;
 	}
 }
-static inline void phase_account(uint64_t nsec)
+static inline void phase_charge(uint64_t nsec)
 {
 	kr_assert(phase != PHASE_ANY);
 	phase_elapsed += nsec;
@@ -135,10 +135,10 @@ static bool using_avx2(void)
 }
 
 /// Increment KRU counters by given time.
-void defer_account(uint64_t nsec, union kr_sockaddr *addr, bool stream)
+void defer_charge(uint64_t nsec, union kr_sockaddr *addr, bool stream)
 {
 	if (phase_accounting) {
-		phase_account(nsec);
+		phase_charge(nsec);
 		phase_accounting = false;
 	}
 
@@ -321,7 +321,7 @@ static inline void process_single_deferred(void)
 	if (kr_fails_assert(ctx)) return;
 
 	defer_sample_addr((const union kr_sockaddr *)ctx->comm->comm_addr, ctx->session->stream);
-	phase_accounting = true;
+	phase_accounting = true;  // TODO check there are no suspensions of sampling
 
 	struct pl_defer_iter_data *idata = protolayer_iter_data_get_current(ctx);
 	struct pl_defer_sess_data *sdata = protolayer_sess_data_get_current(ctx);
@@ -448,10 +448,15 @@ static enum protolayer_iter_cb_result pl_defer_unwrap(
 	push_query(ctx, priority, false);
 	waiting_requests_size += data->size = protolayer_iter_size_est(ctx, !ctx->session->stream);
 		// for stream, payload is counted in session wire buffer
-	while (waiting_requests_size > MAX_WAITING_REQS_SIZE) {
-		defer_sample_restart();
-		process_single_deferred();  // possibly defers again without decreasing waiting_requests_size
-		// defer_sample_stop should be called soon outside
+
+	if (waiting_requests_size > MAX_WAITING_REQS_SIZE) {
+		defer_sample_state_t prev_sample_state;
+		defer_sample_start(&prev_sample_state);
+		do {
+			process_single_deferred();  // possibly defers again without decreasing waiting_requests_size
+			defer_sample_restart();
+		} while (waiting_requests_size > MAX_WAITING_REQS_SIZE);
+		defer_sample_stop(&prev_sample_state, true);
 	}
 
 	return protolayer_async();
@@ -489,14 +494,14 @@ static void defer_queues_idle(uv_idle_t *handle)
 	kr_assert(waiting_requests > 0);
 	VERBOSE_LOG("IDLE\n");
 	VERBOSE_LOG("  %d waiting\n", waiting_requests);
-	defer_sample_start();
+	defer_sample_start(NULL);
 	uint64_t idle_stamp = defer_sample_state.stamp;
-	while ((waiting_requests > 0) && (defer_sample_state.stamp < idle_stamp + IDLE_TIMEOUT)) {
+	do {
 		process_single_deferred();
 		defer_sample_restart();
-	}
+	} while ((waiting_requests > 0) && (defer_sample_state.stamp < idle_stamp + IDLE_TIMEOUT));
+	defer_sample_stop(NULL, true);
 	cleanup_queues();
-	defer_sample_stop();  // TODO skip calling and use just restart elsewhere?
 	udp_queue_send_all();
 
 	if (waiting_requests > 0) {

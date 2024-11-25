@@ -18,10 +18,10 @@ int defer_init_idle(uv_loop_t *loop);
 void defer_deinit(void);
 
 /// Increment KRU counters by the given time.
-void defer_account(uint64_t nsec, union kr_sockaddr *addr, bool stream);
+void defer_charge(uint64_t nsec, union kr_sockaddr *addr, bool stream);
 
 typedef struct {
-	int8_t is_accounting; /// whether currently accounting the time to someone; should be 0/1
+	bool is_accounting; /// whether currently accounting the time to someone
 	union kr_sockaddr addr; /// request source (to which we account) or AF_UNSPEC if unknown yet
 	bool stream;
 	uint64_t stamp; /// monotonic nanoseconds, probably won't wrap
@@ -35,21 +35,11 @@ extern bool defer_initialized; /// defer_init was called, possibly keeping defer
 // TODO: reconsider `static inline` cases below
 
 #include <time.h>
-static inline uint64_t get_stamp(void)
+static inline uint64_t defer_get_stamp(void)
 {
 	struct timespec now_ts = {0};
 	clock_gettime(CLOCK_THREAD_CPUTIME_ID, &now_ts);
 	return now_ts.tv_nsec + 1000*1000*1000 * (uint64_t)now_ts.tv_sec;
-}
-
-/// Start accounting work, if not doing it already.
-static inline void defer_sample_start(void)
-{
-	if (!defer) return;
-	kr_assert(!defer_sample_state.is_accounting);
-	++defer_sample_state.is_accounting;
-	defer_sample_state.stamp = get_stamp();
-	defer_sample_state.addr.ip.sa_family = AF_UNSPEC;
 }
 
 /// Annotate the work currently being accounted by an IP address.
@@ -78,38 +68,74 @@ static inline void defer_sample_addr(const union kr_sockaddr *addr, bool stream)
 	defer_sample_state.stream = stream;
 }
 
-/// Stop accounting work - and change the source if applicable.
-static inline void defer_sample_stop(void)
+/// Internal; start accounting work at specified timestamp.
+static inline void defer_sample_start_stamp(uint64_t stamp)
 {
 	if (!defer) return;
+	kr_assert(!defer_sample_state.is_accounting);
+	defer_sample_state.is_accounting = true;
+	defer_sample_state.stamp = stamp;
+	defer_sample_state.addr.ip.sa_family = AF_UNSPEC;
+}
 
-	if (kr_fails_assert(defer_sample_state.is_accounting > 0)) return; // weird
-	if (--defer_sample_state.is_accounting) return;
+/// Internal; stop accounting work at specified timestamp and charge the source if applicable.
+static inline void defer_sample_stop_stamp(uint64_t stamp)
+{
+	if (!defer) return;
+	kr_assert(defer_sample_state.is_accounting);
+	defer_sample_state.is_accounting = false;
+
 	if (defer_sample_state.addr.ip.sa_family == AF_UNSPEC) return;
 
-	const uint64_t elapsed = get_stamp() - defer_sample_state.stamp;
-
-	// we accounted something
+	const uint64_t elapsed = stamp - defer_sample_state.stamp;
+	if (elapsed == 0) return;
 
 	// TODO: some queries of internal origin have suspicioiusly high numbers.
 	// We won't be really accounting those, but it might suggest some other issue.
 
-	defer_account(elapsed, &defer_sample_state.addr, defer_sample_state.stream);
+	defer_charge(elapsed, &defer_sample_state.addr, defer_sample_state.stream);
 }
 
-/// Stop accounting if active, then start again. Uses just one stamp.
-static inline void defer_sample_restart(void)
-{
+/// Start accounting work; optionally save state of current accounting.
+/// Current state can be saved only after having an address assigned.
+static inline void defer_sample_start(defer_sample_state_t *prev_state_out) {
 	if (!defer) return;
+	uint64_t stamp = defer_get_stamp();
 
-	uint64_t stamp = get_stamp();
-
-	if (defer_sample_state.is_accounting > 0) {
-		const uint64_t elapsed = stamp - defer_sample_state.stamp;
-		defer_account(elapsed, &defer_sample_state.addr, defer_sample_state.stream);
+	// suspend
+	if (prev_state_out) {
+		*prev_state_out = defer_sample_state;  // TODO stamp is not needed
+		if (defer_sample_state.is_accounting)
+			defer_sample_stop_stamp(stamp);
 	}
 
-	defer_sample_state.stamp = stamp;
-	defer_sample_state.addr.ip.sa_family = AF_UNSPEC;
-	defer_sample_state.is_accounting = 1;
+	// start
+	defer_sample_start_stamp(stamp);
+}
+
+/// Stop accounting and start it again.
+static inline void defer_sample_restart(void) {
+	if (!defer) return;
+	uint64_t stamp = defer_get_stamp();
+
+	// stop
+	defer_sample_stop_stamp(stamp);
+
+	// start
+	defer_sample_start_stamp(stamp);
+}
+
+/// Stop accounting and charge the source if applicable; optionally resume previous accounting.
+static inline void defer_sample_stop(defer_sample_state_t *prev_state, bool reuse_last_stamp) {
+	if (!defer) return;
+	uint64_t stamp = reuse_last_stamp ? defer_sample_state.stamp : defer_get_stamp();
+
+	// stop
+	defer_sample_stop_stamp(stamp);
+
+	// resume
+	if (prev_state) {
+		defer_sample_state = *prev_state;
+		defer_sample_state.stamp = stamp;
+	}
 }

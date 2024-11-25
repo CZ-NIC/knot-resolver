@@ -630,7 +630,7 @@ static int session2_submit(
 	// Note two cases: incoming session (new request)
 	// vs. outgoing session (resuming work on some request)
 	if ((direction == PROTOLAYER_UNWRAP) && (layer_ix == 0))
-		defer_sample_start();
+		defer_sample_start(NULL);
 
 	struct protolayer_iter_ctx *ctx = malloc(session->iter_ctx_size);
 	kr_require(ctx);
@@ -692,7 +692,7 @@ static int session2_submit(
 
 	int ret = protolayer_step(ctx);
 	if ((direction == PROTOLAYER_UNWRAP) && (layer_ix == 0))
-		defer_sample_stop();
+		defer_sample_stop(NULL, false);
 	return ret;
 }
 
@@ -980,10 +980,10 @@ uv_handle_t *session2_get_handle(struct session2 *s)
 
 static void session2_on_timeout(uv_timer_t *timer)
 {
-	defer_sample_start();
+	defer_sample_start(NULL);
 	struct session2 *s = timer->data;
 	session2_event(s, s->timer_event, NULL);
-	defer_sample_stop();
+	defer_sample_stop(NULL, false);
 }
 
 int session2_timer_start(struct session2 *s, enum protolayer_event_type event, uint64_t timeout, uint64_t repeat)
