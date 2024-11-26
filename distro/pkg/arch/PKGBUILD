@@ -46,6 +46,7 @@ optdepends=(
     'lua51-http: http and prefill modules, trust_anchors bootstrap'
     'lua51-psl: policy.slice_randomize_psl() function'
     'python-prometheus_client: stats and metrics in Prometheus format'
+    'python-watchdog: files monitoring and reload on changes'
 )
 backup=('etc/knot-resolver/config.yaml')
 options=(debug strip)
