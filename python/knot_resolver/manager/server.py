@@ -60,8 +60,8 @@ async def error_handler(request: web.Request, handler: Any) -> web.Response:
 
     try:
         return await handler(request)
-    except DataValidationError as e:
-        return web.Response(text=f"validation of configuration failed:\n{e}", status=HTTPStatus.BAD_REQUEST)
+    except (AggregateDataValidationError, DataValidationError) as e:
+        return web.Response(text=str(e), status=HTTPStatus.BAD_REQUEST)
     except DataParsingError as e:
         return web.Response(text=f"request processing error:\n{e}", status=HTTPStatus.BAD_REQUEST)
     except KresManagerException as e:
@@ -262,16 +262,7 @@ class Server:
 
     async def _handler_cache_clear(self, request: web.Request) -> web.Response:
         data = parse_from_mime_type(await request.text(), request.content_type)
-
-        try:
-            config = CacheClearRPCSchema(data)
-        except (AggregateDataValidationError, DataValidationError) as e:
-            return web.Response(
-                body=e,
-                status=HTTPStatus.BAD_REQUEST,
-                content_type="text/plain",
-                charset="utf8",
-            )
+        config = CacheClearRPCSchema(data)
 
         _, result = await command_single_registered_worker(config.render_lua())
         return web.Response(
