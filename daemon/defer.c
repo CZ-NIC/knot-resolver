@@ -320,7 +320,7 @@ static inline void process_single_deferred(void)
 	struct protolayer_iter_ctx *ctx = pop_query();
 	if (kr_fails_assert(ctx)) return;
 
-	defer_sample_addr((const union kr_sockaddr *)ctx->comm->comm_addr, ctx->session->stream);
+	defer_sample_addr((const union kr_sockaddr *)ctx->comm->src_addr, ctx->session->stream);
 	phase_accounting = true;  // TODO check there are no suspensions of sampling
 
 	struct pl_defer_iter_data *idata = protolayer_iter_data_get_current(ctx);
@@ -329,7 +329,7 @@ static inline void process_single_deferred(void)
 	uint64_t age_ns = defer_sample_state.stamp - idata->req_stamp;
 
 	VERBOSE_LOG("  %s POP from %d after %4.3f ms\n",
-			kr_straddr(ctx->comm->comm_addr),
+			kr_straddr(ctx->comm->src_addr),
 			queue_ix,
 			age_ns / 1000000.0);
 
@@ -345,7 +345,7 @@ static inline void process_single_deferred(void)
 		return;
 	}
 
-	int priority = classify((const union kr_sockaddr *)ctx->comm->comm_addr, ctx->session->stream);
+	int priority = classify((const union kr_sockaddr *)ctx->comm->src_addr, ctx->session->stream);
 	if (priority > queue_ix) {  // priority dropped (got higher value)
 		VERBOSE_LOG("    PUSH to %d\n", priority);
 		push_query(ctx, priority, false);
@@ -416,13 +416,13 @@ static enum protolayer_iter_cb_result pl_defer_unwrap(
 	if (!defer || ctx->session->outgoing)
 		return protolayer_continue(ctx);
 
-	defer_sample_addr((const union kr_sockaddr *)ctx->comm->comm_addr, ctx->session->stream);
+	defer_sample_addr((const union kr_sockaddr *)ctx->comm->src_addr, ctx->session->stream);
 	struct pl_defer_iter_data *data = iter_data;
 	struct pl_defer_sess_data *sdata = sess_data;
 	data->req_stamp = defer_sample_state.stamp;
 
 	VERBOSE_LOG("  %s UNWRAP\n",
-			kr_straddr(ctx->comm->comm_addr));
+			kr_straddr(ctx->comm->src_addr));
 
 	if (queue_len(sdata->queue) > 0) {  // stream with preceding packet already deferred
 		queue_push(sdata->queue, ctx);
@@ -432,7 +432,7 @@ static enum protolayer_iter_cb_result pl_defer_unwrap(
 		return protolayer_async();
 	}
 
-	int priority = classify((const union kr_sockaddr *)ctx->comm->comm_addr, ctx->session->stream);
+	int priority = classify((const union kr_sockaddr *)ctx->comm->src_addr, ctx->session->stream);
 
 	if (priority == -1) {
 		VERBOSE_LOG("    CONTINUE\n");
