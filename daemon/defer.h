@@ -50,8 +50,14 @@ static inline void defer_sample_addr(const union kr_sockaddr *addr, bool stream)
 
 	if (defer_sample_state.addr.ip.sa_family != AF_UNSPEC) {
 		// TODO: this costs performance, so only in some debug mode?
-		kr_assert(kr_sockaddr_cmp(&addr->ip, &defer_sample_state.addr.ip) == kr_ok());
-		return;
+		if (kr_fails_assert(kr_sockaddr_cmp(&addr->ip, &defer_sample_state.addr.ip) == kr_ok())) {
+			kr_log_error(DEFER, "%s != %s\n",
+				kr_straddr(&addr->ip),
+				kr_straddr(&defer_sample_state.addr.ip));
+			abort(); // TODO change this to warning or remove before releasing
+			return;
+		}
+
 	}
 
 	switch (addr->ip.sa_family) {

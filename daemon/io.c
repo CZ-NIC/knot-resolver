@@ -379,7 +379,7 @@ static void tcp_recv(uv_stream_t *handle, ssize_t nread, const uv_buf_t *buf)
 
 static void tcp_accept_internal(uv_stream_t *master, int status, enum kr_proto grp)
 {
- 	if (status != 0) {
+	if (status != 0) {
 		return;
 	}
 
