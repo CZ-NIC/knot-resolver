@@ -704,6 +704,8 @@ obs:odvr:
     - apkg info cache | grep archive/dev
     - apkg install --build-dep
     - apkg test --test-dep
+  after_script:
+    - journalctl -u knot-resolver.service
   artifacts:
     expire_in: 1 week
     paths:
