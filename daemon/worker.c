@@ -953,6 +953,10 @@ static int qr_task_finalize(struct qr_task *task, int state)
 	if (task->finished) {
 		return kr_ok();
 	}
+
+	if (task->ctx->source.session)
+		defer_sample_addr(&task->ctx->source.addr, task->ctx->source.session->stream);
+
 	struct request_ctx *ctx = task->ctx;
 	struct session2 *source_session = ctx->source.session;
 	kr_resolve_finish(&ctx->req, state);

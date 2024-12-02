@@ -1105,11 +1105,17 @@ struct qr_task *session2_tasklist_del_msgid(const struct session2 *session, uint
 
 void session2_tasklist_finalize(struct session2 *session, int status)
 {
-	while (session2_tasklist_get_len(session) > 0) {
-		struct qr_task *t = session2_tasklist_del_first(session, false);
-		kr_require(worker_task_numrefs(t) > 0);
-		worker_task_finalize(t, status);
-		worker_task_unref(t);
+	if (session2_tasklist_get_len(session) > 0) {
+		defer_sample_state_t defer_prev_sample_state;
+		defer_sample_start(&defer_prev_sample_state);
+		do {
+			struct qr_task *t = session2_tasklist_del_first(session, false);
+			kr_require(worker_task_numrefs(t) > 0);
+			worker_task_finalize(t, status);
+			worker_task_unref(t);
+			defer_sample_restart();
+		} while (session2_tasklist_get_len(session) > 0);
+		defer_sample_stop(&defer_prev_sample_state, true);
 	}
 }
 
@@ -1142,27 +1148,34 @@ int session2_tasklist_finalize_expired(struct session2 *session)
 		key = (char *)&msg_id;
 		keylen = sizeof(msg_id);
 	}
-	while (queue_len(q) > 0) {
-		task = queue_head(q);
-		if (session->outgoing) {
-			knot_pkt_t *pktbuf = worker_task_get_pktbuf(task);
-			msg_id = knot_wire_get_id(pktbuf->wire);
-		}
-		int res = trie_del(t, key, keylen, NULL);
-		if (!worker_task_finished(task)) {
-			/* task->pending_count must be zero,
-			 * but there are can be followers,
-			 * so run worker_task_subreq_finalize() to ensure retrying
-			 * for all the followers. */
-			worker_task_subreq_finalize(task);
-			worker_task_finalize(task, KR_STATE_FAIL);
-		}
-		if (res == KNOT_EOK) {
+
+	if (queue_len(q) > 0) {
+		defer_sample_state_t defer_prev_sample_state;
+		defer_sample_start(&defer_prev_sample_state);
+		do {
+			task = queue_head(q);
+			if (session->outgoing) {
+				knot_pkt_t *pktbuf = worker_task_get_pktbuf(task);
+				msg_id = knot_wire_get_id(pktbuf->wire);
+			}
+			int res = trie_del(t, key, keylen, NULL);
+			if (!worker_task_finished(task)) {
+				/* task->pending_count must be zero,
+				 * but there are can be followers,
+				 * so run worker_task_subreq_finalize() to ensure retrying
+				 * for all the followers. */
+				worker_task_subreq_finalize(task);
+				worker_task_finalize(task, KR_STATE_FAIL);
+			}
+			if (res == KNOT_EOK) {
+				worker_task_unref(task);
+			}
+			queue_pop(q);
 			worker_task_unref(task);
-		}
-		queue_pop(q);
-		worker_task_unref(task);
-		++ret;
+			++ret;
+			defer_sample_restart();
+		} while (queue_len(q) > 0);
+		defer_sample_stop(&defer_prev_sample_state, true);
 	}
 
 	queue_deinit(q);
@@ -1193,22 +1206,34 @@ struct qr_task *session2_waitinglist_pop(struct session2 *session, bool deref)
 
 void session2_waitinglist_retry(struct session2 *session, bool increase_timeout_cnt)
 {
-	while (!session2_waitinglist_is_empty(session)) {
-		struct qr_task *task = session2_waitinglist_pop(session, false);
-		if (increase_timeout_cnt) {
-			worker_task_timeout_inc(task);
-		}
-		worker_task_step(task, session2_get_peer(session), NULL);
-		worker_task_unref(task);
+	if (!session2_waitinglist_is_empty(session)) {
+		defer_sample_state_t defer_prev_sample_state;
+		defer_sample_start(&defer_prev_sample_state);
+		do {
+			struct qr_task *task = session2_waitinglist_pop(session, false);
+			if (increase_timeout_cnt) {
+				worker_task_timeout_inc(task);
+			}
+			worker_task_step(task, session2_get_peer(session), NULL);
+			worker_task_unref(task);
+			defer_sample_restart();
+		} while (!session2_waitinglist_is_empty(session));
+		defer_sample_stop(&defer_prev_sample_state, true);
 	}
 }
 
 void session2_waitinglist_finalize(struct session2 *session, int status)
 {
-	while (!session2_waitinglist_is_empty(session)) {
-		struct qr_task *t = session2_waitinglist_pop(session, false);
-		worker_task_finalize(t, status);
-		worker_task_unref(t);
+	if (!session2_waitinglist_is_empty(session)) {
+		defer_sample_state_t defer_prev_sample_state;
+		defer_sample_start(&defer_prev_sample_state);
+		do {
+			struct qr_task *t = session2_waitinglist_pop(session, false);
+			worker_task_finalize(t, status);
+			worker_task_unref(t);
+			defer_sample_restart();
+		} while (!session2_waitinglist_is_empty(session));
+		defer_sample_stop(&defer_prev_sample_state, true);
 	}
 }
 
