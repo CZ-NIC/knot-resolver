@@ -6,6 +6,7 @@
 #include "lib/defines.h"
 #include "lib/utils.h"
 #include "lib/kru.h"
+#include "execinfo.h"
 
 /// Initialize defer, incl. shared memory with KRU, excl. idle.
 KR_EXPORT
@@ -50,11 +51,13 @@ static inline void defer_sample_addr(const union kr_sockaddr *addr, bool stream)
 
 	if (defer_sample_state.addr.ip.sa_family != AF_UNSPEC) {
 		// TODO: this costs performance, so only in some debug mode?
-		if (kr_fails_assert(kr_sockaddr_cmp(&addr->ip, &defer_sample_state.addr.ip) == kr_ok())) {
+		if (!(kr_sockaddr_cmp(&addr->ip, &defer_sample_state.addr.ip) == kr_ok())) {
 			kr_log_error(DEFER, "%s != %s\n",
 				kr_straddr(&addr->ip),
 				kr_straddr(&defer_sample_state.addr.ip));
-			abort(); // TODO change this to warning or remove before releasing
+			char buf[10000];
+			backtrace_symbols_fd((void *) buf, 10000, 2);
+			kr_require(false);
 			return;
 		}
 
