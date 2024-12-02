@@ -785,6 +785,10 @@ pkg:fedora-40:
 pkg:alma-9:
   <<: *pkg_test
   image: $CI_REGISTRY/packaging/apkg/full/alma-9
+  before_script:
+    # python-watchdog is not included in the official Alma 9 packages
+    # install it using PyPi just for testing
+    - pip3 install watchdog
 
 pkg:arch:
   <<: *pkg_test_user
