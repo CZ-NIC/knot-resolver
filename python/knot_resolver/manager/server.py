@@ -27,7 +27,7 @@ from knot_resolver.datamodel.cache_schema import CacheClearRPCSchema
 from knot_resolver.datamodel.config_schema import KresConfig, get_rundir_without_validation
 from knot_resolver.datamodel.globals import Context, set_global_validation_context
 from knot_resolver.datamodel.management_schema import ManagementSchema
-from knot_resolver.manager import metrics
+from knot_resolver.manager import files, metrics
 from knot_resolver.utils import custom_atexit as atexit
 from knot_resolver.utils import ignore_exceptions_optional
 from knot_resolver.utils.async_utils import readfile
@@ -60,8 +60,8 @@ async def error_handler(request: web.Request, handler: Any) -> web.Response:
 
     try:
         return await handler(request)
-    except DataValidationError as e:
-        return web.Response(text=f"validation of configuration failed:\n{e}", status=HTTPStatus.BAD_REQUEST)
+    except (AggregateDataValidationError, DataValidationError) as e:
+        return web.Response(text=str(e), status=HTTPStatus.BAD_REQUEST)
     except DataParsingError as e:
         return web.Response(text=f"request processing error:\n{e}", status=HTTPStatus.BAD_REQUEST)
     except KresManagerException as e:
@@ -262,16 +262,7 @@ class Server:
 
     async def _handler_cache_clear(self, request: web.Request) -> web.Response:
         data = parse_from_mime_type(await request.text(), request.content_type)
-
-        try:
-            config = CacheClearRPCSchema(data)
-        except (AggregateDataValidationError, DataValidationError) as e:
-            return web.Response(
-                body=e,
-                status=HTTPStatus.BAD_REQUEST,
-                content_type="text/plain",
-                charset="utf8",
-            )
+        config = CacheClearRPCSchema(data)
 
         _, result = await command_single_registered_worker(config.render_lua())
         return web.Response(
@@ -565,6 +556,8 @@ async def start_server(config: Path = CONFIG_FILE) -> int:  # noqa: PLR0915
         # With configuration on hand, we can initialize monitoring. We want to do this before any subprocesses are
         # started, therefore before initializing manager
         await metrics.init_prometheus(config_store)
+
+        await files.init_files_watchdog(config_store)
 
         # prepare instance of the server (no side effects)
         server = Server(config_store, config)

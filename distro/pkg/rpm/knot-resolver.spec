@@ -65,6 +65,7 @@ Requires:       python3-pyyaml
 Requires:       python3-typing-extensions
 %endif
 Recommends:     python3-prometheus_client
+Recommends:     python3-watchdog
 
 # dnstap module dependencies
 # SUSE is missing protoc-c protobuf compiler

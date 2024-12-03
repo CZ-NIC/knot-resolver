@@ -15,6 +15,7 @@ packages = \
  'knot_resolver.datamodel.templates',
  'knot_resolver.datamodel.types',
  'knot_resolver.manager',
+ 'knot_resolver.manager.files',
  'knot_resolver.manager.metrics',
  'knot_resolver.utils',
  'knot_resolver.utils.compat',
@@ -27,7 +28,7 @@ install_requires = \
 ['aiohttp', 'jinja2', 'pyyaml', 'supervisor', 'typing-extensions']
 
 extras_require = \
-{'prometheus': ['prometheus-client']}
+{'prometheus': ['prometheus-client'], 'watchdog': ['watchdog']}
 
 entry_points = \
 {'console_scripts': ['knot-resolver = knot_resolver.manager.main:main',
