@@ -55,6 +55,14 @@ async def _deny_max_worker_changes(config_old: KresConfig, config_new: KresConfi
     return Result.ok(None)
 
 
+async def _subprocess_desc(subprocess: Subprocess) -> object:
+    return {
+        "type": subprocess.type.name,
+        "pid": await subprocess.get_pid(),
+        "status": subprocess.status().name,
+    }
+
+
 class KresManager:  # pylint: disable=too-many-instance-attributes
     """
     Core of the whole operation. Orchestrates individual instances under some
@@ -63,7 +71,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
     Instantiate with `KresManager.create()`, not with the usual constructor!
     """
 
-    def __init__(self, shutdown_trigger: Callable[[int], None], _i_know_what_i_am_doing: bool = False):
+    def __init__(self, _i_know_what_i_am_doing: bool = False):
         if not _i_know_what_i_am_doing:
             logger.error(
                 "Trying to create an instance of KresManager using normal constructor. Please use "
@@ -80,19 +88,18 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
         self._watchdog_task: Optional["asyncio.Task[None]"] = None
         self._fix_counter: _FixCounter = _FixCounter()
         self._config_store: ConfigStore
-        self._shutdown_trigger: Callable[[int], None] = shutdown_trigger
+        self._shutdown_triggers: List[Callable[[int], None]] = []
 
     @staticmethod
     async def create(
         subprocess_controller: SubprocessController,
         config_store: ConfigStore,
-        shutdown_trigger: Callable[[int], None],
     ) -> "KresManager":
         """
         Creates new instance of KresManager.
         """
 
-        inst = KresManager(shutdown_trigger, _i_know_what_i_am_doing=True)
+        inst = KresManager(_i_know_what_i_am_doing=True)
         await inst._async_init(subprocess_controller, config_store)  # noqa: SLF001
         return inst
 
@@ -211,6 +218,9 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
         await self._gc.stop()
         self._gc = None
 
+    def add_shutdown_trigger(self, trigger: Callable[[int], None]) -> None:
+        self._shutdown_triggers.append(trigger)
+
     async def validate_config(self, _old: KresConfig, new: KresConfig) -> Result[NoneType, str]:
         async with self._manager_lock:
             if _old.rate_limiting != new.rate_limiting:
@@ -232,6 +242,10 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
 
             logger.debug("Canary process test passed.")
             return Result.ok(None)
+
+    async def get_processes(self, proc_type: Optional[SubprocessType]) -> List[object]:
+        processes = await self._controller.get_all_running_instances()
+        return [await _subprocess_desc(pr) for pr in processes if proc_type is None or pr.type == proc_type]
 
     async def _reload_system_state(self) -> None:
         async with self._manager_lock:
@@ -338,7 +352,8 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
         logger.warning("Collecting all remaining workers...")
         await self._reload_system_state()
         logger.warning("Terminating...")
-        self._shutdown_trigger(1)
+        for trigger in self._shutdown_triggers:
+            trigger(1)
 
     async def _instability_handler(self) -> None:
         if self._fix_counter.is_too_high():
