@@ -62,6 +62,7 @@ kresd_deps = [
   capng,
   nghttp2,
   malloc,
+  libm
 ]
 
 
