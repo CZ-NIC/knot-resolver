@@ -1,16 +1,23 @@
-Knot Resolver 6.0.9 (2024-mm-dd)
+Knot Resolver 6.0.10 (202y-mm-dd)
 ================================
 
-Incompatible changes
---------------------
-- -f/--forks is removed (#631, !1602)
+Improvements
+------------
+- avoid multiple log lines when IPv6 isn't available (!1633)
+- manager: fix startup on Linux without libsystemd (!1608)
+- auto-reload TLS certificate files (!1626)
+
+
+Knot Resolver 6.0.9 (2024-11-11)
+================================
 
 Improvements
 ------------
 
+- rate-limiting: add these options, mechanism, docs (!1624)
 - manager: secret for TLS session resumption via ticket (RFC5077) (!1567)
 
-  The manager creates and sets the secret for all running 'kresd' workers.
+  The manager creates and sets the secret for all running ``kresd`` workers.
   The secret is created automatically if the user does not configure their own secret in the configuration.
   This means that the workers will be able to resume each other's TLS sessions, regardless of whether the user has configured it to do so.
 
@@ -20,6 +27,10 @@ Improvements
 - extended_errors: answer with EDE in more cases (!1585, !1588, !1590, !1592)
 - local-data: make DNAMEs work, i.e. generate CNAMEs (!1609)
 - daemon: use connected UDP sockets by default (#326, !1618)
+- docker: multiplatform builds (#922, !1623)
+- docker: shared VOLUMEs are prepared for configuration and cache (!1625, !1627)
+  
+  Configuration path was changed to standard ``/etc/knot-resolver/config.yaml``.
 
 Bugfixes
 --------
@@ -29,6 +40,7 @@ Bugfixes
 
 Incompatible changes
 --------------------
+- -f/--forks is removed (#631, !1602)
 - gnutls < 3.4 support is dropped, released over 9 years ago (!1601)
 - libuv < 1.27 support is dropped, released over 5 years ago (!1618)
 
@@ -40,8 +52,8 @@ Security
 --------
 - reduce buffering of transmitted data, especially TCP-based in userspace
   Also expose some of the new tweaks in lua:
-   (require 'ffi').C.the_worker.engine.net.tcp.user_timeout = 1000
-   (require 'ffi').C.the_worker.engine.net.listen_{tcp,udp}_buflens.{snd,rcv}
+  - (require 'ffi').C.the_worker.engine.net.tcp.user_timeout = 1000
+  - (require 'ffi').C.the_worker.engine.net.listen_{tcp,udp}_buflens.{snd,rcv}
 
 Packaging
 ---------
@@ -69,12 +81,11 @@ Improvements
 ------------
 - TLS (DoT, DoH): respect crypto policy overrides in OS (!1526)
 - manager: export metrics to JSON via management HTTP API (!1527)
-  * JSON is the new default metrics output format
-  * the ``prometheus-client`` Python package is now an optional dependency,
-    required only for Prometheus export to work
+  - JSON is the new default metrics output format
+  - the ``prometheus-client`` Python package is now an optional dependency, required only for Prometheus export to work
 - cache: prefetching records
-  * predict module: prefetching expiring records moved to prefetch module
-  * prefetch module: new module to prefetch expiring records
+  - predict module: prefetching expiring records moved to prefetch module
+  - prefetch module: new module to prefetch expiring records
 - stats: add separate metrics for IPv6 and IPv4 (!1545)
 - add the fresh DNSSEC root key "KSK-2024" already, Key ID 38696 (!1556)
 - manager: policy-loader: new component for separate loading of policy rules (!1540)

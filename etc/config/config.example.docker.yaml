@@ -8,5 +8,12 @@ network:
       kind: dot
     - interface: lo@443
       kind: doh2
-management:
-  interface: 127.0.0.1@5000
+
+# By default, there is no need to expose the management API outside the container.
+# But if for some reason it is needed, use port 5000, which is intended for that.
+# You can access the API with 'kresctl' installed inside the container using 'docker exec'.
+# For example: $ docker exec -it CONTANER_ID kresctl reload
+# See more in documentation: https://www.knot-resolver.cz/documentation/latest/deployment-docker.html
+
+# management:
+#   interface: 127.0.0.1@5000

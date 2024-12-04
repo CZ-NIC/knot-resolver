@@ -14,6 +14,11 @@ class IntPositive(IntRangeBase):
     _min: int = 1
 
 
+class Int0_32(IntRangeBase):  # noqa: N801
+    _min: int = 0
+    _max: int = 32
+
+
 class Int0_512(IntRangeBase):  # noqa: N801
     _min: int = 0
     _max: int = 512

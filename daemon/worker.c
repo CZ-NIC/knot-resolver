@@ -845,8 +845,10 @@ static int transmit(struct qr_task *task)
 		do {
 			ret = uv_udp_connect(udp, out_comm.comm_addr);
 		} while (ret == UV_EADDRINUSE && --connect_tries > 0);
-		if (ret < 0)
-			kr_log_error(IO, "Failed to establish udp connection: %s\n", uv_strerror(ret));
+		if (ret < 0) {
+			kr_log_info(IO, "Failed to establish udp connection to %s: %s\n",
+					kr_straddr(out_comm.comm_addr), uv_strerror(ret));
+		}
 	}
 	ret = qr_task_send(task, session, &out_comm, task->pktbuf);
 	if (ret) {

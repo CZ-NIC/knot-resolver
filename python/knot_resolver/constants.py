@@ -1,6 +1,6 @@
 from pathlib import Path
 
-VERSION = "6.0.8"
+VERSION = "6.0.9"
 USER = "knot-resolver"
 GROUP = "knot-resolver"
 
