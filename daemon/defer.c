@@ -2,6 +2,7 @@
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#include <math.h>
 #include "daemon/defer.h"
 #include "daemon/session2.h"
 #include "daemon/udp_queue.h"
@@ -19,38 +20,24 @@
 #define V6_PREFIXES_CNT (sizeof(V6_PREFIXES) / sizeof(*V6_PREFIXES))
 #define MAX_PREFIXES_CNT ((V4_PREFIXES_CNT > V6_PREFIXES_CNT) ? V4_PREFIXES_CNT : V6_PREFIXES_CNT)
 
-#define LOADS_THRESHOLDS        (uint16_t[])  {1<<4, 1<<8, 1<<11, -1}    // the last one should be UINT16_MAX
+#define LOADS_THRESHOLDS        (uint16_t[])  {1<<4, 1<<8, 1<<12, -1}    // the last one should be UINT16_MAX
 #define QUEUES_CNT              (sizeof(LOADS_THRESHOLDS) / sizeof(*LOADS_THRESHOLDS) + 1)  // +1 for unverified
 #define PRIORITY_SYNC           (-1)              // no queue
 #define PRIORITY_UDP            (QUEUES_CNT - 1)  // last queue
 
-#define KRU_CAPACITY            (1<<19)
-	// same as ratelimiting default
-#define MAX_DECAY               (KRU_LIMIT * 0.0006929)
-	// halving counters in 1s
-	//   5s from max  to 2^11   (priority 3)    // TODO change 2^11 to 2^12 to make the times equal?
-	//   3s from 2^11 to 2^8    (priority 2)
-	//   4s from 2^8  to 2^4    (priority 1)
-	//   4s from 2^4  to zero   (priority 0)
-#define BASE_PRICE(nsec, cpus)  ((uint64_t)MAX_DECAY * 10 * nsec / 1000000ll / cpus)
-	// max value when the single host uses 1/10 of all cpus' time;
-	// needed cpu utilization (rate limit) for other thresholds and prefixes:
-	//           single      v6/48      v4/24      v6/32      v4/20      v4/18
-	//   max:    10.000 %    40.00 %        -          -          -          -
-	//   2^11:    0.312 %     1.25 %    10.00 %    20.00 %    80.00 %        -     (priority 3)
-	//   2^8:     0.039 %     0.16 %     1.25 %     2.50 %    10.00 %    30.00 %   (priority 2)
-	//   2^4:     0.002 %     0.01 %     0.08 %     0.16 %     0.63 %     1.87 %   (priority 1)
-	// instant limit for single host and 1 cpu: (greater for larger networks and for more cpus)
-	//   35 us for 2^4,  0.56 ms for 2^8,  4.5 ms for 2^11,  144 ms max value
-	//   TODO adjust somehow
-	//     simple DoT query may cost 1 ms, DoH 2.5 ms; it gets priority 2 during handshake (on laptop);
-	//     the instant limits can be doubled by:
-	//       doubling half-life (approx.),
-	//       doubling percents in the previous table, or
-	//       doubling number of cpus
-	//     possible solution:
-	//       half-life 5s, BASE_PRICE /= 2.5 -> for 4 cpus 1.75 ms fits below 2^4;
-	//       still not enough for home routers -> TODO make something configurable, maybe the BASE_PRICE multiplier
+#define KRU_CAPACITY            (1<<19)  // same as ratelimiting default
+#define MAX_DECAY               (KRU_LIMIT * 0.00013862)  // half-life: 5s
+#define BASE_PRICE(nsec, cpus)  ((uint64_t)MAX_DECAY * 4 * nsec / 1000000ll / cpus)
+	// max value reached when the single host uses 1/4 of all cpus' time;
+	// instant limits in us are multiplied by cpus while rate limits in % of all cpus' time are not;
+	//   see log written by defer_str_conf for details
+	// TODO check that configuration makes sense (public resolvers vs home routers)
+	//   laptop measurements:
+	//     simple cached queries:
+	//       TCP  0.5 ms
+	//       DoT: 1.0 ms
+	//       DoH: 2.5 ms
+	//     uncached resolving: ~10 ms or more
 
 #define REQ_TIMEOUT          20000000 // ns (THREAD_CPUTIME), older deferred queries are dropped
 #define IDLE_TIMEOUT          1000000 // ns (THREAD_CPUTIME); if exceeded, continue processing after next poll phase
@@ -59,7 +46,7 @@
 #define MAX_WAITING_REQS_SIZE (64 * 1024 * 1024)  // bytes; if exceeded, some deferred requests are processed in poll phase
 	// single TCP allocates more than 64KiB wire buffer
 	// TODO check whether all important allocations are counted;
-	//   different things are not counted: tasks and subsessions (not deferred after created), uv handles, queues overhead, ...;
+	//   different things are not counted: tasks and subsessions (not deferred after creation), uv handles, queues overhead, ...;
 	//   payload is counted either as part of session wire buffer (for stream) or as part of iter ctx (for datagrams)
 
 #define VERBOSE_LOG(...) kr_log_debug(DEFER, " | " __VA_ARGS__)
@@ -133,6 +120,96 @@ static bool using_avx2(void)
 	kr_require(result || KRU.initialize == KRU_GENERIC.initialize);
 	return result;
 }
+
+/// Print configuration into desc array.
+void defer_str_conf(char *desc, int desc_len) {
+	int len = 0;
+#define append(...) len += snprintf(desc + len, desc_len > len ? desc_len - len : 0, __VA_ARGS__)
+#define append_time(prefix, ms, suffix) { \
+		if (ms < 1) append(prefix "%7.1f us" suffix, ms * 1000); \
+		else if (ms < 1000) append(prefix "%7.1f ms" suffix, ms); \
+		else append(prefix "%7.1f s " suffix, ms / 1000); }
+	append(     "  Expected cpus/procs: %5d\n", defer->cpus);
+
+	append(     "  Max waiting requests:%7.1f MiB\n", MAX_WAITING_REQS_SIZE / 1024.0 / 1024.0);
+	append_time("  Request timeout:     ", REQ_TIMEOUT           / 1000000.0, "\n");
+	append_time("  Idle:                ", IDLE_TIMEOUT          / 1000000.0, "\n");
+	append_time("  UDP phase:           ", PHASE_UDP_TIMEOUT     / 1000000.0, "\n");
+	append_time("  Non-UDP phase:       ", PHASE_NON_UDP_TIMEOUT / 1000000.0, "\n");
+	append(     "  Priority levels:     %5ld + UDP\n", QUEUES_CNT - 1);
+
+	append(     "  KRU capacity:        %7.1f k\n", KRU_CAPACITY / 1000.0);
+
+	bool uniform_thresholds = true;
+	for (int i = 1; i < QUEUES_CNT - 2; i++)
+		uniform_thresholds &= (LOADS_THRESHOLDS[i] == LOADS_THRESHOLDS[i-1] * LOADS_THRESHOLDS[0]);
+	uniform_thresholds &= ((1<<16) == (int)LOADS_THRESHOLDS[QUEUES_CNT - 3] * LOADS_THRESHOLDS[0]);
+
+	append(     "  Max decay:             %7.3f %% per ms (32-bit: %d)\n",
+			100.0 * MAX_DECAY / KRU_LIMIT, (kru_price_t)MAX_DECAY);
+	float half_life = -1.0 / log2f(1.0 - MAX_DECAY / KRU_LIMIT);
+	append_time("    Half-life:         ", half_life, "\n");
+	if (uniform_thresholds)
+		append_time("    Priority rise in:  ", half_life * 16 / (QUEUES_CNT - 1), "\n");
+	append_time("    Counter reset in:  ", half_life * 16, "\n");
+
+	append("  Rate limits for crossing priority levels as CPU utilization out of %d cores:\n",
+			defer->cpus);
+
+	uint8_t *const prefixes[] = {V4_PREFIXES, V6_PREFIXES};
+	kru_price_t *const rate_mult[] = {V4_RATE_MULT, V6_RATE_MULT};
+	const size_t prefixes_cnt[] = {V4_PREFIXES_CNT, V6_PREFIXES_CNT};
+	const int version[] = {4, 6};
+
+	append("%15s", "");
+	for (int j = 0; j < 3; j++)
+		append("%10d", j+1);
+	append("%10s\n", "max");
+
+	for (int v = 0; v < 2; v++) {
+		for (int i = prefixes_cnt[v] - 1; i >= 0; i--) {
+			append("%9sv%d/%-3d: ", "", version[v], prefixes[v][i]);
+			for (int j = 0; j < QUEUES_CNT - 1; j++) {
+				float needed_util = MAX_DECAY / (1<<16) * LOADS_THRESHOLDS[j] / BASE_PRICE(1000000, 1) * rate_mult[v][i];
+				if (needed_util <= 1) {
+					append("%8.3f %%", needed_util * 100);
+				} else {
+					append("%8s  ", "-");
+				}
+			}
+			append("\n");
+		}
+	}
+
+	append("  Instant limits for crossing priority levels as CPU time (depends on cpu count):\n");
+
+	append("%15s", "");
+	for (int j = 0; j < 3; j++)
+		append("%10d", j+1);
+	append("%10s\n", "max");
+
+	for (int v = 0; v < 2; v++) {
+		for (int i = prefixes_cnt[v] - 1; i >= 0; i--) {
+			append("%9sv%d/%-3d:  ", "", version[v], prefixes[v][i]);
+			for (int j = 0; j < QUEUES_CNT - 1; j++) {
+				float needed_time = (float)KRU_LIMIT / (1<<16) * LOADS_THRESHOLDS[j] / BASE_PRICE(1000000, defer->cpus) * rate_mult[v][i];
+				if (needed_time < 1) {
+					append("%7.1f us", needed_time * 1000);
+				} else if (needed_time < 1000) {
+					append("%7.1f ms", needed_time);
+				} else {
+					append("%7.1f s ", needed_time / 1000);
+				}
+			}
+			append("\n");
+		}
+	}
+	append("    (values above max are indistinguishable)\n");
+
+#undef append_time
+#undef append
+}
+
 
 /// Increment KRU counters by given time.
 void defer_charge(uint64_t nsec, union kr_sockaddr *addr, bool stream)
@@ -574,6 +651,13 @@ int defer_init(const char *mmap_file, int cpus)
 		if (ret != 0) goto fail;
 
 		kr_log_info(SYSTEM, "Prioritization initialized (%s).\n", (defer->using_avx2 ? "AVX2" : "generic"));
+
+		// log current configuration
+		if (KR_LOG_LEVEL_IS(LOG_INFO) || kr_log_group_is_set(LOG_GRP_DEFER)) {
+			char desc[8000];
+			defer_str_conf(desc, sizeof(desc));
+			kr_log_info(DEFER, "Defer configuration:\n%s", desc);
+		}
 	} else if (ret == 0) {
 		defer = defer_mmapped.mem;
 		kr_log_info(SYSTEM, "Using existing prioritization data (%s).\n", (defer->using_avx2 ? "AVX2" : "generic"));
