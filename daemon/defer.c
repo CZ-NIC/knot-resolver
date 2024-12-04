@@ -636,7 +636,7 @@ int defer_init(const char *mmap_file, int cpus)
 
 	ret = mmapped_init(&defer_mmapped, mmap_file, size, &header, header_size);
 	if (ret == MMAPPED_WAS_FIRST) {
-		kr_log_info(SYSTEM, "Initializing prioritization...\n");
+		kr_log_info(DEFER, "Initializing defer...\n");
 
 		defer = defer_mmapped.mem;
 
@@ -650,7 +650,7 @@ int defer_init(const char *mmap_file, int cpus)
 		ret = mmapped_init_continue(&defer_mmapped);
 		if (ret != 0) goto fail;
 
-		kr_log_info(SYSTEM, "Prioritization initialized (%s).\n", (defer->using_avx2 ? "AVX2" : "generic"));
+		kr_log_info(DEFER, "Defer initialized (%s).\n", (defer->using_avx2 ? "AVX2" : "generic"));
 
 		// log current configuration
 		if (KR_LOG_LEVEL_IS(LOG_INFO) || kr_log_group_is_set(LOG_GRP_DEFER)) {
@@ -660,7 +660,7 @@ int defer_init(const char *mmap_file, int cpus)
 		}
 	} else if (ret == 0) {
 		defer = defer_mmapped.mem;
-		kr_log_info(SYSTEM, "Using existing prioritization data (%s).\n", (defer->using_avx2 ? "AVX2" : "generic"));
+		kr_log_info(DEFER, "Using existing defer data (%s).\n", (defer->using_avx2 ? "AVX2" : "generic"));
 	} else goto fail;
 
 	for (size_t i = 0; i < QUEUES_CNT; i++)
@@ -670,7 +670,7 @@ int defer_init(const char *mmap_file, int cpus)
 
 fail:
 
-	kr_log_crit(SYSTEM, "Initialization of shared prioritization data failed.\n");
+	kr_log_crit(DEFER, "Initialization of shared defer data failed.\n");
 	return ret;
 }
 
