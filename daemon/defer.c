@@ -39,7 +39,7 @@
 	//       DoH: 2.5 ms
 	//     uncached resolving: ~10 ms or more
 
-#define REQ_TIMEOUT          20000000 // ns (THREAD_CPUTIME), older deferred queries are dropped
+#define REQ_TIMEOUT          50000000 // ns (THREAD_CPUTIME), older deferred queries are dropped
 #define IDLE_TIMEOUT          1000000 // ns (THREAD_CPUTIME); if exceeded, continue processing after next poll phase
 #define PHASE_UDP_TIMEOUT      400000 // ns (THREAD_CPUTIME); switch between udp, non-udp phases
 #define PHASE_NON_UDP_TIMEOUT  400000 // ns (THREAD_CPUTIME);    after timeout or emptying queue
