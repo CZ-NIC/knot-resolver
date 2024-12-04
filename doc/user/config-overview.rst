@@ -54,7 +54,7 @@ Getting the JSON Schema
 
 * The JSON schema can be `downloaded here <_static/config.schema.json>`_ (valid only for the version of the resolver this documentation was generated for).
 * The :ref:`kresctl schema <manager-client>` command outputs the JSON schema of the currently installed version as well. It does not require a running resolver.
-* The JSON schema can also be obtained from a running resolver by sending a HTTP GET request to the path ``/schema`` on the :ref:`management API <manager-api>` (by default a Unix socket at ``/var/run/knot-resolver/manager.sock``).
+* The JSON schema can also be obtained from a running resolver by sending a HTTP GET request to the path ``/schema`` on the :ref:`management API <manager-api>` (by default a Unix socket at ``/run/knot-resolver/kres-api.sock``).
 
 .. tip::
 

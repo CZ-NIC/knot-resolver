@@ -8,4 +8,4 @@ network:
   listen:
     - interface: 127.0.0.1@53
 management:
-  unix-socket: /run/knot-resolver/manager.sock
+  unix-socket: /run/knot-resolver/kres-api.sock

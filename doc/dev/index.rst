@@ -31,6 +31,13 @@ Welcome to Knot Resolver's documentation for developers and advanced users!
    layered-protocols
 
 .. toctree::
+   :caption: Debugging
+   :name: debugging-chapter
+   :maxdepth: 1
+
+   debugging-with-kresctl
+
+.. toctree::
    :caption: Lua configuration
    :name: configuration-lua-chapter
    :maxdepth: 1

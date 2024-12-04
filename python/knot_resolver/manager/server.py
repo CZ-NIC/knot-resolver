@@ -21,13 +21,14 @@ from aiohttp.web_runner import AppRunner, TCPSite, UnixSite
 from knot_resolver.constants import CONFIG_FILE, USER
 from knot_resolver.controller import get_best_controller_implementation
 from knot_resolver.controller.exceptions import SubprocessControllerExecError
+from knot_resolver.controller.interface import SubprocessType
 from knot_resolver.controller.registered_workers import command_single_registered_worker
 from knot_resolver.datamodel import kres_config_json_schema
 from knot_resolver.datamodel.cache_schema import CacheClearRPCSchema
 from knot_resolver.datamodel.config_schema import KresConfig, get_rundir_without_validation
 from knot_resolver.datamodel.globals import Context, set_global_validation_context
 from knot_resolver.datamodel.management_schema import ManagementSchema
-from knot_resolver.manager import metrics
+from knot_resolver.manager import files, metrics
 from knot_resolver.utils import custom_atexit as atexit
 from knot_resolver.utils import ignore_exceptions_optional
 from knot_resolver.utils.async_utils import readfile
@@ -60,8 +61,8 @@ async def error_handler(request: web.Request, handler: Any) -> web.Response:
 
     try:
         return await handler(request)
-    except DataValidationError as e:
-        return web.Response(text=f"validation of configuration failed:\n{e}", status=HTTPStatus.BAD_REQUEST)
+    except (AggregateDataValidationError, DataValidationError) as e:
+        return web.Response(text=str(e), status=HTTPStatus.BAD_REQUEST)
     except DataParsingError as e:
         return web.Response(text=f"request processing error:\n{e}", status=HTTPStatus.BAD_REQUEST)
     except KresManagerException as e:
@@ -87,7 +88,7 @@ class Server:
     # This is top-level class containing pretty much everything. Instead of global
     # variables, we use instance attributes. That's why there are so many and it's
     # ok.
-    def __init__(self, store: ConfigStore, config_path: Optional[Path]):
+    def __init__(self, store: ConfigStore, config_path: Optional[Path], manager: KresManager):
         # config store & server dynamic reconfiguration
         self.config_store = store
 
@@ -100,6 +101,7 @@ class Server:
         self._config_path: Optional[Path] = config_path
         self._exit_code: int = 0
         self._shutdown_event = asyncio.Event()
+        self._manager = manager
 
     async def _reconfigure(self, config: KresConfig) -> None:
         await self._reconfigure_listen_address(config)
@@ -262,16 +264,7 @@ class Server:
 
     async def _handler_cache_clear(self, request: web.Request) -> web.Response:
         data = parse_from_mime_type(await request.text(), request.content_type)
-
-        try:
-            config = CacheClearRPCSchema(data)
-        except (AggregateDataValidationError, DataValidationError) as e:
-            return web.Response(
-                body=e,
-                status=HTTPStatus.BAD_REQUEST,
-                content_type="text/plain",
-                charset="utf8",
-            )
+        config = CacheClearRPCSchema(data)
 
         _, result = await command_single_registered_worker(config.render_lua())
         return web.Response(
@@ -332,6 +325,30 @@ class Server:
         await self._reload_config()
         return web.Response(text="Reloading...")
 
+    async def _handler_processes(self, request: web.Request) -> web.Response:
+        """
+        Route handler for listing PIDs of subprocesses
+        """
+
+        proc_type: Optional[SubprocessType] = None
+
+        if "path" in request.match_info and len(request.match_info["path"]) > 0:
+            ptstr = request.match_info["path"]
+            if ptstr == "/kresd":
+                proc_type = SubprocessType.KRESD
+            elif ptstr == "/gc":
+                proc_type = SubprocessType.GC
+            elif ptstr == "/all":
+                proc_type = None
+            else:
+                return web.Response(text=f"Invalid process type '{ptstr}'", status=400)
+
+        return web.json_response(
+            await self._manager.get_processes(proc_type),
+            headers={"Access-Control-Allow-Origin": "*"},
+            dumps=partial(json.dumps, indent=4),
+        )
+
     def _setup_routes(self) -> None:
         self.app.add_routes(
             [
@@ -348,6 +365,7 @@ class Server:
                 web.get("/metrics/json", self._handler_metrics_json),
                 web.get("/metrics/prometheus", self._handler_metrics_prometheus),
                 web.post("/cache/clear", self._handler_cache_clear),
+                web.get("/processes{path:.*}", self._handler_processes),
             ]
         )
 
@@ -419,7 +437,7 @@ async def _init_config_store(config: Dict[str, Any]) -> ConfigStore:
     return ConfigStore(config_validated)
 
 
-async def _init_manager(config_store: ConfigStore, server: Server) -> KresManager:
+async def _init_manager(config_store: ConfigStore) -> KresManager:
     """
     Called asynchronously when the application initializes.
     """
@@ -429,7 +447,7 @@ async def _init_manager(config_store: ConfigStore, server: Server) -> KresManage
 
     # Create KresManager. This will perform autodetection of available service managers and
     # select the most appropriate to use (or use the one configured directly)
-    manager = await KresManager.create(controller, config_store, server.trigger_shutdown)
+    manager = await KresManager.create(controller, config_store)
 
     logger.info("Initial configuration applied. Process manager initialized...")
     return manager
@@ -566,11 +584,16 @@ async def start_server(config: Path = CONFIG_FILE) -> int:  # noqa: PLR0915
         # started, therefore before initializing manager
         await metrics.init_prometheus(config_store)
 
-        # prepare instance of the server (no side effects)
-        server = Server(config_store, config)
+        await files.init_files_watchdog(config_store)
 
-        # After we have loaded the configuration, we can start worring about subprocess management.
-        manager = await _init_manager(config_store, server)
+        # After we have loaded the configuration, we can start worrying about subprocess management.
+        manager = await _init_manager(config_store)
+
+        # prepare instance of the server (no side effects)
+        server = Server(config_store, config, manager)
+
+        # add Server's shutdown trigger to the manager
+        manager.add_shutdown_trigger(server.trigger_shutdown)
 
     except SubprocessControllerExecError as e:
         # if we caught this exception, some component wants to perform a reexec during startup. Most likely, it would

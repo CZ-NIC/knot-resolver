@@ -130,9 +130,12 @@ policies.
 
    .. tip::
 
-      The certificate files aren't automatically reloaded on change.
-      If you update the certificate files, e.g. using ACME, you have to either
-      reload or restart the service(s).
+      If you have ``python-watchdog`` installed on your system,
+      the certificate files are automatically reloaded on change.
+      If you update the certificate files, e.g. using ACME,
+      the manager is notified about changes and commands all workers
+      to reload their certificate files. If you don't have ``python-watchdog``,
+      you have to restart the ``knot-resolver`` service manually.
 
    .. option:: sticket-secret: <str>
 

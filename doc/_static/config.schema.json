@@ -1,8 +1,8 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$id": "https://www.knot-resolver.cz/documentation/v6.0.8/_static/config.schema.json",
+    "$id": "https://www.knot-resolver.cz/documentation/v6.0.9/_static/config.schema.json",
     "title": "Knot Resolver configuration JSON schema",
-    "description": "Version Knot Resolver 6.0.8",
+    "description": "Version Knot Resolver 6.0.9",
     "type": "object",
     "properties": {
         "version": {
@@ -1677,27 +1677,33 @@
             "properties": {
                 "capacity": {
                     "type": "integer",
+                    "minimum": 1,
                     "description": "Expected maximal number of blocked networks/hosts at the same time.",
                     "default": 524288
                 },
                 "rate-limit": {
                     "type": "integer",
+                    "minimum": 1,
                     "description": "Maximal number of allowed queries per second from a single host."
                 },
                 "instant-limit": {
                     "type": "integer",
+                    "minimum": 1,
                     "description": "Maximal number of allowed queries at a single point in time from a single host.",
                     "default": 50
                 },
                 "slip": {
                     "type": "integer",
+                    "minimum": 0,
+                    "maximum": 32,
                     "description": "Number of restricted responses out of which one is sent as truncated, the others are dropped.",
                     "default": 2
                 },
                 "log-period": {
-                    "type": "integer",
-                    "description": "Minimal time in msec between two log messages, or zero to disable.",
-                    "default": 0
+                    "type": "string",
+                    "pattern": "^(\\d+)(us|ms|s|m|h|d)$",
+                    "description": "Minimal time between two log messages, or '0s' to disable.",
+                    "default": "0s"
                 },
                 "dry-run": {
                     "type": "boolean",

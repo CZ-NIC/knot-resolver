@@ -306,6 +306,7 @@ All dependencies are also listed in `pyproject.toml <https://gitlab.nic.cz/knot/
    "aiohttp_", "HTTP Client/Server for Python."
    "typing-extensions_", "Compatibility module for Python"
    "prometheus-client_", "Prometheus client for Python (optional)"
+   "watchdog_", "Python API for watching file system events (optional)"
 
 
 You can install the Manager using the generated ``setup.py``.
@@ -367,3 +368,4 @@ For development, it's possible to build the container directly from your git tre
 .. _aiohttp: https://docs.aiohttp.org/
 .. _prometheus-client: https://github.com/prometheus/client_python
 .. _typing-extensions: https://pypi.org/project/typing-extensions/
+.. _watchdog: https://github.com/gorakhargosh/watchdog
