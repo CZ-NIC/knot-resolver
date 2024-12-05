@@ -980,10 +980,8 @@ uv_handle_t *session2_get_handle(struct session2 *s)
 
 static void session2_on_timeout(uv_timer_t *timer)
 {
-	defer_sample_start(NULL);
 	struct session2 *s = timer->data;
 	session2_event(s, s->timer_event, NULL);
-	defer_sample_stop(NULL, false);
 }
 
 int session2_timer_start(struct session2 *s, enum protolayer_event_type event, uint64_t timeout, uint64_t repeat)
@@ -1347,7 +1345,19 @@ static void session2_event_unwrap(struct session2 *s, ssize_t start_ix, enum pro
 
 void session2_event(struct session2 *s, enum protolayer_event_type event, void *baton)
 {
+	/* Events may be sent from inside or outside of already measured code.
+	 * From inside: close by us, statistics, ...
+	 * From outside: timeout, EOF, close by external reasons, ... */
+	bool defer_accounting_here = false;
+	if (!defer_sample_is_accounting() && s->stream && !s->outgoing) {
+		defer_sample_start(NULL);
+		defer_accounting_here = true;
+	}
+
 	session2_event_unwrap(s, 0, event, baton);
+
+	if (defer_accounting_here)
+		defer_sample_stop(NULL, false);
 }
 
 void session2_event_after(struct session2 *s, enum protolayer_type protocol,

@@ -552,8 +552,10 @@ static enum protolayer_event_cb_result pl_defer_event_unwrap(
 		// disable accounting only for events that cannot occur during incoming data processing
 		phase_accounting = false;
 	}
-	if (!defer || session->outgoing)
+	if (!defer || !session->stream || session->outgoing)
 		return PROTOLAYER_EVENT_PROPAGATE;
+
+	defer_sample_addr((const union kr_sockaddr *)session->comm_storage.src_addr, session->stream);
 
 	struct pl_defer_sess_data *sdata = sess_data;
 	if ((event == PROTOLAYER_EVENT_EOF) && (queue_len(sdata->queue) > 0)) {
