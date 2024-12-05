@@ -703,10 +703,18 @@ static struct kr_query *task_get_last_pending_query(struct qr_task *task)
 
 static int send_waiting(struct session2 *session)
 {
+	if (session2_waitinglist_is_empty(session))
+		return 0;
+
+	defer_sample_state_t defer_prev_sample_state;
+	defer_sample_start(&defer_prev_sample_state);
 	int ret = 0;
-	while (!session2_waitinglist_is_empty(session)) {
+	do {
 		struct qr_task *t = session2_waitinglist_get(session);
+		if (t->ctx->source.session)
+			defer_sample_addr(&t->ctx->source.addr, t->ctx->source.session->stream);
 		ret = qr_task_send(t, session, NULL, NULL);
+		defer_sample_restart();
 		if (ret != 0) {
 			struct sockaddr *peer = session2_get_peer(session);
 			session2_waitinglist_finalize(session, KR_STATE_FAIL);
@@ -716,7 +724,9 @@ static int send_waiting(struct session2 *session)
 			break;
 		}
 		session2_waitinglist_pop(session, true);
-	}
+	} while (!session2_waitinglist_is_empty(session));
+	defer_sample_stop(&defer_prev_sample_state, true);
+
 	return ret;
 }
 
@@ -1878,13 +1888,19 @@ static enum protolayer_event_cb_result pl_dns_stream_resolution_timeout(
 	} else {
 		/* Normally it should not happen,
 		 * but better to check if there anything in this list. */
-		while (!session2_waitinglist_is_empty(s)) {
-			struct qr_task *t = session2_waitinglist_pop(s, false);
-			worker_task_finalize(t, KR_STATE_FAIL);
-			worker_task_unref(t);
-			the_worker->stats.timeout += 1;
-			if (s->closing)
-				return PROTOLAYER_EVENT_PROPAGATE;
+		if (!session2_waitinglist_is_empty(s)) {
+			defer_sample_state_t defer_prev_sample_state;
+			defer_sample_start(&defer_prev_sample_state);
+			do {
+				struct qr_task *t = session2_waitinglist_pop(s, false);
+				worker_task_finalize(t, KR_STATE_FAIL);
+				worker_task_unref(t);
+				the_worker->stats.timeout += 1;
+				if (s->closing)
+					return PROTOLAYER_EVENT_PROPAGATE;
+				defer_sample_restart();
+			} while (!session2_waitinglist_is_empty(s));
+			defer_sample_stop(&defer_prev_sample_state, true);
 		}
 		uint64_t idle_in_timeout = the_network->tcp.in_idle_timeout;
 		uint64_t idle_time = kr_now() - s->last_activity;
@@ -1997,6 +2013,13 @@ static enum protolayer_event_cb_result pl_dns_stream_disconnected(
 
 	stream->connected = false;
 
+	if (session2_is_empty(session))
+		return PROTOLAYER_EVENT_PROPAGATE;
+
+	defer_sample_state_t defer_prev_sample_state;
+	if (session->outgoing)
+		defer_sample_start(&defer_prev_sample_state);
+
 	while (!session2_waitinglist_is_empty(session)) {
 		struct qr_task *task = session2_waitinglist_pop(session, false);
 		kr_assert(task->refs > 1);
@@ -2013,6 +2036,7 @@ static enum protolayer_event_cb_result pl_dns_stream_disconnected(
 				qry->flags.TCP = false;
 			}
 			qr_task_step(task, NULL, NULL);
+			defer_sample_restart();
 		} else {
 			kr_assert(task->ctx->source.session == session);
 			task->ctx->source.session = NULL;
@@ -2029,12 +2053,16 @@ static enum protolayer_event_cb_result pl_dns_stream_disconnected(
 				qry->flags.TCP = false;
 			}
 			qr_task_step(task, NULL, NULL);
+			defer_sample_restart();
 		} else {
 			kr_assert(task->ctx->source.session == session);
 			task->ctx->source.session = NULL;
 		}
 		worker_task_unref(task);
 	}
+
+	if (session->outgoing)
+		defer_sample_stop(&defer_prev_sample_state, true);
 
 	return PROTOLAYER_EVENT_PROPAGATE;
 }

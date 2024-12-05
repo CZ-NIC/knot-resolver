@@ -102,6 +102,11 @@ static inline void defer_sample_stop_stamp(uint64_t stamp)
 	defer_charge(elapsed, &defer_sample_state.addr, defer_sample_state.stream);
 }
 
+static inline bool defer_sample_is_accounting(void)
+{
+	return defer_sample_state.is_accounting;
+}
+
 /// Start accounting work; optionally save state of current accounting.
 /// Current state can be saved only after having an address assigned.
 static inline void defer_sample_start(defer_sample_state_t *prev_state_out) {
