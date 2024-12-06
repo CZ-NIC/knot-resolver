@@ -1,12 +1,12 @@
 import argparse
 from enum import Enum
-from typing import List, Tuple, Type
+from typing import List, Optional, Tuple, Type
 
 from knot_resolver.client.command import (
     Command,
     CommandArgs,
     CompWords,
-    get_subparser_by_name,
+    get_action_by_name,
     get_subparser_command,
     get_subparsers_words,
     register_command,
@@ -58,30 +58,56 @@ class CompletionCommand(Command):
     def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
         return get_subparsers_words(parser._actions)  # noqa: SLF001
 
-    def run(self, args: CommandArgs) -> None:
+    def run(self, args: CommandArgs) -> None:  # noqa: PLR0912
         subparsers = args.parser._subparsers  # noqa: SLF001
         words: CompWords = {}
 
         if subparsers:
             words = get_subparsers_words(subparsers._actions)  # noqa: SLF001
 
-            uargs = iter(self.args)
-            for uarg in uargs:
-                subparser = get_subparser_by_name(uarg, subparsers._actions)  # noqa: SLF001
+            args_iter = iter(self.args)
+            for arg in args_iter:
+                action: Optional[argparse.Action] = get_action_by_name(arg, subparsers._actions)  # noqa: SLF001
 
-                if subparser:
-                    cmd: Command = get_subparser_command(subparser)
-                    subparser_args = self.args[self.args.index(uarg) + 1 :]
-                    if subparser_args or self.space:
-                        words = cmd.completion(subparser_args, subparser)
+                # if action is SubParserAction; complete using the command
+                if isinstance(action, argparse._SubParsersAction) and arg in action.choices:  # noqa: SLF001
+                    # remove from words
+                    for choice in action.choices:
+                        del words[choice]
+
+                    subparser = action.choices[arg]
+                    cmd = get_subparser_command(subparser)
+
+                    nargs = len(self.args)
+                    index = self.args.index(arg) + 1
+                    # check that index is not out of args length
+                    if index > nargs:
+                        break
+
+                    # complete using the command
+                    words = cmd.completion(self.args[index:], subparser)
                     break
-                if uarg in ["-s", "--socket", "-c", "--config"]:
-                    # if arg is socket config, skip next arg
-                    next(uargs)
+
+                # if action is StoreAction; skip number of arguments
+                if isinstance(action, argparse._StoreAction) and arg in action.option_strings:  # noqa: SLF001
+                    # remove from words
+                    for option_string in action.option_strings:
+                        del words[option_string]
+
+                    if action.nargs and isinstance(action.nargs, int):
+                        for _ in range(action.nargs):
+                            next(args_iter)
                     continue
-                if uarg in words:
-                    # uarg is valid (complete) arg, continue
-                    continue
+
+                # remove other options from words
+                if action and action.option_strings:
+                    for option_string in action.option_strings:
+                        del words[option_string]
+
+                # if 'arg' is not found in actions
+                # there is nothing to complete
+                if not action:
+                    break
 
         # print completion words
         # based on required bash/fish shell format

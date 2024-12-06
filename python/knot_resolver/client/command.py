@@ -29,11 +29,10 @@ def get_subparsers_words(subparser_actions: List[argparse.Action]) -> CompWords:
     return words
 
 
-def get_subparser_by_name(name: str, parser_actions: List[argparse.Action]) -> Optional[argparse.ArgumentParser]:
+def get_action_by_name(name: str, parser_actions: List[argparse.Action]) -> Optional[argparse.Action]:
     for action in parser_actions:
-        if isinstance(action, argparse._SubParsersAction):  # noqa: SLF001
-            if action.choices and name in action.choices:
-                return action.choices[name]
+        if (action.choices and name in action.choices) or (action.option_strings and name in action.option_strings):
+            return action
     return None
 
 
