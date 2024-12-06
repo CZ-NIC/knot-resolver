@@ -23,54 +23,37 @@ def operation_to_method(operation: Operations) -> Literal["PUT", "GET", "DELETE"
     return "GET"
 
 
-def _properties_words(props: Dict[str, Any]) -> CompWords:
+def _properties_words(props: Dict[str, Any], prefix: str) -> CompWords:
     words: CompWords = {}
-    for name, prop in props.items():
-        words["/" + name] = prop["description"] if "description" in prop else None
+    for name in props:
+        words[prefix + "/" + name] = props[name]["description"]
     return words
 
 
-# def _path_comp_words(node: str, nodes: List[str], props: Dict[str, Any]) -> CompWords:
-#     i = nodes.index(node)
-#     ln = len(nodes[i:])
-#
-#     # if node is last in path, return all possible words on thi level
-#     if ln == 1:
-#         return _properties_words(props)
-#     # if node is valid
-#     elif node in props:
-#         node_schema = props[node]
-#
-#         if "anyOf" in node_schema:
-#             for item in node_schema["anyOf"]:
-#                 print(item)
-#
-#         elif "type" not in node_schema:
-#             pass
-#
-#         elif node_schema["type"] == "array":
-#             if ln > 2:
-#                 # skip index for item in array
-#                 return _path_comp_words(nodes[i + 2], nodes, node_schema["items"]["properties"])
-#             if "enum" in node_schema["items"]:
-#                 print(node_schema["items"]["enum"])
-#             return {"0": "first array item", "-": "last array item"}
-#         elif node_schema["type"] == "object":
-#             if "additionalProperties" in node_schema:
-#                 print(node_schema)
-#             return _path_comp_words(nodes[i + 1], nodes, node_schema["properties"])
-#         # return {}
-#
-#         # arrays/lists must be handled sparately
-#         if node_schema["type"] == "array":
-#             if ln > 2:
-#                 # skip index for item in array
-#                 return _path_comp_words(nodes[i + 2], nodes, node_schema["items"]["properties"])
-#             return {"0": "first array item", "-": "last array item"}
-#         return _path_comp_words(nodes[i + 1], nodes, node_schema["properties"])
-#     else:
-#         # if node is not last or valid, value error
-#         raise ValueError(f"unknown config path node: {node}")
+def generate_paths(data: Dict[str, Any], prefix: str = "/") -> CompWords:
+    paths = {}
+
+    if isinstance(data, dict):
+        if "properties" in data.keys():
+            for key in data["properties"]:
+                current_path = f"{prefix}{key}/"
+
+                new_paths = generate_paths(data["properties"][key], current_path)
+                if new_paths != {}:
+                    paths.update(new_paths)
+                else:
+                    paths[current_path] = None
+
+        elif "items" in data.keys():
+            if isinstance(data["items"], list):
+                for item in data["items"]:
+                    paths.update(generate_paths(item, prefix))
+            else:
+                paths.update(generate_paths(data["items"], prefix))
+        else:
+            paths[prefix] = None
+
+    return paths
 
 
 @register_command
@@ -172,7 +155,30 @@ class ConfigCommand(Command):
     @staticmethod
     def completion(parser: argparse.ArgumentParser, args: Optional[List[str]] = None, curr_index: int = 0) -> CompWords:
         if args is not None and (len(args) - curr_index) > 1 and args[-2] in ["-p", "--path"]:
-            return _properties_words(KresConfig.json_schema()["properties"])
+            # if len(args[-1]) < 2:
+            #     new_props = {}
+            #     for prop in props:
+            #         new_props['/' + prop] = props[prop]
+            #
+            #     return new_props
+
+            paths = generate_paths(KresConfig.json_schema())
+            result = {}
+            for path in paths:
+                if args[-1] in path:
+                    a_count = args[-1].count("/") + 1
+                    new_path = ""
+                    for c in path:
+                        if c == "/":
+                            a_count -= 1
+                            if a_count == 0:
+                                break
+
+                        new_path += c
+
+                    result[new_path + "/"] = paths[path]
+
+            return result
 
         return Command.completion(parser, args, curr_index)
 
