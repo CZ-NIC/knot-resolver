@@ -1721,10 +1721,17 @@
                     "type": "boolean",
                     "description": "Use request prioritization.",
                     "default": true
+                },
+                "log-period": {
+                    "type": "string",
+                    "pattern": "^(\\d+)(us|ms|s|m|h|d)$",
+                    "description": "Minimal time between two log messages, or '0s' to disable.",
+                    "default": "0s"
                 }
             },
             "default": {
-                "enabled": true
+                "enabled": true,
+                "log_period": "0s"
             }
         },
         "lua": {

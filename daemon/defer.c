@@ -3,6 +3,7 @@
  */
 
 #include <math.h>
+#include <stdatomic.h>
 #include "daemon/defer.h"
 #include "daemon/session2.h"
 #include "daemon/udp_queue.h"
@@ -54,8 +55,10 @@
 struct defer {
 	size_t capacity;
 	kru_price_t max_decay;
+	uint32_t log_period;
 	int cpus;
 	bool using_avx2;
+	_Atomic uint32_t log_time;
 	_Alignas(64) uint8_t kru[];
 };
 struct defer *defer = NULL;
@@ -415,8 +418,21 @@ static inline void process_single_deferred(void)
 
 	if (age_ns >= REQ_TIMEOUT) {
 		VERBOSE_LOG("    BREAK (timeout)\n");
-		kr_log_warning(DEFER, "Data from %s too long in queue, dropping.\n",
-			kr_straddr(ctx->comm->src_addr));  // TODO make it notice as it's intended behavior of defer?
+
+		// notice logging according to log-period
+		const uint32_t time_now = kr_now();
+		uint32_t log_time_orig = atomic_load_explicit(&defer->log_time, memory_order_relaxed);
+		if (defer->log_period) {
+			while (time_now - log_time_orig + 1024 >= defer->log_period + 1024) {
+				if (atomic_compare_exchange_weak_explicit(&defer->log_time, &log_time_orig, time_now,
+						memory_order_relaxed, memory_order_relaxed)) {
+					kr_log_notice(DEFER, "Data from %s too long in queue, dropping.\n",
+							kr_straddr(ctx->comm->src_addr));
+					break;
+				}
+			}
+		}
+
 		break_query(ctx, ETIME);
 		return;
 	}
@@ -603,7 +619,7 @@ static void defer_queues_idle(uv_idle_t *handle)
 
 
 /// Initialize shared memory, queues. To be called from Lua.
-int defer_init(const char *mmap_file, int cpus)
+int defer_init(const char *mmap_file, uint32_t log_period, int cpus)
 {
 	defer_initialized = true;
 	if (mmap_file == NULL) {
@@ -620,6 +636,7 @@ int defer_init(const char *mmap_file, int cpus)
 	struct defer header = {
 		.capacity = KRU_CAPACITY,
 		.max_decay = MAX_DECAY,
+		.log_period = log_period,
 		.cpus = cpus,
 		.using_avx2 = using_avx2(),
 	};
@@ -633,6 +650,7 @@ int defer_init(const char *mmap_file, int cpus)
 		offsetof(struct defer, using_avx2) ==
 			sizeof(header.capacity) +
 			sizeof(header.max_decay) +
+			sizeof(header.log_period) +
 			sizeof(header.cpus),
 		"detected padding with undefined data inside mmapped header");
 
@@ -648,6 +666,8 @@ int defer_init(const char *mmap_file, int cpus)
 			ret = kr_error(EINVAL);
 			goto fail;
 		}
+
+		defer->log_time = kr_now() - log_period;
 
 		ret = mmapped_init_continue(&defer_mmapped);
 		if (ret != 0) goto fail;
