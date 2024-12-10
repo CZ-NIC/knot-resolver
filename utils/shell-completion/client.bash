@@ -15,6 +15,8 @@ _kresctl_completion()
         args="$args${args:+ }-d"
     elif [[ "$opt" == "#filenames#" ]]; then
         args="$args${args:+ }-f"
+    elif [[ "$opt" == "#nospace#" ]]; then
+        args="$args${args:+ }-o nospace"
     else
         words="$words${words:+ }$opt"
     fi
