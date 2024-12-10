@@ -1,7 +1,7 @@
 import argparse
 from abc import ABC, abstractmethod  # pylint: disable=[no-name-in-module]
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar
+from typing import Any, Dict, List, Optional, Set, Tuple, Type, TypeVar
 from urllib.parse import quote
 
 from knot_resolver.constants import API_SOCK_FILE, CONFIG_FILE
@@ -17,15 +17,43 @@ CompWords = Dict[str, Optional[str]]
 _registered_commands: List[Type["Command"]] = []
 
 
-def get_subparsers_words(subparser_actions: List[argparse.Action]) -> CompWords:
+def get_mutually_exclusive_commands(parser: argparse.ArgumentParser) -> List[Set[str]]:
+    command_names: List[Set[str]] = []
+    for group in parser._mutually_exclusive_groups:  # pylint: disable=protected-access
+        command_names.append(set())
+        for action in group._group_actions:  # pylint: disable=protected-access
+            if action.option_strings:
+                command_names[-1].update(action.option_strings)
+    return command_names
+
+
+def is_unique_and_new(arg: str, args: Set[str], exclusive: List[Set[str]], last: str) -> bool:
+    if arg not in args:
+        for excl in exclusive:
+            if arg in excl:
+                for cmd in excl:
+                    if cmd in args:
+                        return False
+        return True
+
+    return arg == last
+
+
+def get_subparsers_words(
+    subparser_actions: List[argparse.Action], args: Set[str], exclusive: List[Set[str]], last: str
+) -> CompWords:
+
     words: CompWords = {}
     for action in subparser_actions:
         if isinstance(action, argparse._SubParsersAction) and action.choices:  # pylint: disable=protected-access
             for choice, parser in action.choices.items():
-                words[choice] = parser.description
+                if is_unique_and_new(choice, args, exclusive, last):
+                    words[choice] = parser.description
         else:
             for opt in action.option_strings:
-                words[opt] = action.help
+                if is_unique_and_new(opt, args, exclusive, last):
+                    words[opt] = action.help
+
     return words
 
 
@@ -136,34 +164,54 @@ class Command(ABC):
         raise NotImplementedError()
 
     @staticmethod
-    def completion(parser: argparse.ArgumentParser, args: Optional[List[str]] = None, curr_index: int = 0) -> CompWords:
+    def completion(
+        parser: argparse.ArgumentParser,
+        args: Optional[List[str]] = None,
+        curr_index: int = 0,
+        argset: Optional[Set[str]] = None,
+    ) -> CompWords:
+
         if args is None or len(args) == 0:
             return {}
 
-        words: CompWords = get_subparsers_words(parser._actions)  # pylint: disable=protected-access
+        if argset is None:
+            argset = set(args)
+
+        if "-h" in argset or "--help" in argset:
+            return {args[-1]: None} if args[-1] in ["-h", "--help"] else {}
+
+        exclusive: List[Set[str]] = get_mutually_exclusive_commands(parser)
+
+        words = get_subparsers_words(parser._actions, argset, exclusive, args[-1])  # pylint: disable=protected-access
 
         subparsers = parser._subparsers  # pylint: disable=protected-access
-
         if subparsers:
             while curr_index < len(args):
                 uarg = args[curr_index]
-                subpar = get_subparser_by_name(uarg, subparsers._actions)  # pylint: disable=W0212
-
                 curr_index += 1
+
+                subpar = get_subparser_by_name(uarg, subparsers._actions)  # pylint: disable=protected-access
                 if subpar:
                     cmd = get_subparser_command(subpar)
                     if cmd is None:
-                        return get_subparsers_words(subpar._actions)  # pylint: disable=protected-access
+                        exclusive = get_mutually_exclusive_commands(subpar)
 
-                    if len(args) > curr_index:
-                        return cmd.completion(subpar, args, curr_index)
+                        if (curr_index >= len(args) or args[curr_index] == "") and uarg in words:
+                            continue
 
-                    return words
+                        words = get_subparsers_words(
+                            subpar._actions, argset, exclusive, args[-1]  # pylint: disable=protected-access
+                        )
 
-                elif uarg in ["-s", "--socket", "-c", "--config"]:
-                    # following word shall not be a kresctl command, switch to path completion
+                    elif len(args) > curr_index:
+                        words = cmd.completion(subpar, args, curr_index, argset)
+
+                    break
+
+                if uarg in ["-s", "--socket", "-c", "--config"]:
                     if uarg in (args[-1], args[-2]):
                         words = {}
+
                     curr_index += 1
 
         return words

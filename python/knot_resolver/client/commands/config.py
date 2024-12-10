@@ -1,7 +1,7 @@
 import argparse
 import sys
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional, Tuple, Type
+from typing import Any, Dict, List, Literal, Optional, Set, Tuple, Type
 
 from knot_resolver.client.command import Command, CommandArgs, CompWords, register_command
 from knot_resolver.datamodel import KresConfig
@@ -23,22 +23,15 @@ def operation_to_method(operation: Operations) -> Literal["PUT", "GET", "DELETE"
     return "GET"
 
 
-def _properties_words(props: Dict[str, Any], prefix: str) -> CompWords:
-    words: CompWords = {}
-    for name in props:
-        words[prefix + "/" + name] = props[name]["description"]
-    return words
-
-
 def generate_paths(data: Dict[str, Any], prefix: str = "/") -> CompWords:
     paths = {}
 
     if isinstance(data, dict):
         if "properties" in data.keys():
             for key in data["properties"]:
-                current_path = f"{prefix}{key}/"
+                current_path = f"{prefix}{key}"
 
-                new_paths = generate_paths(data["properties"][key], current_path)
+                new_paths = generate_paths(data["properties"][key], current_path + "/")
                 if new_paths != {}:
                     paths.update(new_paths)
                 else:
@@ -50,8 +43,6 @@ def generate_paths(data: Dict[str, Any], prefix: str = "/") -> CompWords:
                     paths.update(generate_paths(item, prefix))
             else:
                 paths.update(generate_paths(data["items"], prefix))
-        else:
-            paths[prefix] = None
 
     return paths
 
@@ -78,14 +69,22 @@ class ConfigCommand(Command):
         get = config_subparsers.add_parser("get", help="Get current configuration from the resolver.")
         get.set_defaults(operation=Operations.GET, format=DataFormat.YAML)
 
-        get.add_argument(
+        get_path = get.add_mutually_exclusive_group()
+        get_path.add_argument(
             "-p",
+            help=path_help,
+            action="store",
+            type=str,
+            default="",
+        )
+        get_path.add_argument(
             "--path",
             help=path_help,
             action="store",
             type=str,
             default="",
         )
+
         get.add_argument(
             "file",
             help="Optional, path to the file where to save exported configuration data. If not specified, data will be printed.",
@@ -113,8 +112,15 @@ class ConfigCommand(Command):
         set = config_subparsers.add_parser("set", help="Set new configuration for the resolver.")
         set.set_defaults(operation=Operations.SET)
 
-        set.add_argument(
+        set_path = set.add_mutually_exclusive_group()
+        set_path.add_argument(
             "-p",
+            help=path_help,
+            action="store",
+            type=str,
+            default="",
+        )
+        set_path.add_argument(
             "--path",
             help=path_help,
             action="store",
@@ -141,8 +147,15 @@ class ConfigCommand(Command):
             "delete", help="Delete given configuration property or list item at the given index."
         )
         delete.set_defaults(operation=Operations.DELETE)
-        delete.add_argument(
+        delete_path = delete.add_mutually_exclusive_group()
+        delete_path.add_argument(
             "-p",
+            help=path_help,
+            action="store",
+            type=str,
+            default="",
+        )
+        delete_path.add_argument(
             "--path",
             help=path_help,
             action="store",
@@ -153,15 +166,17 @@ class ConfigCommand(Command):
         return config, ConfigCommand
 
     @staticmethod
-    def completion(parser: argparse.ArgumentParser, args: Optional[List[str]] = None, curr_index: int = 0) -> CompWords:
-        if args is not None and (len(args) - curr_index) > 1 and args[-2] in ["-p", "--path"]:
-            # if len(args[-1]) < 2:
-            #     new_props = {}
-            #     for prop in props:
-            #         new_props['/' + prop] = props[prop]
-            #
-            #     return new_props
+    def completion(
+        parser: argparse.ArgumentParser,
+        args: Optional[List[str]] = None,
+        curr_index: int = 0,
+        argset: Optional[Set[str]] = None,
+    ) -> CompWords:
 
+        if args is None or len(args) == 0:
+            return {}
+
+        if args is not None and (len(args) - curr_index) > 1 and args[-2] in {"-p", "--path"}:
             paths = generate_paths(KresConfig.json_schema())
             result = {}
             for path in paths:
@@ -169,18 +184,20 @@ class ConfigCommand(Command):
                     a_count = args[-1].count("/") + 1
                     new_path = ""
                     for c in path:
+                        new_path += c
                         if c == "/":
                             a_count -= 1
                             if a_count == 0:
                                 break
 
-                        new_path += c
-
-                    result[new_path + "/"] = paths[path]
+                    result[new_path] = paths[path]
 
             return result
 
-        return Command.completion(parser, args, curr_index)
+        if argset is None:
+            argset = set(args)
+
+        return Command.completion(parser, args, curr_index, argset)
 
     def run(self, args: CommandArgs) -> None:
         if not self.operation:

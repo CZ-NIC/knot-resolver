@@ -1,39 +1,28 @@
-#/usr/bin/env bash
-
-_kresctl_filter_double_dash()
-{
-    local words=("$@")
-    local new_words=()
-    local count=0
-
-    for WORD in "${words[@]}"
-    do
-        if [[ "$WORD" != "--" ]]
-        then
-            new_words[count]="$WORD"
-            ((count++))
-        fi
-    done
-
-    printf "%s\n" "${new_words[@]}"
-}
+#!/usr/bin/env bash
 
 _kresctl_completion()
 {
     COMPREPLY=()
-    local cur opts cmp_words
+    local cur prev opts words_up_to_cursor
 
     cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
     local line="${COMP_LINE:0:$COMP_POINT}"
     local words_up_to_cursor=($line)
 
-    cmp_words=($(_kresctl_filter_double_dash "${words_up_to_cursor[@]}"))
-
     if [[ -z "$cur" && "$COMP_POINT" -gt 0 && "${line: -1}" == " " ]]
     then
-        opts=$(kresctl completion --bash --space --args "${cmp_words[@]}")
+        opts=$(kresctl completion --bash --space --args "${words_up_to_cursor[@]}")
     else
-        opts=$(kresctl completion --bash --args "${cmp_words[@]}")
+        opts=$(kresctl completion --bash --args "${words_up_to_cursor[@]}")
+    fi
+
+    # if we're completing a config path do not append a space
+    # (unless we have reached the bottom)
+    if [[ "$prev" == "-p" || "$prev" == "--path" ]] \
+        && [[ $(echo "$opts" | wc -w) -gt 1 || "${opts: -1}" == '/' ]]
+    then
+        compopt -o nospace
     fi
 
     # if there is no completion from kresctl
@@ -48,4 +37,4 @@ _kresctl_completion()
     return 0
 }
 
-complete -o filenames -o dirnames -o nosort -F _kresctl_completion kresctl
+complete -o filenames -o dirnames -F _kresctl_completion kresctl
