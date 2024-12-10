@@ -1,7 +1,7 @@
 import argparse
 from abc import ABC, abstractmethod  # pylint: disable=[no-name-in-module]
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Type, TypeVar
+from typing import Dict, List, Optional, Set, Tuple, Type, TypeVar
 from urllib.parse import quote
 
 from knot_resolver.constants import API_SOCK_FILE, CONFIG_FILE
@@ -16,8 +16,48 @@ CompWords = Dict[str, Optional[str]]
 
 COMP_DIRNAMES = "#dirnames#"
 COMP_FILENAMES = "#filenames#"
+COMP_NOSPACE = "#nospace#"
 
 _registered_commands: List[Type["Command"]] = []
+
+
+def get_mutually_exclusive_commands(parser: argparse.ArgumentParser) -> List[Set[str]]:
+    command_names: List[Set[str]] = []
+    for group in parser._mutually_exclusive_groups:  # noqa: SLF001
+        command_names.append(set())
+        for action in group._group_actions:  # noqa: SLF001
+            if action.option_strings:
+                command_names[-1].update(action.option_strings)
+    return command_names
+
+
+def is_unique_and_new(arg: str, args: Set[str], exclusive: List[Set[str]], last: str) -> bool:
+    if arg not in args:
+        for excl in exclusive:
+            if arg in excl:
+                for cmd in excl:
+                    if cmd in args:
+                        return False
+        return True
+
+    return arg == last
+
+
+def get_subparsers_words(
+    subparser_actions: List[argparse.Action], args: Set[str], exclusive: List[Set[str]], last: str
+) -> CompWords:
+    words: CompWords = {}
+    for action in subparser_actions:
+        if isinstance(action, argparse._SubParsersAction) and action.choices:  # noqa: SLF001
+            for choice, parser in action.choices.items():
+                if is_unique_and_new(choice, args, exclusive, last):
+                    words[choice] = parser.description
+        else:
+            for opt in action.option_strings:
+                if is_unique_and_new(opt, args, exclusive, last):
+                    words[opt] = action.help
+
+    return words
 
 
 def get_parser_action(name: str, parser_actions: List[argparse.Action]) -> Optional[argparse.Action]:

@@ -3,7 +3,7 @@ import sys
 from enum import Enum
 from typing import List, Literal, Optional, Tuple, Type
 
-from knot_resolver.client.command import Command, CommandArgs, CompWords, comp_get_words, register_command
+from knot_resolver.client.command import COMP_NOSPACE, Command, CommandArgs, CompWords, comp_get_words, register_command
 from knot_resolver.datamodel import KresConfig
 from knot_resolver.utils.modeling.parsing import DataFormat, parse_json, try_to_parse
 from knot_resolver.utils.requests import request
@@ -124,6 +124,8 @@ class ConfigCommand(Command):
 
         if nargs > 1 and args[-2] in ["-p", "--path"]:
             words: CompWords = {}
+            words[COMP_NOSPACE] = None
+
             path = args[-1]
             path_nodes = path.split("/")
 
