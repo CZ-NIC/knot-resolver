@@ -223,14 +223,15 @@ void defer_charge(uint64_t nsec, union kr_sockaddr *addr, bool stream)
 	_Alignas(16) uint8_t key[16] = {0, };
 	uint16_t max_load = 0;
 	uint8_t prefix = 0;
-	kru_price_t base_price = BASE_PRICE(nsec);
+	uint64_t base_price = BASE_PRICE(nsec);
 
 	if (addr->ip.sa_family == AF_INET6) {
 		memcpy(key, &addr->ip6.sin6_addr, 16);
 
 		kru_price_t prices[V6_PREFIXES_CNT];
 		for (size_t i = 0; i < V6_PREFIXES_CNT; i++) {
-			prices[i] = base_price / V6_RATE_MULT[i];
+			uint64_t price = base_price / V6_RATE_MULT[i];
+			prices[i] = price > (kru_price_t)-1 ? -1 : price;
 		}
 
 		max_load = KRU.load_multi_prefix_max((struct kru *)defer->kru, kr_now(),
@@ -240,7 +241,8 @@ void defer_charge(uint64_t nsec, union kr_sockaddr *addr, bool stream)
 
 		kru_price_t prices[V4_PREFIXES_CNT];
 		for (size_t i = 0; i < V4_PREFIXES_CNT; i++) {
-			prices[i] = base_price / V4_RATE_MULT[i];
+			uint64_t price = base_price / V4_RATE_MULT[i];
+			prices[i] = price > (kru_price_t)-1 ? -1 : price;
 		}
 
 		max_load = KRU.load_multi_prefix_max((struct kru *)defer->kru, kr_now(),
