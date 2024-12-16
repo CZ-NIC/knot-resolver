@@ -19,7 +19,7 @@ class DebugCommand(Command):
         self.sudo: bool = namespace.sudo
         self.gdb: str = namespace.gdb
         self.print_only: bool = namespace.print_only
-        self.gdb_args: List[str] = namespace.extra
+        self.gdb_args: List[str] = namespace.extra if namespace.extra is not None else []
         super().__init__(namespace)
 
     @staticmethod
