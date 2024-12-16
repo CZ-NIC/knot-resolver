@@ -1,7 +1,7 @@
 import argparse
 from abc import ABC, abstractmethod  # pylint: disable=[no-name-in-module]
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar
+from typing import Dict, List, Optional, Tuple, Type, TypeVar
 from urllib.parse import quote
 
 from knot_resolver.constants import API_SOCK_FILE, CONFIG_FILE
@@ -14,33 +14,96 @@ T = TypeVar("T", bound=Type["Command"])
 
 CompWords = Dict[str, Optional[str]]
 
+COMP_DIRNAMES = "#dirnames#"
+COMP_FILENAMES = "#filenames#"
+
 _registered_commands: List[Type["Command"]] = []
 
 
-def get_subparsers_words(subparser_actions: List[argparse.Action]) -> CompWords:
-    words: CompWords = {}
-    for action in subparser_actions:
-        if isinstance(action, argparse._SubParsersAction) and action.choices:  # noqa: SLF001
-            for choice, parser in action.choices.items():
-                words[choice] = parser.description
-        else:
-            for opt in action.option_strings:
-                words[opt] = action.help
-    return words
-
-
-def get_action_by_name(name: str, parser_actions: List[argparse.Action]) -> Optional[argparse.Action]:
+def get_parser_action(name: str, parser_actions: List[argparse.Action]) -> Optional[argparse.Action]:
     for action in parser_actions:
         if (action.choices and name in action.choices) or (action.option_strings and name in action.option_strings):
             return action
     return None
 
 
-def get_subparser_command(subparser: argparse.ArgumentParser) -> "Command":
-    defaults: Dict[str, Any] = subparser._defaults  # noqa: SLF001
-    if "command" in defaults:
-        return defaults["command"]
-    raise ValueError(f"missing 'command' default for '{subparser.prog}' parser")
+def get_subparser_command(subparser: argparse.ArgumentParser) -> Optional["Command"]:
+    if "command" in subparser._defaults:  # noqa: SLF001
+        return subparser._defaults["command"]  # noqa: SLF001
+    return None
+
+
+def comp_get_actions_words(parser_actions: List[argparse.Action]) -> CompWords:
+    words: CompWords = {}
+    for action in parser_actions:
+        if isinstance(action, argparse._SubParsersAction) and action.choices:  # noqa: SLF001
+            for choice, parser in action.choices.items():
+                words[choice] = parser.description if isinstance(parser, argparse.ArgumentParser) else None
+        elif action.option_strings:
+            for opt in action.option_strings:
+                words[opt] = action.help
+        elif not action.option_strings and action.choices:
+            for choice in action.choices:
+                words[choice] = action.help
+        elif not action.option_strings and not action.choices:
+            words[COMP_DIRNAMES] = None
+            words[COMP_FILENAMES] = None
+    return words
+
+
+def comp_get_words(args: List[str], parser_actions: List[argparse.Action]) -> CompWords:  # noqa: PLR0912
+    words: CompWords = comp_get_actions_words(parser_actions)
+    nargs = len(args)
+
+    skip_arg = False
+    for i, arg in enumerate(args):
+        action: Optional[argparse.Action] = get_parser_action(arg, parser_actions)  # noqa: SLF001
+
+        if skip_arg:
+            skip_arg = False
+            continue
+
+        if not action:
+            words = comp_get_actions_words(parser_actions)
+            continue
+
+        if i + 1 >= nargs:
+            return words
+
+        # if not action or action is HelpAction or VersionAction
+        if isinstance(action, (argparse._HelpAction, argparse._VersionAction)):  # noqa: SLF001
+            words = {}
+            break
+
+        # if action is StoreTrueAction or StoreFalseAction
+        if isinstance(action, argparse._StoreConstAction):  # noqa: SLF001
+            continue
+
+        # if action is StoreAction
+        if isinstance(action, argparse._StoreAction):  # noqa: SLF001
+            choices = {}
+            if action.choices:
+                for choice in action.choices:
+                    choices[choice] = action.help
+            else:
+                choices[COMP_DIRNAMES] = None
+                choices[COMP_FILENAMES] = None
+            words = choices
+            skip_arg = True
+            continue
+
+        # if action is SubParserAction
+        if isinstance(action, argparse._SubParsersAction):  # noqa: SLF001
+            subparser = action.choices[arg]
+            cmd = get_subparser_command(subparser)
+            return cmd.completion(args[i + 1 :], subparser) if cmd else {}
+
+    # delete already used args
+    for arg in args:
+        if arg in words.keys():
+            del words[arg]
+
+    return words
 
 
 def register_command(cls: T) -> T:

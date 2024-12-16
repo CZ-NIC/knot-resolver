@@ -1,24 +1,27 @@
-#/usr/bin/env bash
+#!/usr/bin/env bash
 
 _kresctl_completion()
 {
     COMPREPLY=()
+    local args=""
     local words=""
-    local space_arg=""
     local cur="${COMP_WORDS[COMP_CWORD]}"
+    local opts=$(kresctl completion --bash --args "${COMP_WORDS[@]:1}")
 
-    # if the current word is empty
-    # we need to inform the kresctl client about it
-    if [[ -z "$cur" ]]; then
-        space_arg="--space"
+    # filter special opts
+    for opt in $opts
+    do
+    if [[ "$opt" == "#dirnames#" ]]; then
+        args="$args${args:+ }-d"
+    elif [[ "$opt" == "#filenames#" ]]; then
+        args="$args${args:+ }-f"
+    else
+        words="$words${words:+ }$opt"
     fi
+    done
 
-    # get words from the kresctl client
-    words=$(kresctl completion --bash ${space_arg} --args "${COMP_WORDS[@]:1}")
-
-    COMPREPLY=($(compgen  -W "${words}" -- "${cur}"))
-
+    COMPREPLY=($(compgen $args -W "${words}" -- "${cur}"))
     return 0
 }
 
-complete -o filenames -o dirnames -o nosort -F _kresctl_completion kresctl
+complete -o nosort -F _kresctl_completion kresctl
