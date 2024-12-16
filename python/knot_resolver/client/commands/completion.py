@@ -22,6 +22,8 @@ class CompletionCommand(Command):
         super().__init__(namespace)
         self.shell: Shells = namespace.shell
         self.args: List[str] = namespace.args
+        if namespace.extra is not None:
+            self.args.append("--")
 
     @staticmethod
     def register_args_subparser(
