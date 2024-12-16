@@ -3,7 +3,7 @@ import sys
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional, Tuple, Type
 
-from knot_resolver.client.command import Command, CommandArgs, CompWords, get_subparsers_words, register_command
+from knot_resolver.client.command import Command, CommandArgs, CompWords, comp_get_words, register_command
 from knot_resolver.datamodel import KresConfig
 from knot_resolver.utils.modeling.parsing import DataFormat, parse_json, try_to_parse
 from knot_resolver.utils.requests import request
@@ -170,7 +170,7 @@ class ConfigCommand(Command):
 
     @staticmethod
     def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
-        words = get_subparsers_words(parser._actions)  # noqa: SLF001
+        words = comp_get_words(args, parser._actions)  # noqa: SLF001
         if args is None:
             return words
 

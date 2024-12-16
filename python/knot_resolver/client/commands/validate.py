@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 from typing import List, Tuple, Type
 
-from knot_resolver.client.command import Command, CommandArgs, CompWords, get_subparsers_words, register_command
+from knot_resolver.client.command import Command, CommandArgs, CompWords, comp_get_words, register_command
 from knot_resolver.datamodel import KresConfig
 from knot_resolver.datamodel.globals import Context, reset_global_validation_context, set_global_validation_context
 from knot_resolver.utils.modeling import try_to_parse
@@ -41,7 +41,7 @@ class ValidateCommand(Command):
 
     @staticmethod
     def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
-        return get_subparsers_words(parser._actions)  # noqa: SLF001
+        return comp_get_words(args, parser._actions)  # noqa: SLF001
 
     def run(self, args: CommandArgs) -> None:
         if self.input_file:
