@@ -29,7 +29,7 @@
 #define Q0_INSTANT_LIMIT      1000000 // ns
 #define KRU_CAPACITY          (1<<19) // same as ratelimiting default
 #define BASE_PRICE(nsec)      ((uint64_t)KRU_LIMIT * LOADS_THRESHOLDS[0] / (1<<16) * nsec / Q0_INSTANT_LIMIT)
-#define MAX_DECAY(cpus)       (BASE_PRICE(1000000) * cpus / 4)  // max value at 25% utilization out of all cpus
+#define MAX_DECAY             (BASE_PRICE(1000000) / 2)  // max value at 50% utilization of single cpu
 	//   see log written by defer_str_conf for details
 
 #define REQ_TIMEOUT        1000000000 // ns (THREAD_CPUTIME), older deferred queries are dropped
@@ -146,15 +146,14 @@ void defer_str_conf(char *desc, int desc_len) {
 	uniform_thresholds &= ((1<<16) == (int)LOADS_THRESHOLDS[QUEUES_CNT - 3] * LOADS_THRESHOLDS[0]);
 
 	append(     "  Decay:                 %7.3f %% per ms (32-bit max: %d)\n",
-			100.0 * MAX_DECAY(defer->cpus) / KRU_LIMIT, (kru_price_t)MAX_DECAY(defer->cpus));
-	float half_life = -1.0 / log2f(1.0 - (float)MAX_DECAY(defer->cpus) / KRU_LIMIT);
+			100.0 * MAX_DECAY / KRU_LIMIT, (kru_price_t)MAX_DECAY);
+	float half_life = -1.0 / log2f(1.0 - (float)MAX_DECAY / KRU_LIMIT);
 	append_time("    Half-life:         ", half_life, "\n");
 	if (uniform_thresholds)
 		append_time("    Priority rise in:  ", half_life * 16 / (QUEUES_CNT - 1), "\n");
 	append_time("    Counter reset in:  ", half_life * 16, "\n");
 
-	append("  Rate limits for crossing priority levels as CPU utilization out of %d cores:\n",
-			defer->cpus);
+	append("  Rate limits for crossing priority levels as single CPU utilization:\n");
 
 	uint8_t *const prefixes[] = {V4_PREFIXES, V6_PREFIXES};
 	kru_price_t *const rate_mult[] = {V4_RATE_MULT, V6_RATE_MULT};
@@ -163,19 +162,15 @@ void defer_str_conf(char *desc, int desc_len) {
 
 	append("%15s", "");
 	for (int j = 0; j < 3; j++)
-		append("%10d", j+1);
-	append("%10s\n", "max");
+		append("%14d", j+1);
+	append("%14s\n", "max");
 
 	for (int v = 0; v < 2; v++) {
 		for (int i = prefixes_cnt[v] - 1; i >= 0; i--) {
 			append("%9sv%d/%-3d: ", "", version[v], prefixes[v][i]);
 			for (int j = 0; j < QUEUES_CNT - 1; j++) {
-				float needed_util = (float)MAX_DECAY(defer->cpus) / (1<<16) * LOADS_THRESHOLDS[j] / BASE_PRICE(1000000 * defer->cpus) * rate_mult[v][i];
-				if (needed_util <= 1) {
-					append("%8.3f %%", needed_util * 100);
-				} else {
-					append("%8s  ", "-");
-				}
+				float needed_util = (float)MAX_DECAY / (1<<16) * LOADS_THRESHOLDS[j] / BASE_PRICE(1000000) * rate_mult[v][i];
+				append("%12.3f %%", needed_util * 100);
 			}
 			append("\n");
 		}
@@ -185,8 +180,8 @@ void defer_str_conf(char *desc, int desc_len) {
 
 	append("%15s", "");
 	for (int j = 0; j < 3; j++)
-		append("%10d", j+1);
-	append("%10s\n", "max");
+		append("%14d", j+1);
+	append("%14s\n", "max");
 
 	for (int v = 0; v < 2; v++) {
 		for (int i = prefixes_cnt[v] - 1; i >= 0; i--) {
@@ -194,11 +189,11 @@ void defer_str_conf(char *desc, int desc_len) {
 			for (int j = 0; j < QUEUES_CNT - 1; j++) {
 				float needed_time = (float)KRU_LIMIT / (1<<16) * LOADS_THRESHOLDS[j] / BASE_PRICE(1000000) * rate_mult[v][i];
 				if (needed_time < 1) {
-					append("%7.1f us", needed_time * 1000);
+					append("%11.1f us", needed_time * 1000);
 				} else if (needed_time < 1000) {
-					append("%7.1f ms", needed_time);
+					append("%11.1f ms", needed_time);
 				} else {
-					append("%7.1f s ", needed_time / 1000);
+					append("%11.1f s ", needed_time / 1000);
 				}
 			}
 			append("\n");
@@ -618,7 +613,7 @@ static void defer_queues_idle(uv_idle_t *handle)
 
 
 /// Initialize shared memory, queues. To be called from Lua.
-int defer_init(const char *mmap_file, uint32_t log_period, int cpus)
+int defer_init(const char *mmap_file, uint32_t log_period, int cpus)  // TODO possibly remove cpus; not needed
 {
 	defer_initialized = true;
 	if (mmap_file == NULL) {
@@ -634,7 +629,7 @@ int defer_init(const char *mmap_file, uint32_t log_period, int cpus)
 
 	struct defer header = {
 		.capacity = KRU_CAPACITY,
-		.max_decay = MAX_DECAY(cpus),
+		.max_decay = MAX_DECAY,
 		.log_period = log_period,
 		.cpus = cpus,
 		.using_avx2 = using_avx2(),
