@@ -265,6 +265,7 @@ struct kr_request {
 	bool answ_validated; /**< internal to validator; beware of caching, etc. */
 	bool auth_validated; /**< see answ_validated ^^ ; TODO */
 	bool stale_accounted;
+	bool ratelimited; /**< this request shot over the rate limit */
 
 	/** Overall rank for the request.
 	 *
