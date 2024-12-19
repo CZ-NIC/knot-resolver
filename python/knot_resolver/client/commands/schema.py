@@ -35,7 +35,7 @@ class SchemaCommand(Command):
 
     @staticmethod
     def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
-        return comp_get_words(args, parser._actions)  # noqa: SLF001
+        return comp_get_words(args, parser)
 
     def run(self, args: CommandArgs) -> None:
         if self.live:

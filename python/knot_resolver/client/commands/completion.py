@@ -45,14 +45,14 @@ class CompletionCommand(Command):
 
     @staticmethod
     def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
-        return comp_get_words(args, parser._actions)  # noqa: SLF001
+        return comp_get_words(args, parser)
 
     def run(self, args: CommandArgs) -> None:  # noqa: PLR0912
         words: CompWords = {}
 
-        subparsers = args.parser._subparsers  # noqa: SLF001
-        if subparsers:
-            words = comp_get_words(self.args, subparsers._actions)  # noqa: SLF001
+        parser = args.parser
+        if parser:
+            words = comp_get_words(self.args, args.parser)
 
         # print completion words
         # based on required bash/fish shell format

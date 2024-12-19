@@ -1,5 +1,5 @@
 import argparse
-from abc import ABC, abstractmethod  # pylint: disable=[no-name-in-module]
+from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple, Type, TypeVar
 from urllib.parse import quote
@@ -21,43 +21,17 @@ COMP_NOSPACE = "#nospace#"
 _registered_commands: List[Type["Command"]] = []
 
 
-def get_mutually_exclusive_commands(parser: argparse.ArgumentParser) -> List[Set[str]]:
-    command_names: List[Set[str]] = []
+def get_mutually_exclusive_args(parser: argparse.ArgumentParser) -> List[Set[str]]:
+    groups: List[Set[str]] = []
+
     for group in parser._mutually_exclusive_groups:  # noqa: SLF001
-        command_names.append(set())
+        group_args: Set[str] = set()
         for action in group._group_actions:  # noqa: SLF001
             if action.option_strings:
-                command_names[-1].update(action.option_strings)
-    return command_names
-
-
-def is_unique_and_new(arg: str, args: Set[str], exclusive: List[Set[str]], last: str) -> bool:
-    if arg not in args:
-        for excl in exclusive:
-            if arg in excl:
-                for cmd in excl:
-                    if cmd in args:
-                        return False
-        return True
-
-    return arg == last
-
-
-def get_subparsers_words(
-    subparser_actions: List[argparse.Action], args: Set[str], exclusive: List[Set[str]], last: str
-) -> CompWords:
-    words: CompWords = {}
-    for action in subparser_actions:
-        if isinstance(action, argparse._SubParsersAction) and action.choices:  # noqa: SLF001
-            for choice, parser in action.choices.items():
-                if is_unique_and_new(choice, args, exclusive, last):
-                    words[choice] = parser.description
-        else:
-            for opt in action.option_strings:
-                if is_unique_and_new(opt, args, exclusive, last):
-                    words[opt] = action.help
-
-    return words
+                group_args.update(action.option_strings)
+        if group_args:
+            groups.append(group_args)
+    return groups
 
 
 def get_parser_action(name: str, parser_actions: List[argparse.Action]) -> Optional[argparse.Action]:
@@ -91,24 +65,34 @@ def comp_get_actions_words(parser_actions: List[argparse.Action]) -> CompWords:
     return words
 
 
-def comp_get_words(args: List[str], parser_actions: List[argparse.Action]) -> CompWords:  # noqa: PLR0912
-    words: CompWords = comp_get_actions_words(parser_actions)
+def comp_get_words(args: List[str], parser: argparse.ArgumentParser) -> CompWords:  # noqa: PLR0912
+    words: CompWords = comp_get_actions_words(parser._actions)  # noqa: SLF001
     nargs = len(args)
 
     skip_arg = False
     for i, arg in enumerate(args):
-        action: Optional[argparse.Action] = get_parser_action(arg, parser_actions)  # noqa: SLF001
+        action: Optional[argparse.Action] = get_parser_action(arg, parser._actions)  # noqa: SLF001
 
         if skip_arg:
             skip_arg = False
             continue
 
         if not action:
-            words = comp_get_actions_words(parser_actions)
             continue
 
         if i + 1 >= nargs:
-            return words
+            continue
+
+        # remove exclusive arguments from words
+        for exclusive_args in get_mutually_exclusive_args(parser):
+            if arg in exclusive_args:
+                for earg in exclusive_args:
+                    if earg in words.keys():
+                        del words[earg]
+        # remove alternative arguments from words
+        for opt in action.option_strings:
+            if opt in words.keys():
+                del words[opt]
 
         # if not action or action is HelpAction or VersionAction
         if isinstance(action, (argparse._HelpAction, argparse._VersionAction)):  # noqa: SLF001
@@ -121,27 +105,28 @@ def comp_get_words(args: List[str], parser_actions: List[argparse.Action]) -> Co
 
         # if action is StoreAction
         if isinstance(action, argparse._StoreAction):  # noqa: SLF001
-            choices = {}
-            if action.choices:
-                for choice in action.choices:
-                    choices[choice] = action.help
-            else:
-                choices[COMP_DIRNAMES] = None
-                choices[COMP_FILENAMES] = None
-            words = choices
+            if i + 2 >= nargs:
+                choices = {}
+                if action.choices:
+                    for choice in action.choices:
+                        choices[choice] = action.help
+                else:
+                    choices[COMP_DIRNAMES] = None
+                    choices[COMP_FILENAMES] = None
+                words = choices
             skip_arg = True
             continue
 
         # if action is SubParserAction
         if isinstance(action, argparse._SubParsersAction):  # noqa: SLF001
-            subparser = action.choices[arg]
-            cmd = get_subparser_command(subparser)
-            return cmd.completion(args[i + 1 :], subparser) if cmd else {}
+            subparser: Optional[argparse.ArgumentParser] = action.choices[arg] if arg in action.choices else None
 
-    # delete already used args
-    for arg in args:
-        if arg in words.keys():
-            del words[arg]
+            command = get_subparser_command(subparser) if subparser else None
+            if command and subparser:
+                return command.completion(args[i + 1 :], subparser)
+            if subparser:
+                return comp_get_words(args[i + 1 :], subparser)  # noqa: SLF001
+            return {}
 
     return words
 
