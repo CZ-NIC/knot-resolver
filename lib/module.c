@@ -123,6 +123,8 @@ int kr_module_load(struct kr_module *module, const char *name, const char *path)
 		ret = module->init(module);
 	}
 	if (ret != 0) {
+		/* Avoid calling deinit() as init() wasn't called or failed. */
+		module->deinit = NULL;
 		kr_module_unload(module);
 	}
 
