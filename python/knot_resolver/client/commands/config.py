@@ -148,6 +148,7 @@ class ConfigCommand(Command):
                         prefix += f"/{node}"
                         is_list = True
                         continue
+                    del words[COMP_NOSPACE]
                     break
                 if is_list and node.isnumeric():
                     prefix += f"/{node}"
