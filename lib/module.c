@@ -103,10 +103,8 @@ int kr_module_load(struct kr_module *module, const char *name, const char *path)
 		return kr_error(EINVAL);
 	}
 
-	/* Initialize, keep userdata */
-	void *data = module->data;
+	/* Initialize */
 	memset(module, 0, sizeof(struct kr_module));
-	module->data = data;
 	module->name = strdup(name);
 	if (module->name == NULL) {
 		return kr_error(ENOMEM);
