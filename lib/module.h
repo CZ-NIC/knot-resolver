@@ -86,7 +86,7 @@ struct kr_prop {
 /**
  * Load a C module instance into memory.  And call its init().
  *
- * @param module module structure.  Will be overwritten except for ->data on success.
+ * @param module module structure.  Will be overwritten.
  * @param name module name
  * @param path module search path
  * @return 0 or an error
