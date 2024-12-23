@@ -63,17 +63,14 @@ int is_ascii(char *str)
 
 char *prep_regstr(const char *whitelist)
 {
-        int h_len = strlen(HEAD);
-        int t_len = strlen(TAIL);
-        int wl_len = strlen(whitelist);
-        char *regstr = malloc(wl_len + h_len + t_len + 1);
+        size_t total_len = strlen(HEAD) + strlen(whitelist) + strlen(TAIL);
+        char *regstr = malloc(total_len + 1);
         if (!regstr)
                 return NULL;
 
-        strcpy(regstr, HEAD);
-        strcpy(regstr + h_len, whitelist);
-        strcpy(regstr + h_len + wl_len, TAIL);
-        regstr[t_len + h_len + wl_len] = '\0';
+        if (snprintf(regstr, total_len + 1, "%s%s%s",
+                     HEAD, whitelist, TAIL) != total_len)
+                return NULL;
 
         return regstr;
 }
