@@ -77,7 +77,7 @@ def main() -> None:
         argv_extra = sys.argv[(pa_index + 1) :]
     except ValueError:
         argv_to_parse = sys.argv[1:]
-        argv_extra = []
+        argv_extra = None
 
     namespace = parser.parse_args(argv_to_parse)
     if hasattr(namespace, "extra"):

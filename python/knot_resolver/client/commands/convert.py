@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 from typing import List, Optional, Tuple, Type
 
-from knot_resolver.client.command import Command, CommandArgs, CompWords, register_command
+from knot_resolver.client.command import Command, CommandArgs, CompWords, comp_get_words, register_command
 from knot_resolver.datamodel import KresConfig
 from knot_resolver.datamodel.globals import Context, reset_global_validation_context, set_global_validation_context
 from knot_resolver.utils.modeling import try_to_parse
@@ -39,7 +39,6 @@ class ConvertCommand(Command):
             type=str,
             help="File with configuration in YAML or JSON format.",
         )
-
         convert.add_argument(
             "output_file",
             type=str,
@@ -47,12 +46,11 @@ class ConvertCommand(Command):
             help="Optional, output file for converted configuration in Lua script. If not specified, converted configuration is printed.",
             default=None,
         )
-
         return convert, ConvertCommand
 
     @staticmethod
     def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
-        return {}
+        return comp_get_words(args, parser)
 
     def run(self, args: CommandArgs) -> None:
         with open(self.input_file, "r") as f:
