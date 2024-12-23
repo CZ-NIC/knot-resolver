@@ -27,6 +27,8 @@ lmdb = dependency('lmdb', required: false)
 if not lmdb.found()  # darwin workaround: missing pkgconfig
   lmdb = meson.get_compiler('c').find_library('lmdb')
 endif
+libidn2 = dependency('libidn2', version: '>=2.0.0')
+libpcre2 = dependency('libpcre2-8', version: '>=10.00')
 gnutls = dependency('gnutls', version: '>=3.4')
 luajit = dependency('luajit')
 # https://mesonbuild.com/howtox.html#add-math-library-lm-portably

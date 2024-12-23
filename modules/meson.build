@@ -59,6 +59,7 @@ subdir('refuse_nord')
 subdir('stats')
 subdir('ta_update')
 subdir('view')
+subdir('filter')
 
 # install lua modules
 foreach mod : lua_mod_src

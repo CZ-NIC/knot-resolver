@@ -30,6 +30,7 @@ usr/lib/knot-resolver/kres_modules/ta_update.lua
 usr/lib/knot-resolver/kres_modules/view.lua
 usr/lib/knot-resolver/kres_modules/watchdog.lua
 usr/lib/knot-resolver/kres_modules/workarounds.lua
+usr/lib/knot-resolver/kres_modules/filter.so
 usr/lib/systemd/system/knot-resolver.service
 usr/lib/tmpfiles.d/knot-resolver.conf
 usr/sbin/kres-cache-gc
