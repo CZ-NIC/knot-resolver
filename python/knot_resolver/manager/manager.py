@@ -11,7 +11,13 @@ from knot_resolver.controller.exceptions import SubprocessControllerError
 from knot_resolver.controller.interface import Subprocess, SubprocessController, SubprocessStatus, SubprocessType
 from knot_resolver.controller.registered_workers import command_registered_workers, get_registered_workers_kresids
 from knot_resolver.datamodel import KresConfig
-from knot_resolver.manager.config_store import ConfigStore, only_on_real_changes_update, only_on_real_changes_verifier
+from knot_resolver.manager.config_store import (
+    ConfigStore,
+    only_on_no_changes_update,
+    only_on_real_changes_update,
+    only_on_real_changes_verifier,
+)
+from knot_resolver.manager.files import files_reload
 from knot_resolver.utils.compat.asyncio import create_task
 from knot_resolver.utils.functional import Result
 from knot_resolver.utils.modeling.types import NoneType
@@ -151,6 +157,9 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
         await config_store.register_on_change_callback(
             only_on_real_changes_update(config_nodes)(self.set_new_tls_sticket_secret)
         )
+
+        # register callback that reloads files (TLS cert files) if selected configuration has not been changed
+        await config_store.register_on_change_callback(only_on_no_changes_update(config_nodes)(files_reload))
 
         # register controller config change listeners
         await config_store.register_verifier(_deny_max_worker_changes)
