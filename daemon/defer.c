@@ -42,7 +42,7 @@ V6_CONF = {1, V6_PREFIXES_CNT, V6_PREFIXES, V6_RATE_MULT, V6_SUBPRIO};
 
 #define Q0_INSTANT_LIMIT      1000000 // ns
 #define KRU_CAPACITY          (1<<19) // same as ratelimiting default
-#define BASE_PRICE(nsec)      ((uint64_t)KRU_LIMIT * LOADS_THRESHOLDS[0] / (1<<16) * nsec / Q0_INSTANT_LIMIT)
+#define BASE_PRICE(nsec)      ((uint64_t)KRU_LIMIT * LOADS_THRESHOLDS[0] / (1<<16) * (nsec) / Q0_INSTANT_LIMIT)
 #define MAX_DECAY             (BASE_PRICE(1000000) / 2)  // max value at 50% utilization of single cpu
 	//   see log written by defer_str_conf for details
 
@@ -50,7 +50,7 @@ V6_CONF = {1, V6_PREFIXES_CNT, V6_PREFIXES, V6_RATE_MULT, V6_SUBPRIO};
 #define IDLE_TIMEOUT          1000000 // ns (THREAD_CPUTIME); if exceeded, continue processing after next poll phase
 #define PHASE_UDP_TIMEOUT      400000 // ns (THREAD_CPUTIME); switch between udp, non-udp phases
 #define PHASE_NON_UDP_TIMEOUT  400000 // ns (THREAD_CPUTIME);    after timeout or emptying queue
-#define MAX_WAITING_REQS_SIZE (64 * 1024 * 1024)  // bytes; if exceeded, some deferred requests are processed in poll phase
+#define MAX_WAITING_REQS_SIZE (64l * 1024 * 1024)  // bytes; if exceeded, some deferred requests are processed in poll phase
 	// single TCP allocates more than 64KiB wire buffer
 	// TODO check whether all important allocations are counted;
 	//   different things are not counted: tasks and subsessions (not deferred after creation), uv handles, queues overhead, ...;
@@ -137,9 +137,9 @@ void defer_str_conf(char *desc, int desc_len)
 	int len = 0;
 #define append(...) len += snprintf(desc + len, desc_len > len ? desc_len - len : 0, __VA_ARGS__)
 #define append_time(prefix, ms, suffix) { \
-		if (ms < 1) append(prefix "%7.1f us" suffix, ms * 1000); \
-		else if (ms < 1000) append(prefix "%7.1f ms" suffix, ms); \
-		else append(prefix "%7.1f s " suffix, ms / 1000); }
+		if ((ms) < 1) append(prefix "%7.1f us" suffix, (ms) * 1000); \
+		else if ((ms) < 1000) append(prefix "%7.1f ms" suffix, (ms)); \
+		else append(prefix "%7.1f s " suffix, (ms) / 1000); }
 	append(     "  Expected cpus/procs: %5d\n", defer->cpus);
 
 	const size_t thresholds = sizeof(LOADS_THRESHOLDS) / sizeof(*LOADS_THRESHOLDS);
@@ -162,8 +162,8 @@ void defer_str_conf(char *desc, int desc_len)
 	uniform_thresholds &= ((1<<16) == (int)LOADS_THRESHOLDS[thresholds - 2] * LOADS_THRESHOLDS[0]);
 
 	append(     "  Decay:                 %7.3f %% per ms (32-bit max: %d)\n",
-			100.0 * MAX_DECAY / KRU_LIMIT, (kru_price_t)MAX_DECAY);
-	float half_life = -1.0 / log2f(1.0 - (float)MAX_DECAY / KRU_LIMIT);
+			100.0 * defer->max_decay / KRU_LIMIT, defer->max_decay);
+	float half_life = -1.0 / log2f(1.0 - (float)defer->max_decay / KRU_LIMIT);
 	append_time("    Half-life:         ", half_life, "\n");
 	if (uniform_thresholds)
 		append_time("    Priority rise in:  ", half_life * 16 / thresholds, "\n");
@@ -171,10 +171,9 @@ void defer_str_conf(char *desc, int desc_len)
 
 	append("  Rate limits for crossing priority levels as single CPU utilization:\n");
 
-	uint8_t *const prefixes[] = {V4_PREFIXES, V6_PREFIXES};
-	kru_price_t *const rate_mult[] = {V4_RATE_MULT, V6_RATE_MULT};
-	const size_t prefixes_cnt[] = {V4_PREFIXES_CNT, V6_PREFIXES_CNT};
+	const struct kru_conf *kru_confs[] = {&V4_CONF, &V6_CONF};
 	const int version[] = {4, 6};
+	const kru_price_t base_price_ms = BASE_PRICE(1000000);
 
 	append("%15s", "");
 	for (int j = 0; j < 3; j++)
@@ -182,10 +181,10 @@ void defer_str_conf(char *desc, int desc_len)
 	append("%14s\n", "max");
 
 	for (int v = 0; v < 2; v++) {
-		for (int i = prefixes_cnt[v] - 1; i >= 0; i--) {
-			append("%9sv%d/%-3d: ", "", version[v], prefixes[v][i]);
+		for (int i = kru_confs[v]->prefixes_cnt - 1; i >= 0; i--) {
+			append("%9sv%d/%-3d: ", "", version[v], kru_confs[v]->prefixes[i]);
 			for (int j = 0; j < thresholds; j++) {
-				float needed_util = (float)MAX_DECAY / (1<<16) * LOADS_THRESHOLDS[j] / BASE_PRICE(1000000) * rate_mult[v][i];
+				float needed_util = (float)defer->max_decay / (1<<16) * LOADS_THRESHOLDS[j] / base_price_ms * kru_confs[v]->rate_mult[i];
 				append("%12.3f %%", needed_util * 100);
 			}
 			append("\n");
@@ -200,10 +199,10 @@ void defer_str_conf(char *desc, int desc_len)
 	append("%14s\n", "max");
 
 	for (int v = 0; v < 2; v++) {
-		for (int i = prefixes_cnt[v] - 1; i >= 0; i--) {
-			append("%9sv%d/%-3d:  ", "", version[v], prefixes[v][i]);
+		for (int i = kru_confs[v]->prefixes_cnt - 1; i >= 0; i--) {
+			append("%9sv%d/%-3d:  ", "", version[v], kru_confs[v]->prefixes[i]);
 			for (int j = 0; j < thresholds; j++) {
-				float needed_time = (float)KRU_LIMIT / (1<<16) * LOADS_THRESHOLDS[j] / BASE_PRICE(1000000) * rate_mult[v][i];
+				float needed_time = (float)KRU_LIMIT / (1<<16) * LOADS_THRESHOLDS[j] / base_price_ms * kru_confs[v]->rate_mult[i];
 				if (needed_time < 1) {
 					append("%11.1f us", needed_time * 1000);
 				} else if (needed_time < 1000) {
@@ -295,7 +294,7 @@ static inline int classify(const union kr_sockaddr *addr, bool stream)
 	}
 
 	_Alignas(16) uint8_t key[16] = {0, };
-	const struct kru_conf *kru_conf;
+	const struct kru_conf *kru_conf = NULL;
 	if (addr->ip.sa_family == AF_INET6) {
 		memcpy(key, &addr->ip6.sin6_addr, 16);
 		kru_conf = &V6_CONF;
@@ -304,7 +303,7 @@ static inline int classify(const union kr_sockaddr *addr, bool stream)
 		kru_conf = &V4_CONF;
 	} else {
 		kr_assert(false);
-		return PRIORITY_UDP; // shouldn't happen anyway
+		return 0; // shouldn't happen anyway
 	}
 
 	uint16_t load;
