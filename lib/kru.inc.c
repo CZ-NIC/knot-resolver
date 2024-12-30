@@ -565,6 +565,33 @@ static uint8_t kru_limited_multi_prefix_or(struct kru *kru, uint32_t time_now, u
 	return 0;
 }
 
+static void kru_load_multi_prefix(struct kru *kru, uint32_t time_now, uint8_t namespace,
+                                           uint8_t key[static 16], uint8_t *prefixes, kru_price_t *prices, size_t queries_cnt, uint16_t *loads_out)
+{
+	struct query_ctx ctx[queries_cnt];
+
+	for (size_t i = 0; i < queries_cnt; i++) {
+		kru_limited_prefetch_prefix(kru, time_now, namespace, key, prefixes[i], (prices ? prices[i] : 0), ctx + i);
+	}
+
+	for (size_t i = 0; i < queries_cnt; i++) {
+		kru_limited_fetch(kru, ctx + i);
+	}
+
+	if (prices) {
+		for (int i = queries_cnt - 1; i >= 0; i--) {
+			kru_limited_update(kru, ctx + i, true);
+		}
+	}
+
+	if (loads_out) {
+		for (size_t i = 0; i < queries_cnt; i++) {
+			loads_out[i] = ctx[i].final_load_value;
+		}
+	}
+}
+
+
 static uint16_t kru_load_multi_prefix_max(struct kru *kru, uint32_t time_now, uint8_t namespace,
                                            uint8_t key[static 16], uint8_t *prefixes, kru_price_t *prices, size_t queries_cnt, uint8_t *prefix_out)
 {
@@ -612,5 +639,6 @@ static bool kru_limited(struct kru *kru, uint32_t time_now, uint8_t key[static 1
 	.limited_multi_or = kru_limited_multi_or, \
 	.limited_multi_or_nobreak = kru_limited_multi_or_nobreak, \
 	.limited_multi_prefix_or = kru_limited_multi_prefix_or, \
+	.load_multi_prefix = kru_load_multi_prefix, \
 	.load_multi_prefix_max = kru_load_multi_prefix_max, \
 }
