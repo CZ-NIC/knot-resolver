@@ -135,6 +135,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                 config.monitoring,
                 config.lua,
                 config.rate_limiting,
+                config.defer,
             ]
 
         # register and immediately call a verifier that validates config with 'canary' kresd process
