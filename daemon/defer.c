@@ -302,6 +302,9 @@ static inline int classify(const union kr_sockaddr *addr, bool stream)
 	} else if (addr->ip.sa_family == AF_INET) {
 		memcpy(key, &addr->ip4.sin_addr, 4);
 		kru_conf = &V4_CONF;
+	} else {
+		kr_assert(false);
+		return PRIORITY_UDP; // shouldn't happen anyway
 	}
 
 	uint16_t load;
@@ -371,7 +374,8 @@ static inline struct protolayer_iter_ctx *pop_query(void)
 	int i;
 	if (phase == PHASE_NON_UDP) {
 		for (; queue_ix < QUEUES_CNT && queue_len(queues[queue_ix]) == 0; queue_ix++);
-		if (queue_ix >= PRIORITY_UDP) kr_assert(false);
+		if (kr_fails_assert(queue_ix < PRIORITY_UDP))
+			return NULL;
 		i = queue_ix;
 	} else {
 		i = PRIORITY_UDP;
@@ -461,6 +465,7 @@ static inline void process_single_deferred(void)
 	int priority = classify((const union kr_sockaddr *)ctx->comm->src_addr, ctx->session->stream);
 	if (priority > queue_ix) {  // priority dropped (got higher value)
 		VERBOSE_LOG("    PUSH to %d\n", priority);
+		kr_require(priority >= 0); // placate static analyzers; queue_ix can't be negative
 		push_query(ctx, priority, false);
 		return;
 	}
