@@ -1,8 +1,12 @@
 -- SPDX-License-Identifier: GPL-3.0-or-later
+-- try loading the module
+local has_filter = pcall(modules.load, 'filter')
+if not has_filter then
+	os.exit(77) -- SKIP filter tests
+end
+
 local kres = require('kres')
 local condition = require('cqueues.condition')
-
-modules = { 'filter' }
 
 -- helper to wait for query resolution
 local function wait_resolve(qname)

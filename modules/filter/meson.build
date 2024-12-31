@@ -10,16 +10,18 @@ config_tests += [
   ['filter', files('filter.test.lua')],
 ]
 
-filter_mod = shared_module(
-  'filter',
-  filter_src,
-  dependencies: mod_deps + [
-    libidn2,
-    libpcre2
-  ],
-  include_directories: mod_inc_dir,
-  name_prefix: '',
-  install: true,
-  install_dir: modules_dir,
-  link_with: kresd,
-)
+if libidn2.found() and libpcre2.found()
+  filter_mod = shared_module(
+    'filter',
+    filter_src,
+    dependencies: mod_deps + [
+      libidn2,
+      libpcre2,
+    ],
+    include_directories: mod_inc_dir,
+    name_prefix: '',
+    install: true,
+    install_dir: modules_dir,
+    link_with: kresd,
+  )
+endif
