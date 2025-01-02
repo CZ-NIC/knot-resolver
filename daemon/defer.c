@@ -37,7 +37,6 @@ V6_CONF = {1, V6_PREFIXES_CNT, V6_PREFIXES, V6_RATE_MULT, V6_SUBPRIO};
 #define LOADS_THRESHOLDS      (uint16_t[])  {1<<4, 1<<8, 1<<12, -1}    // the last one should be UINT16_MAX
 #define QUEUES_CNT            ((sizeof(LOADS_THRESHOLDS) / sizeof(*LOADS_THRESHOLDS) - 1) * SUBPRIO_CNT + 2)
 	// priority 0 has no subpriorities, +1 for unverified
-#define PRIORITY_SYNC         (-1)              // no queue
 #define PRIORITY_UDP          (QUEUES_CNT - 1)  // last queue
 
 #define Q0_INSTANT_LIMIT      1000000 // ns
@@ -278,18 +277,12 @@ void defer_charge(uint64_t nsec, union kr_sockaddr *addr, bool stream)
 			kr_straddr(&addr->ip), nsec / 1000000.0, load, prefix);
 }
 
-/// Determine priority of the request in [-1, QUEUES_CNT - 1].
-/// Lower value has higher priority, -1 should be synchronous.
-/// Both UDP and non-UDP may end up with synchronous priority
-/// if the phase is active and no requests can be scheduled before them.
+/// Determine priority of the request in [0, QUEUES_CNT - 1];
+/// lower value has higher priority; plain UDP always gets PRIORITY_UDP.
 static inline int classify(const union kr_sockaddr *addr, bool stream)
 {
 	if (!stream) { // UDP
 		VERBOSE_LOG("    unverified address\n");
-		if ((phase & PHASE_UDP) && (queue_len(queues[PRIORITY_UDP]) == 0)) {
-			phase_set(PHASE_UDP);
-			return PRIORITY_SYNC;
-		}
 		return PRIORITY_UDP;
 	}
 
@@ -312,10 +305,6 @@ static inline int classify(const union kr_sockaddr *addr, bool stream)
 
 	VERBOSE_LOG("    load %d on /%d\n", load, prefix);
 
-	if ((phase & PHASE_NON_UDP) && (priority == 0) && (queue_len(queues[0]) == 0)) {
-		phase_set(PHASE_NON_UDP);
-		return PRIORITY_SYNC;
-	}
 	return priority;
 }
 
@@ -464,7 +453,6 @@ static inline void process_single_deferred(void)
 	int priority = classify((const union kr_sockaddr *)ctx->comm->src_addr, ctx->session->stream);
 	if (priority > queue_ix) {  // priority dropped (got higher value)
 		VERBOSE_LOG("    PUSH to %d\n", priority);
-		kr_require(priority >= 0); // placate static analyzers; queue_ix can't be negative
 		push_query(ctx, priority, false);
 		return;
 	}
@@ -552,8 +540,13 @@ static enum protolayer_iter_cb_result pl_defer_unwrap(
 
 	int priority = classify((const union kr_sockaddr *)ctx->comm->src_addr, ctx->session->stream);
 
-	if (priority == PRIORITY_SYNC) {
+	// Process synchronously if the phase is active and no requests can be scheduled before.
+	if ((
+				((priority == PRIORITY_UDP) && (phase & PHASE_UDP)) ||
+				((priority == 0) && (phase & PHASE_NON_UDP))
+			 ) && (queue_len(queues[priority]) == 0)) {
 		VERBOSE_LOG("    CONTINUE\n");
+		phase_set(priority == PRIORITY_UDP ? PHASE_UDP : PHASE_NON_UDP);
 		phase_accounting = true;
 		return protolayer_continue(ctx);
 	}
