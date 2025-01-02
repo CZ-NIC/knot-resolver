@@ -1,4 +1,4 @@
-# CLI comletion for bash-shell
+# CLI completion for bash-shell
 install_data(
     sources: 'client.bash',
     rename: 'kresctl',
@@ -6,8 +6,8 @@ install_data(
   )
 
 # CLI completion for fish-shell
-install_data(
-    sources: 'client.fish',
-    rename: 'kresctl.fish',
-    install_dir: completion_dir / 'fish' / 'completions'
-  )
+# install_data(
+#     sources: 'client.fish',
+#     rename: 'kresctl.fish',
+#     install_dir: completion_dir / 'fish' / 'completions'
+#   )

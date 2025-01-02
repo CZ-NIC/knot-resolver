@@ -741,8 +741,6 @@ int engine_register(const char *name, const char *precedence, const char* ref)
 	if (!module) {
 		return kr_error(ENOMEM);
 	}
-	module->data = the_engine; /*< some outside modules may still use this value */
-
 	int ret = kr_module_load(module, name, LIBDIR "/kres_modules");
 	if (ret == 0) {
 		/* We have a C module, loaded and init() was called.

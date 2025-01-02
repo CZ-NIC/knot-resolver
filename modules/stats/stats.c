@@ -624,6 +624,9 @@ int stats_init(struct kr_module *module)
 	/* Initialize ring buffer of recently visited upstreams */
 	array_init(data->upstreams.q);
 	if (array_reserve(data->upstreams.q, UPSTREAMS_COUNT) != 0) {
+		trie_free(data->trie);
+		lru_free(data->queries.frequent);
+		free(data);
 		return kr_error(ENOMEM);
 	}
 	data->upstreams.q.len = UPSTREAMS_COUNT; /* signify we use the entries */

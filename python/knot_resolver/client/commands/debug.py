@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 from typing import List, Optional, Tuple, Type
 
-from knot_resolver.client.command import Command, CommandArgs, CompWords, register_command
+from knot_resolver.client.command import Command, CommandArgs, CompWords, comp_get_words, register_command
 from knot_resolver.utils import which
 from knot_resolver.utils.requests import request
 
@@ -19,7 +19,7 @@ class DebugCommand(Command):
         self.sudo: bool = namespace.sudo
         self.gdb: str = namespace.gdb
         self.print_only: bool = namespace.print_only
-        self.gdb_args: List[str] = namespace.extra
+        self.gdb_args: List[str] = namespace.extra if namespace.extra is not None else []
         super().__init__(namespace)
 
     @staticmethod
@@ -29,13 +29,6 @@ class DebugCommand(Command):
         debug = subparser.add_parser(
             "debug",
             help="Run GDB on the manager's subprocesses",
-        )
-        debug.add_argument(
-            "proc_type",
-            help="Optional, the type of process to debug. May be 'kresd' (default), 'gc', or 'all'.",
-            type=str,
-            nargs="?",
-            default="kresd",
         )
         debug.add_argument(
             "--sudo",
@@ -56,11 +49,19 @@ class DebugCommand(Command):
             action="store_true",
             default=False,
         )
+        debug.add_argument(
+            "proc_type",
+            help="Optional, the type of process to debug. May be 'kresd', 'gc', or 'all'.",
+            choices=["kresd", "gc", "all"],
+            type=str,
+            nargs="?",
+            default="kresd",
+        )
         return debug, DebugCommand
 
     @staticmethod
     def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
-        return {}
+        return comp_get_words(args, parser)
 
     def run(self, args: CommandArgs) -> None:  # noqa: PLR0912, PLR0915
         if self.gdb is None:
