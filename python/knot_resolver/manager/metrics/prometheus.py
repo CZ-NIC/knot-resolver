@@ -1,8 +1,8 @@
 import asyncio
-import importlib
 import logging
 from typing import Any, Dict, Generator, List, Optional, Tuple
 
+from knot_resolver.constants import PROMETHEUS_LIB
 from knot_resolver.controller.interface import KresID
 from knot_resolver.controller.registered_workers import get_registered_workers_kresids
 from knot_resolver.datamodel.config_schema import KresConfig
@@ -12,13 +12,9 @@ from knot_resolver.utils.functional import Result
 
 from .collect import collect_kresd_workers_metrics
 
-_prometheus_client = False
-if importlib.util.find_spec("prometheus_client"):
-    _prometheus_client = True
-
 logger = logging.getLogger(__name__)
 
-if _prometheus_client:
+if PROMETHEUS_LIB:
     from prometheus_client import exposition  # type: ignore
     from prometheus_client.bridge.graphite import GraphiteBridge  # type: ignore
     from prometheus_client.core import (
@@ -359,7 +355,7 @@ async def init_prometheus(config_store: ConfigStore) -> None:
     """
     Initialize metrics collection. Must be called before any other function from this module.
     """
-    if _prometheus_client:
+    if PROMETHEUS_LIB:
         # init and register metrics collector
         global _metrics_collector
         _metrics_collector = KresPrometheusMetricsCollector(config_store)
@@ -371,7 +367,7 @@ async def init_prometheus(config_store: ConfigStore) -> None:
 
 
 async def report_prometheus() -> Optional[bytes]:
-    if _prometheus_client:
+    if PROMETHEUS_LIB:
         # manually trigger stat collection so that we do not have to wait for it
         if _metrics_collector is not None:
             await _metrics_collector.collect_kresd_stats()

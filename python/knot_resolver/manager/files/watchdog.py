@@ -1,18 +1,14 @@
-import importlib
 import logging
 from pathlib import Path
 from threading import Timer
 from typing import List, Optional
 
+from knot_resolver.constants import WATCHDOG_LIB
 from knot_resolver.controller.registered_workers import command_registered_workers
 from knot_resolver.datamodel import KresConfig
 from knot_resolver.datamodel.types import File
 from knot_resolver.manager.config_store import ConfigStore, only_on_real_changes_update
 from knot_resolver.utils import compat
-
-_watchdog = False
-if importlib.util.find_spec("watchdog"):
-    _watchdog = True
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +21,7 @@ def tls_cert_paths(config: KresConfig) -> List[str]:
     return [str(file) for file in files if file is not None]
 
 
-if _watchdog:
+if WATCHDOG_LIB:
     from watchdog.events import (
         FileSystemEvent,
         FileSystemEventHandler,
@@ -112,13 +108,16 @@ if _watchdog:
             self._observer.stop()
             self._observer.join()
 
-    @only_on_real_changes_update(tls_cert_paths)
-    async def _init_tls_cert_watchdog(config: KresConfig) -> None:
+
+@only_on_real_changes_update(tls_cert_paths)
+async def _init_tls_cert_watchdog(config: KresConfig) -> None:
+    if WATCHDOG_LIB:
         global _tls_cert_watchdog
+
         if _tls_cert_watchdog:
             _tls_cert_watchdog.stop()
 
-        if config.network.tls.cert_file and config.network.tls.key_file:
+        if config.network.tls.files_watchdog and config.network.tls.cert_file and config.network.tls.key_file:
             logger.info("Initializing TLS certificate files WatchDog")
             _tls_cert_watchdog = TLSCertWatchDog(
                 config.network.tls.cert_file.to_path(),
@@ -128,6 +127,5 @@ if _watchdog:
 
 
 async def init_files_watchdog(config_store: ConfigStore) -> None:
-    if _watchdog:
-        # watchdog for TLS certificate files
-        await config_store.register_on_change_callback(_init_tls_cert_watchdog)
+    # watchdog for TLS certificate files
+    await config_store.register_on_change_callback(_init_tls_cert_watchdog)
