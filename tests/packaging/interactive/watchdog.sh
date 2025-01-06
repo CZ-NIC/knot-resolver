@@ -29,11 +29,31 @@ function count_reloads(){
     echo "$(journalctl -u knot-resolver.service | grep -c "Reloading of TLS certificate files has finished")"
 }
 
+# test that files watchdog is turned off
+# {{
+
+err_count=$(count_errors)
+rel_count=$(count_reloads)
+sleep 6
+
+if [ $(count_errors) -ne $err_count ] || [ $(count_reloads) -ne $rel_count ]; then
+    echo "TLS certificate files watchdog is running (should not) or other errors occurred."
+    exit 1
+fi
+
+# }}
+
+# configure TLS certificate files and turn on watchdog
+kresctl config set -p /network/tls/files-watchdog true
+if [ "$?" -ne "0" ]; then
+    echo "Could not turn on TLS certificate files watchdog."
+    exit 1
+fi
+
 # test modification
 # {{
 
 # modify certificate files with '-', it will trigger reload
-err_count=$(count_errors)
 rel_count=$(count_reloads)
 echo "-----------" >> $cert_file
 echo "-----------" >> $key_file
