@@ -22,8 +22,8 @@ void defer_charge(uint64_t nsec, union kr_sockaddr *addr, bool stream);
 
 typedef struct {
 	bool is_accounting; /// whether currently accounting the time to someone
-	union kr_sockaddr addr; /// request source (to which we account) or AF_UNSPEC if unknown yet
 	bool stream;
+	union kr_sockaddr addr; /// request source (to which we account) or AF_UNSPEC if unknown yet
 	uint64_t stamp; /// monotonic nanoseconds, probably won't wrap
 } defer_sample_state_t;
 extern defer_sample_state_t defer_sample_state;
