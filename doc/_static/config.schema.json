@@ -305,6 +305,21 @@
                     "description": "TLS configuration, also affects DNS over TLS and DNS over HTTPS.",
                     "type": "object",
                     "properties": {
+                        "files-watchdog": {
+                            "anyOf": [
+                                {
+                                    "type": "string",
+                                    "enum": [
+                                        "auto"
+                                    ]
+                                },
+                                {
+                                    "type": "boolean"
+                                }
+                            ],
+                            "description": "Enables files watchdog for TLS certificate files. Requires the optional 'watchdog' dependency.",
+                            "default": "auto"
+                        },
                         "cert-file": {
                             "type": [
                                 "string",
@@ -359,6 +374,7 @@
                         }
                     },
                     "default": {
+                        "files_watchdog": true,
                         "cert_file": null,
                         "key_file": null,
                         "sticket_secret": null,
@@ -517,6 +533,7 @@
                 },
                 "address_renumbering": null,
                 "tls": {
+                    "files_watchdog": true,
                     "cert_file": null,
                     "key_file": null,
                     "sticket_secret": null,

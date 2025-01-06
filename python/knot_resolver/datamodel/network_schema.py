@@ -1,5 +1,6 @@
-from typing import List, Literal, Optional, Union
+from typing import Any, List, Literal, Optional, Union
 
+from knot_resolver.constants import WATCHDOG_LIB
 from knot_resolver.datamodel.types import (
     EscapedStr32B,
     Int0_512,
@@ -48,18 +49,31 @@ class AddressRenumberingSchema(ConfigSchema):
 
 
 class TLSSchema(ConfigSchema):
-    """
-    TLS configuration, also affects DNS over TLS and DNS over HTTPS.
+    class Raw(ConfigSchema):
+        """
+        TLS configuration, also affects DNS over TLS and DNS over HTTPS.
 
-    ---
-    cert_file: Path to certificate file.
-    key_file: Path to certificate key file.
-    sticket_secret: Secret for TLS session resumption via tickets. (RFC 5077).
-    sticket_secret_file: Path to file with secret for TLS session resumption via tickets. (RFC 5077).
-    auto_discovery: Experimental automatic discovery of authoritative servers supporting DNS-over-TLS.
-    padding: EDNS(0) padding of queries and answers sent over an encrypted channel.
-    """
+        ---
+        files_watchdog: Enables files watchdog for TLS certificate files. Requires the optional 'watchdog' dependency.
+        cert_file: Path to certificate file.
+        key_file: Path to certificate key file.
+        sticket_secret: Secret for TLS session resumption via tickets. (RFC 5077).
+        sticket_secret_file: Path to file with secret for TLS session resumption via tickets. (RFC 5077).
+        auto_discovery: Experimental automatic discovery of authoritative servers supporting DNS-over-TLS.
+        padding: EDNS(0) padding of queries and answers sent over an encrypted channel.
+        """
 
+        files_watchdog: Union[Literal["auto"], bool] = "auto"
+        cert_file: Optional[ReadableFile] = None
+        key_file: Optional[ReadableFile] = None
+        sticket_secret: Optional[EscapedStr32B] = None
+        sticket_secret_file: Optional[ReadableFile] = None
+        auto_discovery: bool = False
+        padding: Union[bool, Int0_512] = True
+
+    _LAYER = Raw
+
+    files_watchdog: bool
     cert_file: Optional[ReadableFile] = None
     key_file: Optional[ReadableFile] = None
     sticket_secret: Optional[EscapedStr32B] = None
@@ -67,9 +81,20 @@ class TLSSchema(ConfigSchema):
     auto_discovery: bool = False
     padding: Union[bool, Int0_512] = True
 
+    def _files_watchdog(self, obj: Raw) -> Any:
+        if obj.files_watchdog == "auto":
+            return WATCHDOG_LIB
+        return obj.files_watchdog
+
     def _validate(self):
         if self.sticket_secret and self.sticket_secret_file:
             raise ValueError("'sticket_secret' and 'sticket_secret_file' are both defined, only one can be used")
+        if bool(self.cert_file) != bool(self.key_file):
+            raise ValueError("'cert-file' and 'key-file' must be configured together")
+        if self.cert_file and self.key_file and self.files_watchdog and not WATCHDOG_LIB:
+            raise ValueError(
+                "'files-watchdog' is enabled, but the required 'watchdog' dependency (optional) is not installed"
+            )
 
 
 class ListenSchema(ConfigSchema):
