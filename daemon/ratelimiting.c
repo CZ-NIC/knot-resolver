@@ -129,6 +129,8 @@ bool ratelimiting_request_begin(struct kr_request *req)
 	if (!ratelimiting) return false;
 	if (!req->qsource.addr)
 		return false;  // don't consider internal requests
+	if (req->qsource.price_factor16 == 0)
+		return false;  // whitelisted
 
 	// We only do this on pure UDP.  (also TODO if cookies get implemented)
 	const bool ip_validated = req->qsource.flags.tcp || req->qsource.flags.tls;
@@ -143,14 +145,26 @@ bool ratelimiting_request_begin(struct kr_request *req)
 		struct sockaddr_in6 *ipv6 = (struct sockaddr_in6 *)req->qsource.addr;
 		memcpy(key, &ipv6->sin6_addr, 16);
 
+		// compute adjusted prices, using standard rounding
+		kru_price_t prices[V6_PREFIXES_CNT];
+		for (int i = 0; i < V6_PREFIXES_CNT; ++i) {
+			prices[i] = (req->qsource.price_factor16
+					* (uint64_t)ratelimiting->v6_prices[i] + (1<<15)) >> 16;
+		}
 		limited_prefix = KRU.limited_multi_prefix_or((struct kru *)ratelimiting->kru, time_now,
-				1, key, V6_PREFIXES, ratelimiting->v6_prices, V6_PREFIXES_CNT, NULL);
+				1, key, V6_PREFIXES, prices, V6_PREFIXES_CNT, NULL);
 	} else {
 		struct sockaddr_in *ipv4 = (struct sockaddr_in *)req->qsource.addr;
 		memcpy(key, &ipv4->sin_addr, 4);  // TODO append port?
 
+		// compute adjusted prices, using standard rounding
+		kru_price_t prices[V4_PREFIXES_CNT];
+		for (int i = 0; i < V4_PREFIXES_CNT; ++i) {
+			prices[i] = (req->qsource.price_factor16
+					* (uint64_t)ratelimiting->v4_prices[i] + (1<<15)) >> 16;
+		}
 		limited_prefix = KRU.limited_multi_prefix_or((struct kru *)ratelimiting->kru, time_now,
-				0, key, V4_PREFIXES, ratelimiting->v4_prices, V4_PREFIXES_CNT, NULL);
+				0, key, V4_PREFIXES, prices, V4_PREFIXES_CNT, NULL);
 	}
 	if (!limited_prefix) return false;  // not limited
 

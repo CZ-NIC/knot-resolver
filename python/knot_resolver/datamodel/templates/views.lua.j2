@@ -12,7 +12,9 @@ assert(C.kr_view_insert_action('{{ subnet }}', '{{ view.dst_subnet or '' }}',
 {% if flags %}
 	{{ quotes(policy_flags(flags)) }},
 {%- endif %}
-
+{% if view.options.price_factor|float != 1.0 %}
+	'C.defer_set_price_factor16(req, {{ (view.options.price_factor|float * 2**16)|round|int }})',
+{%- endif %}
 {% if view.tags %}
 	{{ policy_tags_assign(view.tags) }},
 {% elif view.answer %}

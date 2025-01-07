@@ -32,6 +32,7 @@ uint32_t _count_test(int expected_passing, int addr_family, char *addr_format, u
 	knot_pkt_t answer = { .wire = wire };
 	struct kr_request req = {
 		.qsource.addr = (struct sockaddr *) &addr,
+		.qsource.price_factor16 = 1 << 16,
 		.answer = &answer
 	};
 	char addr_str[40];
