@@ -450,15 +450,15 @@ static inline void process_single_deferred(void)
 		return;
 	}
 
-	int priority = classify((const union kr_sockaddr *)ctx->comm->src_addr, ctx->session->stream);
-	if (priority > queue_ix) {  // priority dropped (got higher value)
-		VERBOSE_LOG("    PUSH to %d\n", priority);
-		push_query(ctx, priority, false);
-		return;
-	}
-
 	bool eof = false;
 	if (ctx->session->stream) {
+		int priority = classify((const union kr_sockaddr *)ctx->comm->src_addr, ctx->session->stream);
+		if (priority > queue_ix) {  // priority dropped (got higher value)
+			VERBOSE_LOG("    PUSH to %d\n", priority);
+			push_query(ctx, priority, false);
+			return;
+		}
+
 		kr_assert(queue_head(sdata->queue) == ctx);
 		queue_pop(sdata->queue);
 		while ((queue_len(sdata->queue) > 0) && (queue_head(sdata->queue) == NULL)) { // EOF event
