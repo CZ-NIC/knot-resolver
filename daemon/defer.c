@@ -89,7 +89,7 @@ enum phase {
 	PHASE_ANY      = PHASE_UDP | PHASE_NON_UDP
 } phase = PHASE_ANY;
 uint64_t phase_elapsed = 0;    // ns
-bool phase_accounting = false; // add accounted time to phase_elapsed on next call of defer_account
+bool phase_accounting = false; // add accounted time to phase_elapsed in defer_account
 
 static inline void phase_set(enum phase p)
 {
@@ -104,8 +104,10 @@ static inline void phase_charge(uint64_t nsec)
 	phase_elapsed += nsec;
 	if ((phase == PHASE_UDP) && (phase_elapsed > PHASE_UDP_TIMEOUT)) {
 		phase_set(PHASE_NON_UDP);
+		phase_accounting = false;
 	} else if ((phase == PHASE_NON_UDP) && (phase_elapsed > PHASE_NON_UDP_TIMEOUT)) {
 		phase_set(PHASE_UDP);
+		phase_accounting = false;
 	}
 }
 
@@ -497,8 +499,8 @@ static inline void process_deferred_over_size_limit(void) {
 	if (waiting_requests_size > MAX_WAITING_REQS_SIZE) {
 		defer_sample_state_t prev_sample_state;
 		defer_sample_start(&prev_sample_state);
-		phase_accounting = true;
 		do {
+			phase_accounting = true;
 			process_single_deferred();  // possibly defers again without decreasing waiting_requests_size
 				// If the unwrapped query is to be processed here,
 				// it is the last iteration and the query is processed after returning.
@@ -622,8 +624,8 @@ static void defer_queues_idle(uv_idle_t *handle)
 	VERBOSE_LOG("  %d waiting\n", waiting_requests);
 	defer_sample_start(NULL);
 	uint64_t idle_stamp = defer_sample_state.stamp;
-	phase_accounting = true;
 	do {
+		phase_accounting = true;
 		process_single_deferred();
 		defer_sample_restart();
 	} while ((waiting_requests > 0) && (defer_sample_state.stamp < idle_stamp + IDLE_TIMEOUT));
