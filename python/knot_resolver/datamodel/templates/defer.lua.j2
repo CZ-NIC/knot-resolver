@@ -4,7 +4,8 @@
 assert(C.defer_init(
 	'{{ cfg.rundir }}/defer',
 	{{ cfg.defer.log_period.millis() }},
+	{{ cfg.defer.hard_timeout.millis() }},
 	{{ cfg.workers }}) == 0)
 {% else %}
-assert(C.defer_init(nil, 0, 0) == 0)
+assert(C.defer_init(nil, 0, 0, 0) == 0)
 {%- endif %}

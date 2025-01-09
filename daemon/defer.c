@@ -4,6 +4,7 @@
 
 #include <math.h>
 #include <stdatomic.h>
+#include <unistd.h>
 #include "daemon/defer.h"
 #include "daemon/session2.h"
 #include "daemon/udp_queue.h"
@@ -63,6 +64,7 @@ struct defer {
 	size_t capacity;
 	kru_price_t max_decay;
 	uint32_t log_period;
+	uint32_t hard_timeout;
 	int cpus;
 	bool using_avx2;
 	_Atomic uint32_t log_time;
@@ -642,9 +644,36 @@ static void defer_queues_idle(uv_idle_t *handle)
 	VERBOSE_LOG("POLL\n");
 }
 
+static void defer_alarm(int signum)
+{
+	if (!defer || (defer->hard_timeout == 0)) return;
+
+	uint64_t elapsed = 0;
+	if (defer_sample_state.is_accounting) {
+		elapsed = defer_get_stamp() - defer_sample_state.stamp;
+		VERBOSE_LOG("SIGALRM %s, host %s used %.3f s of cpu time on ongoing operation\n",
+				signum ? "received" : "initialized",
+				kr_straddr(&defer_sample_state.addr.ip), elapsed / 1000000000.0); // XXX
+	} else {
+		VERBOSE_LOG("SIGALRM %s, no measuring in progress\n",
+				signum ? "received" : "initialized");
+	}
+	int64_t rest_to_timeout_ms = defer->hard_timeout - elapsed / 1000000; // ms - ns
+	if (rest_to_timeout_ms <= 0) {
+		uv_update_time(uv_default_loop()); // TODO more conceptual solution?
+		defer_charge(elapsed, &defer_sample_state.addr, defer_sample_state.stream);
+		kr_log_crit(DEFER, "Host %s used %0.3f s of cpu time continuously, interrupting cresd.\n",
+			kr_straddr(&defer_sample_state.addr.ip), elapsed / 1000000000.0);
+		classify(&defer_sample_state.addr, defer_sample_state.stream); // XXX
+		__sync_synchronize();
+		abort();
+	}
+	alarm((rest_to_timeout_ms + 999) / 1000);
+}
 
 /// Initialize shared memory, queues. To be called from Lua.
-int defer_init(const char *mmap_file, uint32_t log_period, int cpus)  // TODO possibly remove cpus; not needed
+int defer_init(const char *mmap_file, uint32_t log_period, uint32_t hard_timeout, int cpus)
+	// TODO possibly remove cpus; not needed
 {
 	defer_initialized = true;
 	if (mmap_file == NULL) {
@@ -662,6 +691,7 @@ int defer_init(const char *mmap_file, uint32_t log_period, int cpus)  // TODO po
 		.capacity = KRU_CAPACITY,
 		.max_decay = MAX_DECAY,
 		.log_period = log_period,
+		.hard_timeout = hard_timeout,
 		.cpus = cpus,
 		.using_avx2 = using_avx2(),
 	};
@@ -676,6 +706,7 @@ int defer_init(const char *mmap_file, uint32_t log_period, int cpus)  // TODO po
 			sizeof(header.capacity) +
 			sizeof(header.max_decay) +
 			sizeof(header.log_period) +
+			sizeof(header.hard_timeout) +
 			sizeof(header.cpus),
 		"detected padding with undefined data inside mmapped header");
 
@@ -712,6 +743,9 @@ int defer_init(const char *mmap_file, uint32_t log_period, int cpus)  // TODO po
 
 	for (size_t i = 0; i < QUEUES_CNT; i++)
 		queue_init(queues[i]);
+
+	signal(SIGALRM, defer_alarm);
+	defer_alarm(0);
 
 	return 0;
 

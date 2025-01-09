@@ -8,6 +8,7 @@ Request prioritization (defer)
 Defer tries to mitigate DoS attacks by measuring cpu time consumption of different hosts and networks
 and deferring future requests from the same origin.
 If there is not enough time to process all the requests, the lowest priority ones are dropped.
+It also allows setting a hard timeout on a continuous computation on a single request.
 
 The time measurements are taken into account only for TCP-based queries (including DoT and DoH),
 as the source address of plain UDP can be forged.
@@ -46,6 +47,30 @@ The limits can be adjusted for different packet origins using :option:`price-fac
     and sources with more dropped queries have greater probability to be chosen.
 
 
+.. option:: defer/hard-timeout: <time ms|s|m|h|d>
+
+    :default: 0s
+
+    Time limit for a cpu time consumed continuously on a single request, or ``0s`` to disable.
+    It causes crash of kresd if exceeded; use carefully.
+
+    This is intended as a last resort defence against yet unknown bugs
+    allowing an attacker to initiate very expensive computations by a single request
+    resulting in freezing kresd process for several seconds or minutes.
+
+    It is based on scheduling a SIGALRM to be delivered after the timeout (or up to 1s later),
+    which then interrupts the computation.
+    After the interrupt the priority of the request's origin is decreased according to the duration,
+    the kresd process is terminated (dropping all pending, but probably already timeouted, requests)
+    and started again by manager.
+    To keep the data with measurements and priorities alive during restart,
+    it is crucial to use :ref:`multiple workers <config-multiple-workers>`
+    as those data are shared between them and disappear with the last one.
+
+    A continuous work on a single request usually takes under 1 ms. (TODO check)
+    Set the timeout at least to several seconds to avoid random crashes. (TODO or more?)
+
+
 Implementation details
 ----------------------
 
@@ -64,4 +89,3 @@ Further ordering is according to the time of arrival.
 If a request is deferred for too long, it gets dropped.
 This can happen also for UDP requests,
 which are stored in a single queue ordered by the time of their arrival.
-
