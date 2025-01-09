@@ -620,7 +620,7 @@ struct qr_task *worker_resolve_start(knot_pkt_t *, struct kr_qflags);
 int zi_zone_import(const zi_config_t);
 _Bool ratelimiting_request_begin(struct kr_request *);
 int ratelimiting_init(const char *, size_t, uint32_t, uint32_t, uint16_t, uint32_t, _Bool);
-int defer_init(const char *, uint32_t, int);
+int defer_init(const char *, uint32_t, uint32_t, int);
 void defer_set_price_factor16(struct kr_request *, uint32_t);
 struct engine {
 	char _stub[];
