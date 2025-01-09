@@ -1,24 +1,23 @@
 import logging
 from pathlib import Path
 from threading import Timer
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from knot_resolver.constants import WATCHDOG_LIB
 from knot_resolver.controller.registered_workers import command_registered_workers
 from knot_resolver.datamodel import KresConfig
-from knot_resolver.datamodel.types import File
 from knot_resolver.manager.config_store import ConfigStore, only_on_real_changes_update
 from knot_resolver.utils import compat
 
 logger = logging.getLogger(__name__)
 
 
-def tls_cert_paths(config: KresConfig) -> List[str]:
-    files: List[Optional[File]] = [
+def tls_cert_files_config(config: KresConfig) -> List[Any]:
+    return [
+        config.network.tls.files_watchdog,
         config.network.tls.cert_file,
         config.network.tls.key_file,
     ]
-    return [str(file) for file in files if file is not None]
 
 
 if WATCHDOG_LIB:
@@ -109,7 +108,7 @@ if WATCHDOG_LIB:
             self._observer.join()
 
 
-@only_on_real_changes_update(tls_cert_paths)
+@only_on_real_changes_update(tls_cert_files_config)
 async def _init_tls_cert_watchdog(config: KresConfig) -> None:
     if WATCHDOG_LIB:
         global _tls_cert_watchdog
