@@ -69,6 +69,7 @@ struct defer {
 };
 struct defer *defer = NULL;
 bool defer_initialized = false;
+uint64_t defer_uvtime_stamp = 0;
 struct mmapped defer_mmapped = {0};
 
 defer_sample_state_t defer_sample_state = {

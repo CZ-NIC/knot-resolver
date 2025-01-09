@@ -30,7 +30,7 @@ extern defer_sample_state_t defer_sample_state;
 
 extern struct defer *defer;  /// skip sampling/deferring if NULL
 extern bool defer_initialized; /// defer_init was called, possibly keeping defer disabled
-
+extern uint64_t defer_uvtime_stamp; /// stamp of the last uv time update
 
 // TODO: reconsider `static inline` cases below
 
@@ -39,7 +39,12 @@ static inline uint64_t defer_get_stamp(void)
 {
 	struct timespec now_ts = {0};
 	clock_gettime(CLOCK_THREAD_CPUTIME_ID, &now_ts);
-	return now_ts.tv_nsec + 1000*1000*1000 * (uint64_t)now_ts.tv_sec;
+	uint64_t stamp = now_ts.tv_nsec + 1000*1000*1000 * (uint64_t)now_ts.tv_sec;
+	if (defer_uvtime_stamp + 1000*1000 < stamp) {
+		defer_uvtime_stamp = stamp;
+		uv_update_time(uv_default_loop());
+	}
+	return stamp;
 }
 
 /// Annotate the work currently being accounted by an IP address.
