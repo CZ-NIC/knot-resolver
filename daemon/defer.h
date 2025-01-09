@@ -9,9 +9,9 @@
 
 /// Initialize defer, incl. shared memory with KRU, excl. idle.
 KR_EXPORT
-int defer_init(const char *mmap_file, uint32_t log_period, int cpus);
+int defer_init(const char *mmap_file, uint32_t log_period, uint32_t hard_timeout, int cpus);
 
-/// Initialize idle.
+/// Initialize idle and SIGALRM handler.
 int defer_init_idle(uv_loop_t *loop);
 
 /// Deinitialize shared memory.
@@ -79,9 +79,10 @@ static inline void defer_sample_start_stamp(uint64_t stamp)
 {
 	if (!defer) return;
 	kr_assert(!defer_sample_state.is_accounting);
-	defer_sample_state.is_accounting = true;
 	defer_sample_state.stamp = stamp;
 	defer_sample_state.addr.ip.sa_family = AF_UNSPEC;
+	__sync_synchronize();
+	defer_sample_state.is_accounting = true;
 }
 
 /// Internal; stop accounting work at specified timestamp and charge the source if applicable.
@@ -90,6 +91,7 @@ static inline void defer_sample_stop_stamp(uint64_t stamp)
 	if (!defer) return;
 	kr_assert(defer_sample_state.is_accounting);
 	defer_sample_state.is_accounting = false;
+	__sync_synchronize();
 
 	if (defer_sample_state.addr.ip.sa_family == AF_UNSPEC) return;
 
@@ -146,7 +148,10 @@ static inline void defer_sample_stop(defer_sample_state_t *prev_state, bool reus
 
 	// resume
 	if (prev_state) {
-		defer_sample_state = *prev_state;
+		defer_sample_state.addr = prev_state->addr;
+		defer_sample_state.stream = prev_state->stream;
 		defer_sample_state.stamp = stamp;
+		__sync_synchronize();
+		defer_sample_state.is_accounting = prev_state->is_accounting;
 	}
 }
