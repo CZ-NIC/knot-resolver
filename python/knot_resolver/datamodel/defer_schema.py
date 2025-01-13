@@ -11,5 +11,5 @@ class DeferSchema(ConfigSchema):
     log_period: Minimal time between two log messages, or '0s' to disable.
     """
 
-    enabled: bool = True
+    enabled: bool = False
     log_period: TimeUnit = TimeUnit("0s")

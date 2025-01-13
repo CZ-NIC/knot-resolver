@@ -1720,7 +1720,7 @@
                 "enabled": {
                     "type": "boolean",
                     "description": "Use request prioritization.",
-                    "default": true
+                    "default": false
                 },
                 "log-period": {
                     "type": "string",
@@ -1730,7 +1730,7 @@
                 }
             },
             "default": {
-                "enabled": true,
+                "enabled": false,
                 "log_period": "0s"
             }
         },

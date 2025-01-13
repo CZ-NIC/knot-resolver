@@ -37,7 +37,7 @@ The detailed configuration is printed by ``defer`` group on ``info`` level on st
 
 .. option:: defer/enabled: true|false
 
-    :default: true
+    :default: false
 
     Enable request prioritization.
 
