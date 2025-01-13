@@ -6,6 +6,7 @@ Improvements
 - avoid multiple log lines when IPv6 isn't available (!1633)
 - manager: fix startup on Linux without libsystemd (!1608)
 - auto-reload TLS certificate files (!1626)
+  - Can be configured using the ``/network/tls/files-watchdog`` option. (!1645)
 - reload TLS certificate files even if the configuration has not changed (!1644)
 - kresctl: bash command-line TAB completion (!1622)
 - add request prioritization (defer) to mitigate DoS attacks (!1641)
