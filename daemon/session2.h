@@ -334,6 +334,8 @@ typedef void (*protolayer_finished_cb)(int status, struct session2 *session,
 	XX(MALFORMED) \
 	/** Signal that a connection has ended. */\
 	XX(DISCONNECT) \
+	/** Signal EOF from peer (e.g. half-closed TCP connection). */\
+	XX(EOF) \
 	/** Failed task send - update stats. */\
 	XX(STATS_SEND_ERR) \
 	/** Outgoing query submission - update stats. */\
@@ -535,6 +537,10 @@ size_t protolayer_queue_count_payload(const protolayer_iter_ctx_queue_t *queue);
  * queue iterators, as it does not need to iterate through the whole queue. */
 bool protolayer_queue_has_payload(const protolayer_iter_ctx_queue_t *queue);
 
+/** Gets layer-specific session data for the specified protocol layer.
+ * Returns NULL if the layer is not present in the session. */
+void *protolayer_sess_data_get_proto(struct session2 *s, enum protolayer_type protocol);
+
 /** Gets layer-specific session data for the last processed layer.
  * To be used after returning from its callback for async continuation but before calling protolayer_continue. */
 void *protolayer_sess_data_get_current(struct protolayer_iter_ctx *ctx);
@@ -542,6 +548,13 @@ void *protolayer_sess_data_get_current(struct protolayer_iter_ctx *ctx);
 /** Gets layer-specific iteration data for the last processed layer.
  * To be used after returning from its callback for async continuation but before calling protolayer_continue. */
 void *protolayer_iter_data_get_current(struct protolayer_iter_ctx *ctx);
+
+/** Gets rough memory footprint estimate of session/iteration for use in defer.
+ * Different, hopefully minor, allocations are not counted here;
+ * tasks and subsessions are also not counted;
+ * read the code before using elsewhere. */
+size_t protolayer_sess_size_est(struct session2 *s);
+size_t protolayer_iter_size_est(struct protolayer_iter_ctx *ctx, bool incl_payload);
 
 /** Layer-specific data - the generic struct. To be added as the first member of
  * each specific struct. */
@@ -867,6 +880,9 @@ struct session2 {
 	/** The size of a single iteration context
 	 * (`struct protolayer_iter_ctx`), including layer-specific data. */
 	size_t iter_ctx_size;
+
+	/** The size of this session struct. */
+	size_t session_size;
 
 	/** The following flexible array has basically this structure:
 	 *

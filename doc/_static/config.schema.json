@@ -1713,6 +1713,27 @@
             },
             "default": null
         },
+        "defer": {
+            "description": "Configuration of request prioritization (defer).",
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "description": "Use request prioritization.",
+                    "default": false
+                },
+                "log-period": {
+                    "type": "string",
+                    "pattern": "^(\\d+)(us|ms|s|m|h|d)$",
+                    "description": "Minimal time between two log messages, or '0s' to disable.",
+                    "default": "0s"
+                }
+            },
+            "default": {
+                "enabled": false,
+                "log_period": "0s"
+            }
+        },
         "lua": {
             "description": "Custom Lua configuration.",
             "type": "object",

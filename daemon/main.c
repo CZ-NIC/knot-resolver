@@ -616,6 +616,15 @@ int main(int argc, char **argv)
 		lua_settop(the_engine->L, 0);
 	}
 
+	if (!defer_initialized) {
+		kr_log_warning(SYSTEM, "Prioritization not initialized from Lua, using hardcoded default.\n");
+		ret = defer_init("defer", 1, 1);
+		if (ret) {
+			ret = EXIT_FAILURE;
+			goto cleanup;
+		}
+	}
+
 	if (defer_init_idle(loop) != 0) {
 		ret = EXIT_FAILURE;
 		goto cleanup;

@@ -90,6 +90,14 @@ struct kru_api {
 	/// The key of i-th query consists of prefixes[i] bits of key, prefixes[i], and namespace; as above.
 	uint16_t (*load_multi_prefix_max)(struct kru *kru, uint32_t time_now,
 			uint8_t namespace, uint8_t key[static 16], uint8_t *prefixes, kru_price_t *prices, size_t queries_cnt, uint8_t *prefix_out);
+
+
+	/// Multiple queries based on different prefixes of a single key.
+	/// Stores the final values of the involved counters normalized to the limit 2^16 to *loads_out (unless NULL).
+	/// Set prices to NULL to skip updating; otherwise, KRU is always updated, using maximal allowed value on overflow.
+	/// The key of i-th query consists of prefixes[i] bits of key, prefixes[i], and namespace; as above.
+	void (*load_multi_prefix)(struct kru *kru, uint32_t time_now,
+			uint8_t namespace, uint8_t key[static 16], uint8_t *prefixes, kru_price_t *prices, size_t queries_cnt, uint16_t *loads_out);
 };
 
 // The functions are stored this way to make it easier to switch

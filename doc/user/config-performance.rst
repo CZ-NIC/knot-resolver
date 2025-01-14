@@ -33,3 +33,4 @@ impact than cache settings and number of instances.
    config-priming
    config-edns-keepalive
    config-rate-limiting
+   config-defer

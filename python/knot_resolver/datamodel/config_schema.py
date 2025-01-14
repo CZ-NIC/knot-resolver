@@ -17,6 +17,7 @@ from knot_resolver.datamodel.monitoring_schema import MonitoringSchema
 from knot_resolver.datamodel.network_schema import NetworkSchema
 from knot_resolver.datamodel.options_schema import OptionsSchema
 from knot_resolver.datamodel.rate_limiting_schema import RateLimitingSchema
+from knot_resolver.datamodel.defer_schema import DeferSchema
 from knot_resolver.datamodel.templates import POLICY_CONFIG_TEMPLATE, WORKER_CONFIG_TEMPLATE
 from knot_resolver.datamodel.types import EscapedStr, IntPositive, WritableDir
 from knot_resolver.datamodel.view_schema import ViewSchema
@@ -108,6 +109,7 @@ class KresConfig(ConfigSchema):
         monitoring: Metrics exposisition configuration (Prometheus, Graphite)
         lua: Custom Lua configuration.
         rate_limiting: Configuration of rate limiting.
+        defer: Configuration of request prioritization (defer).
         """
 
         version: int = 1
@@ -129,6 +131,7 @@ class KresConfig(ConfigSchema):
         logging: LoggingSchema = LoggingSchema()
         monitoring: MonitoringSchema = MonitoringSchema()
         rate_limiting: Optional[RateLimitingSchema] = None
+        defer: DeferSchema = DeferSchema()
         lua: LuaSchema = LuaSchema()
 
     _LAYER = Raw
@@ -151,6 +154,7 @@ class KresConfig(ConfigSchema):
     logging: LoggingSchema
     monitoring: MonitoringSchema
     rate_limiting: Optional[RateLimitingSchema]
+    defer: DeferSchema
     lua: LuaSchema
 
     def _hostname(self, obj: Raw) -> Any:
