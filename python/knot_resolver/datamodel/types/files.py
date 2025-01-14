@@ -89,9 +89,12 @@ class Dir(UncheckedPath):
     def __init__(
         self, source_value: Any, parents: Tuple["UncheckedPath", ...] = tuple(), object_path: str = "/"
     ) -> None:
-        super().__init__(source_value, parents=parents, object_path=object_path)
-        if self.strict_validation and not self._value.is_dir():
-            raise ValueError(f"path '{self._value}' does not point to an existing directory")
+        try:
+            super().__init__(source_value, parents=parents, object_path=object_path)
+            if self.strict_validation and not self._value.is_dir():
+                raise ValueError(f"path '{self._value}' does not point to an existing directory")
+        except PermissionError as e:
+            raise ValueError(str(e)) from e
 
 
 class AbsoluteDir(Dir):
@@ -118,11 +121,14 @@ class File(UncheckedPath):
     def __init__(
         self, source_value: Any, parents: Tuple["UncheckedPath", ...] = tuple(), object_path: str = "/"
     ) -> None:
-        super().__init__(source_value, parents=parents, object_path=object_path)
-        if self.strict_validation and not self._value.exists():
-            raise ValueError(f"file '{self._value}' does not exist")
-        if self.strict_validation and not self._value.is_file():
-            raise ValueError(f"path '{self._value}' is not a file")
+        try:
+            super().__init__(source_value, parents=parents, object_path=object_path)
+            if self.strict_validation and not self._value.exists():
+                raise ValueError(f"file '{self._value}' does not exist")
+            if self.strict_validation and not self._value.is_file():
+                raise ValueError(f"path '{self._value}' is not a file")
+        except PermissionError as e:
+            raise ValueError(str(e)) from e
 
 
 class FilePath(UncheckedPath):
@@ -135,13 +141,15 @@ class FilePath(UncheckedPath):
     def __init__(
         self, source_value: Any, parents: Tuple["UncheckedPath", ...] = tuple(), object_path: str = "/"
     ) -> None:
-        super().__init__(source_value, parents=parents, object_path=object_path)
-        p = self._value.parent
-        if self.strict_validation and (not p.exists() or not p.is_dir()):
-            raise ValueError(f"path '{self._value}' does not point inside an existing directory")
-
-        if self.strict_validation and self._value.is_dir():
-            raise ValueError(f"path '{self._value}' points to a directory when we expected a file")
+        try:
+            super().__init__(source_value, parents=parents, object_path=object_path)
+            p = self._value.parent
+            if self.strict_validation and (not p.exists() or not p.is_dir()):
+                raise ValueError(f"path '{self._value}' does not point inside an existing directory")
+            if self.strict_validation and self._value.is_dir():
+                raise ValueError(f"path '{self._value}' points to a directory when we expected a file")
+        except PermissionError as e:
+            raise ValueError(str(e)) from e
 
 
 class _PermissionMode(Flag):

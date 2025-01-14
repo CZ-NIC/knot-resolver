@@ -128,14 +128,22 @@ policies.
           cert-file: /etc/knot-resolver/server-cert.pem
           key-file: /etc/knot-resolver/server-key.pem
 
-   .. tip::
+   .. option:: files-watchdog: auto|true|false
 
-      If you have ``python-watchdog`` installed on your system,
+      :default: auto
+
+      By default, if you have ``python-watchdog`` installed on your system,
       the certificate files are automatically reloaded on change.
-      If you update the certificate files, e.g. using ACME,
-      the manager is notified about changes and commands all workers
-      to reload their certificate files. If you don't have ``python-watchdog``,
-      you have to restart the ``knot-resolver`` service manually.
+      When you update the certificate files, e.g. using ACME,
+      the manager is notified of the changes and commands all workers
+      to reload their certificate files.
+
+      If you don't have ``python-watchdog`` installed, this feature is not available
+      and you will have to restart the ``knot-resolver`` service manually.
+
+      You can also manually enable (``true``) and disable (``false``) this feature in the config,
+      but if it is enabled and ``python-watchdog`` is not installed,
+      the resolver will fail to start with a configuration validation error.
 
    .. option:: sticket-secret: <str>
 

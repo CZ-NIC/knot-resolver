@@ -3,7 +3,8 @@ from typing import Any, Dict, Optional
 import pytest
 from pytest import raises
 
-from knot_resolver.datamodel.network_schema import ListenSchema, NetworkSchema
+from knot_resolver.constants import WATCHDOG_LIB
+from knot_resolver.datamodel.network_schema import ListenSchema, NetworkSchema, TLSSchema
 from knot_resolver.datamodel.types import InterfaceOptionalPort, PortNumber
 from knot_resolver.utils.modeling.exceptions import DataValidationError
 
@@ -77,3 +78,16 @@ def test_listen_valid(listen: Dict[str, Any]):
 def test_listen_invalid(listen: Dict[str, Any]):
     with raises(DataValidationError):
         ListenSchema(listen)
+
+
+@pytest.mark.parametrize(
+    "tls",
+    [
+        {"files-watchdog": "auto"},
+        {"files-watchdog": True},
+        {"files-watchdog": False},
+    ],
+)
+def test_tls_files_watchdog(tls: Dict[str, Any]):
+    expected: bool = WATCHDOG_LIB if tls["files-watchdog"] == "auto" else tls["files-watchdog"]
+    assert TLSSchema(tls).files_watchdog == expected
