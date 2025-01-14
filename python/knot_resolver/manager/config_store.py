@@ -59,6 +59,25 @@ class ConfigStore:
         return self._config
 
 
+def only_on_no_changes_update(selector: Callable[[KresConfig], Any]) -> Callable[[UpdateCallback], UpdateCallback]:
+    def decorator(orig_func: UpdateCallback) -> UpdateCallback:
+        original_value_set: Any = False
+        original_value: Any = None
+
+        async def new_func_update(config: KresConfig) -> None:
+            nonlocal original_value_set
+            nonlocal original_value
+            if not original_value_set:
+                original_value_set = True
+            elif original_value == selector(config):
+                await orig_func(config)
+            original_value = selector(config)
+
+        return new_func_update
+
+    return decorator
+
+
 def only_on_real_changes_update(selector: Callable[[KresConfig], Any]) -> Callable[[UpdateCallback], UpdateCallback]:
     def decorator(orig_func: UpdateCallback) -> UpdateCallback:
         original_value_set: Any = False
