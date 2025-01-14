@@ -273,7 +273,7 @@ docker:test:cross-platform:
     - tests/packaging/kresctl.sh
     - tests/packaging/interactive/cache-clear.sh
     - tests/packaging/interactive/etag.sh
-    - tests/packaging/interactive/files-reload.sh
+    - tests/packaging/interactive/files_reload.sh
     - tests/packaging/interactive/metrics.sh
     - tests/packaging/interactive/reload.sh
     - tests/packaging/interactive/schema.sh
