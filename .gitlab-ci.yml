@@ -226,9 +226,9 @@ docker:build:
 docker:build:cross-platform:
   <<: *docker
   stage: build
-  only:
-    - master@knot/knot-resolver
-    - tags
+  # only:
+  #   - master@knot/knot-resolver
+  #   - tags
   before_script:
     - >
       docker buildx create
@@ -251,9 +251,9 @@ docker:test:cross-platform:
   <<: *docker
   <<: *multi_platform
   stage: test
-  only:
-    - tags
-    - master@knot/knot-resolver
+  # only:
+  #   - tags
+  #   - master@knot/knot-resolver
   needs:
     - docker:build:cross-platform
   image:
@@ -271,11 +271,13 @@ docker:test:cross-platform:
     - kdig +https nic.cz @localhost#443
     # run some packaging tests
     - tests/packaging/kresctl.sh
-    - tests/packaging/interactive/etag.sh
-    - tests/packaging/interactive/schema.sh
-    - tests/packaging/interactive/reload.sh
-    - tests/packaging/interactive/metrics.sh
     - tests/packaging/interactive/cache-clear.sh
+    - tests/packaging/interactive/etag.sh
+    - tests/packaging/interactive/files-reload.sh
+    - tests/packaging/interactive/metrics.sh
+    - tests/packaging/interactive/reload.sh
+    - tests/packaging/interactive/schema.sh
+    - tests/packaging/interactive/watchdog.sh
     - tests/packaging/interactive/workers.sh
     - kresctl stop
   artifacts:
