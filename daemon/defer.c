@@ -299,8 +299,8 @@ void defer_charge(uint64_t nsec, union kr_sockaddr *addr, bool stream)
 	uint8_t prefix;
 	kru_charge_classify(kru_conf, key, prices, &load, &prefix);
 
-	VERBOSE_LOG("  %s ADD %4.3f ms -> load: %d on /%d\n",
-			kr_straddr(&addr->ip), nsec / 1000000.0, load, prefix);
+	VERBOSE_LOG("  %s ADD %4.3f ms * %.2f -> load: %d on /%d\n",
+			kr_straddr(&addr->ip), nsec / 1000000.0, pf16 / (float)(1<<16), load, prefix);
 }
 
 /// Determine priority of the request in [0, QUEUES_CNT - 1];

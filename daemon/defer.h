@@ -84,6 +84,7 @@ static inline void defer_sample_addr(const union kr_sockaddr *addr, bool stream)
 	}
 	defer_sample_state.stream = stream;
 	defer_sample_state.price_factor16 = 1 << 16; // meaning *1.0, until more information is known
+		// TODO set to the proper value on each invocation of defer_sample_addr
 }
 
 /// Internal; start accounting work at specified timestamp.
