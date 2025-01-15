@@ -97,3 +97,20 @@ Actions
 
          Enable/disable DNS64.
 
+      .. option:: price-factor: <float>
+
+          :default: 1.0
+
+          Multiplies prices of operations in :ref:`rate limiting <config-rate-limiting>` and :ref:`defer <config-defer>`;
+          i.e. the number of queries is multiplied by the value for rate limiting and the measured time for defer.
+          In other words, we can say that
+          both :option:`instant-limit <rate-limiting/instant-limit: <int>` and :option:`rate-limit <rate-limiting/rate-limit: <int>`
+          are divided by the value and similarly all limits are divided for defer.
+
+          Use ``0.0`` to never use rate limiting and always assign the highest priority level in defer.
+
+          .. warning::
+
+            The effect on defer may be currently limited,
+            because some of the measured operations on incoming data occur before processing views
+            and the default :option:`price-factor <price-factor: <float>` value is thus used for them.
