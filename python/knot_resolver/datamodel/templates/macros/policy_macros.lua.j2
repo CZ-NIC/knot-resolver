@@ -42,6 +42,13 @@ policy.FLAGS({
 {%- endmacro %}
 
 
+{# Price factor #}
+
+{% macro policy_price_factor(factor) -%}
+policy.PRICE_FACTOR16({{ (factor|float * 2**16)|round|int }})
+{%- endmacro %}
+
+
 {# Tags assign #}
 
 {% macro policy_tags_assign(tags) -%}

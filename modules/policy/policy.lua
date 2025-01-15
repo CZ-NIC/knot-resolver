@@ -218,6 +218,13 @@ function policy.FLAGS(opts_set, opts_clear)
 	end
 end
 
+-- Set price-factor
+function policy.PRICE_FACTOR16(factor)
+	return function(_, req)
+		ffi.C.defer_set_price_factor16(req, factor)
+	end
+end
+
 local function mkauth_soa(answer, dname, mname, ttl)
 	if mname == nil then
 		mname = dname
