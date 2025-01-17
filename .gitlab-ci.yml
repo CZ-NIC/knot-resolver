@@ -813,7 +813,7 @@ pkg:arch:
 # docs: {{{
 
 docs:build:
-  stage: deploy
+  stage: build
   needs: []
   script:
     - git submodule update --init --recursive
