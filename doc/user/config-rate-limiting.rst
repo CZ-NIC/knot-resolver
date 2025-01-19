@@ -19,6 +19,7 @@ for more in depth introduction to this section,
 but beware that the *soft limit* was dropped in favor of the *slip* mechanism
 that's common in other DNS servers.
 
+The limits can be adjusted for different packet origins using :option:`price-factor <price-factor: <float>` in :ref:`views <config-views>`.
 
 .. option:: rate-limiting/rate-limit: <int>
 

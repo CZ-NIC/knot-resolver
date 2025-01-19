@@ -644,11 +644,18 @@
                                 "type": "boolean",
                                 "description": "Enable/disable DNS64.",
                                 "default": true
+                            },
+                            "price-factor": {
+                                "type": "number",
+                                "minimum": 0.0,
+                                "description": "Multiplies rate-limiting and defer prices of operations, use 0 to whitelist.",
+                                "default": 1.0
                             }
                         },
                         "default": {
                             "minimize": true,
-                            "dns64": true
+                            "dns64": true,
+                            "price_factor": 1.0
                         }
                     }
                 }

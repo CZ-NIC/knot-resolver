@@ -17,6 +17,8 @@ if there are enough requests of both types.
 
 Detailed configuration is printed by ``defer`` group on ``info`` level on startup (unless disabled).
 
+The limits can be adjusted for different packet origins using :option:`price-factor <price-factor: <float>` in :ref:`views <config-views>`.
+
 .. note::
 
    The data of all deferred queries may occupy 64 MiB of memory per :ref:`worker <config-multiple-workers>`.

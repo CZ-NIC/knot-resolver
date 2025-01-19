@@ -1,6 +1,6 @@
 {% from 'macros/common_macros.lua.j2' import quotes %}
 {% from 'macros/view_macros.lua.j2' import get_proto_set, view_flags, view_answer %}
-{% from 'macros/policy_macros.lua.j2' import policy_flags, policy_tags_assign %}
+{% from 'macros/policy_macros.lua.j2' import policy_flags, policy_tags_assign, policy_price_factor %}
 
 {% if cfg.views %}
 {% for view in cfg.views %}
@@ -12,7 +12,9 @@ assert(C.kr_view_insert_action('{{ subnet }}', '{{ view.dst_subnet or '' }}',
 {% if flags %}
 	{{ quotes(policy_flags(flags)) }},
 {%- endif %}
-
+{% if view.options.price_factor|float != 1.0 %}
+	{{ quotes(policy_price_factor(view.options.price_factor)) }},
+{%- endif %}
 {% if view.tags %}
 	{{ policy_tags_assign(view.tags) }},
 {% elif view.answer %}

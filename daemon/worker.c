@@ -133,6 +133,15 @@ static void subreq_finalize(struct qr_task *task, const struct sockaddr *packet_
 struct worker_ctx the_worker_value; /**< Static allocation is suitable for the singleton. */
 struct worker_ctx *the_worker = NULL;
 
+
+static inline void defer_sample_task(const struct qr_task *task)
+{
+	if (task && task->ctx->source.session) {
+		defer_sample_addr(&task->ctx->source.addr, task->ctx->source.session->stream);
+		defer_sample_state.price_factor16 = task->ctx->req.qsource.price_factor16;
+	}
+}
+
 /*! @internal Create a UDP/TCP handle for an outgoing AF_INET* connection.
  *  socktype is SOCK_* */
 static struct session2 *ioreq_spawn(int socktype, sa_family_t family,
@@ -335,6 +344,7 @@ static struct request_ctx *request_create(struct session2 *session,
 	req->vars_ref = LUA_NOREF;
 	req->uid = uid;
 	req->qsource.comm_flags.xdp = comm && comm->xdp;
+	req->qsource.price_factor16 = 1 << 16; // meaning *1.0
 	kr_request_set_extended_error(req, KNOT_EDNS_EDE_NONE, NULL);
 	array_init(req->qsource.headers);
 	if (session) {
@@ -711,8 +721,7 @@ static int send_waiting(struct session2 *session)
 	int ret = 0;
 	do {
 		struct qr_task *t = session2_waitinglist_get(session);
-		if (t->ctx->source.session)
-			defer_sample_addr(&t->ctx->source.addr, t->ctx->source.session->stream);
+		defer_sample_task(t);
 		ret = qr_task_send(t, session, NULL, NULL);
 		defer_sample_restart();
 		if (ret != 0) {
@@ -966,8 +975,7 @@ static int qr_task_finalize(struct qr_task *task, int state)
 		return kr_ok();
 	}
 
-	if (task->ctx->source.session)
-		defer_sample_addr(&task->ctx->source.addr, task->ctx->source.session->stream);
+	defer_sample_task(task);
 
 	struct request_ctx *ctx = task->ctx;
 	struct session2 *source_session = ctx->source.session;
@@ -1251,8 +1259,7 @@ static int tcp_task_step(struct qr_task *task,
 static int qr_task_step(struct qr_task *task,
 			const struct sockaddr *packet_source, knot_pkt_t *packet)
 {
-	if (task && task->ctx->source.session)
-		defer_sample_addr(&task->ctx->source.addr, task->ctx->source.session->stream);
+	defer_sample_task(task);
 
 	/* No more steps after we're finished. */
 	if (!task || task->finished) {

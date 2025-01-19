@@ -1,6 +1,7 @@
 from typing import List, Literal, Optional
 
 from knot_resolver.datamodel.types import IDPattern, IPNetwork
+from knot_resolver.datamodel.types import FloatNonNegative
 from knot_resolver.utils.modeling import ConfigSchema
 
 
@@ -11,10 +12,12 @@ class ViewOptionsSchema(ConfigSchema):
     ---
     minimize: Send minimum amount of information in recursive queries to enhance privacy.
     dns64: Enable/disable DNS64.
+    price_factor: Multiplies rate-limiting and defer prices of operations, use 0 to whitelist.
     """
 
     minimize: bool = True
     dns64: bool = True
+    price_factor: FloatNonNegative = FloatNonNegative(1.0)
 
 
 class ViewSchema(ConfigSchema):

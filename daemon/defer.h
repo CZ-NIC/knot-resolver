@@ -20,10 +20,16 @@ void defer_deinit(void);
 /// Increment KRU counters by the given time.
 void defer_charge(uint64_t nsec, union kr_sockaddr *addr, bool stream);
 
+struct kr_request;
+/// Set the price-factor; see struct kr_request::qsource.price_factor16
+KR_EXPORT
+void defer_set_price_factor16(struct kr_request *req, uint32_t price_factor16);
+
 typedef struct {
 	bool is_accounting; /// whether currently accounting the time to someone
 	bool stream;
 	union kr_sockaddr addr; /// request source (to which we account) or AF_UNSPEC if unknown yet
+	uint32_t price_factor16; /// see struct kr_request::qsource.price_factor16
 	uint64_t stamp; /// monotonic nanoseconds, probably won't wrap
 } defer_sample_state_t;
 extern defer_sample_state_t defer_sample_state;
@@ -77,6 +83,8 @@ static inline void defer_sample_addr(const union kr_sockaddr *addr, bool stream)
 		break;
 	}
 	defer_sample_state.stream = stream;
+	defer_sample_state.price_factor16 = 1 << 16; // meaning *1.0, until more information is known
+		// TODO set to the proper value on each invocation of defer_sample_addr
 }
 
 /// Internal; start accounting work at specified timestamp.

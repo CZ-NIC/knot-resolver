@@ -245,6 +245,10 @@ struct kr_request {
 		 * this describes the request from the proxy. When there is no
 		 * proxy, this will have exactly the same value as `flags`. */
 		struct kr_request_qsource_flags comm_flags;
+ 		/** Option price-factor from views:
+		 *  - represented as 16+16-bit fixed-point number
+		 *  - affects ratelimiting and defer */
+		uint32_t price_factor16;
 		size_t size; /**< query packet size */
 		int32_t stream_id; /**< HTTP/2 stream ID for DoH requests */
 		kr_http_header_array_t headers;  /**< HTTP/2 headers for DoH requests */

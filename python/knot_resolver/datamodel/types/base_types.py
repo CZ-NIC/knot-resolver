@@ -1,7 +1,7 @@
 # ruff: noqa: SLF001
 
 import re
-from typing import Any, Dict, Type
+from typing import Any, Dict, Type, Union
 
 from knot_resolver.utils.compat.typing import Pattern
 from knot_resolver.utils.modeling import BaseValueType
@@ -44,6 +44,48 @@ class IntBase(BaseValueType):
     @classmethod
     def json_schema(cls: Type["IntBase"]) -> Dict[Any, Any]:
         return {"type": "integer"}
+
+
+class FloatBase(BaseValueType):
+    """
+    Base class to work with float value.
+    """
+
+    _orig_value: Union[float, int]
+    _value: float
+
+    def __init__(self, source_value: Any, object_path: str = "/") -> None:
+        if isinstance(source_value, (float, int)) and not isinstance(source_value, bool):
+            self._orig_value = source_value
+            self._value = float(source_value)
+        else:
+            raise ValueError(
+                f"Unexpected value for '{type(self)}'."
+                f" Expected float, got '{source_value}' with type '{type(source_value)}'",
+                object_path,
+            )
+
+    def __int__(self) -> int:
+        return int(self._value)
+
+    def __float__(self) -> float:
+        return self._value
+
+    def __str__(self) -> str:
+        return str(self._value)
+
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}("{self._value}")'
+
+    def __eq__(self, o: object) -> bool:
+        return isinstance(o, FloatBase) and o._value == self._value
+
+    def serialize(self) -> Any:
+        return self._orig_value
+
+    @classmethod
+    def json_schema(cls: Type["FloatBase"]) -> Dict[Any, Any]:
+        return {"type": "number"}
 
 
 class StrBase(BaseValueType):
@@ -144,6 +186,35 @@ class IntRangeBase(IntBase):
     @classmethod
     def json_schema(cls: Type["IntRangeBase"]) -> Dict[Any, Any]:
         typ: Dict[str, Any] = {"type": "integer"}
+        if hasattr(cls, "_min"):
+            typ["minimum"] = cls._min
+        if hasattr(cls, "_max"):
+            typ["maximum"] = cls._max
+        return typ
+
+
+class FloatRangeBase(FloatBase):
+    """
+    Base class to work with float value in range.
+    Just inherit the class and set the values for '_min' and '_max'.
+
+    class FloatNonNegative(IntRangeBase):
+        _min: float = 0.0
+    """
+
+    _min: float
+    _max: float
+
+    def __init__(self, source_value: Any, object_path: str = "/") -> None:
+        super().__init__(source_value, object_path)
+        if hasattr(self, "_min") and (self._value < self._min):
+            raise ValueError(f"value {self._value} is lower than the minimum {self._min}.", object_path)
+        if hasattr(self, "_max") and (self._value > self._max):
+            raise ValueError(f"value {self._value} is higher than the maximum {self._max}", object_path)
+
+    @classmethod
+    def json_schema(cls: Type["FloatRangeBase"]) -> Dict[Any, Any]:
+        typ: Dict[str, Any] = {"type": "number"}
         if hasattr(cls, "_min"):
             typ["minimum"] = cls._min
         if hasattr(cls, "_max"):

@@ -2,7 +2,14 @@ import ipaddress
 import re
 from typing import Any, Dict, Optional, Type, Union
 
-from knot_resolver.datamodel.types.base_types import IntRangeBase, PatternBase, StrBase, StringLengthBase, UnitBase
+from knot_resolver.datamodel.types.base_types import (
+    FloatRangeBase,
+    IntRangeBase,
+    PatternBase,
+    StrBase,
+    StringLengthBase,
+    UnitBase,
+)
 from knot_resolver.utils.modeling import BaseValueType
 
 
@@ -44,6 +51,10 @@ class PortNumber(IntRangeBase):
             return cls(int(port), object_path)
         except ValueError as e:
             raise ValueError(f"invalid port number {port}") from e
+
+
+class FloatNonNegative(FloatRangeBase):
+    _min: float = 0.0
 
 
 class SizeUnit(UnitBase):

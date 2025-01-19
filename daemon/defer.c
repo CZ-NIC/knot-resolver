@@ -9,6 +9,7 @@
 #include "daemon/udp_queue.h"
 #include "lib/kru.h"
 #include "lib/mmapped.h"
+#include "lib/resolve.h"
 #include "lib/utils.h"
 
 #define V4_PREFIXES  (uint8_t[])       {  18,  20, 24, 32 }
@@ -234,6 +235,10 @@ void defer_str_conf(char *desc, int desc_len)
 #undef append
 }
 
+void defer_set_price_factor16(struct kr_request *req, uint32_t price_factor16)
+{
+	req->qsource.price_factor16 = defer_sample_state.price_factor16 = price_factor16;
+}
 
 /// Call KRU, return priority and as params load and prefix.
 static inline int kru_charge_classify(const struct kru_conf *kru_conf, uint8_t *key, kru_price_t *prices,
@@ -260,6 +265,16 @@ static inline int kru_charge_classify(const struct kru_conf *kru_conf, uint8_t *
 void defer_charge(uint64_t nsec, union kr_sockaddr *addr, bool stream)
 {
 	if (!stream) return;  // UDP is not accounted in KRU; TODO remove !stream invocations?
+	
+	// compute time adjusted by the price factor
+	uint64_t nsec_adj;
+	const uint32_t pf16 = defer_sample_state.price_factor16;
+	if (pf16 == 0) return;  // whitelisted
+	if (nsec < (1ul<<32)) {  // simple way with standard rounding
+		nsec_adj = (nsec * pf16 + (1<<15)) >> 16;
+	} else {  // afraid of overflow, so we swap the order of the math
+		nsec_adj = ((nsec + (1<<15)) >> 16) * pf16;
+	}
 
 	_Alignas(16) uint8_t key[16] = {0, };
 	const struct kru_conf *kru_conf;
@@ -273,7 +288,7 @@ void defer_charge(uint64_t nsec, union kr_sockaddr *addr, bool stream)
 		return;
 	}
 
-	uint64_t base_price = BASE_PRICE(nsec);
+	uint64_t base_price = BASE_PRICE(nsec_adj);
 	kru_price_t prices[kru_conf->prefixes_cnt];
 	for (size_t i = 0; i < kru_conf->prefixes_cnt; i++) {
 		uint64_t price = base_price / kru_conf->rate_mult[i];
@@ -284,8 +299,8 @@ void defer_charge(uint64_t nsec, union kr_sockaddr *addr, bool stream)
 	uint8_t prefix;
 	kru_charge_classify(kru_conf, key, prices, &load, &prefix);
 
-	VERBOSE_LOG("  %s ADD %4.3f ms -> load: %d on /%d\n",
-			kr_straddr(&addr->ip), nsec / 1000000.0, load, prefix);
+	VERBOSE_LOG("  %s ADD %4.3f ms * %.2f -> load: %d on /%d\n",
+			kr_straddr(&addr->ip), nsec / 1000000.0, pf16 / (float)(1<<16), load, prefix);
 }
 
 /// Determine priority of the request in [0, QUEUES_CNT - 1];

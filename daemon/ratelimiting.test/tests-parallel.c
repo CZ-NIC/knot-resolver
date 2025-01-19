@@ -62,6 +62,7 @@ static void *runnable(void *arg)
 	knot_pkt_t answer = { .wire = wire };
 	struct kr_request req = {
 		.qsource.addr = (struct sockaddr *) &addr,
+		.qsource.price_factor16 = 1 << 16,
 		.answer = &answer
 	};
 
