@@ -189,6 +189,7 @@ bool ratelimiting_request_begin(struct kr_request *req)
 		}
 	}
 
+	req->ratelimited = true; // we set this even on dry_run
 	if (ratelimiting->dry_run) return false;
 
 	// perform limiting

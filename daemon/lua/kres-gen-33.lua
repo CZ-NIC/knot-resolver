@@ -250,6 +250,7 @@ struct kr_request {
 	_Bool answ_validated;
 	_Bool auth_validated;
 	_Bool stale_accounted;
+	_Bool ratelimited;
 	uint8_t rank;
 	struct kr_rplan rplan;
 	trace_log_f trace_log;
