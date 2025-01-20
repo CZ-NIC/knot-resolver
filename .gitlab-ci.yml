@@ -836,49 +836,23 @@ docs:build:
     paths:
       - doc/html
 
-# This job deploys the Knot Resolver documentation into a development
-# environment, which may be found at
-# <https://gitlab.nic.cz/knot/knot-resolver/-/environments/folders/docs-develop>.
-# The actual URL is found in the `environment.url` property, where
-# $CI_PROJECT_NAMESPACE will be "knot" on the upstream GitLab.
-docs:develop:
+# Deploys the documentation into a GitLab environment.
+# https://gitlab.nic.cz/knot/knot-resolver/-/environments
+docs:environment:
   stage: deploy
   needs:
     - docs:build
-  except:
-    refs:
-      - tags
   script:
-    - echo "Propagating artifacts into develop environment"
+    - echo "Propagating artifacts into a GitLab environment."
   artifacts:
     paths:
       - doc/html
   environment:
-    name: docs-develop/$CI_COMMIT_REF_NAME
+    name: docs/$CI_COMMIT_REF_NAME
     url: https://www.knot-resolver.cz/documentation/artifacts/$CI_JOB_ID/index.html
 
-# This job deploys the Knot Resolver documentation into a release environment,
-# which may be found at
-# <https://gitlab.nic.cz/knot/knot-resolver/-/environments/folders/docs-release>.
-# The actual URL is found in the `environment.url` property, where
-# $CI_PROJECT_NAMESPACE will be "knot" on the upstream GitLab.
-# The job requires the `DOCS_ENV_NAME` variable to be set by the user.
-docs:release:
-  stage: deploy
-  needs:
-    - docs:build
-  only:
-    refs:
-      - tags
-  script: echo "Propagating artifacts into release environment"
-  artifacts:
-    paths:
-      - doc/html
-  environment:
-    name: docs-release/$CI_COMMIT_TAG
-    url: https://www.knot-resolver.cz/documentation/artifacts/$CI_JOB_ID/index.html
-
-# This job deploys the current docs as <https://knot.pages.nic.cz/knot-resolver>
+# Deploys the current documentation to the GitLab pages.
+# https://knot.pages.nic.cz/knot-resolver
 docs:pages:
   stage: deploy
   needs:
@@ -889,8 +863,8 @@ docs:pages:
     paths:
       - public
 
-# This job pushes the Knot Resolver documentation into a new branch of the
-# `websites/knot-resolver.cz` repository.
+# Pushes the documetation as a new branch to the website repository.
+# https://gitlab.nic.cz/websites/knot-resolver.cz
 docs:website:
   stage: release
   needs:
@@ -899,15 +873,13 @@ docs:website:
   only:
     refs:
       - tags
-  variables:
   script:
-    - "SRC_COMMIT_REF=\"$CI_COMMIT_TAG$CI_COMMIT_BRANCH$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME\""
-    - "git clone \"https://gitlab-ci-token:$WEBSITE_DOCS_CI_TOKEN@$CI_SERVER_HOST:$CI_SERVER_PORT/websites/knot-resolver.cz.git\" website"
-    - "cp --recursive --verbose \"doc/html\" \"website/content/documentation/$SRC_COMMIT_REF\""
+    - "git clone \"https://gitlab-ci-token:${WEBSITE_DOCS_CI_TOKEN}@${CI_SERVER_HOST}:${CI_SERVER_PORT}/websites/knot-resolver.cz.git\" website"
+    - "cp --recursive --verbose \"doc/html\" \"website/content/documentation/${CI_COMMIT_REF_NAME}\""
     - cd website
-    - "git checkout -b \"docs/$SRC_COMMIT_REF\""
-    - "git add \"content/documentation/$SRC_COMMIT_REF\""
-    - "git commit -m \"docs: $SRC_COMMIT_REF\""
-    - "git push --force --set-upstream origin \"docs/$SRC_COMMIT_REF\""
+    - "git checkout -b \"docs/${CI_COMMIT_REF_NAME}\""
+    - "git add \"content/documentation/${CI_COMMIT_REF_NAME}\""
+    - "git commit -m \"docs: ${CI_COMMIT_REF_NAME}\""
+    - "git push --force --set-upstream origin \"docs/${CI_COMMIT_REF_NAME}\""
 
 # }}}
