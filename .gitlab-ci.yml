@@ -38,7 +38,6 @@ stages:
   - test
   - respdiff
   - deploy
-  - release
   - pkg
 
  # https://docs.gitlab.com/ce/ci/jobs/job_control.html#select-different-runner-tags-for-each-parallel-matrix-job
@@ -292,7 +291,7 @@ docker:test:cross-platform:
 
 docker:dockerhub:
   <<: *docker
-  stage: release
+  stage: deploy
   when: manual
   only:
     - tags
@@ -674,6 +673,7 @@ obs:odvr:
 # }}}
 
 # pkg {{{
+
 .pkg_deb_extras: &pkg_deb_extras
   before_script:
     - apt update
@@ -853,7 +853,7 @@ docs:pages:
 # Pushes the documetation as a new branch to the website repository.
 # https://gitlab.nic.cz/websites/knot-resolver.cz
 docs:website:
-  stage: release
+  stage: deploy
   needs:
     - docs:build
   when: manual
@@ -871,7 +871,7 @@ docs:website:
 
 # }}}
 
-# docs: {{{
+# python: {{{
 
 .python: &python
   <<: *nodep
