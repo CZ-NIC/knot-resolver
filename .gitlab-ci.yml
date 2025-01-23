@@ -861,7 +861,7 @@ docs:website:
 
 # }}}
 
-# docs: {{{
+# python: {{{
 
 .python: &python
   <<: *nodep
