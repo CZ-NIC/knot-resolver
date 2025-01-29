@@ -22,7 +22,7 @@ from knot_resolver.utils.compat.asyncio import create_task
 from knot_resolver.utils.functional import Result
 from knot_resolver.utils.modeling.types import NoneType
 
-from .constants import FIX_COUNTER_ATTEMPTS_MAX, FIX_COUNTER_DECREASE_INTERVAL_SEC, WATCHDOG_INTERVAL_SEC
+from .constants import FIX_COUNTER_ATTEMPTS_MAX, FIX_COUNTER_DECREASE_INTERVAL_SEC, PROCESSES_WATCHDOG_INTERVAL_SEC
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +91,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
         self._manager_lock = asyncio.Lock()
         self._workers_reset_needed: bool = False
         self._controller: SubprocessController
-        self._watchdog_task: Optional["asyncio.Task[None]"] = None
+        self._processes_watchdog_task: Optional["asyncio.Task[None]"] = None
         self._fix_counter: _FixCounter = _FixCounter()
         self._config_store: ConfigStore
         self._shutdown_triggers: List[Callable[[int], None]] = []
@@ -116,7 +116,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
         # initialize subprocess controller
         logger.debug("Starting controller")
         await self._controller.initialize_controller(config_store.get())
-        self._watchdog_task = create_task(self._watchdog())
+        self._processes_watchdog_task = create_task(self._processes_watchdog())
         logger.debug("Looking for already running workers")
         await self._collect_already_running_workers()
 
@@ -350,10 +350,10 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
         return Result.ok(None)
 
     async def stop(self):
-        if self._watchdog_task is not None:
-            self._watchdog_task.cancel()  # cancel it
+        if self._processes_watchdog_task is not None:
+            self._processes_watchdog_task.cancel()  # cancel it
             try:
-                await self._watchdog_task  # and let it really finish
+                await self._processes_watchdog_task  # and let it really finish
             except asyncio.CancelledError:
                 pass
 
@@ -390,9 +390,9 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
             logger.error("Failed attempting to fix an error. Forcefully shutting down.", exc_info=True)
             await self.forced_shutdown()
 
-    async def _watchdog(self) -> None:  # pylint: disable=too-many-branches  # noqa: PLR0912
+    async def _processes_watchdog(self) -> None:  # pylint: disable=too-many-branches  # noqa: PLR0912
         while True:
-            await asyncio.sleep(WATCHDOG_INTERVAL_SEC)
+            await asyncio.sleep(PROCESSES_WATCHDOG_INTERVAL_SEC)
 
             self._fix_counter.try_decrease()
 
