@@ -441,12 +441,12 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                 raise
             except BaseException:
                 invoke_callback = True
-                logger.error("Knot Resolver watchdog failed with an unexpected exception.", exc_info=True)
+                logger.error("Knot Resolver processes watchdog failed with an unexpected exception.", exc_info=True)
 
             if invoke_callback:
                 try:
                     await self._instability_handler()
                 except Exception:
-                    logger.error("Watchdog failed while invoking instability callback", exc_info=True)
+                    logger.error("Processes watchdog failed while invoking instability callback", exc_info=True)
                     logger.error("Violently terminating!")
                     sys.exit(1)
