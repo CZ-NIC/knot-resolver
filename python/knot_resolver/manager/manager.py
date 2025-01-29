@@ -351,8 +351,8 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
 
     async def stop(self):
         if self._processes_watchdog_task is not None:
-            self._processes_watchdog_task.cancel()  # cancel it
             try:
+                self._processes_watchdog_task.cancel()  # cancel it
                 await self._processes_watchdog_task  # and let it really finish
             except asyncio.CancelledError:
                 pass
@@ -437,11 +437,17 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                     )
                     invoke_callback = True
 
+            except SubprocessControllerError as e:
+                # wait few seconds and see if 'processes_watchdog' task is cancelled (during shutdown)
+                # otherwise it is an error
+                await asyncio.sleep(3)
+                invoke_callback = True
+                logger.error(f"Processes watchdog failed with SubprocessControllerError: {e}")
             except asyncio.CancelledError:
                 raise
             except BaseException:
                 invoke_callback = True
-                logger.error("Knot Resolver processes watchdog failed with an unexpected exception.", exc_info=True)
+                logger.error("Processes watchdog failed with an unexpected exception.", exc_info=True)
 
             if invoke_callback:
                 try:
