@@ -53,7 +53,7 @@ async def _reload_supervisord(config: KresConfig) -> None:
         supervisord = _create_supervisord_proxy(config)
         supervisord.reloadConfig()
     except Fault as e:
-        raise SubprocessControllerError("supervisord reload failed") from e
+        raise SubprocessControllerError(f"supervisord reload failed: {e}") from e
 
 
 @async_in_a_thread
