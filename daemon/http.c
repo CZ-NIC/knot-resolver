@@ -294,6 +294,7 @@ static void http_cleanup_stream(struct http_ctx *ctx)
 {
 	ctx->incomplete_stream = -1;
 	ctx->current_method = HTTP_METHOD_NONE;
+	ctx->status = HTTP_STATUS_OK;
 	free(ctx->uri_path);
 	ctx->uri_path = NULL;
 	http_free_headers(ctx->headers);
