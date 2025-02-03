@@ -15,7 +15,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
-#define CONTROL_SOCKET_NAME "knot-resolver-control-socket"
+#define CONTROL_SOCKET_NAME "./supervisor-notify-socket"
 #define NOTIFY_SOCKET_NAME "NOTIFY_SOCKET"
 #define MODULE_NAME "notify"
 #define RECEIVE_BUFFER_SIZE 2048
@@ -32,15 +32,14 @@ static PyObject *init_control_socket(PyObject *self, PyObject *args)
 	}
 
 	/* create address */
-	struct sockaddr_un server_addr;
-	bzero(&server_addr, sizeof(server_addr));
+	struct sockaddr_un server_addr = {0};
 	server_addr.sun_family = AF_UNIX;
-	server_addr.sun_path[0] = '\0'; // mark it as abstract namespace socket
-	strcpy(server_addr.sun_path + 1, CONTROL_SOCKET_NAME);
+	strcpy(server_addr.sun_path, CONTROL_SOCKET_NAME);
 	size_t addr_len = offsetof(struct sockaddr_un, sun_path) +
 			  strlen(CONTROL_SOCKET_NAME) + 1;
 
-	/* bind to the address */
+	/* overwrite the (pseudo-)file if it exists */
+	(void)unlink(CONTROL_SOCKET_NAME);
 	int res = bind(controlfd, (struct sockaddr *)&server_addr, addr_len);
 	if (res < 0) {
 		PyErr_SetFromErrno(NotifySocketError);
@@ -64,7 +63,7 @@ static PyObject *init_control_socket(PyObject *self, PyObject *args)
 		// fixme
 	}
 
-	res = setenv(NOTIFY_SOCKET_NAME, "@" CONTROL_SOCKET_NAME, 1);
+	res = setenv(NOTIFY_SOCKET_NAME, CONTROL_SOCKET_NAME, 1);
 	if (res < 0) {
 		PyErr_SetFromErrno(NotifySocketError);
 		return NULL;
