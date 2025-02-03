@@ -62,6 +62,10 @@ struct timeval {
 	__suseconds_t tv_usec;
 };
 "
+# We use this in policy-loader
+printf "
+unsigned sleep(unsigned seconds);
+"
 
 ## Various types (mainly), from libknot and libkres
 

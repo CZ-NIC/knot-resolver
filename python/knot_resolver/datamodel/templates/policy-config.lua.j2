@@ -46,7 +46,7 @@ cache.open({{ cfg.cache.size_max.bytes() }}, 'lmdb://{{ cfg.cache.storage }}')
 -- termination of the policy-loader before it is
 -- added into starting_processes in sd_notify.py.
 -- If this happens, the READY notification will end with an error.
-worker.sleep(1)
+C.sleep(1)
 
 -- exit policy-loader properly
 quit()
