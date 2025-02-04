@@ -40,7 +40,13 @@ cache.open({{ cfg.cache.size_max.bytes() }}, 'lmdb://{{ cfg.cache.storage }}')
 {% set disable_defer = true %}
 {% include "defer.lua.j2" %}
 
-
 {% endif %}
 
+-- This sleep() is necessary because of the possible
+-- termination of the policy-loader before it is
+-- added into starting_processes in sd_notify.py.
+-- If this happens, the READY notification will end with an error.
+C.sleep(1)
+
+-- exit policy-loader properly
 quit()
