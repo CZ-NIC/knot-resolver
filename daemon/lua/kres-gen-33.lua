@@ -61,10 +61,9 @@ typedef struct {
 struct kr_module;
 typedef char *(kr_prop_cb)(void *, struct kr_module *, const char *);
 typedef unsigned char knot_dname_storage_t[255];
+
+typedef struct {} knot_edns_options_t;
 typedef struct knot_pkt knot_pkt_t;
-typedef struct {
-	uint8_t *ptr[18];
-} knot_edns_options_t;
 typedef struct {
 	knot_pkt_t *pkt;
 	uint16_t pos;
