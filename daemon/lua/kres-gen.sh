@@ -113,10 +113,13 @@ typedef char *(kr_prop_cb)(void *, struct kr_module *, const char *);
 typedef unsigned char knot_dname_storage_t[255];
 "
 
+printf "
+typedef struct {} knot_edns_options_t;
+"
+
 ${CDEFS} ${LIBKRES} types <<-EOF
 	#knot_pkt_t contains indirect recursion
 	typedef knot_pkt_t
-	knot_edns_options_t
 	knot_pktsection_t
 	knot_compr_t
 	struct knot_pkt
