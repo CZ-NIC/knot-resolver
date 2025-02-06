@@ -928,6 +928,21 @@
                                 "type": "string",
                                 "description": "Path to the RPZ zone file."
                             },
+                            "watchdog": {
+                                "anyOf": [
+                                    {
+                                        "type": "string",
+                                        "enum": [
+                                            "auto"
+                                        ]
+                                    },
+                                    {
+                                        "type": "boolean"
+                                    }
+                                ],
+                                "description": "Enables files watchdog for configured RPZ file. Requires the optional 'watchdog' dependency.",
+                                "default": "auto"
+                            },
                             "tags": {
                                 "type": [
                                     "array",
