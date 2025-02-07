@@ -12,12 +12,26 @@ from knot_resolver.utils import compat
 logger = logging.getLogger(__name__)
 
 
-def tls_cert_files_config(config: KresConfig) -> List[Any]:
+def workers_config(config: KresConfig) -> List[Any]:
+    return []
+
+
+def policy_loader_config(config: KresConfig) -> List[Any]:
+    return []
+
+
+def tls_cert_config(config: KresConfig) -> List[Any]:
     return [
         config.network.tls.files_watchdog,
         config.network.tls.cert_file,
         config.network.tls.key_file,
     ]
+
+
+class WatchedFile:
+    def __init__(self, file: Path, lua_cmd: Optional[str]) -> None:
+        self.file = file
+        self.lua_template = lua_cmd.format(file=file) if lua_cmd else None
 
 
 if WATCHDOG_LIB:
@@ -27,9 +41,43 @@ if WATCHDOG_LIB:
     )
     from watchdog.observers import Observer
 
-    _tls_cert_watchdog: Optional["TLSCertWatchDog"] = None
+    _workers_files_watchdog: Optional["WorkersFilesWatchdog"] = None
 
-    class TLSCertEventHandler(FileSystemEventHandler):
+    _policy_loader_files_watchdog: Optional["PolicyLoaderFilesWatchdog"] = None
+
+    _tls_cert_files_watchdog: Optional["TLSCertFilesWatchdog"] = None
+
+    class WorkersFilesEventHandler(FileSystemEventHandler):
+        def __init__(self, files: List[Path]) -> None:
+            self._files = files
+
+    class WorkersFilesWatchdog:
+        def __init__(self, files: List[Path]) -> None:
+            self._observer = Observer()
+
+        def start(self) -> None:
+            self._observer.start()
+
+        def stop(self) -> None:
+            self._observer.stop()
+            self._observer.join()
+
+    class PolicyLoaderFilesEventHandler(FileSystemEventHandler):
+        def __init__(self, files: List[Path]) -> None:
+            self._files = files
+
+    class PolicyLoaderFilesWatchdog:
+        def __init__(self, files: List[Path]) -> None:
+            self._observer = Observer()
+
+        def start(self) -> None:
+            self._observer.start()
+
+        def stop(self) -> None:
+            self._observer.stop()
+            self._observer.join()
+
+    class TLSCertFilesEventHandler(FileSystemEventHandler):
         def __init__(self, files: List[Path], cmd: str) -> None:
             self._files = files
             self._cmd = cmd
@@ -76,7 +124,7 @@ if WATCHDOG_LIB:
                 logger.info(f"Watched file '{src_path}' has been modified")
                 self._reload()
 
-    class TLSCertWatchDog:
+    class TLSCertFilesWatchdog:
         def __init__(self, cert_file: Path, key_file: Path) -> None:
             self._observer = Observer()
 
@@ -91,7 +139,7 @@ if WATCHDOG_LIB:
             if cert_file.parent != key_file.parent:
                 cert_dirs.append(key_file.parent)
 
-            event_handler = TLSCertEventHandler(cert_files, cmd)
+            event_handler = TLSCertFilesEventHandler(cert_files, cmd)
             for d in cert_dirs:
                 self._observer.schedule(
                     event_handler,
@@ -108,23 +156,69 @@ if WATCHDOG_LIB:
             self._observer.join()
 
 
-@only_on_real_changes_update(tls_cert_files_config)
+@only_on_real_changes_update(workers_config)
+async def _init_workers_files_watchdog(config: KresConfig) -> None:
+    if WATCHDOG_LIB:
+        global _workers_files_watchdog
+
+        if _workers_files_watchdog:
+            _workers_files_watchdog.stop()
+
+        files_to_watch: List[Path] = []
+        if config.local_data.rpz:
+            for rpz in config.local_data.rpz:
+                if rpz.watchdog:
+                    files_to_watch.append(rpz.file.to_path())
+
+        if files_to_watch:
+            logger.info("Initializing workers files Watchdog")
+            _workers_files_watchdog = WorkersFilesWatchdog(files_to_watch)
+            _workers_files_watchdog.start()
+
+
+@only_on_real_changes_update(policy_loader_config)
+async def _init_policy_loader_files_watchdog(config: KresConfig) -> None:
+    if WATCHDOG_LIB:
+        global _policy_loader_files_watchdog
+
+        if _policy_loader_files_watchdog:
+            _policy_loader_files_watchdog.stop()
+
+        files_to_watch: List[Path] = []
+        if config.local_data.rpz:
+            for rpz in config.local_data.rpz:
+                if rpz.watchdog:
+                    files_to_watch.append(rpz.file.to_path())
+
+        if files_to_watch:
+            logger.info("Initializing policy=loader files Watchdog")
+            _policy_loader_files_watchdog = PolicyLoaderFilesWatchdog(files_to_watch)
+            _policy_loader_files_watchdog.start()
+
+
+@only_on_real_changes_update(tls_cert_config)
 async def _init_tls_cert_watchdog(config: KresConfig) -> None:
     if WATCHDOG_LIB:
-        global _tls_cert_watchdog
+        global _tls_cert_files_watchdog
 
-        if _tls_cert_watchdog:
-            _tls_cert_watchdog.stop()
+        if _tls_cert_files_watchdog:
+            _tls_cert_files_watchdog.stop()
 
         if config.network.tls.files_watchdog and config.network.tls.cert_file and config.network.tls.key_file:
-            logger.info("Initializing TLS certificate files WatchDog")
-            _tls_cert_watchdog = TLSCertWatchDog(
+            logger.info("Initializing TLS certificate files Watchdog")
+            _tls_cert_files_watchdog = TLSCertFilesWatchdog(
                 config.network.tls.cert_file.to_path(),
                 config.network.tls.key_file.to_path(),
             )
-            _tls_cert_watchdog.start()
+            _tls_cert_files_watchdog.start()
 
 
 async def init_files_watchdog(config_store: ConfigStore) -> None:
-    # watchdog for TLS certificate files
+    # watchdog for workers files
+    await config_store.register_on_change_callback(_init_workers_files_watchdog)
+
+    # watchdog for policy-loader files
+    await config_store.register_on_change_callback(_init_policy_loader_files_watchdog)
+
+    # watchdogs for special cases
     await config_store.register_on_change_callback(_init_tls_cert_watchdog)
