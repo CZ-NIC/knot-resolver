@@ -9,6 +9,7 @@
 #include "daemon/network.h"
 #include "daemon/tls.h"
 #include "lib/utils.h"
+#include "lua.h"
 
 #include <stdlib.h>
 
@@ -527,6 +528,19 @@ static int net_pipeline(lua_State *L)
 		lua_error_p(L, "tcp_pipeline must be within <0, " STR(UINT16_MAX) ">");
 	the_worker->tcp_pipeline_max = len;
 	lua_pushinteger(L, len);
+	return 1;
+}
+
+#include "lib/resolve.h"
+static int net_tls_whitelist(lua_State *L)
+{
+	if (!the_network || !the_network->tls_credentials)
+		return 1;
+
+	int r = kr_init_whitelist(lua_tostring(L, 1));
+	lua_error_maybe(L, r);
+
+	lua_pushboolean(L, true);
 	return 1;
 }
 
@@ -1232,6 +1246,7 @@ int kr_bindings_net(lua_State *L)
 		{ "tls_padding",  net_tls_padding },
 		{ "tls_sticket_secret", net_tls_sticket_secret_string },
 		{ "tls_sticket_secret_file", net_tls_sticket_secret_file },
+		{ "tls_whitelist", net_tls_whitelist },
 		{ "outgoing_v4",  net_outgoing_v4 },
 		{ "outgoing_v6",  net_outgoing_v6 },
 		{ "tcp_in_idle",  net_tcp_in_idle },
