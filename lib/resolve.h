@@ -142,6 +142,13 @@ static inline void kr_rank_set(uint8_t *rank, uint8_t kr_flag)
 typedef array_t(struct kr_module *) module_array_t;
 /* @endcond */
 
+struct issuer_whitelist {
+	int count;
+	char **names;
+};
+KR_EXPORT
+int kr_init_whitelist(const char *whitelistpath);
+
 /**
  * Name resolution context.
  *
@@ -175,6 +182,7 @@ struct kr_context
 	kr_cookie_lru_t *cache_cookie;
 	int32_t tls_padding; /**< See net.tls_padding in ../daemon/README.rst -- -1 is "true" (default policy), 0 is "false" (no padding) */
 	knot_mm_t *pool;
+	struct issuer_whitelist *issuers;
 };
 
 /** Pointer to the singleton resolver context. NULL if not initialized */
