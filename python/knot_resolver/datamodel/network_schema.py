@@ -61,6 +61,7 @@ class TLSSchema(ConfigSchema):
         sticket_secret_file: Path to file with secret for TLS session resumption via tickets. (RFC 5077).
         auto_discovery: Experimental automatic discovery of authoritative servers supporting DNS-over-TLS.
         padding: EDNS(0) padding of queries and answers sent over an encrypted channel.
+        whitelist: Path to certificate authority whitelist file
         """
 
         files_watchdog: Union[Literal["auto"], bool] = "auto"
@@ -70,6 +71,7 @@ class TLSSchema(ConfigSchema):
         sticket_secret_file: Optional[ReadableFile] = None
         auto_discovery: bool = False
         padding: Union[bool, Int0_512] = True
+        whitelist: Optional[ReadableFile] = None
 
     _LAYER = Raw
 
@@ -80,6 +82,7 @@ class TLSSchema(ConfigSchema):
     sticket_secret_file: Optional[ReadableFile] = None
     auto_discovery: bool = False
     padding: Union[bool, Int0_512] = True
+    whitelist: Optional[ReadableFile] = None
 
     def _files_watchdog(self, obj: Raw) -> Any:
         if obj.files_watchdog == "auto":
