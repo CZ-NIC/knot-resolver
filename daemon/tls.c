@@ -240,6 +240,80 @@ static ssize_t kres_gnutls_vec_push(gnutls_transport_ptr_t h, const giovec_t * i
 	return total_len;
 }
 
+static void *get_peer_serial(gnutls_x509_crt_t cert)
+{
+	size_t result_size = 256;
+	uint8_t *serial_number = calloc(sizeof(uint8_t), result_size);
+	if (!serial_number)
+		return NULL;
+
+	int ret = gnutls_x509_crt_get_serial(cert, serial_number, &result_size);
+	if (ret == GNUTLS_E_SUCCESS)
+		// pass to dnstap
+		;
+
+	kr_log_warning(TLS, "Failed to retrieve peer's certificate serial number (%s)\n",
+			gnutls_strerror(ret));
+}
+
+int search_authorities(gnutls_datum_t cert)
+{
+	int rv = -1;
+	gnutls_x509_crt_t peer_cert = NULL;
+	if (!the_resolver->issuers)
+		return rv;
+	struct issuer_whitelist *wl = the_resolver->issuers;
+
+	size_t bufsize = 256;
+	char *buffer = calloc(1, bufsize);
+	if (!buffer)
+		goto end;
+
+	int ret = gnutls_x509_crt_init(&peer_cert);
+	if (ret != GNUTLS_E_SUCCESS) {
+		kr_log_warning(TLS, "failed to initialize gnutls_x509_crt_t (%s)\n",
+				gnutls_strerror(ret));
+		goto end;
+	}
+
+	ret = gnutls_x509_crt_import(peer_cert, &cert, GNUTLS_X509_FMT_DER);
+	if (ret != GNUTLS_E_SUCCESS) {
+		kr_log_warning(TLS, "DBG failed to import peer certificate (%s)\n",
+				gnutls_strerror(ret));
+		return -1;
+	}
+
+	uint8_t *serial_number = get_peer_serial(peer_cert);
+	if (serial_number) {
+		;
+	}
+retry:
+	ret = gnutls_x509_crt_get_issuer_dn_by_oid(
+			peer_cert, GNUTLS_OID_X520_ORGANIZATION_NAME,
+			0, 0, buffer, &bufsize);
+	if (unlikely(ret == GNUTLS_E_SHORT_MEMORY_BUFFER)) {
+		char *new_buf = realloc(buffer, bufsize);
+		if (!new_buf)
+			goto end;
+		buffer = new_buf;
+
+		goto retry;
+
+	} else if (ret == GNUTLS_E_SUCCESS) {
+		for (int s = 0; s < wl->count; s++) {
+			if (strcmp(wl->names[s], buffer) == 0) {
+				rv = kr_ok();
+				goto end;
+			}
+		}
+	}
+end:
+	if (peer_cert)
+		gnutls_x509_crt_deinit(peer_cert);
+
+	return rv;
+}
+
 static void tls_handshake_success(struct pl_tls_sess_data *tls,
                                   struct session2 *session)
 {
@@ -863,6 +937,11 @@ static int client_verify_certificate(gnutls_session_t tls_session)
 		kr_log_error(TLSCLIENT, "empty certificate list\n");
 		return GNUTLS_E_CERTIFICATE_ERROR;
 	}
+
+	// if (search_authorities(cert_list[0]) != kr_ok()) {
+	// 	kr_log_error(TLS, "failed to validate cert issuer\n");
+	// 	return GNUTLS_E_CERTIFICATE_ERROR;
+	// }
 
 	if (tls->client_params->pins.len > 0)
 		/* check hash of the certificate but ignore everything else */
