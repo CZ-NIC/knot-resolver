@@ -36,6 +36,11 @@ net.bufsize(
 net.tls('{{ cfg.network.tls.cert_file  }}', '{{ cfg.network.tls.key_file }}')
 {% endif %}
 
+{% if cfg.network.tls.whitelist %}
+-- network.tls_whitelist
+net.tls_whitelist('{{ cfg.network.tls.whitelist }}')
+{% endif %}
+
 {% if cfg.network.tls.sticket_secret %}
 -- network.tls.sticket-secret
 net.tls_sticket_secret('{{ cfg.network.tls.sticket_secret }}')

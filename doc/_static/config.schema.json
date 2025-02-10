@@ -371,6 +371,14 @@
                             ],
                             "description": "EDNS(0) padding of queries and answers sent over an encrypted channel.",
                             "default": true
+                        },
+                        "whitelist": {
+                            "type": [
+                                "string",
+                                "null"
+                            ],
+                            "description": "Path to certificate authority whitelist file",
+                            "default": null
                         }
                     },
                     "default": {
@@ -380,7 +388,8 @@
                         "sticket_secret": null,
                         "sticket_secret_file": null,
                         "auto_discovery": false,
-                        "padding": true
+                        "padding": true,
+                        "whitelist": null
                     }
                 },
                 "proxy-protocol": {
@@ -539,7 +548,8 @@
                     "sticket_secret": null,
                     "sticket_secret_file": null,
                     "auto_discovery": false,
-                    "padding": true
+                    "padding": true,
+                    "whitelist": null
                 },
                 "proxy_protocol": false,
                 "listen": [
