@@ -360,6 +360,7 @@ ${CDEFS} ${KRESD} functions <<-EOF
 	ratelimiting_init
 	defer_init
 	defer_set_price_factor16
+	search_authorities
 EOF
 
 echo "struct engine" | ${CDEFS} ${KRESD} types | sed '/module_array_t/,$ d'
