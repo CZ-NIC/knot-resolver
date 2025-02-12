@@ -60,6 +60,7 @@ subdir('stats')
 subdir('ta_update')
 subdir('view')
 subdir('filter')
+subdir('tunnel_filter')
 
 # install lua modules
 foreach mod : lua_mod_src

@@ -167,6 +167,9 @@ malloc = meson.get_compiler('c').find_library(
 ### filter module
 libidn2 = dependency('libidn2', version: '>=2.0.0', required: false)
 libpcre2 = dependency('libpcre2-8', version: '>=10.00', required: false)
+
+### tunnel_filter module
+libtorch = dependency('Torch', version: '>=2.4.1', required: false)
 message('---------------------------')
 
 ## Compiler args
