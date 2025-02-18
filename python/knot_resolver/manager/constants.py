@@ -13,7 +13,7 @@ PID_FILE_NAME = "knot-resolver.pid"
 
 FIX_COUNTER_ATTEMPTS_MAX = 2
 FIX_COUNTER_DECREASE_INTERVAL_SEC = 30 * 60
-WATCHDOG_INTERVAL_SEC: float = 5
+PROCESSES_WATCHDOG_INTERVAL_SEC: float = 5
 
 
 def kres_cache_dir(config: "KresConfig") -> Path:

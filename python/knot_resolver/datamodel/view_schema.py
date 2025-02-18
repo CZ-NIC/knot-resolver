@@ -1,7 +1,6 @@
 from typing import List, Literal, Optional
 
-from knot_resolver.datamodel.types import IDPattern, IPNetwork
-from knot_resolver.datamodel.types import FloatNonNegative
+from knot_resolver.datamodel.types import FloatNonNegative, IDPattern, IPNetwork
 from knot_resolver.utils.modeling import ConfigSchema
 
 

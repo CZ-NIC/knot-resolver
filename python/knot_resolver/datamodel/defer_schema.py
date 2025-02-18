@@ -1,5 +1,5 @@
-from knot_resolver.utils.modeling import ConfigSchema
 from knot_resolver.datamodel.types import TimeUnit
+from knot_resolver.utils.modeling import ConfigSchema
 
 
 class DeferSchema(ConfigSchema):

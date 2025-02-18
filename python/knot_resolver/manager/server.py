@@ -20,7 +20,7 @@ from aiohttp.web_runner import AppRunner, TCPSite, UnixSite
 
 from knot_resolver.constants import CONFIG_FILE, USER
 from knot_resolver.controller import get_best_controller_implementation
-from knot_resolver.controller.exceptions import SubprocessControllerExecError
+from knot_resolver.controller.exceptions import SubprocessControllerError, SubprocessControllerExecError
 from knot_resolver.controller.interface import SubprocessType
 from knot_resolver.controller.registered_workers import command_single_registered_worker
 from knot_resolver.datamodel import kres_config_json_schema
@@ -610,6 +610,10 @@ async def start_server(config: Path = CONFIG_FILE) -> int:  # noqa: PLR0915
 
         # and finally exec what we were told to exec
         os.execl(*e.exec_args)
+
+    except SubprocessControllerError as e:
+        logger.error(f"Server initialization failed: {e}")
+        return 1
 
     except KresManagerException as e:
         # We caught an error with a pretty error message. Just print it and exit.
