@@ -374,7 +374,7 @@
                         }
                     },
                     "default": {
-                        "files_watchdog": false,
+                        "files_watchdog": true,
                         "cert_file": null,
                         "key_file": null,
                         "sticket_secret": null,
@@ -533,7 +533,7 @@
                 },
                 "address_renumbering": null,
                 "tls": {
-                    "files_watchdog": false,
+                    "files_watchdog": true,
                     "cert_file": null,
                     "key_file": null,
                     "sticket_secret": null,

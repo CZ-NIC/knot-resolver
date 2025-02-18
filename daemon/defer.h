@@ -48,7 +48,9 @@ static inline uint64_t defer_get_stamp(void)
 	uint64_t stamp = now_ts.tv_nsec + 1000*1000*1000 * (uint64_t)now_ts.tv_sec;
 	if (defer_uvtime_stamp + 1000*1000 < stamp) {
 		defer_uvtime_stamp = stamp;
-		uv_update_time(uv_default_loop());
+		uv_update_time(uv_default_loop()); // NOLINT, async-signal-safe
+			// on Linux, it just calls clock_gettime(CLOCK_MONOTONIC[_COARSE], ...) and sets value for uv_now (kr_now);
+			// libuv probably updates time just once per loop by itself
 	}
 	return stamp;
 }
