@@ -10,8 +10,8 @@ prefill.config({
 {% for item in cfg.cache.prefill %}
     ['{{ item.origin.punycode() }}'] = {
         url = '{{ item.url }}',
-        interval = {{ item.refresh_interval.seconds() }}
-        {{ "ca_file = '"+item.ca_file+"'," if item.ca_file }}
+        interval = {{ item.refresh_interval.seconds() }},
+        {{ "ca_file = '" + item.ca_file|string + "'," if item.ca_file }}
     }
 {% endfor %}
 })
