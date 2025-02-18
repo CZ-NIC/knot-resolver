@@ -15,7 +15,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
-#define CONTROL_SOCKET_NAME "knot-resolver-control-socket"
+#define CONTROL_SOCKET_NAME "supervisor-notify-socket"
 #define NOTIFY_SOCKET_NAME "NOTIFY_SOCKET"
 #define MODULE_NAME "notify"
 #define RECEIVE_BUFFER_SIZE 2048
@@ -26,36 +26,29 @@ static PyObject *init_control_socket(PyObject *self, PyObject *args)
 {
 	/* create socket */
 	int controlfd = socket(AF_UNIX, SOCK_DGRAM | SOCK_NONBLOCK, 0);
-	if (controlfd == -1) {
-		PyErr_SetFromErrno(NotifySocketError);
-		return NULL;
-	}
+	if (controlfd == -1) goto fail_errno;
 
-	/* create address */
-	struct sockaddr_un server_addr;
-	bzero(&server_addr, sizeof(server_addr));
+	/* construct the address; sd_notify() requires that the path is absolute */
+	struct sockaddr_un server_addr = {0};
 	server_addr.sun_family = AF_UNIX;
-	server_addr.sun_path[0] = '\0'; // mark it as abstract namespace socket
-	strcpy(server_addr.sun_path + 1, CONTROL_SOCKET_NAME);
-	size_t addr_len = offsetof(struct sockaddr_un, sun_path) +
-			  strlen(CONTROL_SOCKET_NAME) + 1;
+	const size_t cwd_max = sizeof(server_addr) - offsetof(struct sockaddr_un, sun_path)
+		/* but we also need space for making the path longer: */
+		- 1/*slash*/ - strlen(CONTROL_SOCKET_NAME);
+	if (!getcwd(server_addr.sun_path, cwd_max))
+		goto fail_errno;
+	char *p = server_addr.sun_path + strlen(server_addr.sun_path);
+	*p = '/';
+	strcpy(p + 1, CONTROL_SOCKET_NAME);
 
-	/* bind to the address */
-	int res = bind(controlfd, (struct sockaddr *)&server_addr, addr_len);
-	if (res < 0) {
-		PyErr_SetFromErrno(NotifySocketError);
-		return NULL;
-	}
+	/* overwrite the (pseudo-)file if it exists */
+	(void)unlink(CONTROL_SOCKET_NAME);
+	int res = bind(controlfd, (struct sockaddr *)&server_addr, sizeof(server_addr));
+	if (res < 0) goto fail_errno;
 
-	/* make sure that we are send credentials */
+	/* make sure that we get credentials with messages */
 	int data = (int)true;
-	res = setsockopt(controlfd, SOL_SOCKET, SO_PASSCRED, &data,
-			 sizeof(data));
-	if (res < 0) {
-		PyErr_SetFromErrno(NotifySocketError);
-		return NULL;
-	}
-
+	res = setsockopt(controlfd, SOL_SOCKET, SO_PASSCRED, &data, sizeof(data));
+	if (res < 0) goto fail_errno;
 	/* store the name of the socket in env to fake systemd */
 	char *old_value = getenv(NOTIFY_SOCKET_NAME);
 	if (old_value != NULL) {
@@ -64,13 +57,13 @@ static PyObject *init_control_socket(PyObject *self, PyObject *args)
 		// fixme
 	}
 
-	res = setenv(NOTIFY_SOCKET_NAME, "@" CONTROL_SOCKET_NAME, 1);
-	if (res < 0) {
-		PyErr_SetFromErrno(NotifySocketError);
-		return NULL;
-	}
+	res = setenv(NOTIFY_SOCKET_NAME, server_addr.sun_path, 1);
+	if (res < 0) goto fail_errno;
 
 	return PyLong_FromLong((long)controlfd);
+fail_errno:
+	PyErr_SetFromErrno(NotifySocketError);
+	return NULL;
 }
 
 static PyObject *handle_control_socket_connection_event(PyObject *self,
