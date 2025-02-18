@@ -6,6 +6,7 @@ Bugfixes
 - manager: avoid an uncommon startup race in policy-loader (!1653)
   [WARN] exited: policy-loader (exit status 0; not expected)
 - manager: fix processes watchdog errors during shutdown (!1651)
+- /cache/prefill/*/ca_file: fix setting this attribute (!1655)
 
 
 Knot Resolver 6.0.10 (2025-01-20)
