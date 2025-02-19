@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple, Type, TypeVar
 from urllib.parse import quote
 
-from knot_resolver.constants import API_SOCK_FILE, CONFIG_FILE
+from knot_resolver.constants import API_SOCK_FILE, CONFIG_FILE, RUN_DIR
 from knot_resolver.datamodel.types import IPAddressPort
 from knot_resolver.utils.modeling import parsing
 from knot_resolver.utils.modeling.exceptions import DataValidationError
@@ -158,8 +158,12 @@ def get_socket_from_config(config: Path, optional_file: bool) -> Optional[Socket
         if mkey in data:
             management = data[mkey]
             if "unix-socket" in management:
+                soc = Path(management["unix-socket"])
+                if not soc.is_absolute():
+                    rundir = data["rundir"] if "rundir" in data else RUN_DIR
+                    soc = rundir / soc
                 return SocketDesc(
-                    f'http+unix://{quote(management["unix-socket"], safe="")}/',
+                    f'http+unix://{quote(str(soc), safe="")}/',
                     f'Key "/management/unix-socket" in "{config}" file',
                 )
             if "interface" in management:

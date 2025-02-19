@@ -54,7 +54,7 @@
             "default": 256
         },
         "management": {
-            "description": "Configuration of management HTTP API.",
+            "description": "Configuration of management HTTP API. By default, unix-socket is located in 'rundir'.",
             "type": "object",
             "properties": {
                 "unix-socket": {
@@ -75,7 +75,7 @@
                 }
             },
             "default": {
-                "unix_socket": "/run/knot-resolver/kres-api.sock",
+                "unix_socket": "kres-api.sock",
                 "interface": null
             }
         },
