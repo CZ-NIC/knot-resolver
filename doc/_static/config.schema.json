@@ -1082,11 +1082,17 @@
                                 "type": "boolean",
                                 "description": "Enable/disable DNSSEC.",
                                 "default": true
+                            },
+                            "insecure": {
+                                "type": "boolean",
+                                "description": "Allow insecure TLS configuration.",
+                                "default": false
                             }
                         },
                         "default": {
                             "authoritative": false,
-                            "dnssec": true
+                            "dnssec": true,
+                            "insecure": false
                         }
                     }
                 }
