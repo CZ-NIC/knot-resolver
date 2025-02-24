@@ -87,6 +87,8 @@ int kr_nsec3_wildcard_answer_response_check(const knot_pkt_t *pkt, knot_section_
  * @return           0 or error code:
  *                   DNSSEC_NOT_FOUND - neither ds nor nsec records
  *                   were not found.
+ *                   KNOT_EDOWNGRADED - special case where
+ *                     the RR would be in an insecure child zone.
  *                   KNOT_ERANGE - denial of existence can't be proven
  *                   due to opt-out, otherwise - bogus.
  */

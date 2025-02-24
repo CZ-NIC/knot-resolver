@@ -11,6 +11,7 @@ Bugfixes
 Improvements
 ------------
 - manager: allow multiple instances with different rundirs (!1656)
+- validator: accept a confusing NODATA proof with insecure delegation (!1659)
 
 
 Knot Resolver 6.0.10 (2025-01-20)
