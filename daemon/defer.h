@@ -127,7 +127,10 @@ static inline bool defer_sample_is_accounting(void)
 /// Start accounting work; optionally save state of current accounting.
 /// Current state can be saved only after having an address assigned.
 static inline void defer_sample_start(defer_sample_state_t *prev_state_out) {
-	if (!defer) return;
+	if (!defer) {
+		if (prev_state_out) *prev_state_out = (defer_sample_state_t){ 0 }; // just to meet undefined-value check of linter, but never used
+		return;
+	}
 	uint64_t stamp = defer_get_stamp();
 
 	// suspend

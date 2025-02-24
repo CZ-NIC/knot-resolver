@@ -2024,7 +2024,8 @@ static enum protolayer_event_cb_result pl_dns_stream_disconnected(
 		return PROTOLAYER_EVENT_PROPAGATE;
 
 	defer_sample_state_t defer_prev_sample_state;
-	if (session->outgoing)
+	const bool use_recursive_defer_sampling = session->outgoing; // make linter warning silent
+	if (use_recursive_defer_sampling)
 		defer_sample_start(&defer_prev_sample_state);
 
 	while (!session2_waitinglist_is_empty(session)) {
@@ -2043,7 +2044,7 @@ static enum protolayer_event_cb_result pl_dns_stream_disconnected(
 				qry->flags.TCP = false;
 			}
 			qr_task_step(task, NULL, NULL);
-			defer_sample_restart();
+			defer_sample_restart();  // use_recursive_defer_sampling == true
 		} else {
 			kr_assert(task->ctx->source.session == session);
 			task->ctx->source.session = NULL;
@@ -2068,7 +2069,7 @@ static enum protolayer_event_cb_result pl_dns_stream_disconnected(
 		worker_task_unref(task);
 	}
 
-	if (session->outgoing)
+	if (use_recursive_defer_sampling)
 		defer_sample_stop(&defer_prev_sample_state, true);
 
 	return PROTOLAYER_EVENT_PROPAGATE;

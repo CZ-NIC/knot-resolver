@@ -897,7 +897,10 @@ int defer_init(const char *mmap_file, uint32_t log_period, uint32_t hard_timeout
 	for (size_t i = 0; i < QUEUES_CNT; i++)
 		queue_init(queues[i]);
 
-	signal(SIGALRM, defer_alarm);
+	if (signal(SIGALRM, defer_alarm) == SIG_ERR) {
+		kr_log_error(DEFER, "Cannot set SIGALRM handler, interrupting of too long work on a single request will not work: %s\n",
+			strerror(errno));
+	}
 	defer_alarm(0);
 
 	return 0;
