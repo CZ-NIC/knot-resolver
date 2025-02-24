@@ -129,12 +129,14 @@ int sigsafe_format(char *str, size_t size, const char *fmt, ...) {
 						case AF_INET: {
 							struct sockaddr_in *addr4 = (struct sockaddr_in *)addr;
 							uint8_t *ipv4 = (uint8_t *)&(addr4->sin_addr);
-							strp += sigsafe_format(strp, stre-strp, "%u.%u.%u.%u#%u", ipv4[0], ipv4[1], ipv4[2], ipv4[3], addr4->sin_port);
+							uint8_t *port = (uint8_t *)&(addr4->sin_port);
+							strp += sigsafe_format(strp, stre-strp, "%u.%u.%u.%u#%u", ipv4[0], ipv4[1], ipv4[2], ipv4[3], (port[0] << 8) | port[1]);
 							append_str = "";
 							} break;
 						case AF_INET6: {
 							struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *)addr;
 							uint8_t *ipv6 = (uint8_t *)&(addr6->sin6_addr);
+							uint8_t *port = (uint8_t *)&(addr6->sin6_port);
 							int mzb = -2, mze = 0;  // maximal zero-filled gap begin (incl.) and end (excl.)
 							{ // find longest gap
 								int zb = 0, ze = 0;
@@ -162,7 +164,7 @@ int sigsafe_format(char *str, size_t size, const char *fmt, ...) {
 									strp += sigsafe_format(strp, stre-strp, "%x", (ipv6[i] << 8) | ipv6[i+1]);
 								}
 							}
-							strp += sigsafe_format(strp, stre-strp, "#%u", addr6->sin6_port);
+							strp += sigsafe_format(strp, stre-strp, "#%u", (port[0] << 8) | port[1]);
 							append_str = "";
 							} break;
 						case AF_UNSPEC:
