@@ -17,7 +17,7 @@ def test_policy_rule_forward_add():
             },
         }
     )
-    result = "policy.rule_forward_add('.',{dnssec=true,auth=false},{{'2001:148f:fffe::1',tls=false,hostname='odvr.nic.cz',},{'185.43.135.1',tls=false,hostname='odvr.nic.cz',},})"
+    result = "policy.rule_forward_add('.',{dnssec=true,auth=false},{{'2001:148f:fffe::1',tls=false,insecure=false,hostname='odvr.nic.cz',},{'185.43.135.1',tls=false,insecure=false,hostname='odvr.nic.cz',},})"
 
     tmpl = template_from_str(tmpl_str)
     assert tmpl.render(rule=rule) == result

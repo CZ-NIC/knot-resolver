@@ -4,7 +4,7 @@
 {dnssec={{ boolean(options.dnssec) }},auth={{ boolean(options.authoritative) }}}
 {%- endmacro %}
 
-{% macro forward_server(server) -%}
+{% macro forward_server(server, options) -%}
 {%- if server.address is defined and server.address-%}
 {%- for addr in server.address -%}
 {'{{ addr }}',
@@ -12,6 +12,11 @@
 tls=true,
 {%- else -%}
 tls=false,
+{%- endif -%}
+{%- if options.insecure -%}
+insecure=true,
+{%- else -%}
+insecure=false,
 {%- endif -%}
 {%- if server.hostname -%}
 hostname='{{ server.hostname }}',
@@ -29,14 +34,14 @@ ca_file='{{ server.ca_file }}',
 {%- endif -%}
 {%- endmacro %}
 
-{% macro forward_servers(servers) -%}
+{% macro forward_servers(servers, options) -%}
 {
 {%- for server in servers -%}
-{{ forward_server(server) }}
+{{ forward_server(server, options) }}
 {%- endfor -%}
 }
 {%- endmacro %}
 
 {% macro policy_rule_forward_add(subtree,options,servers) -%}
-policy.rule_forward_add('{{ subtree }}',{{ forward_options(options) }},{{ forward_servers(servers) }})
+policy.rule_forward_add('{{ subtree }}',{{ forward_options(options) }},{{ forward_servers(servers, options) }})
 {%- endmacro %}

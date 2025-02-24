@@ -34,10 +34,13 @@ class ForwardOptionsSchema(ConfigSchema):
     ---
     authoritative: The forwarding target is an authoritative server.
     dnssec: Enable/disable DNSSEC.
+    insecure: Allow insecure TLS configuration.
+
     """
 
     authoritative: bool = False
     dnssec: bool = True
+    insecure: bool = False
 
 
 class ForwardSchema(ConfigSchema):
@@ -74,6 +77,17 @@ class ForwardSchema(ConfigSchema):
 
         if self.options.authoritative and is_transport_tls(self.servers):
             raise ValueError("Forwarding to authoritative servers using TLS protocol is not supported.")
+
+        if not self.options.insecure:
+            for server in self.servers:
+                if (
+                    isinstance(server, ForwardServerSchema)
+                    and server.transport == "tls"
+                    and not (server.pin_sha256 or server.hostname or server.ca_file)
+                ):
+                    raise ValueError(
+                        "no way to authenticate server (hostname, ca-file or pin-sha256) and 'insecure' is not set"
+                    )
 
 
 class FallbackSchema(ConfigSchema):
