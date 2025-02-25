@@ -19,7 +19,7 @@ lua_mod_src += [
 ]
 
 config_tests += [
-  ['http', files('http.test.lua')],
+  #['http', files('http.test.lua')],  # https://gitlab.nic.cz/knot/knot-resolver/-/issues/925
   ['http.doh', files('http_doh.test.lua')],
   ['http.tls', files('test_tls/tls.test.lua'), ['skip_asan']],
 ]
