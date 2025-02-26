@@ -5,15 +5,18 @@ VERSION = "6.0.10"
 USER = "knot-resolver"
 GROUP = "knot-resolver"
 
-# dirs paths
+# default files names
+API_SOCK_NAME = "kres-api.sock"
+
+# default dirs paths
 RUN_DIR = Path("/run/knot-resolver")
 ETC_DIR = Path("/etc/knot-resolver")
 SBIN_DIR = Path("/usr/sbin")
 CACHE_DIR = Path("/var/cache/knot-resolver")
 
-# files paths
+# default files paths
 CONFIG_FILE = ETC_DIR / "config.yaml"
-API_SOCK_FILE = RUN_DIR / "kres-api.sock"
+API_SOCK_FILE = RUN_DIR / API_SOCK_NAME
 
 # executables paths
 KRESD_EXECUTABLE = SBIN_DIR / "kresd"
