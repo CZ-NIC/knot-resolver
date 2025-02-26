@@ -8,6 +8,8 @@
 
 #include "lib/layer/iterate.h"
 
+#define KNOT_EDOWNGRADED (KNOT_ERROR_MIN - 1)
+
 /**
  * Check bitmap that child names are contained in the same zone.
  * @note see RFC6840 4.1.
@@ -25,6 +27,7 @@ int kr_nsec_children_in_zone_check(const uint8_t *bm, uint16_t bm_size);
  * @param owner   NSEC record owner.
  * @note This includes special checks for zone cuts, e.g. from RFC 6840 sec. 4.
  * @return 0, abs(ENOENT) (no proof), kr_error(EINVAL)
+ *   KNOT_EDOWNGRADED: special case where the RR would be in an insecure child zone.
  */
 int kr_nsec_bitmap_nodata_check(const uint8_t *bm, uint16_t bm_size, uint16_t type, const knot_dname_t *owner);
 
@@ -44,6 +47,7 @@ int kr_nsec_wildcard_answer_response_check(const knot_pkt_t *pkt, knot_section_t
  * @param rrrs       list of RRs to search; typically kr_request::auth_selected
  * @param qry_uid    only consider NSECs from this packet, for better efficiency
  * @return           negative error code, or PKT_NXDOMAIN | PKT_NODATA (both for NXDOMAIN)
+ *                   KNOT_EDOWNGRADED: special case where the RR would be in an insecure child zone.
  */
 int kr_nsec_negative(const ranked_rr_array_t *rrrs, uint32_t qry_uid,
 			const knot_dname_t *sname, uint16_t stype);

@@ -507,6 +507,7 @@ int kr_nsec3_name_error_response_check(const knot_pkt_t *pkt, knot_section_t sec
  * @param sname      Name to be checked.
  * @param stype      Type to be checked.
  * @return           0 or error code.
+ *                   KNOT_EDOWNGRADED: special case where the RR would be in an insecure child zone.
  * @note             This does NOT check the opt-out case if type is DS;
  *                   see RFC 5155 8.6.
  */
@@ -528,8 +529,9 @@ static int nodata_find(const knot_pkt_t *pkt, knot_section_t section_id,
 
 		const uint8_t *bm = knot_nsec3_bitmap(nsec3->rrs.rdata);
 		uint16_t bm_size = knot_nsec3_bitmap_len(nsec3->rrs.rdata);
-		if (kr_nsec_bitmap_nodata_check(bm, bm_size, type, nsec3->owner) == kr_ok())
-			return kr_ok();
+		int ret = kr_nsec_bitmap_nodata_check(bm, bm_size, type, nsec3->owner);
+		if (ret == kr_ok() || ret == KNOT_EDOWNGRADED)
+			return ret;
 	}
 
 	return kr_error(ENOENT);
@@ -602,8 +604,8 @@ int kr_nsec3_no_data(const knot_pkt_t *pkt, knot_section_t section_id,
 {
 	/* DS record may be also matched by an existing NSEC3 RR. */
 	int ret = nodata_find(pkt, section_id, sname, stype);
-	if (ret == 0) {
-		/* Satisfies RFC5155 8.5 and 8.6, both first paragraph. */
+	if (ret == 0 || ret == KNOT_EDOWNGRADED) {
+		/* If 0, satisfies RFC5155 8.5 and 8.6, both first paragraph. */
 		return ret;
 	}
 
