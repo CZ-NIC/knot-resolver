@@ -53,6 +53,8 @@ struct __attribute((packed)) kr_sockaddr_un_key {
 
 extern inline uint64_t kr_rand_bytes(unsigned int size);
 
+extern inline const char * kr_strerror(int e);
+
 /* Logging & debugging */
 bool kr_dbg_assertion_abort = DBG_ASSERTION_ABORT;
 int kr_dbg_assertion_fork = DBG_ASSERTION_FORK;
