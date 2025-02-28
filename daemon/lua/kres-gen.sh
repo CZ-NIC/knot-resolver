@@ -285,6 +285,7 @@ ${CDEFS} ${LIBKRES} functions <<-EOF
 	lru_create_impl
 	lru_get_impl
 	mm_realloc
+	kr_strerror
 # Trust anchors
 	kr_ta_get
 	kr_ta_add

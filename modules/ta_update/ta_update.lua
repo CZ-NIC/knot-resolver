@@ -17,7 +17,7 @@ local function ta_find(keyset, rr)
 	local rr_tag = C.kr_dnssec_key_tag(rr.type, rr.rdata, #rr.rdata)
 	if rr_tag < 0 or rr_tag > 65535 then
 		log_warn(ffi.C.LOG_GRP_TAUPDATE, string.format('ignoring invalid or unsupported RR: %s: %s',
-			kres.rr2str(rr), ffi.string(C.knot_strerror(rr_tag))))
+			kres.rr2str(rr), kres.strerror(rr_tag)))
 		return nil
 	end
 	for i, ta in ipairs(keyset) do
@@ -25,7 +25,7 @@ local function ta_find(keyset, rr)
 		local ta_tag = C.kr_dnssec_key_tag(ta.type, ta.rdata, #ta.rdata)
 		if ta_tag < 0 or ta_tag > 65535 then
 			log_warn(ffi.C.LOG_GRP_TAUPDATE, string.format('[ta_update] ignoring invalid or unsupported RR: %s: %s',
-				kres.rr2str(ta), ffi.string(C.knot_strerror(ta_tag))))
+				kres.rr2str(ta), kres.strerror(ta_tag)))
 		else
 			if ta.owner == rr.owner then
 				if ta.type == rr.type then
@@ -65,7 +65,7 @@ local function ta_present(keyset, rr, hold_down_time)
 	local key_tag = C.kr_dnssec_key_tag(rr.type, rr.rdata, #rr.rdata)
 	if key_tag < 0 or key_tag > 65535 then
 		log_warn(ffi.C.LOG_GRP_TAUPDATE, string.format('[ta_update] ignoring invalid or unsupported RR: %s: %s',
-			kres.rr2str(rr), ffi.string(C.knot_strerror(key_tag))))
+			kres.rr2str(rr), kres.strerror(key_tag)))
 		return false
 	end
 	-- Find the key in current key set and check its status
@@ -115,7 +115,7 @@ local function ta_missing(ta, hold_down_time)
 	local key_tag = C.kr_dnssec_key_tag(ta.type, ta.rdata, #ta.rdata)
 	if key_tag < 0 or key_tag > 65535 then
 		log_warn(ffi.C.LOG_GRP_TAUPDATE, string.format('[ta_update] ignoring invalid or unsupported RR: %s: %s',
-			kres.rr2str(ta), ffi.string(C.knot_strerror(key_tag))))
+			kres.rr2str(ta), kres.strerror(key_tag)))
 		key_tag = ''
 	end
 	if ta.state == key_state.Valid then

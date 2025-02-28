@@ -263,7 +263,7 @@ local function keyset_read(path, str)
 		local ta_keytag = C.kr_dnssec_key_tag(ta.type, ta.rdata, #ta.rdata)
 		if not (ta_keytag >= 0 and ta_keytag <= 65535) then
 			return nil, string.format('invalid key: "%s": %s',
-				kres.rr2str(ta), ffi.string(C.knot_strerror(ta_keytag)))
+				kres.rr2str(ta), kres.strerror(ta_keytag))
 		end
 		ta.key_tag = ta_keytag
 	end

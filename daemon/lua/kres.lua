@@ -1143,6 +1143,10 @@ kres = {
 	context = function () return ffi.C.the_resolver end,
 
 	knot_pkt_rr = knot_pkt_rr,
+	-- Convenience shorthand
+	strerror = function (errcode)
+		return ffi.string(ffi.C.kr_strerror(errcode))
+	end,
 }
 
 return kres

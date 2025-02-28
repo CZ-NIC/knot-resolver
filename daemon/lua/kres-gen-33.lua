@@ -488,6 +488,7 @@ void lru_free_items_impl(struct lru *);
 struct lru *lru_create_impl(unsigned int, unsigned int, knot_mm_t *, knot_mm_t *);
 void *lru_get_impl(struct lru *, const char *, unsigned int, unsigned int, _Bool, _Bool *);
 void *mm_realloc(knot_mm_t *, void *, size_t, size_t);
+const char *kr_strerror(int);
 knot_rrset_t *kr_ta_get(trie_t *, const knot_dname_t *);
 int kr_ta_add(trie_t *, const knot_dname_t *, uint16_t, uint32_t, const uint8_t *, uint16_t);
 int kr_ta_del(trie_t *, const knot_dname_t *);
