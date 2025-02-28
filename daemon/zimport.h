@@ -35,6 +35,9 @@ typedef struct {
 
 /** Import zone from a file.
  *
+ * \return kr_ok() if OK.  The return code may not be meaningful (e.g. -1),
+ *   but the error log should contain interesting information.
+ *
  * Error can be directly returned in the first phase (parsing + ZONEMD);
  * otherwise it will be kr_ok() and config->cb gets (optionally) called finally.
  *
