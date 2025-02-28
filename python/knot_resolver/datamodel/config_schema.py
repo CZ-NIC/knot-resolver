@@ -1,10 +1,9 @@
 import logging
 import os
 import socket
-from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
-from knot_resolver.constants import API_SOCK_NAME, RUN_DIR, VERSION
+from knot_resolver.constants import API_SOCK_FILE, RUN_DIR, VERSION
 from knot_resolver.datamodel.cache_schema import CacheSchema
 from knot_resolver.datamodel.defer_schema import DeferSchema
 from knot_resolver.datamodel.dns64_schema import Dns64Schema
@@ -96,7 +95,7 @@ class KresConfig(ConfigSchema):
         rundir: Directory where the resolver can create files and which will be it's cwd.
         workers: The number of running kresd (Knot Resolver daemon) workers. If set to 'auto', it is equal to number of CPUs available.
         max_workers: The maximum number of workers allowed. Cannot be changed in runtime.
-        management: Configuration of management HTTP API. By default, unix-socket is located in 'rundir'.
+        management: Configuration of management HTTP API.
         webmgmt: Configuration of legacy web management endpoint.
         options: Fine-tuning global parameters of DNS resolver operation.
         network: Network connections and protocols configuration.
@@ -119,7 +118,7 @@ class KresConfig(ConfigSchema):
         rundir: WritableDir = lazy_default(WritableDir, str(RUN_DIR))
         workers: Union[Literal["auto"], IntPositive] = IntPositive(1)
         max_workers: IntPositive = IntPositive(WORKERS_MAX)
-        management: ManagementSchema = lazy_default(ManagementSchema, {"unix-socket": str(API_SOCK_NAME)})
+        management: ManagementSchema = lazy_default(ManagementSchema, {"unix-socket": str(API_SOCK_FILE)})
         webmgmt: Optional[WebmgmtSchema] = None
         options: OptionsSchema = OptionsSchema()
         network: NetworkSchema = NetworkSchema()
@@ -174,14 +173,6 @@ class KresConfig(ConfigSchema):
             )
         return obj.workers
 
-    def _management(self, obj: Raw) -> Any:
-        if obj.management.unix_socket:
-            soc = Path(obj.management.unix_socket.serialize())
-            if soc.is_absolute():
-                return obj.management
-            return ManagementSchema({"unix-socket": str(obj.rundir.to_path() / soc)})
-        return obj.management
-
     def _dnssec(self, obj: Raw) -> Any:
         if obj.dnssec is True:
             return DnssecSchema()
@@ -193,6 +184,14 @@ class KresConfig(ConfigSchema):
         return obj.dns64
 
     def _validate(self) -> None:
+        # warn about '/management/unix-socket' not located in '/rundir'
+        if self.management.unix_socket and self.management.unix_socket.to_path().parent != self.rundir.to_path():
+            logger.warning(
+                f"The management API unix-socket '{self.management.unix_socket}'"
+                f" is not located in the resolver's rundir '{self.rundir}'."
+                " This can lead to permissions issues."
+            )
+
         # enforce max-workers config
         workers_max = _workers_max_count()
         if int(self.workers) > workers_max:
@@ -268,7 +267,7 @@ def kres_config_json_schema() -> Dict[str, Any]:
     """
 
     context = get_global_validation_context()
-    set_global_validation_context(Context(RUN_DIR, False))
+    set_global_validation_context(Context(None, False))
 
     schema = KresConfig.json_schema(
         schema_id=f"https://www.knot-resolver.cz/documentation/v{VERSION}/_static/config.schema.json",

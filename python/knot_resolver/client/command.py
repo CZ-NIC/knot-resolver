@@ -4,8 +4,8 @@ from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple, Type, TypeVar
 from urllib.parse import quote
 
-from knot_resolver.constants import API_SOCK_FILE, API_SOCK_NAME, CONFIG_FILE, RUN_DIR
-from knot_resolver.datamodel.types import IPAddressPort
+from knot_resolver.constants import API_SOCK_FILE, CONFIG_FILE
+from knot_resolver.datamodel.types import IPAddressPort, WritableFilePath
 from knot_resolver.utils.modeling import parsing
 from knot_resolver.utils.modeling.exceptions import DataValidationError
 from knot_resolver.utils.requests import SocketDesc
@@ -155,37 +155,25 @@ def get_socket_from_config(config: Path, optional_file: bool) -> Optional[Socket
         with open(config, "r", encoding="utf8") as f:
             data = parsing.try_to_parse(f.read())
 
-        rkey = "rundir"
-        rundir = Path(data[rkey]) if rkey in data else RUN_DIR
-
         mkey = "management"
         if mkey in data:
             management = data[mkey]
 
+            skey = "unix-socket"
+            if skey in management:
+                sock = WritableFilePath(management[skey], object_path=f"/{mkey}/{skey}")
+                return SocketDesc(
+                    f'http+unix://{quote(str(sock), safe="")}/',
+                    f'Key "/management/unix-socket" in "{config}" file',
+                )
             ikey = "interface"
             if ikey in data[mkey]:
-                ip = IPAddressPort(data[mkey][ikey], object_path=f"/{mkey}/{ikey}")
+                ip = IPAddressPort(management[ikey], object_path=f"/{mkey}/{ikey}")
                 return SocketDesc(
                     f"http://{ip.addr}:{ip.port}",
                     f'Key "/management/interface" in "{config}" file',
                 )
-
-            skey = "unix-socket"
-            if skey in management:
-                socket = Path(management[skey])
-                if not socket.is_absolute():
-                    socket = rundir / socket
-                return SocketDesc(
-                    f'http+unix://{quote(str(socket), safe="")}/',
-                    f'Key "/management/unix-socket" in "{config}" file',
-                )
-
-        socket = rundir / API_SOCK_NAME
-        return SocketDesc(
-            f'http+unix://{quote(str(socket), safe="")}/',
-            f'Key "/rundir" in "{config}" file',
-        )
-
+        return None
     except ValueError as e:
         raise DataValidationError(*e.args) from e  # pylint: disable=no-value-for-parameter
     except OSError as e:
