@@ -184,6 +184,14 @@ class KresConfig(ConfigSchema):
         return obj.dns64
 
     def _validate(self) -> None:
+        # warn about '/management/unix-socket' not located in '/rundir'
+        if self.management.unix_socket and self.management.unix_socket.to_path().parent != self.rundir.to_path():
+            logger.warning(
+                f"The management API unix-socket '{self.management.unix_socket}'"
+                f" is not located in the resolver's rundir '{self.rundir}'."
+                " This can lead to permissions issues."
+            )
+
         # enforce max-workers config
         workers_max = _workers_max_count()
         if int(self.workers) > workers_max:
