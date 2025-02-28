@@ -1,9 +1,7 @@
 import inspect
 import json
-import os
 from typing import Any, Dict, Type, cast
 
-from knot_resolver.constants import API_SOCK_FILE, API_SOCK_NAME, RUN_DIR
 from knot_resolver.datamodel import KresConfig
 from knot_resolver.datamodel.lua_schema import LuaSchema
 from knot_resolver.utils.modeling import BaseSchema
@@ -51,29 +49,8 @@ def test_config_check_str_type():
 def test_config_defaults():
     config = KresConfig()
 
-    # Management API default
-    assert config.management.unix_socket.to_path() == API_SOCK_FILE
-
     # DNS64 default
     assert config.dns64 == False
-
-
-def test_management_unix_socket():
-    cwd = os.getcwd()
-    config = KresConfig({"rundir": cwd})
-    assert str(config.management.unix_socket) == f"{cwd}/{API_SOCK_NAME}"
-
-    my_soc = "my-new.soc"
-    config = KresConfig({"management": {"unix-socket": my_soc}})
-    assert str(config.management.unix_socket) == f"{RUN_DIR}/{my_soc}"
-
-
-def test_management_interface():
-    cwd = os.getcwd()
-    config = KresConfig({"rundir": cwd, "management": {"interface": "127.0.0.1@5000"}})
-
-    assert config.management.unix_socket == None
-    assert str(config.management.interface) == "127.0.0.1@5000"
 
 
 def test_dnssec_false():
