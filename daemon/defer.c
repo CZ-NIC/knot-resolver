@@ -12,6 +12,7 @@
 #include "lib/mmapped.h"
 #include "lib/resolve.h"
 #include "lib/utils.h"
+#include "lib/sigsafe.h"
 
 #define V4_PREFIXES  (uint8_t[])       {  18,  20, 24, 32 }
 #define V4_RATE_MULT (kru_price_t[])   { 768, 256, 32,  1 }
@@ -58,150 +59,9 @@ V6_CONF = {1, V6_PREFIXES_CNT, V6_PREFIXES, V6_RATE_MULT, V6_SUBPRIO};
 	//   payload is counted either as part of session wire buffer (for stream) or as part of iter ctx (for datagrams)
 
 
-/// Async-signal-safe snprintf-like formatting function, it supports:
-///   * %s takes (char *);
-///   * %u takes unsigned, %NUMu allowed for padding with spaces or zeroes;
-///   * %x takes unsigned, %NUMx allowed;
-///   * %f takes double, behaves like %.3f;
-///   * %r takes (struct sockaddr *).
-int sigsafe_format(char *str, size_t size, const char *fmt, ...) {
-	char *strp = str;        // ptr just after last written char
-	char *stre = str + size; // ptr just after str buffer
-	const char digits[] ="0123456789abcdef";
-	va_list ap;
-	va_start(ap, fmt);  // NOLINT, should be safe in GCC
-	while (*fmt && (stre-strp > 1)) {
-		const char *append_str = NULL;
-		int append_len = -1;
-		bool mod_zero = false;
-		int  mod_int = 0;
-		int  base = 10;
-		char tmpstr[50];
-
-		if (*fmt != '%') {
-			char *perc = strchr(fmt, '%');
-			append_str = fmt;
-			append_len = perc ? perc - fmt : strlen(fmt);
-			fmt += append_len;
-		} else while(fmt++, !append_str) {
-			switch(*fmt) {
-				case '%':   // %%
-					append_str = "%";
-					break;
-				case 's':   // just %s
-					append_str = va_arg(ap, char *);  // NOLINT, should be safe in GCC
-					break;
-				case 'x':   // %x, %#x, %0#x
-					base = 16; // passthrough
-				case 'u': { // %u, %#u, %0#u
-					unsigned num = va_arg(ap, unsigned);  // NOLINT, should be safe in GCC
-					char *sp = tmpstr + sizeof(tmpstr);
-					*--sp = '\0';
-					while ((num > 0) || !*sp) {
-						*--sp = digits[num % base];
-						num /= base;
-						mod_int--;
-					}
-					while (mod_int-- > 0) {
-						*--sp = mod_zero ? '0' : ' ';
-					}
-					append_str = sp;
-					} break;
-				case 'f': { // just %f, behaves like %.3f
-					double valf = va_arg(ap, double);  // NOLINT, should be safe in GCC
-					const char *sign = "";
-					if (valf < 0) { sign = "-"; valf *= -1; }
-					uint64_t vali = valf * 1000 + 0.5;  // NOLINT(bugprone-incorrect-roundings), just minor imprecisions
-						// larger numbers, NaNs, ... are not handled
-					strp += sigsafe_format(strp, stre-strp, "%s%u.%03u", sign, (unsigned)(vali / 1000), (unsigned)(vali % 1000));
-					append_str = "";
-					} break;
-				case 'r': { // just %r, takes (struct sockaddr *)
-					struct sockaddr *addr = va_arg(ap, void *);  // NOLINT, should be safe in GCC
-					if (!addr) {
-						append_str = "(null)";
-						break;
-					}
-					switch (addr->sa_family) {
-						case AF_UNIX:
-							append_str = ((struct sockaddr_un *)addr)->sun_path;
-							break;
-						case AF_INET: {
-							struct sockaddr_in *addr4 = (struct sockaddr_in *)addr;
-							uint8_t *ipv4 = (uint8_t *)&(addr4->sin_addr);
-							uint8_t *port = (uint8_t *)&(addr4->sin_port);
-							strp += sigsafe_format(strp, stre-strp, "%u.%u.%u.%u#%u", ipv4[0], ipv4[1], ipv4[2], ipv4[3], (port[0] << 8) | port[1]);
-							append_str = "";
-							} break;
-						case AF_INET6: {
-							struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *)addr;
-							uint8_t *ipv6 = (uint8_t *)&(addr6->sin6_addr);
-							uint8_t *port = (uint8_t *)&(addr6->sin6_port);
-							int mzb = -2, mze = 0;  // maximal zero-filled gap begin (incl.) and end (excl.)
-							{ // find longest gap
-								int zb = 0, ze = 0;
-								for (size_t i = 0; i < 16; i += 2) {
-									if (!ipv6[i] && !ipv6[i+1]) {
-										if (i == ze) {
-											ze += 2;
-										} else {
-											if (ze - zb > mze - mzb) {
-												mzb = zb; mze = ze;
-											}
-											zb = i; ze = i + 2;
-										}
-									}
-								}
-								if (ze - zb > mze - mzb) {
-									mzb = zb; mze = ze;
-								}
-							}
-							for (int i = -!mzb; i < 15; i++) {
-								if (i == mzb) i = mze - 1;  // after ':' (possibly for i=-1), skip sth. and continue with ':' (possibly for i=15)
-								if (i%2) {
-									if (strp < stre) *strp++ = ':';
-								} else {
-									strp += sigsafe_format(strp, stre-strp, "%x", (ipv6[i] << 8) | ipv6[i+1]);
-								}
-							}
-							strp += sigsafe_format(strp, stre-strp, "#%u", (port[0] << 8) | port[1]);
-							append_str = "";
-							} break;
-						case AF_UNSPEC:
-							append_str = "(unspec)";
-							break;
-						default:
-							append_str = "(unknown)";
-							break;
-					}
-					} break;
-				default:
-					if (('0' <= *fmt) && (*fmt <= '9')) {
-						if ((mod_int == 0) && (*fmt == '0')) {
-							mod_zero = true;
-						} else {
-							mod_int = mod_int * 10 + *fmt - '0';
-						}
-					} else {
-						append_str = "[ERR]";
-					}
-					break;
-			}
-		}
-
-		// append to str (without \0)
-		append_len = MIN(append_len >= 0 ? append_len : strlen(append_str), stre-strp-1);
-		memcpy(strp, append_str, append_len);
-		strp += append_len;
-	}
-	*strp = '\0';
-	va_end(ap);  // NOLINT, should be safe in GCC
-	return strp-str;
-}
-
 #define VERBOSE_LOG(...) kr_log_debug(DEFER, " | " __VA_ARGS__)
 
-// Uses NON-STANDARD format string, see sigsafe_format above.
+// Uses NON-STANDARD format string, see sigsafe_format.
 #define SIGSAFE_LOG(max_size, ...) { \
 	char msg[max_size]; \
 	int len = sigsafe_format(msg, sizeof(msg), "[defer ] "__VA_ARGS__); \

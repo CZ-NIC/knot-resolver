@@ -39,6 +39,7 @@ libkres_src = files([
   'selection.c',
   'selection_forward.c',
   'selection_iter.c',
+  'sigsafe.c',
   'utils.c',
   'zonecut.c',
 ])
@@ -75,6 +76,7 @@ libkres_headers = files([
   'selection.h',
   'selection_forward.h',
   'selection_iter.h',
+  'sigsafe.h',
   'utils.h',
   'zonecut.h',
 ])
