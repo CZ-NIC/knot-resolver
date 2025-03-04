@@ -138,6 +138,14 @@ class Server:
                 logger.error(f"Reloading of the configuration file failed: {e}")
                 logger.error("Configuration have NOT been changed.")
 
+    async def _renew_config(self) -> None:
+        try:
+            await self.config_store.renew()
+            logger.info("Configuration successfully renewed")
+        except KresManagerException as e:
+            logger.error(f"Renewing the configuration failed: {e}")
+            logger.error("Configuration have NOT been renewed.")
+
     async def sigint_handler(self) -> None:
         logger.info("Received SIGINT, triggering graceful shutdown")
         self.trigger_shutdown(0)
@@ -325,6 +333,15 @@ class Server:
         await self._reload_config()
         return web.Response(text="Reloading...")
 
+    async def _handler_renew(self, _request: web.Request) -> web.Response:
+        """
+        Route handler for renewing the configuration
+        """
+
+        logger.info("Renewing configuration event triggered...")
+        await self._renew_config()
+        return web.Response(text="Renewing configuration...")
+
     async def _handler_processes(self, request: web.Request) -> web.Response:
         """
         Route handler for listing PIDs of subprocesses
@@ -359,6 +376,7 @@ class Server:
                 web.patch(r"/v1/config{path:.*}", self._handler_config_query),
                 web.post("/stop", self._handler_stop),
                 web.post("/reload", self._handler_reload),
+                web.post("/renew", self._handler_renew),
                 web.get("/schema", self._handler_schema),
                 web.get("/schema/ui", self._handle_view_schema),
                 web.get("/metrics", self._handler_metrics),
