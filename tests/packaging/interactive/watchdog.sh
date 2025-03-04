@@ -26,7 +26,7 @@ function count_errors(){
 }
 
 function count_reloads(){
-    echo "$(journalctl -u knot-resolver.service | grep -c "Reloading of TLS certificate files has finished")"
+    echo "$(journalctl -u knot-resolver.service | grep -c "to reload watched files has finished")"
 }
 
 # test that files watchdog is turned off

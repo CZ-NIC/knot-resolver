@@ -11,6 +11,8 @@ from knot_resolver.utils import compat
 
 logger = logging.getLogger(__name__)
 
+FilesToWatch = Dict[Path, Optional[str]]
+
 
 def tls_cert_files_config(config: KresConfig) -> List[Any]:
     return [
@@ -18,9 +20,6 @@ def tls_cert_files_config(config: KresConfig) -> List[Any]:
         config.network.tls.cert_file,
         config.network.tls.key_file,
     ]
-
-
-FilesToWatch = Dict[Path, str]
 
 
 if WATCHDOG_LIB:
@@ -33,48 +32,52 @@ if WATCHDOG_LIB:
     class FilesWatchdogEventHandler(FileSystemEventHandler):
         def __init__(self, files: FilesToWatch) -> None:
             self._files = files
-            self._timer: Optional[Timer] = None
+            self._timers: Dict[str, Timer] = {}
 
-        def _reload(self, cmd: str) -> None:
+        def _trigger(self, cmd: Optional[str]) -> None:
+            if not cmd:
+                return
             def command() -> None:
                 if compat.asyncio.is_event_loop_running():
                     compat.asyncio.create_task(command_registered_workers(cmd))
                 else:
                     compat.asyncio.run(command_registered_workers(cmd))
-                logger.info("Reloading of TLS certificate files has finished")
+                logger.info(f"Sending '{cmd}' command to reload watched files has finished")
 
-            # skipping if reload was already triggered
-            if self._timer and self._timer.is_alive():
-                logger.info("Skipping TLS certificate files reloading, reload command was already triggered")
+            # skipping if command was already triggered
+            if cmd in self._timers and self._timers[cmd].is_alive():
+                logger.info(f"Skipping sending '{cmd}' command, it was already triggered")
                 return
             # start a 5sec timer
-            logger.info("Delayed reload of TLS certificate files has started")
-            self._timer = Timer(5, command)
-            self._timer.start()
+            logger.info(f"Delayed send of '{cmd}' command has started")
+            self._timers[cmd] = Timer(5, command)
+            self._timers[cmd].start()
 
         def on_created(self, event: FileSystemEvent) -> None:
             src_path = Path(str(event.src_path))
             if src_path in self._files.keys():
                 logger.info(f"Watched file '{src_path}' has been created")
-                self._reload(self._files[src_path])
+                self._trigger(self._files[src_path])
 
         def on_deleted(self, event: FileSystemEvent) -> None:
             src_path = Path(str(event.src_path))
             if src_path in self._files.keys():
                 logger.warning(f"Watched file '{src_path}' has been deleted")
-                if self._timer:
-                    self._timer.cancel()
+                cmd = self._files[src_path]
+                if cmd in self._timers:
+                    self._timers[cmd].cancel()
             for file in self._files.keys():
                 if file.parent == src_path:
                     logger.warning(f"Watched directory '{src_path}' has been deleted")
-                    if self._timer:
-                        self._timer.cancel()
+                    cmd = self._files[file]
+                    if cmd in self._timers:
+                        self._timers[cmd].cancel()
 
         def on_modified(self, event: FileSystemEvent) -> None:
             src_path = Path(str(event.src_path))
             if src_path in self._files.keys():
                 logger.info(f"Watched file '{src_path}' has been modified")
-                self._reload(self._files[src_path])
+                self._trigger(self._files[src_path])
 
     _files_watchdog: Optional["FilesWatchdog"] = None
 
@@ -118,6 +121,12 @@ async def _init_files_watchdog(config: KresConfig) -> None:
             net_tls = f"net.tls('{config.network.tls.cert_file}', '{config.network.tls.key_file}')"
             files_to_watch[config.network.tls.cert_file.to_path()] = net_tls
             files_to_watch[config.network.tls.key_file.to_path()] = net_tls
+
+        # local-data.rpz
+        if config.local_data.rpz:
+            for rpz in config.local_data.rpz:
+                if rpz.watchdog:
+                    files_to_watch[rpz.file.to_path()] = None
 
         if files_to_watch:
             logger.info("Initializing files watchdog")
