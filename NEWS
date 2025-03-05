@@ -91,6 +91,10 @@ Improvements
 ------------
 - /local-data/rpz/*/watchdog: new configuration to enable watchdog for RPZ files (!1665)
 
+Improvements
+------------
+- defer: hard timeout for continuous work on a single request, terminates kresd if exceeded (!1661)
+
 
 Knot Resolver 6.0.11 (2025-02-26)
 =================================
