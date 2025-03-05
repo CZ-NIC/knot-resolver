@@ -618,7 +618,7 @@ int main(int argc, char **argv)
 
 	if (!defer_initialized) {
 		kr_log_warning(SYSTEM, "Prioritization not initialized from Lua, using hardcoded default.\n");
-		ret = defer_init("defer", 1, 0, 1);
+		ret = defer_init("defer", 1, 0, 0, 1);
 		if (ret) {
 			ret = EXIT_FAILURE;
 			goto cleanup;

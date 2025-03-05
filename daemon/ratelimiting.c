@@ -90,7 +90,7 @@ int ratelimiting_init(const char *mmap_file, size_t capacity, uint32_t instant_l
 			goto fail;
 		}
 
-		ratelimiting->log_time = kr_now() - log_period;
+		ratelimiting->log_time = kr_log_period_init(log_period);
 
 		for (size_t i = 0; i < V4_PREFIXES_CNT; i++) {
 			ratelimiting->v4_prices[i] = base_price / V4_RATE_MULT[i];
@@ -175,18 +175,11 @@ bool ratelimiting_request_begin(struct kr_request *req)
 			((ratelimiting->slip == 1) ? true : false);
 
 	// logging
-	uint32_t log_time_orig = atomic_load_explicit(&ratelimiting->log_time, memory_order_relaxed);
-	if (ratelimiting->log_period) {
-		while (time_now - log_time_orig + 1024 >= ratelimiting->log_period + 1024) {
-			if (atomic_compare_exchange_weak_explicit(&ratelimiting->log_time, &log_time_orig, time_now,
-					memory_order_relaxed, memory_order_relaxed)) {
-				kr_log_notice(SYSTEM, "address %s rate-limited on /%d (%s%s)\n",
-						kr_straddr(req->qsource.addr), limited_prefix,
-						ratelimiting->dry_run ? "dry-run, " : "",
-						tc ? "truncated" : "dropped");
-				break;
-			}
-		}
+	if (kr_log_period(ratelimiting->log_period, &ratelimiting->log_time)) {
+		kr_log_notice(SYSTEM, "address %s rate-limited on /%d (%s%s)\n",
+				kr_straddr(req->qsource.addr), limited_prefix,
+				ratelimiting->dry_run ? "dry-run, " : "",
+				tc ? "truncated" : "dropped");
 	}
 
 	req->ratelimited = true; // we set this even on dry_run

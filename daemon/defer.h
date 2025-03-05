@@ -9,7 +9,7 @@
 
 /// Initialize defer, incl. shared memory with KRU, excl. idle.
 KR_EXPORT
-int defer_init(const char *mmap_file, uint32_t log_period, uint32_t hard_timeout, int cpus);
+int defer_init(const char *mmap_file, uint32_t log_period, uint32_t hard_timeout, uint32_t coredump_period, int cpus);
 
 /// Initialize idle and SIGALRM handler.
 int defer_init_idle(uv_loop_t *loop);

@@ -79,9 +79,11 @@ struct defer {
 	kru_price_t max_decay;
 	uint32_t log_period;
 	uint32_t hard_timeout;
+	uint32_t coredump_period;
 	int cpus;
 	bool using_avx2;
 	_Atomic uint32_t log_time;
+	_Atomic uint32_t coredump_time;
 	_Alignas(64) uint8_t kru[];
 };
 struct defer *defer = NULL;
@@ -462,17 +464,9 @@ static inline void process_single_deferred(void)
 		VERBOSE_LOG("    BREAK (timeout)\n");
 
 		// notice logging according to log-period
-		const uint32_t time_now = kr_now();
-		uint32_t log_time_orig = atomic_load_explicit(&defer->log_time, memory_order_relaxed);
-		if (defer->log_period) {
-			while (time_now - log_time_orig + 1024 >= defer->log_period + 1024) {
-				if (atomic_compare_exchange_weak_explicit(&defer->log_time, &log_time_orig, time_now,
-						memory_order_relaxed, memory_order_relaxed)) {
-					kr_log_notice(DEFER, "Data from %s too long in queue, dropping. (%0.3f MiB in queues)\n",
-							kr_straddr(ctx->comm->src_addr), waiting_requests_size / 1024.0 / 1024.0);
-					break;
-				}
-			}
+		if (kr_log_period(defer->log_period, &defer->log_time)) {
+			kr_log_notice(DEFER, "Data from %s too long in queue, dropping. (%0.3f MiB in queues)\n",
+					kr_straddr(ctx->comm->src_addr), waiting_requests_size / 1024.0 / 1024.0);
 		}
 
 		break_query(ctx, ETIME);
@@ -680,16 +674,22 @@ static void defer_alarm(int signum)
 
 	if (rest_to_timeout_ms <= 0) {
 		defer_charge(elapsed, &defer_sample_state.addr, defer_sample_state.stream);
+		bool coredump = kr_log_period(defer->coredump_period, &defer->coredump_time);
 		SIGSAFE_LOG(KR_STRADDR_MAXLEN + 100,
-			"Host %r used %f s of cpu time continuously, interrupting kresd.\n",
-			&defer_sample_state.addr.ip, elapsed / 1000000000.0);
-		abort();
+			"Host %r used %f s of cpu time continuously, interrupting kresd (%s).\n",
+			&defer_sample_state.addr.ip, elapsed / 1000000000.0,
+			coredump ? "abort" : "exit");
+		if (coredump) {
+			abort();
+		} else {
+			_exit(EXIT_FAILURE);
+		}
 	}
 	alarm((rest_to_timeout_ms + 999) / 1000);
 }
 
 /// Initialize shared memory, queues. To be called from Lua.
-int defer_init(const char *mmap_file, uint32_t log_period, uint32_t hard_timeout, int cpus)
+int defer_init(const char *mmap_file, uint32_t log_period, uint32_t hard_timeout, uint32_t coredump_period, int cpus)
 	// TODO possibly remove cpus; not needed
 {
 	defer_initialized = true;
@@ -709,6 +709,7 @@ int defer_init(const char *mmap_file, uint32_t log_period, uint32_t hard_timeout
 		.max_decay = MAX_DECAY,
 		.log_period = log_period,
 		.hard_timeout = hard_timeout,
+		.coredump_period = coredump_period,
 		.cpus = cpus,
 		.using_avx2 = using_avx2(),
 	};
@@ -724,6 +725,7 @@ int defer_init(const char *mmap_file, uint32_t log_period, uint32_t hard_timeout
 			sizeof(header.max_decay) +
 			sizeof(header.log_period) +
 			sizeof(header.hard_timeout) +
+			sizeof(header.coredump_period) +
 			sizeof(header.cpus),
 		"detected padding with undefined data inside mmapped header");
 
@@ -740,7 +742,8 @@ int defer_init(const char *mmap_file, uint32_t log_period, uint32_t hard_timeout
 			goto fail;
 		}
 
-		defer->log_time = kr_now() - log_period;
+		defer->log_time = kr_log_period_init(log_period);
+		defer->coredump_time = kr_log_period_init(coredump_period);
 
 		ret = mmapped_init_continue(&defer_mmapped);
 		if (ret != 0) goto fail;

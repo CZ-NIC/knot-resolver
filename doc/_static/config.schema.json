@@ -1787,12 +1787,19 @@
                     "pattern": "^(\\d+)(us|ms|s|m|h|d)$",
                     "description": "If a measured operation lasts longer, kresd is interrupted; use '0s' to disable.",
                     "default": "0s"
+                },
+                "coredump-period": {
+                    "type": "string",
+                    "pattern": "^(\\d+)(us|ms|s|m|h|d)$",
+                    "description": "Minimal time between two coredumps caused by hard_timeout, or '0s' to disable them.",
+                    "default": "10m"
                 }
             },
             "default": {
                 "enabled": false,
                 "log_period": "0s",
-                "hard_timeout": "0s"
+                "hard_timeout": "0s",
+                "coredump_period": "10m"
             }
         },
         "lua": {

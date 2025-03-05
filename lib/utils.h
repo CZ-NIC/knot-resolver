@@ -5,6 +5,7 @@
 #pragma once
 
 #include <dirent.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -632,3 +633,22 @@ static inline const  knot_dname_t * knot_dname_next_label(const knot_dname_t *dn
 }
 #endif
 
+/* Determine whether to perform an action (logging) limited once per time period in ms. */
+static inline bool kr_log_period(uint32_t period, _Atomic uint32_t *last_time) {
+	const uint32_t time_now = kr_now(); // 32 bits are sufficient here
+	uint32_t last_time_orig = atomic_load_explicit(last_time, memory_order_relaxed);
+	if (period) {
+		while (time_now - last_time_orig + 1024 >= period + 1024) {
+			if (atomic_compare_exchange_weak_explicit(last_time, &last_time_orig, time_now,
+					memory_order_relaxed, memory_order_relaxed)) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+/* Initialize last_time for kr_log_period. */
+static inline uint32_t kr_log_period_init(uint32_t period) {
+	return kr_now() - period;
+}

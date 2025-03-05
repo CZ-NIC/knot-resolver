@@ -67,8 +67,27 @@ The limits can be adjusted for different packet origins using :option:`price-fac
     it is crucial to use :ref:`multiple workers <config-multiple-workers>`
     as those data are shared between them and disappear with the last one.
 
-    A continuous work on a single request usually takes under 1 ms. (TODO check)
-    Set the timeout at least to several seconds to avoid random crashes. (TODO or more?)
+    A continuous work on a single request usually takes under 1 ms.
+    Set the timeout to 1s or higher values to avoid random crashes.
+
+.. option:: defer/coredump-period: <time ms|s|m|h|d>
+
+    :defeult: 10m
+
+    Minimal time between two coredumps caused by :option:`hard-timeout <defer/hard-timeout: <time ms|s|m|h|d>`,
+    or ``0s`` to disable them.
+
+    If kresd is to be terminated due to :option:`hard-timeout <defer/hard-timeout: <time ms|s|m|h|d>`,
+    it calls ``abort``, which might cause coredump to be generated, and disables this behaviour
+    for :option:`coredump-period <defer/coredump-period: <time ms|s|m|h|d>`.
+    Subsequent terminations call just ``_exit``, so that kresd is terminated without coredump.
+
+    The last abortion timestamp is stored along with other defer data
+    in the memory shared between workers which disappears with the last one;
+    it is thus needed to use :ref:`multiple workers <config-multiple-workers>`
+    to keep the data alive during restart.
+    Otherwise, :option:`coredump-period <defer/coredump-period: <time ms|s|m|h|d>` has no effect
+    and coredumps are always enabled.
 
 
 Implementation details
