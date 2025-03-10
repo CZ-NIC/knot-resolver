@@ -11,6 +11,7 @@ If there is not enough time to process all the requests, the lowest priority one
 It also allows setting a hard timeout on a continuous computation on a single request.
 
 The time measurements are taken into account only for TCP-based queries (including DoT and DoH),
+except for hard timeout which is applied for both,
 as the source address of plain UDP can be forged.
 We aim to spend half of the time for UDP without prioritization
 and half of the time for non-UDP with prioritization,
@@ -60,7 +61,7 @@ The limits can be adjusted for different packet origins using :option:`price-fac
 
     It is based on scheduling a SIGALRM to be delivered after the timeout (or up to 1s later),
     which then interrupts the computation.
-    After the interrupt the priority of the request's origin is decreased according to the duration,
+    After interrupting the priority of the request's origin is decreased according to the duration (if non-UDP),
     the kresd process is terminated (dropping all pending, but probably already timeouted, requests)
     and started again by manager.
     To keep the data with measurements and priorities alive during restart,
