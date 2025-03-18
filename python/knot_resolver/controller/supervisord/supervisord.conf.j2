@@ -66,7 +66,7 @@ killasgroup=true
 startsecs=60
 environment={{ kresd.environment }}
 stdout_logfile=NONE
-stderr_logfile=NONE
+stderr_logfile={{ config.systemd_logfile }}  # empty string has special meaning defined in patch_logger
 
 [program:policy-loader]
 directory={{ loader.workdir }}
@@ -77,7 +77,7 @@ killasgroup=true
 startsecs=300
 environment={{ loader.environment }}
 stdout_logfile=NONE
-stderr_logfile=NONE
+stderr_logfile={{ config.systemd_logfile }}  # empty string has special meaning defined in patch_logger
 
 [program:cache-gc]
 redirect_stderr=false

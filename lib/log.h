@@ -140,6 +140,9 @@ enum kr_log_group {
 #define LOG_GRP_REQDBG_TAG		"reqdbg"	/**< ``reqdbg``: debug logs enabled by policy actions */
 ///@}
 
+// Async-signal-safe variant of the lowercase function; fails silently.
+#define KR_LOG_GROUP_IS_SET(grp) ((LOG_GRP_ ## grp < 1) || (kr_log_groups & (1ULL << LOG_GRP_ ## grp)))
+
 KR_EXPORT
 bool kr_log_group_is_set(enum kr_log_group group);
 KR_EXPORT
@@ -159,6 +162,10 @@ typedef int kr_log_level_t;
 /** Current logging level.  Read only, please. */
 KR_EXPORT extern
 kr_log_level_t kr_log_level;
+
+/** Set of log-groups that are on debug level. It's a bitmap over 1 << enum kr_log_group. Read only. */
+KR_EXPORT extern
+uint64_t kr_log_groups;
 
 /** Set the current logging level. */
 KR_EXPORT

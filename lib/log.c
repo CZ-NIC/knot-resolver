@@ -22,9 +22,7 @@ bool use_journal = false;
 
 kr_log_level_t kr_log_level = LOG_DEFAULT_LEVEL;
 kr_log_target_t kr_log_target = LOG_TARGET_DEFAULT;
-
-/** Set of log-groups that are on debug level.  It's a bitmap over 1 << enum kr_log_group. */
-static uint64_t kr_log_groups = 0;
+uint64_t kr_log_groups = 0;
 
 typedef struct {
 	const char		*g_name;

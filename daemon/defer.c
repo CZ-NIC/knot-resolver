@@ -64,14 +64,7 @@ V6_CONF = {1, V6_PREFIXES_CNT, V6_PREFIXES, V6_RATE_MULT, V6_SUBPRIO};
 #define VERBOSE_LOG_PRICY(...) { if (kr_log_is_debug(DEFER, NULL)) VERBOSE_LOG(__VA_ARGS__); }
 
 // Uses NON-STANDARD format string, see sigsafe_format.
-#define SIGSAFE_LOG(max_size, ...) { \
-	char msg[max_size]; \
-	int len = sigsafe_format(msg, sizeof(msg), "[defer ] "__VA_ARGS__); \
-	write(kr_log_target == LOG_TARGET_STDOUT ? 1 : 2, msg, len); \
-}
-#define SIGSAFE_VERBOSE_LOG(max_size, ...) { \
-	if (kr_log_is_debug(DEFER, NULL)) /* NOLINT */\
-	{ SIGSAFE_LOG(max_size, " | " __VA_ARGS__)}}
+#define SIGSAFE_VERBOSE_LOG(max_size, ...) sigsafe_log(LOG_DEBUG, DEFER, max_size, " | " __VA_ARGS__)
 
 
 struct defer {
@@ -675,7 +668,7 @@ static void defer_alarm(int signum)
 	if (rest_to_timeout_ms <= 0) {
 		defer_charge(elapsed, &defer_sample_state.addr, defer_sample_state.stream);
 		bool coredump = kr_log_period(defer->coredump_period, &defer->coredump_time);
-		SIGSAFE_LOG(KR_STRADDR_MAXLEN + 100,
+		sigsafe_log(LOG_CRIT, DEFER, KR_STRADDR_MAXLEN + 100,
 			"Host %r used %f s of cpu time continuously, interrupting kresd (%s).\n",
 			&defer_sample_state.addr.ip, elapsed / 1000000000.0,
 			coredump ? "abort" : "exit");

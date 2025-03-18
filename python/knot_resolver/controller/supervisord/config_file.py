@@ -140,6 +140,8 @@ class ProcessTypeConfig:
             logfile=Path(""),  # this will be ignored
         )
 
+def sd_booted():
+    return os.path.lexists("/run/systemd/system")  # same as in libsystemd
 
 @dataclass
 class SupervisordConfig:
@@ -149,6 +151,7 @@ class SupervisordConfig:
     logfile: Path
     loglevel: Literal["critical", "error", "warn", "info", "debug", "trace", "blather"]
     target: LogTargetEnum
+    systemd_logfile: Literal["NONE", "PASS"]
 
     @staticmethod
     def create(config: KresConfig) -> "SupervisordConfig":
@@ -165,6 +168,12 @@ class SupervisordConfig:
                 "debug": "debug",
             }[config.logging.level]
         cwd = str(os.getcwd())
+
+        # Keep stderr FD unchanged if logging to systemd (it is likely to be handled by systemd as well as syslog);
+        # reformat `<N>` line prefixes in supervisord's patch_logger module, otherwise.
+        # Use as the value of `stderr_logfile` where desired.
+        systemd_logfile = "" if config.logging.target == "syslog" and sd_booted() else "NONE"
+
         return SupervisordConfig(  # type: ignore[call-arg]
             unix_http_server=supervisord_sock_file(config),
             pid_file=supervisord_pid_file(config),
@@ -172,6 +181,7 @@ class SupervisordConfig:
             logfile=Path("syslog" if config.logging.target == "syslog" else "/dev/null"),
             loglevel=loglevel,  # type: ignore[arg-type]
             target=config.logging.target,
+            systemd_logfile = systemd_logfile,
         )
 
 
