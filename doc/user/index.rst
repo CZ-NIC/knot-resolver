@@ -59,6 +59,8 @@ If you are a completely new user or new to version 6, please start with chapters
    upgrading
    upgrading-to-6
    NEWS
+   rfc-list
+.. maybe find a better location for rfc-list
 
 .. toctree::
    :caption: For developers
