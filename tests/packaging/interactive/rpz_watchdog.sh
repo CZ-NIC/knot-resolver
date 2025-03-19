@@ -14,14 +14,12 @@ EOF
 echo "$rpz_example" >> $rpz_file
 
 rpz_conf=$(cat <<EOF
-local-data:
-  rpz:
-    - file: $rpz_file
-      watchdog: false
+{[
+    "file": "$rpz_file"
+    "watchdog": false
+]}
 EOF
 )
-# add RPZ to config
-echo "$rpz_conf" >> /etc/knot-resolver/config.yaml
 
 function count_errors(){
     echo "$(journalctl -u knot-resolver.service | grep -c error)"
@@ -37,8 +35,8 @@ function count_reloads(){
 err_count=$(count_errors)
 rel_count=$(count_reloads)
 
-# reload config with RPZ configured without watchdog turned on
-kresctl reload
+# configure RPZ without files watchdog
+kresctl config set -p /local-dat/rpz "$rpz_conf"
 sleep 1
 if [ $(count_errors) -ne $err_count ] || [ $(count_reloads) -ne $rel_count ]; then
     echo "RPZ file watchdog is running (should not) or other errors occurred."
