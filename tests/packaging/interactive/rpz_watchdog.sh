@@ -15,8 +15,8 @@ echo "$rpz_example" >> $rpz_file
 
 rpz_conf=$(cat <<EOF
 {[
-    "file": "$rpz_file"
-    "watchdog": false
+    "file": "$rpz_file",
+    "watchdog": false,
 ]}
 EOF
 )
