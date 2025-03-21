@@ -14,10 +14,12 @@ EOF
 echo "$rpz_example" >> $rpz_file
 
 rpz_conf=$(cat <<EOF
-{[
+{
+  "rpz": [{
     "file": "$rpz_file",
     "watchdog": false,
-]}
+  }]
+}
 EOF
 )
 
@@ -36,7 +38,7 @@ err_count=$(count_errors)
 rel_count=$(count_reloads)
 
 # configure RPZ without files watchdog
-kresctl config set -p /local-dat/rpz "$rpz_conf"
+kresctl config set -p /local-dat "$rpz_conf"
 sleep 1
 if [ $(count_errors) -ne $err_count ] || [ $(count_reloads) -ne $rel_count ]; then
     echo "RPZ file watchdog is running (should not) or other errors occurred."
