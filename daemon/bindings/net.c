@@ -531,13 +531,16 @@ static int net_pipeline(lua_State *L)
 	return 1;
 }
 
-#include "lib/resolve.h"
 static int net_tls_whitelist(lua_State *L)
 {
-	if (!the_network || !the_network->tls_credentials)
-		return 1;
+	if (kr_fails_assert(the_network)) {
+		return kr_error(EINVAL);
+	}
 
-	int r = kr_init_whitelist(lua_tostring(L, 1));
+	if (lua_gettop(L) != 1 || !lua_isstring(L, 1)) {
+		lua_error_p(L, "net.tls.whitelist takes one parameter: (\"whitelist-file\")");
+	}
+	int r = tls_certificate_authority_whitelist_set(lua_tostring(L, 1));
 	lua_error_maybe(L, r);
 
 	lua_pushboolean(L, true);
