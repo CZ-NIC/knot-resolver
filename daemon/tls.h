@@ -79,9 +79,11 @@ static inline tls_client_param_t *
 	return pe ? *pe : NULL;
 }
 
-/** Check if the client's certificate was issued by a whitelisted authority */
 KR_EXPORT
-int search_authorities(gnutls_datum_t cert);
+int tls_certificate_authority_whitelist_set(const char *filepath);
+
+/** Check the client's certificate againts a configured trust whitelist */
+int cert_verify_issuers(gnutls_session_t session);
 
 /** Allocate and initialize the structure (with ->ref = 1). */
 tls_client_param_t * tls_client_param_new(void);

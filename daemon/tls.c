@@ -240,80 +240,6 @@ static ssize_t kres_gnutls_vec_push(gnutls_transport_ptr_t h, const giovec_t * i
 	return total_len;
 }
 
-static void *get_peer_serial(gnutls_x509_crt_t cert)
-{
-	size_t result_size = 256;
-	uint8_t *serial_number = calloc(sizeof(uint8_t), result_size);
-	if (!serial_number)
-		return NULL;
-
-	int ret = gnutls_x509_crt_get_serial(cert, serial_number, &result_size);
-	if (ret == GNUTLS_E_SUCCESS)
-		// pass to dnstap
-		;
-
-	kr_log_warning(TLS, "Failed to retrieve peer's certificate serial number (%s)\n",
-			gnutls_strerror(ret));
-}
-
-int search_authorities(gnutls_datum_t cert)
-{
-	int rv = -1;
-	gnutls_x509_crt_t peer_cert = NULL;
-	if (!the_resolver->issuers)
-		return rv;
-	struct issuer_whitelist *wl = the_resolver->issuers;
-
-	size_t bufsize = 256;
-	char *buffer = calloc(1, bufsize);
-	if (!buffer)
-		goto end;
-
-	int ret = gnutls_x509_crt_init(&peer_cert);
-	if (ret != GNUTLS_E_SUCCESS) {
-		kr_log_warning(TLS, "failed to initialize gnutls_x509_crt_t (%s)\n",
-				gnutls_strerror(ret));
-		goto end;
-	}
-
-	ret = gnutls_x509_crt_import(peer_cert, &cert, GNUTLS_X509_FMT_DER);
-	if (ret != GNUTLS_E_SUCCESS) {
-		kr_log_warning(TLS, "DBG failed to import peer certificate (%s)\n",
-				gnutls_strerror(ret));
-		return -1;
-	}
-
-	uint8_t *serial_number = get_peer_serial(peer_cert);
-	if (serial_number) {
-		;
-	}
-retry:
-	ret = gnutls_x509_crt_get_issuer_dn_by_oid(
-			peer_cert, GNUTLS_OID_X520_ORGANIZATION_NAME,
-			0, 0, buffer, &bufsize);
-	if (unlikely(ret == GNUTLS_E_SHORT_MEMORY_BUFFER)) {
-		char *new_buf = realloc(buffer, bufsize);
-		if (!new_buf)
-			goto end;
-		buffer = new_buf;
-
-		goto retry;
-
-	} else if (ret == GNUTLS_E_SUCCESS) {
-		for (int s = 0; s < wl->count; s++) {
-			if (strcmp(wl->names[s], buffer) == 0) {
-				rv = kr_ok();
-				goto end;
-			}
-		}
-	}
-end:
-	if (peer_cert)
-		gnutls_x509_crt_deinit(peer_cert);
-
-	return rv;
-}
-
 static void tls_handshake_success(struct pl_tls_sess_data *tls,
                                   struct session2 *session)
 {
@@ -543,6 +469,42 @@ static time_t get_end_entity_expiration(gnutls_certificate_credentials_t creds)
 	 * constant. */
 	gnutls_x509_crt_deinit(cert);
 	return ret;
+}
+
+int tls_certificate_authority_whitelist_set(const char *filepath)
+{
+	if (kr_fails_assert(the_network)) {
+		return kr_error(EINVAL);
+	}
+
+	if (!the_network->tls_credentials) {
+		return kr_error(EINVAL);
+	}
+
+	if (!the_resolver->trust_whitelist) {
+		int ret = gnutls_certificate_allocate_credentials(&the_resolver->trust_whitelist);
+		if (ret != GNUTLS_E_SUCCESS) {
+			kr_log_warning(TLS, "gnutls_certificate_allocate_credentials() failed: (%d) %s\n",
+				     ret, gnutls_strerror_name(ret));
+			return kr_error(ENOMEM);
+		}
+
+	}
+
+	int ret = gnutls_certificate_set_x509_trust_file(
+			the_resolver->trust_whitelist,
+			filepath,
+			GNUTLS_X509_FMT_PEM);
+
+	if (ret < 0) {
+		kr_log_warning(TLS, "Unable to load trust whitelist (%s)\n", filepath);
+		gnutls_certificate_free_credentials(the_resolver->trust_whitelist);
+		return kr_ok();
+	}
+
+	kr_log_info(TLS, "Succesfully loaded trust whitelist (found %d CAs)\n", ret);
+	gnutls_certificate_set_verify_function(the_network->tls_credentials->credentials, cert_verify_issuers);
+	return kr_ok();
 }
 
 int tls_certificate_set(const char *tls_cert, const char *tls_key)
@@ -938,11 +900,6 @@ static int client_verify_certificate(gnutls_session_t tls_session)
 		return GNUTLS_E_CERTIFICATE_ERROR;
 	}
 
-	// if (search_authorities(cert_list[0]) != kr_ok()) {
-	// 	kr_log_error(TLS, "failed to validate cert issuer\n");
-	// 	return GNUTLS_E_CERTIFICATE_ERROR;
-	// }
-
 	if (tls->client_params->pins.len > 0)
 		/* check hash of the certificate but ignore everything else */
 		return client_verify_pin(cert_list_size, cert_list, tls->client_params);
@@ -997,6 +954,82 @@ static int pl_tls_sess_data_deinit(struct pl_tls_sess_data *tls)
 	queue_deinit(tls->wrap_queue);
 
 	return kr_ok();
+}
+
+/* Retrieved the certificate serial number to be used
+ * as a client ID */
+// static void *get_peer_serial(gnutls_x509_crt_t cert)
+// {
+// 	size_t result_size = 256;
+// 	uint8_t *serial_number = calloc(sizeof(uint8_t), result_size);
+// 	if (!serial_number)
+// 		return NULL;
+//
+// 	int ret = gnutls_x509_crt_get_serial(cert, serial_number, &result_size);
+// 	if (ret == GNUTLS_E_SUCCESS)
+// 		// pass to dnstap
+// 		;
+//
+// 	kr_log_warning(TLS, "Failed to retrieve peer's certificate serial number (%s)\n",
+// 			gnutls_strerror(ret));
+// 	return NULL;
+// }
+
+int cert_verify_issuers(gnutls_session_t session)
+{
+	/* Should never happen */
+	if (!the_resolver->trust_whitelist) {
+		kr_log_warning(TLS , "Trust whitelist has not been set. Skipping verification.\n");
+		return GNUTLS_E_SUCCESS;
+	}
+
+	const gnutls_datum_t *peer_cert_list;
+	unsigned int peer_cert_count;
+	peer_cert_list = gnutls_certificate_get_peers(session, &peer_cert_count);
+	if (peer_cert_list == NULL) {
+		kr_log_info(TLS, "No certificate provided by peer. Rejecting connection.\n");
+		return GNUTLS_E_CERTIFICATE_ERROR;
+	}
+
+	gnutls_x509_trust_list_t whitelist_tlist;
+	gnutls_certificate_get_trust_list(the_resolver->trust_whitelist, &whitelist_tlist);
+
+	int valid_found = 0;
+	unsigned int voutput = 0;
+
+	for (unsigned int i = 0; i < peer_cert_count; i++) {
+		gnutls_x509_crt_t tmp_cert;
+		gnutls_x509_crt_init(&tmp_cert);
+		if (gnutls_x509_crt_import(tmp_cert, &peer_cert_list[i], GNUTLS_X509_FMT_DER) < 0) {
+			kr_log_warning(TLS, "Failed to import certificate from chain index %u.\n", i);
+			gnutls_x509_crt_deinit(tmp_cert);
+			continue;
+		}
+
+		gnutls_x509_crt_t cert_array[1] = { tmp_cert };
+
+		int ret = gnutls_x509_trust_list_verify_crt(
+			whitelist_tlist,
+			cert_array,
+			1,
+			0,
+			&voutput,
+			NULL
+		);
+
+		gnutls_x509_crt_deinit(tmp_cert);
+
+		if (ret == GNUTLS_E_SUCCESS && !(voutput & GNUTLS_CERT_SIGNER_NOT_FOUND)) {
+			valid_found = 1;
+			break;
+		}
+	}
+
+	if (valid_found)
+		return GNUTLS_E_SUCCESS;
+
+	kr_log_info(TLS, "No valid certificate found in the chain based on the whitelist.\n");
+	return GNUTLS_E_CERTIFICATE_ERROR;
 }
 
 static int pl_tls_sess_server_init(struct session2 *session,
@@ -1180,6 +1213,10 @@ static enum protolayer_iter_cb_result pl_tls_unwrap(void *sess_data, void *iter_
 	struct session2 *s = ctx->session;
 
 	queue_push(tls->unwrap_queue, ctx);
+
+	if (the_resolver->trust_whitelist) {
+		gnutls_certificate_server_set_request(tls->tls_session, GNUTLS_CERT_REQUIRE);
+	}
 
 	/* Ensure TLS handshake is performed before receiving data.
 	 * See https://www.gnutls.org/manual/html_node/TLS-handshake.html */
