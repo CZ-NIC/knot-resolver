@@ -65,9 +65,6 @@ typedef unsigned char knot_dname_storage_t[255];
 typedef struct {} knot_edns_options_t;
 typedef struct knot_pkt knot_pkt_t;
 typedef struct {
-	uint8_t *ptr[20];
-} knot_edns_options_t;
-typedef struct {
 	knot_pkt_t *pkt;
 	uint16_t pos;
 	uint16_t count;
@@ -517,7 +514,6 @@ int kr_rule_zonefile(const struct kr_rule_zonefile_config *);
 int kr_rule_forward(const knot_dname_t *, kr_rule_fwd_flags_t, const struct sockaddr **);
 int kr_rule_local_address(const char *, const char *, _Bool, uint32_t, kr_rule_tags_t);
 int kr_rule_local_hosts(const char *, _Bool, uint32_t, kr_rule_tags_t);
-int kr_init_whitelist(const char *);
 struct tls_credentials;
 typedef struct {
 	int sock_type;
