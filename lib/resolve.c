@@ -595,21 +595,6 @@ cleanup:
 	return rv;
 }
 
-int kr_init_whitelist(const char *whitelistpath)
-{
-	the_resolver->issuers = calloc(sizeof(struct issuer_whitelist), 1);
-	if (!the_resolver->issuers)
-		return ENOMEM;
-
-	int ret = get_auth_name_array(the_resolver->issuers, whitelistpath);
-	if (ret != kr_ok()) {
-		whitelist_free(the_resolver->issuers);
-		the_resolver->issuers = NULL;
-	}
-
-	return ret;
-}
-
 int kr_resolver_init(module_array_t *modules, knot_mm_t *pool)
 {
 	the_resolver = &the_resolver_value;
@@ -637,6 +622,7 @@ int kr_resolver_init(module_array_t *modules, knot_mm_t *pool)
 	/* Empty init; filled via ./lua/postconfig.lua */
 	kr_zonecut_init(&the_resolver->root_hints, (const uint8_t *)"", pool);
 	lru_create(&the_resolver->cache_cookie, LRU_COOKIES_SIZE, NULL, NULL);
+	the_resolver->trust_whitelist = NULL;
 
 	return kr_ok();
 }
@@ -653,7 +639,7 @@ void kr_resolver_deinit(void)
 	trie_free(the_resolver->trust_anchors);
 	kr_ta_clear(the_resolver->negative_anchors);
 	trie_free(the_resolver->negative_anchors);
-	whitelist_free(the_resolver->issuers);
+	gnutls_certificate_free_credentials(the_resolver->trust_whitelist);
 
 	the_resolver = NULL;
 }
