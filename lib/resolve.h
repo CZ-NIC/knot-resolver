@@ -142,13 +142,6 @@ static inline void kr_rank_set(uint8_t *rank, uint8_t kr_flag)
 typedef array_t(struct kr_module *) module_array_t;
 /* @endcond */
 
-struct issuer_whitelist {
-	int count;
-	char **names;
-};
-KR_EXPORT
-int kr_init_whitelist(const char *whitelistpath);
-
 /**
  * Name resolution context.
  *

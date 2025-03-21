@@ -13,7 +13,6 @@
 #include <libknot/descriptor.h>
 #include <ucw/mempool.h>
 #include <sys/socket.h>
-#include <gnutls/x509.h>
 #include "lib/resolve.h"
 #include "lib/layer.h"
 #include "lib/rplan.h"
@@ -470,131 +469,6 @@ static int query_finalize(struct kr_request *request, struct kr_query *qry, knot
 	return kr_ok();
 }
 
-void certs_free(gnutls_x509_crt_t *array, size_t count)
-{
-	if (!array)
-		return;
-	for (int i = 0; i < count; i++)
-		gnutls_free(array[i]);
-	gnutls_free(array);
-}
-
-void whitelist_free(struct issuer_whitelist *iss)
-{
-	if (!iss || !iss->names)
-		return;
-	// WARNING: assume count is initialized?
-	for (int i = 0; i < iss->count; i++)
-		free(iss->names[i]);
-	free(iss->names);
-	free(iss);
-}
-
-
-int read_certs(const char *filepath, char **out)
-{
-	size_t size;
-	char *certs = NULL;
-	int fd = open(filepath, O_RDONLY);
-	if (fd == -1)
-		goto fail;
-
-	if ((size = lseek(fd, 0, SEEK_END)) == -1 || lseek(fd, 0, SEEK_SET) == -1)
-		goto fail;
-
-	certs = calloc(1, size);
-	if (!certs)
-		goto fail;
-
-	int ret = read(fd, certs, size);
-	if (ret != size)
-		goto fail;
-
-	close(fd);
-	*out = certs;
-	return kr_ok();
-
-fail:
-	kr_log_warning(TLS, "failed to read %s (%s)\n", filepath, strerror(errno));
-	if (certs)
-		free(certs);
-
-	if (fd != -1)
-		close(fd);
-
-	return EXIT_FAILURE;
-}
-
-gnutls_x509_crt_t *parse_certificates(char *raw_certs, size_t size, int *count)
-{
-	*count = 0;
-
-	gnutls_datum_t cert_datum = { (unsigned char *)raw_certs, size };
-	gnutls_x509_crt_t *cert_list = NULL;
-	unsigned int cert_count = 0;
-	int ret = gnutls_x509_crt_list_import2(&cert_list, &cert_count,
-			&cert_datum, GNUTLS_X509_FMT_PEM, 0);
-
-	if (ret < 0) {
-		kr_log_warning(TLS, "failed to import certificates (%s)\n",
-				gnutls_strerror(ret));
-		certs_free(cert_list, cert_count);
-		return NULL;
-	}
-
-	*count = cert_count;
-	return cert_list;
-}
-
-int get_auth_name_array(struct issuer_whitelist *iss, const char *filepath)
-{
-	int rv = EXIT_FAILURE;
-	char *raw_certs = NULL;
-	if (read_certs(filepath, &raw_certs) != kr_ok())
-		goto cleanup;
-
-	int count = 0;
-	gnutls_x509_crt_t *certs = parse_certificates(raw_certs, strlen(raw_certs), &count);
-	if (count <= 0)
-		goto cleanup;
-
-	char iss_org_name[256] = { 0 };
-	size_t iss_org_name_size = sizeof(iss_org_name);
-	iss->count = 0;
-	iss->names = calloc(count, sizeof(char *));
-	if (!iss->names)
-		goto cleanup;
-
-	for (int i = 0; i < count; i++) {
-		iss_org_name_size = sizeof(iss_org_name);
-		int ret = gnutls_x509_crt_get_issuer_dn_by_oid(
-				certs[i], GNUTLS_OID_X520_ORGANIZATION_NAME,
-				0, 0, iss_org_name, &iss_org_name_size);
-
-		if (ret == GNUTLS_E_SUCCESS) {
-			iss->names[iss->count] = strndup(iss_org_name, iss_org_name_size);
-			if (!iss->names[iss->count])
-				kr_error(ENOMEM);
-				// TODO: deal with ENOMEM
-				// ;
-
-			// TODO: Delete
-			kr_log_warning(TLS, "whitelisted %s\n", iss->names[iss->count]);
-			iss->count++;
-		}
-	}
-
-	iss->count = iss->count;
-	rv = kr_ok();
-
-cleanup:
-	if (raw_certs)
-		free(raw_certs);
-
-	certs_free(certs, count);
-	return rv;
-}
-
 int kr_resolver_init(module_array_t *modules, knot_mm_t *pool)
 {
 	the_resolver = &the_resolver_value;
@@ -640,7 +514,6 @@ void kr_resolver_deinit(void)
 	kr_ta_clear(the_resolver->negative_anchors);
 	trie_free(the_resolver->negative_anchors);
 	gnutls_certificate_free_credentials(the_resolver->trust_whitelist);
-
 	the_resolver = NULL;
 }
 
