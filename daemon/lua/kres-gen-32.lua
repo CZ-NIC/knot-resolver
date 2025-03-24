@@ -634,6 +634,7 @@ typedef struct zs_scanner {
 	uint8_t addr[16];
 	_Bool long_string;
 	_Bool comma_list;
+	_Bool pending_backslash;
 	uint8_t *dname;
 	uint32_t *dname_length;
 	uint32_t dname_tmp_length;
