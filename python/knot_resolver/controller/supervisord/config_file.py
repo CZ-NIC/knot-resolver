@@ -140,8 +140,10 @@ class ProcessTypeConfig:
             logfile=Path(""),  # this will be ignored
         )
 
+
 def sd_booted():
     return os.path.lexists("/run/systemd/system")  # same as in libsystemd
+
 
 @dataclass
 class SupervisordConfig:
@@ -181,7 +183,7 @@ class SupervisordConfig:
             logfile=Path("syslog" if config.logging.target == "syslog" else "/dev/null"),
             loglevel=loglevel,  # type: ignore[arg-type]
             target=config.logging.target,
-            systemd_logfile = systemd_logfile,
+            systemd_logfile=systemd_logfile,  # type: ignore[arg-type]
         )
 
 

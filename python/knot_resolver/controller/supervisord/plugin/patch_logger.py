@@ -2,15 +2,15 @@
 # pylint: disable=protected-access
 
 import os
+import re
 import sys
 import traceback
-import re
 from typing import Any, Literal
 
 from supervisor.dispatchers import POutputDispatcher
 from supervisor.loggers import LevelsByName, StreamHandler, SyslogHandler
-from supervisor.supervisord import Supervisor
 from supervisor.process import Subprocess
+from supervisor.supervisord import Supervisor
 
 FORWARD_LOG_LEVEL = LevelsByName.CRIT  # to make sure it's always printed
 
@@ -23,6 +23,7 @@ FORWARD_MSG_FORMAT: str = "%(prefix)s%(name)s[%(pid)d]%(stream)s: %(data)s"
 FORWARD_MSG_PREFIX: str = ""
 
 loglevel_re = re.compile(r"<(\d)>(.*)")
+
 
 def p_output_dispatcher_log(self: POutputDispatcher, data: bytearray):
     if data:
@@ -45,14 +46,20 @@ def p_output_dispatcher_log(self: POutputDispatcher, data: bytearray):
             if loglevel_match:
                 # just strip the loglevel as supervisor cannot handle it;
                 # used only for target=syslog without systemd
-                line = loglevel_match.group(2)
+                line = loglevel_match.group(2)  # pylint: disable=redefined-loop-name
             else:
                 # no loglevel found, mark as stdio output to retain previous behaviour
                 if self.channel == "stderr":
                     stream = " (stderr)"
                 prefix = FORWARD_MSG_PREFIX
             config.options.logger.log(
-                FORWARD_LOG_LEVEL, FORWARD_MSG_FORMAT, prefix=prefix, name=config.name, stream=stream, data=line, pid=self.process.pid
+                FORWARD_LOG_LEVEL,
+                FORWARD_MSG_FORMAT,
+                prefix=prefix,
+                name=config.name,
+                stream=stream,
+                data=line,
+                pid=self.process.pid,
             )
         config.options.logger.handlers = supervisord_handlers
 
@@ -71,19 +78,20 @@ def _create_handler(fmt, level, target: Literal["stdout", "stderr", "syslog"]) -
 # we use "" as other strings involve creation of file of that name (bool("") == False)
 def _prepare_child_fds(self):
     options = self.config.options
-    options.dup2(self.pipes['child_stdin'], 0)
-    options.dup2(self.pipes['child_stdout'], 1)
+    options.dup2(self.pipes["child_stdin"], 0)
+    options.dup2(self.pipes["child_stdout"], 1)
     if self.config.stderr_logfile != "":
         if self.config.redirect_stderr:
-            options.dup2(self.pipes['child_stdout'], 2)
+            options.dup2(self.pipes["child_stdout"], 2)
         else:
-            options.dup2(self.pipes['child_stderr'], 2)
+            options.dup2(self.pipes["child_stderr"], 2)
     for i in range(3, options.minfds):
         options.close_fd(i)
 
 
 supervisord_handlers = []
 forward_handlers = []
+
 
 def inject(supervisord: Supervisor, **config: Any) -> Any:  # pylint: disable=useless-return
     try:
@@ -105,7 +113,7 @@ def inject(supervisord: Supervisor, **config: Any) -> Any:  # pylint: disable=us
         POutputDispatcher._log = p_output_dispatcher_log  # noqa: SLF001
 
         # replace setting FDs of subprocesses
-        Subprocess._prepare_child_fds = _prepare_child_fds
+        Subprocess._prepare_child_fds = _prepare_child_fds  # noqa: SLF001
 
         # we forward stdio in all cases, even when logging to syslog. This should prevent the unforturtunate
         # case of swallowing an error message leaving the users confused. To make the forwarded lines obvious
