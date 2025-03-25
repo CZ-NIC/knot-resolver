@@ -8,7 +8,7 @@ from jinja2 import Template
 
 from knot_resolver.constants import KRES_CACHE_GC_EXECUTABLE, KRESD_EXECUTABLE
 from knot_resolver.controller.interface import KresID, SubprocessType
-from knot_resolver.datamodel.config_schema import KresConfig
+from knot_resolver.datamodel.config_schema import KresConfig, workers_max_count
 from knot_resolver.datamodel.logging_schema import LogTargetEnum
 from knot_resolver.manager.constants import (
     kres_cache_dir,
@@ -115,7 +115,7 @@ class ProcessTypeConfig:
             workdir=cwd,
             command=f"{KRESD_EXECUTABLE} -c {kresd_config_file_supervisord_pattern(config)} -n",
             environment='SYSTEMD_INSTANCE="%(process_num)d",X-SUPERVISORD-TYPE=notify',
-            max_procs=int(config.max_workers) + 1,  # +1 for the canary process
+            max_procs=int(workers_max_count()) + 1,  # +1 for the canary process
         )
 
     @staticmethod
