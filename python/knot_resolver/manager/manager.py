@@ -52,15 +52,6 @@ class _FixCounter:
         return self._counter >= FIX_COUNTER_ATTEMPTS_MAX
 
 
-async def _deny_max_worker_changes(config_old: KresConfig, config_new: KresConfig) -> Result[None, str]:
-    if config_old.max_workers != config_new.max_workers:
-        return Result.err(
-            "Changing 'max-workers', the maximum number of workers allowed to run, is not allowed at runtime."
-        )
-
-    return Result.ok(None)
-
-
 async def _subprocess_desc(subprocess: Subprocess) -> object:
     return {
         "type": subprocess.type.name,
@@ -129,7 +120,6 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                 config.nsid,
                 config.hostname,
                 config.workers,
-                config.max_workers,
                 config.options,
                 config.network,
                 config.forward,
@@ -159,9 +149,6 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
 
         # register callback that reloads files (TLS cert files) if selected configuration has not been changed
         await config_store.register_on_change_callback(only_on_no_changes_update(config_nodes)(files_reload))
-
-        # register controller config change listeners
-        await config_store.register_verifier(_deny_max_worker_changes)
 
     async def _spawn_new_worker(self, config: KresConfig) -> None:
         subprocess = await self._controller.create_subprocess(config, SubprocessType.KRESD)
