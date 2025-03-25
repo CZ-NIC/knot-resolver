@@ -10,6 +10,7 @@ Incompatible changes
 - Removed options from declarative configuration model (YAML).  
   These are mostly experimental and debugging/testing options that are not useful for general users (remain in Lua):
   - /logging/debugging
+  - /max-workers
   - /webmgmt
 
 

@@ -41,7 +41,7 @@ def _cpu_count() -> Optional[int]:
         return cpus
 
 
-def _workers_max_count() -> int:
+def workers_max_count() -> int:
     c = _cpu_count()
     if c:
         return c * 10
@@ -93,7 +93,6 @@ class KresConfig(ConfigSchema):
         hostname: Internal DNS resolver hostname. Default is machine hostname.
         rundir: Directory where the resolver can create files and which will be it's cwd.
         workers: The number of running kresd (Knot Resolver daemon) workers. If set to 'auto', it is equal to number of CPUs available.
-        max_workers: The maximum number of workers allowed. Cannot be changed in runtime.
         management: Configuration of management HTTP API.
         options: Fine-tuning global parameters of DNS resolver operation.
         network: Network connections and protocols configuration.
@@ -115,7 +114,6 @@ class KresConfig(ConfigSchema):
         hostname: Optional[EscapedStr] = None
         rundir: WritableDir = lazy_default(WritableDir, str(RUN_DIR))
         workers: Union[Literal["auto"], IntPositive] = IntPositive(1)
-        max_workers: IntPositive = IntPositive(WORKERS_MAX)
         management: ManagementSchema = lazy_default(ManagementSchema, {"unix-socket": str(API_SOCK_FILE)})
         options: OptionsSchema = OptionsSchema()
         network: NetworkSchema = NetworkSchema()
@@ -137,7 +135,6 @@ class KresConfig(ConfigSchema):
     hostname: EscapedStr
     rundir: WritableDir
     workers: IntPositive
-    max_workers: IntPositive
     management: ManagementSchema
     options: OptionsSchema
     network: NetworkSchema
@@ -189,7 +186,7 @@ class KresConfig(ConfigSchema):
             )
 
         # enforce max-workers config
-        workers_max = _workers_max_count()
+        workers_max = workers_max_count()
         if int(self.workers) > workers_max:
             raise ValueError(
                 f"can't run with more workers than the recommended maximum {workers_max} or hardcoded {WORKERS_MAX}"
