@@ -1,6 +1,6 @@
 /*  Copyright (C) CZ.NIC, z.s.p.o. <knot-resolver@labs.nic.cz>
- *  SPDX-License-Identifier: GPL-3.0-or-later
- */
+*  SPDX-License-Identifier: GPL-3.0-or-later
+*/
 
 #include <stdatomic.h>
 #include "daemon/dnamelimiting.h"
@@ -82,8 +82,6 @@ int dnamelimiting_init(const char *mmap_file, size_t capacity, uint32_t instant_
 		const kru_price_t max_decay = rate_limit > 1000ll * instant_limit ? base_price :
 			(uint64_t) base_price * rate_limit / 1000;
 
-		printf("base price: %d\n", base_price);
-
 		bool succ = KRU.initialize((struct kru *)dnamelimiting->kru, capacity_log, max_decay);
 		if (!succ) {
 			dnamelimiting = NULL;
@@ -92,6 +90,14 @@ int dnamelimiting_init(const char *mmap_file, size_t capacity, uint32_t instant_
 		}
 
 		dnamelimiting->log_time = kr_now() - log_period;
+
+		for (size_t i = 0; i < V4_PREFIXES_CNT; i++) {
+			dnamelimiting->v4_prices[i] = base_price / V4_RATE_MULT[i];
+		}
+
+		for (size_t i = 0; i < V6_PREFIXES_CNT; i++) {
+			dnamelimiting->v6_prices[i] = base_price / V6_RATE_MULT[i];
+		}
 
 		ret = mmapped_init_continue(&dnamelimiting_mmapped);
 		if (ret != 0) goto fail;
@@ -117,9 +123,7 @@ void dnamelimiting_deinit(void)
 }
 
 
-
-
-bool dnamelimiting_request_begin(struct kr_request *req, kru_price_t instant_limit)
+bool dnamelimiting_request_begin(struct kr_request *req)
 {
 	if (!dnamelimiting) return false;
 	if (!req->qsource.addr)
@@ -130,30 +134,6 @@ bool dnamelimiting_request_begin(struct kr_request *req, kru_price_t instant_lim
 	// We only do this on pure UDP.  (also TODO if cookies get implemented)
 	const bool ip_validated = req->qsource.flags.tcp || req->qsource.flags.tls;
 	if (ip_validated) return false;
-
-	uint8_t dname_size;
-	if (req->current_query) {
-		if (req->current_query->sname) {
-			dname_size = strlen((char *)req->current_query->sname);
-			printf("Domain name: %s (length: %u)\n", req->current_query->sname, dname_size);
-
-		}
-	}
-			
-	const kru_price_t dname_price = ((float)dname_size)/100 * (KRU_LIMIT / instant_limit);
-	//printf("dname_size: %d\n", dname_price/);
-
-	for (size_t i = 0; i < V4_PREFIXES_CNT; i++) {
-		kru_price_t v4_price = dname_price / V4_RATE_MULT[i];
-		dnamelimiting->v4_prices[i] = v4_price;
-		// printf("V4 - %ld: %d (dname_size = %d), ratio - %f\n", i, v4_price, dname_size, dname_price/(float)dnamelimiting->v4_prices[i]);
-	}
-
-	for (size_t i = 0; i < V6_PREFIXES_CNT; i++) {
-		kru_price_t v6_price = dname_price / V6_RATE_MULT[i];
-		dnamelimiting->v6_prices[i] = v6_price;
-		// printf("V6 - %ld: %d (dname_size = %d), ratio - %f\n", i, v6_price, dname_size, dname_price/(float)dnamelimiting->v6_prices[i]);
-	}
 
 	const uint32_t time_now = kr_now();
 
