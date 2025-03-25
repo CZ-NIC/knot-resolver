@@ -141,6 +141,7 @@ bool ratelimiting_request_begin(struct kr_request *req)
 	// classify
 	_Alignas(16) uint8_t key[16] = {0, };
 	uint8_t limited_prefix;
+	struct limited_info combined_prefix;
 	if (req->qsource.addr->sa_family == AF_INET6) {
 		struct sockaddr_in6 *ipv6 = (struct sockaddr_in6 *)req->qsource.addr;
 		memcpy(key, &ipv6->sin6_addr, 16);
@@ -151,7 +152,7 @@ bool ratelimiting_request_begin(struct kr_request *req)
 			prices[i] = (req->qsource.price_factor16
 					* (uint64_t)ratelimiting->v6_prices[i] + (1<<15)) >> 16;
 		}
-		limited_prefix = KRU.limited_multi_prefix_or((struct kru *)ratelimiting->kru, time_now,
+		combined_prefix = KRU.limited_multi_prefix_or((struct kru *)ratelimiting->kru, time_now,
 				1, key, V6_PREFIXES, prices, V6_PREFIXES_CNT, NULL);
 	} else {
 		struct sockaddr_in *ipv4 = (struct sockaddr_in *)req->qsource.addr;
@@ -163,9 +164,11 @@ bool ratelimiting_request_begin(struct kr_request *req)
 			prices[i] = (req->qsource.price_factor16
 					* (uint64_t)ratelimiting->v4_prices[i] + (1<<15)) >> 16;
 		}
-		limited_prefix = KRU.limited_multi_prefix_or((struct kru *)ratelimiting->kru, time_now,
+		combined_prefix = KRU.limited_multi_prefix_or((struct kru *)ratelimiting->kru, time_now,
 				0, key, V4_PREFIXES, prices, V4_PREFIXES_CNT, NULL);
 	}
+	if (combined_prefix.score < 255) return false;
+	limited_prefix = combined_prefix.prefix;
 	if (!limited_prefix) return false;  // not limited
 
 	// slip: truncating vs dropping

@@ -34,6 +34,11 @@ typedef uint32_t kru_price_t;
 
 struct kru;
 
+struct limited_info {
+	uint8_t score;
+	uint8_t prefix;
+};
+
 /// Usage: KRU.limited(...)
 struct kru_api {
 	/// Initialize a new KRU structure that can track roughly 2^capacity_log limited keys.
@@ -80,7 +85,7 @@ struct kru_api {
 	/// they just extend the keys to allow storing different noncolliding sets of them in the same table (such as IPv4 and IPv6).
 	/// If zero is returned, *max_load_out (unless NULL) is set to
 	/// the maximum of final values of the involved counters normalized to the limit 2^16.
-	uint8_t (*limited_multi_prefix_or)(struct kru *kru, uint32_t time_now,
+	struct limited_info (*limited_multi_prefix_or)(struct kru *kru, uint32_t time_now,
 			uint8_t namespace, uint8_t key[static 16], uint8_t *prefixes, kru_price_t *prices, size_t queries_cnt, uint16_t *max_load_out);
 
 	/// Multiple queries based on different prefixes of a single key.

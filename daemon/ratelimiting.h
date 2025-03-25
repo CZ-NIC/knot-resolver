@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include "lib/defines.h"
 #include "lib/utils.h"
+#include "lib/kru.h"
 struct kr_request;
 
 /** Initialize rate-limiting with shared mmapped memory.
