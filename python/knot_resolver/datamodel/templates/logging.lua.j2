@@ -35,9 +35,3 @@ dnstap.config({
     }
 })
 {%- endif %}
-
--- logging.debugging.assertion-abort
-debugging.assertion_abort = {{ boolean(cfg.logging.debugging.assertion_abort) }}
-
--- logging.debugging.assertion-fork
-debugging.assertion_fork = {{ cfg.logging.debugging.assertion_fork.millis() }}
