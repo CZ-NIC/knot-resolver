@@ -79,53 +79,6 @@
                 "interface": null
             }
         },
-        "webmgmt": {
-            "description": "Configuration of legacy web management endpoint.",
-            "type": [
-                "object",
-                "null"
-            ],
-            "properties": {
-                "unix-socket": {
-                    "type": [
-                        "string",
-                        "null"
-                    ],
-                    "description": "Path to unix domain socket to listen to.",
-                    "default": null
-                },
-                "interface": {
-                    "type": [
-                        "string",
-                        "null"
-                    ],
-                    "description": "IP address or interface name with port number to listen to.",
-                    "default": null
-                },
-                "tls": {
-                    "type": "boolean",
-                    "description": "Enable/disable TLS.",
-                    "default": false
-                },
-                "cert-file": {
-                    "type": [
-                        "string",
-                        "null"
-                    ],
-                    "description": "Path to certificate file.",
-                    "default": null
-                },
-                "key-file": {
-                    "type": [
-                        "string",
-                        "null"
-                    ],
-                    "description": "Path to certificate key.",
-                    "default": null
-                }
-            },
-            "default": null
-        },
         "options": {
             "description": "Fine-tuning global parameters of DNS resolver operation.",
             "type": "object",
