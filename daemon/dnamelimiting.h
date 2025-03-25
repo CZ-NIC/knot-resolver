@@ -17,7 +17,7 @@
  
  /** Do rate-limiting, during knot_layer_api::begin. */
  KR_EXPORT
- bool dnamelimiting_request_begin(struct kr_request *req, kru_price_t instant_limit);
+ bool dnamelimiting_request_begin(struct kr_request *req);
  
  /** Remove mmapped file data if not used by other processes. */
  KR_EXPORT
