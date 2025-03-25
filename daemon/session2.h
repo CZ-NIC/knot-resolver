@@ -228,6 +228,7 @@ static inline size_t wire_buf_free_space_length(const struct wire_buf *wb)
 	XX(TCP)\
 	XX(TLS)\
 	XX(HTTP)\
+	XX(QUIC)\
 	\
 	/* PROXYv2 */\
 	XX(PROXYV2_DGRAM)\

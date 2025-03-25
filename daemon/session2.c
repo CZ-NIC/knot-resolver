@@ -67,8 +67,11 @@ static const enum protolayer_type protolayer_grp_doh[] = {
 };
 
 static const enum protolayer_type protolayer_grp_doq[] = {
-	// not yet used
-	PROTOLAYER_TYPE_NULL,
+	// PROTOLAYER_TYPE_UDP,
+	// PROTOLAYER_TYPE_PROXYV2_DGRAM,
+	// PROTOLAYER_TYPE_DEFER,
+	PROTOLAYER_TYPE_QUIC,
+	// PROTOLAYER_TYPE_DNS_DGRAM,
 };
 
 struct protolayer_grp {

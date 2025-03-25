@@ -35,6 +35,7 @@ gnutls = dependency('gnutls', version: '>=3.4')
 luajit = dependency('luajit')
 # https://mesonbuild.com/howtox.html#add-math-library-lm-portably
 libm = meson.get_compiler('c').find_library('m', required : false)
+libngtcp2 = dependency('libngtcp2', version: '>=0.17.0')
 message('------------------------------')
 
 

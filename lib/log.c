@@ -82,6 +82,7 @@ const log_group_names_t log_group_names[] = {
 	GRP_NAME_ITEM(LOG_GRP_PROTOLAYER),
 	GRP_NAME_ITEM(LOG_GRP_DEFER),
 	GRP_NAME_ITEM(LOG_GRP_REQDBG),
+	GRP_NAME_ITEM(LOG_GRP_DOQ),
 	{ NULL, LOG_GRP_UNKNOWN },
 };
 static_assert(LOG_GRP_REQDBG <= 8 * sizeof(kr_log_groups), "Too many log groups.");

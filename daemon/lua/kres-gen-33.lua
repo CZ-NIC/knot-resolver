@@ -202,6 +202,7 @@ struct kr_request_qsource_flags {
 	_Bool tls : 1;
 	_Bool http : 1;
 	_Bool xdp : 1;
+	_Bool quic : 1;
 };
 typedef unsigned long kr_rule_tags_t;
 struct kr_rule_opts {
@@ -554,6 +555,7 @@ typedef struct {
 	_Bool tls;
 	_Bool http;
 	_Bool xdp;
+	_Bool doq;
 	_Bool freebind;
 	const char *kind;
 } endpoint_flags_t;

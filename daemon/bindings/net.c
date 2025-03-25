@@ -32,6 +32,8 @@ static int net_list_add(const char *b_key, uint32_t key_len, trie_val_t *val, vo
 			lua_pushliteral(L, "tls");
 		} else if (ep->flags.xdp) {
 			lua_pushliteral(L, "xdp");
+		} else if (ep->flags.doq) {
+			lua_pushliteral(L, "doq");
 		} else {
 			lua_pushliteral(L, "dns");
 		}
@@ -255,6 +257,8 @@ static int net_listen(lua_State *L)
 			flags.http = false;
 		} else if (k && strcasecmp(k, "doh2") == 0) {
 			flags.tls = flags.http = true;
+		} else if (k && strcasecmp(k, "doq") == 0) {
+			flags.tls = flags.doq = true;
 		} else if (k) {
 			flags.kind = k;
 			if (strcasecmp(k, "doh") == 0) {

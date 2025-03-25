@@ -19,7 +19,7 @@ from knot_resolver.datamodel.types import (
 )
 from knot_resolver.utils.modeling import ConfigSchema
 
-KindEnum = Literal["dns", "xdp", "dot", "doh-legacy", "doh2"]
+KindEnum = Literal["dns", "xdp", "dot", "doh-legacy", "doh2", "doq"]
 
 
 class EdnsBufferSizeSchema(ConfigSchema):
