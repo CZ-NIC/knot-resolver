@@ -40,8 +40,8 @@ static int infer(kr_layer_t *ctx)
 	uint8_t *packet = req->qsource.packet->wire;
 	size_t packet_size = req->qsource.size;
 
-	int result = predict_packet(net, packet, packet_size);
-	if (result)
+	float ret = predict_packet(net, packet, packet_size);
+	if (ret > 0.95)
 		return create_exfiltration_answer(ctx);
 
 	return ctx->state;

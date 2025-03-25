@@ -8,7 +8,7 @@ extern "C" {
 typedef void* TorchModule;
 
 TorchModule load_model(const char *model_path);
-int predict_packet(TorchModule model, const unsigned char *data, size_t size);
+float predict_packet(TorchModule model, const unsigned char *data, size_t size);
 void free_model(TorchModule model);
 
 #ifdef __cplusplus

@@ -32,7 +32,7 @@ TorchModule load_model(const char *model_path) {
 	}
 }
 
-int predict_packet(TorchModule module, const unsigned char *data, size_t size) {
+float predict_packet(TorchModule module, const unsigned char *data, size_t size) {
 	if (!module) return -1;
 	auto* wrapper = reinterpret_cast<TorchModuleWrapper*>(module);
 
@@ -46,11 +46,12 @@ int predict_packet(TorchModule module, const unsigned char *data, size_t size) {
 	}
 
 	torch::Tensor output = wrapper->model.forward({one_hot}).toTensor();
-
-	int predicted_class = std::get<1>(torch::max(output, 1)).item<int>();
-	return predicted_class;
+	torch::Tensor tensor_prob = torch::softmax(output, 1);
+	
+	return tensor_prob[0][0].item<float>();
 }
 
 void free_model(TorchModule model) {
 	delete static_cast<TorchModuleWrapper*>(model);
 }
+
