@@ -130,7 +130,6 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                 config.hostname,
                 config.workers,
                 config.max_workers,
-                config.webmgmt,
                 config.options,
                 config.network,
                 config.forward,
