@@ -66,4 +66,3 @@ needs you can configure your own checks and exports using `asynchronous events <
    config-ta-signal-query
    config-time-skew-detection
    config-time-jump-detection
-   config-logging-debugging
