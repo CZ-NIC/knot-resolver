@@ -15,7 +15,7 @@ from knot_resolver.controller.interface import (
     SubprocessType,
 )
 from knot_resolver.controller.supervisord.config_file import SupervisordKresID, write_config_file
-from knot_resolver.datamodel.config_schema import KresConfig
+from knot_resolver.datamodel.config_schema import KresConfig, workers_max_count
 from knot_resolver.manager.constants import supervisord_config_file, supervisord_pid_file, supervisord_sock_file
 from knot_resolver.utils import which
 from knot_resolver.utils.async_utils import call, readfile
@@ -204,7 +204,7 @@ class SupervisordSubprocess(Subprocess):
     @async_in_a_thread
     def _start(self) -> None:
         # +1 for canary process (same as in config_file.py)
-        assert int(self.id) <= int(self._config.max_workers) + 1, "trying to spawn more than allowed limit of workers"
+        assert int(self.id) <= int(workers_max_count()) + 1, "trying to spawn more than allowed limit of workers"
         try:
             supervisord = _create_fast_proxy(self._config)
             supervisord.startProcess(self.name)
