@@ -21,7 +21,6 @@ from knot_resolver.datamodel.rate_limiting_schema import RateLimitingSchema
 from knot_resolver.datamodel.templates import POLICY_CONFIG_TEMPLATE, WORKER_CONFIG_TEMPLATE
 from knot_resolver.datamodel.types import EscapedStr, IntPositive, WritableDir
 from knot_resolver.datamodel.view_schema import ViewSchema
-from knot_resolver.datamodel.webmgmt_schema import WebmgmtSchema
 from knot_resolver.utils.modeling import ConfigSchema
 from knot_resolver.utils.modeling.base_schema import lazy_default
 from knot_resolver.utils.modeling.exceptions import AggregateDataValidationError, DataValidationError
@@ -96,7 +95,6 @@ class KresConfig(ConfigSchema):
         workers: The number of running kresd (Knot Resolver daemon) workers. If set to 'auto', it is equal to number of CPUs available.
         max_workers: The maximum number of workers allowed. Cannot be changed in runtime.
         management: Configuration of management HTTP API.
-        webmgmt: Configuration of legacy web management endpoint.
         options: Fine-tuning global parameters of DNS resolver operation.
         network: Network connections and protocols configuration.
         views: List of views and its configuration.
@@ -119,7 +117,6 @@ class KresConfig(ConfigSchema):
         workers: Union[Literal["auto"], IntPositive] = IntPositive(1)
         max_workers: IntPositive = IntPositive(WORKERS_MAX)
         management: ManagementSchema = lazy_default(ManagementSchema, {"unix-socket": str(API_SOCK_FILE)})
-        webmgmt: Optional[WebmgmtSchema] = None
         options: OptionsSchema = OptionsSchema()
         network: NetworkSchema = NetworkSchema()
         views: Optional[List[ViewSchema]] = None
@@ -142,7 +139,6 @@ class KresConfig(ConfigSchema):
     workers: IntPositive
     max_workers: IntPositive
     management: ManagementSchema
-    webmgmt: Optional[WebmgmtSchema]
     options: OptionsSchema
     network: NetworkSchema
     views: Optional[List[ViewSchema]]
