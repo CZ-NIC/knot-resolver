@@ -1617,27 +1617,6 @@
                     ],
                     "description": "Logging DNS requests and responses to a unix socket.",
                     "default": false
-                },
-                "debugging": {
-                    "description": "Advanced debugging parameters for kresd (Knot Resolver daemon).",
-                    "type": "object",
-                    "properties": {
-                        "assertion-abort": {
-                            "type": "boolean",
-                            "description": "Allow the process to be aborted in case it encounters a failed assertion.",
-                            "default": false
-                        },
-                        "assertion-fork": {
-                            "type": "string",
-                            "pattern": "^(\\d+)(us|ms|s|m|h|d)$",
-                            "description": "Fork and abord child kresd process to obtain a coredump, while the parent process recovers and keeps running.",
-                            "default": "5m"
-                        }
-                    },
-                    "default": {
-                        "assertion_abort": false,
-                        "assertion_fork": "5m"
-                    }
                 }
             },
             "default": {
@@ -1645,11 +1624,7 @@
                 "target": "stdout",
                 "groups": null,
                 "dnssec_bogus": false,
-                "dnstap": false,
-                "debugging": {
-                    "assertion_abort": false,
-                    "assertion_fork": "5m"
-                }
+                "dnstap": false
             }
         },
         "monitoring": {
