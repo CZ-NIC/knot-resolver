@@ -47,12 +47,6 @@
             "description": "The number of running kresd (Knot Resolver daemon) workers. If set to 'auto', it is equal to number of CPUs available.",
             "default": 1
         },
-        "max-workers": {
-            "type": "integer",
-            "minimum": 1,
-            "description": "The maximum number of workers allowed. Cannot be changed in runtime.",
-            "default": 256
-        },
         "management": {
             "description": "Configuration of management HTTP API.",
             "type": "object",
