@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 def tls_cert_files_config(config: KresConfig) -> List[Any]:
     return [
-        config.network.tls.files_watchdog,
+        config.network.tls.watchdog,
         config.network.tls.cert_file,
         config.network.tls.key_file,
     ]
@@ -116,7 +116,7 @@ async def _init_tls_cert_watchdog(config: KresConfig) -> None:
         if _tls_cert_watchdog:
             _tls_cert_watchdog.stop()
 
-        if config.network.tls.files_watchdog and config.network.tls.cert_file and config.network.tls.key_file:
+        if config.network.tls.watchdog and config.network.tls.cert_file and config.network.tls.key_file:
             logger.info("Initializing TLS certificate files WatchDog")
             _tls_cert_watchdog = TLSCertWatchDog(
                 config.network.tls.cert_file.to_path(),
