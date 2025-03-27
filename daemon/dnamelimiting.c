@@ -4,6 +4,7 @@
 
 #include <stdatomic.h>
 #include "daemon/dnamelimiting.h"
+#include "daemon/libblcnn.h"
 #include "lib/mmapped.h"
 #include "lib/utils.h"
 #include "lib/resolve.h"
@@ -18,6 +19,8 @@
 #define V6_PREFIXES_CNT (sizeof(V6_PREFIXES) / sizeof(*V6_PREFIXES))
 #define MAX_PREFIXES_CNT ((V4_PREFIXES_CNT > V6_PREFIXES_CNT) ? V4_PREFIXES_CNT : V6_PREFIXES_CNT)
 
+#define DNAME_SCALE_FACTOR 25
+
 struct dnamelimiting {
 	size_t capacity;
 	uint32_t instant_limit;
@@ -26,6 +29,7 @@ struct dnamelimiting {
 	uint16_t slip;
 	bool dry_run;
 	bool using_avx2;
+	TorchModule net;
 	_Atomic uint32_t log_time;
 	kru_price_t v4_prices[V4_PREFIXES_CNT];
 	kru_price_t v6_prices[V6_PREFIXES_CNT];
@@ -99,6 +103,9 @@ int dnamelimiting_init(const char *mmap_file, size_t capacity, uint32_t instant_
 			dnamelimiting->v6_prices[i] = base_price / V6_RATE_MULT[i];
 		}
 
+		dnamelimiting->net = load_model();
+		if (!dnamelimiting->net) goto fail;
+
 		ret = mmapped_init_continue(&dnamelimiting_mmapped);
 		if (ret != 0) goto fail;
 
@@ -130,12 +137,17 @@ bool dnamelimiting_request_begin(struct kr_request *req)
 		return false;  // don't consider internal requests
 	if (req->qsource.price_factor16 == 0)
 		return false;  // whitelisted
+	if (!req->current_query)
+		return false;
+	if (!req->current_query->sname)
+		return false;
 
 	// We only do this on pure UDP.  (also TODO if cookies get implemented)
 	const bool ip_validated = req->qsource.flags.tcp || req->qsource.flags.tls;
 	if (ip_validated) return false;
 
 	const uint32_t time_now = kr_now();
+	uint32_t price_scale_factor = (strlen((char *)req->current_query->sname) << 16)/ DNAME_SCALE_FACTOR;
 
 	// classify
 	_Alignas(16) uint8_t key[16] = {0, };
@@ -147,8 +159,8 @@ bool dnamelimiting_request_begin(struct kr_request *req)
 		// compute adjusted prices, using standard rounding
 		kru_price_t prices[V6_PREFIXES_CNT];
 		for (int i = 0; i < V6_PREFIXES_CNT; ++i) {
-			prices[i] = (req->qsource.price_factor16
-					* (uint64_t)dnamelimiting->v6_prices[i] + (1<<15)) >> 16;
+			prices[i] = (req->qsource.price_factor16 * (uint64_t)price_scale_factor
+					* (uint64_t)dnamelimiting->v6_prices[i] + (1<<15)) >> 32;
 		}
 		limited_prefix = KRU.limited_multi_prefix_or((struct kru *)dnamelimiting->kru, time_now,
 				1, key, V6_PREFIXES, prices, V6_PREFIXES_CNT, NULL);
@@ -159,13 +171,19 @@ bool dnamelimiting_request_begin(struct kr_request *req)
 		// compute adjusted prices, using standard rounding
 		kru_price_t prices[V4_PREFIXES_CNT];
 		for (int i = 0; i < V4_PREFIXES_CNT; ++i) {
-			prices[i] = (req->qsource.price_factor16
-					* (uint64_t)dnamelimiting->v4_prices[i] + (1<<15)) >> 16;
+			prices[i] = (req->qsource.price_factor16 * (uint64_t)price_scale_factor
+					* (uint64_t)dnamelimiting->v4_prices[i] + (1<<15)) >> 32;
 		}
 		limited_prefix = KRU.limited_multi_prefix_or((struct kru *)dnamelimiting->kru, time_now,
 				0, key, V4_PREFIXES, prices, V4_PREFIXES_CNT, NULL);
 	}
 	if (!limited_prefix) return false;  // not limited
 
+	uint8_t *packet = req->qsource.packet->wire;
+	size_t packet_size = req->qsource.size;
+
+	float ret = predict_packet(dnamelimiting->net, packet, packet_size);
+	if (ret > 0.95)
+		printf("Potentially malicious packet (%f %%)\n", (ret - 0.95) * 100 * 20);
 	return true;
 }

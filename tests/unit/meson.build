@@ -19,6 +19,12 @@ foreach unit_test : unit_tests
   extra_link_args = []
   extra_link_libs = []
 
+  if unit_test[0] == 'dnamelimiting'
+    extra_link_args += ['-lstdc++', '-lc10']
+    extra_link_libs += [blcnn_lib]
+  endif
+
+
   exec_test = executable(
     unit_test[0],
     unit_test[1],

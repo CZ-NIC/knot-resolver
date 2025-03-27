@@ -28,16 +28,23 @@ uint32_t _count_test(int expected_passing, uint32_t dname_length, int addr_famil
 {
 	uint32_t max_queries = expected_passing > 0 ? 2 * expected_passing : -expected_passing;
 	struct sockaddr_storage addr;
-	uint8_t wire[KNOT_WIRE_MIN_PKTSIZE] = { 0 };
-	knot_pkt_t answer = { .wire = wire };
-	unsigned char sname[dname_length + 1];
-	memset(sname, 'a', dname_length);
-	sname[dname_length] = '\0';
-	struct kr_query query = { .sname = sname}; 
-	uint32_t price_factor16 = (strlen((char *)query.sname) << 16) / 25;
+
+	uint8_t wire_answer[KNOT_WIRE_MIN_PKTSIZE] = { 0 };
+	knot_pkt_t answer = { .wire = wire_answer };
+
+	size_t query_packet_size = get_packet_size(dname_length);
+	uint8_t wire_query[query_packet_size];
+	unsigned char dname[256];
+	create_dns_query(dname_length, wire_query, dname);
+	
+	knot_pkt_t query_packet = { .wire = wire_query};
+	struct kr_query query = { .sname = dname}; 
 	struct kr_request req = {
 		.qsource.addr = (struct sockaddr *) &addr,
-		.qsource.price_factor16 = price_factor16,
+		.qsource.price_factor16 = (1 << 16),
+		.qsource.packet = &query_packet,
+		.qsource.size = query_packet_size,
+		
 		.answer = &answer,
 		.current_query = &query
 	};
@@ -48,7 +55,6 @@ uint32_t _count_test(int expected_passing, uint32_t dname_length, int addr_famil
 		(void)snprintf(addr_str, sizeof(addr_str), addr_format,
 				i % (ip_max_value - ip_min_value + 1) + ip_min_value,
 				i / (ip_max_value - ip_min_value + 1) % 256);
-		//printf("string: %s\n", addr_str);
 		kr_straddr_socket_set((struct sockaddr *) &addr, addr_str, 0);
 		if (dnamelimiting_request_begin(&req)) {
 			cnt = i;
