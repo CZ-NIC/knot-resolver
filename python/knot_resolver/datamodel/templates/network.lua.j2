@@ -46,13 +46,6 @@ net.tls_sticket_secret('{{ cfg.network.tls.sticket_secret }}')
 net.tls_sticket_secret_file('{{ cfg.network.tls.sticket_secret_file }}')
 {% endif %}
 
-{% if cfg.network.tls.auto_discovery %}
--- network.tls.auto-discovery
-modules.load('experimental_dot_auth')
-{% else %}
--- modules.unload('experimental_dot_auth')
-{% endif %}
-
 -- network.tls.padding
 net.tls_padding(
 {%- if cfg.network.tls.padding == true -%}

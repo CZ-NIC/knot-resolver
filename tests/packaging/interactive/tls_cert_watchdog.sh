@@ -44,7 +44,7 @@ fi
 # }}
 
 # configure TLS certificate files and turn on watchdog
-kresctl config set -p /network/tls/files-watchdog true
+kresctl config set -p /network/tls/watchdog true
 if [ "$?" -ne "0" ]; then
     echo "Could not turn on TLS certificate files watchdog."
     exit 1
