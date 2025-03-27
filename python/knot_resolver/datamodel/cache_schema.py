@@ -1,4 +1,4 @@
-from typing import List, Literal, Optional, Union
+from typing import List, Optional
 
 from knot_resolver.constants import CACHE_DIR
 from knot_resolver.datamodel.templates import template_from_str
@@ -6,9 +6,7 @@ from knot_resolver.datamodel.types import (
     DNSRecordTypeEnum,
     DomainName,
     EscapedStr,
-    IntNonNegative,
     IntPositive,
-    Percent,
     ReadableFile,
     SizeUnit,
     TimeUnit,
@@ -57,33 +55,6 @@ class PrefillSchema(ConfigSchema):
             raise ValueError("cache prefilling is not yet supported for non-root zones")
 
 
-class GarbageCollectorSchema(ConfigSchema):
-    """
-    Configuration options of the cache garbage collector (kres-cache-gc).
-
-    ---
-    interval: Time interval how often the garbage collector will be run.
-    threshold: Cache usage in percent that triggers the garbage collector.
-    release: Percent of used cache to be freed by the garbage collector.
-    temp_keys_space: Maximum amount of temporary memory for copied keys (0 = unlimited).
-    rw_deletes: Maximum number of deleted records per read-write transaction (0 = unlimited).
-    rw_reads: Maximum number of readed records per read-write transaction (0 = unlimited).
-    rw_duration: Maximum duration of read-write transaction (0 = unlimited).
-    rw_delay: Wait time between two read-write transactions.
-    dry_run: Run the garbage collector in dry-run mode.
-    """
-
-    interval: TimeUnit = TimeUnit("1s")
-    threshold: Percent = Percent(80)
-    release: Percent = Percent(10)
-    temp_keys_space: SizeUnit = SizeUnit("0M")
-    rw_deletes: IntNonNegative = IntNonNegative(100)
-    rw_reads: IntNonNegative = IntNonNegative(200)
-    rw_duration: TimeUnit = TimeUnit("0us")
-    rw_delay: TimeUnit = TimeUnit("0us")
-    dry_run: bool = False
-
-
 class PredictionSchema(ConfigSchema):
     """
     Helps keep the cache hot by prefetching expiring records and learning usage patterns and repetitive queries.
@@ -126,7 +97,7 @@ class CacheSchema(ConfigSchema):
 
     storage: WritableDir = lazy_default(WritableDir, str(CACHE_DIR))
     size_max: SizeUnit = SizeUnit("100M")
-    garbage_collector: Union[GarbageCollectorSchema, Literal[False]] = GarbageCollectorSchema()
+    garbage_collector: bool = True
     ttl_min: TimeUnit = TimeUnit("5s")
     ttl_max: TimeUnit = TimeUnit("1d")
     ns_timeout: TimeUnit = TimeUnit("1000ms")

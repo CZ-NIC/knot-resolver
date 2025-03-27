@@ -57,22 +57,8 @@ def kres_cache_gc_args(config: KresConfig) -> str:
     if config.logging.level == "debug" or (config.logging.groups and "cache-gc" in config.logging.groups):
         args += " -v"
 
-    gc_config = config.cache.garbage_collector
-    if gc_config:
-        args += (
-            f" -d {gc_config.interval.millis()}"
-            f" -u {gc_config.threshold}"
-            f" -f {gc_config.release}"
-            f" -l {gc_config.rw_deletes}"
-            f" -L {gc_config.rw_reads}"
-            f" -t {gc_config.temp_keys_space.mbytes()}"
-            f" -m {gc_config.rw_duration.micros()}"
-            f" -w {gc_config.rw_delay.micros()}"
-        )
-        if gc_config.dry_run:
-            args += " -n"
-        return args
-    raise ValueError("missing configuration for the cache garbage collector")
+    args += " -d 1000" " -u 80" " -f 10" " -l 100" " -L 200" " -t 0" " -m 0" " -w 0"
+    return args
 
 
 @dataclass
