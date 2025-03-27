@@ -1,6 +1,19 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # daemon
 
+if libtorch.found()
+  libtorch_dep = declare_dependency(
+    link_args: ['-ltorch', '-ltorch_cpu'],
+    dependencies: [libtorch]
+  )
+
+  blcnn_lib = library('blcnn',
+    sources: ['libblcnn.cpp'],
+    dependencies: [libtorch_dep]
+  )
+endif
+
+
 kresd_src = files([
   'bindings/cache.c',
   'bindings/event.c',
@@ -64,7 +77,8 @@ kresd_deps = [
   capng,
   nghttp2,
   malloc,
-  libm
+  libm,
+  libtorch_dep
 ]
 
 
@@ -74,9 +88,11 @@ subdir('lua')
 kresd = executable(
   'kresd',
   kresd_src,
+  link_with: [blcnn_lib],
+  link_args: ['-lstdc++', '-lc10'],
   dependencies: kresd_deps,
   export_dynamic: true,
   install: true,
   install_dir: get_option('sbindir'),
-  install_rpath: rpath,
+  install_rpath: rpath
 )
