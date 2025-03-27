@@ -83,11 +83,11 @@ def test_listen_invalid(listen: Dict[str, Any]):
 @pytest.mark.parametrize(
     "tls",
     [
-        {"files-watchdog": "auto"},
-        {"files-watchdog": True},
-        {"files-watchdog": False},
+        {"watchdog": "auto"},
+        {"watchdog": True},
+        {"watchdog": False},
     ],
 )
-def test_tls_files_watchdog(tls: Dict[str, Any]):
-    expected: bool = WATCHDOG_LIB if tls["files-watchdog"] == "auto" else tls["files-watchdog"]
-    assert TLSSchema(tls).files_watchdog == expected
+def test_tls_watchdog(tls: Dict[str, Any]):
+    expected: bool = WATCHDOG_LIB if tls["watchdog"] == "auto" else tls["watchdog"]
+    assert TLSSchema(tls).watchdog == expected
