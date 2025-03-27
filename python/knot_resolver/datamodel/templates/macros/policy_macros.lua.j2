@@ -56,7 +56,7 @@ policy.TAGS_ASSIGN({{ string_table(tags) }})
 {%- endmacro %}
 
 {% macro policy_get_tagset(tags) -%}
-{%- if tags -%}
+{%- if tags is defined and tags-%}
 policy.get_tagset({{ string_table(tags) }})
 {%- else -%}
 0

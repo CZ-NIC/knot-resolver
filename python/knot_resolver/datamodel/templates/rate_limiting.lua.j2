@@ -1,6 +1,6 @@
 {% from 'macros/common_macros.lua.j2' import boolean %}
 
-{% if cfg.rate_limiting.rate_limit -%}
+{% if cfg.rate_limiting.rate_limit is defined and cfg.rate_limiting.rate_limit -%}
 assert(C.ratelimiting_init(
 	'{{ cfg.rundir }}/ratelimiting',
 	{{ cfg.rate_limiting.capacity }},
