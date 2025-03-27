@@ -18,6 +18,8 @@
 #include <sched.h>
 #include <stdio.h>
 #include <stdatomic.h>
+#include <string.h>
+#include <time.h>
 
 #include "tests/unit/test.h"
 #include "libdnssec/crypto.h"
@@ -76,6 +78,78 @@ struct kru_avx2 {
 uint64_t fakeclock_tick = 0;
 uint64_t fakeclock_start = 0;
 
+#define DNS_QUERY_TYPE_A 0x0001
+#define DNS_QUERY_CLASS_IN 0x0001
+
+typedef struct {
+	uint16_t id;
+	uint16_t flags;
+	uint16_t qdcount;
+	uint16_t ancount;
+	uint16_t nscount;
+	uint16_t arcount;
+} __attribute__((packed)) dns_header_t;
+
+size_t get_packet_size(uint32_t dname_length) {
+	uint8_t header_size = sizeof(dns_header_t);
+	uint8_t encoded_dname_size = dname_length + 1;
+	uint8_t query_flags_size = 4;
+	return header_size + encoded_dname_size + query_flags_size;
+}
+
+void create_domain_name(uint8_t *dname, size_t domain_length, unsigned char *sname) {
+	uint8_t encoded_size = 0;
+	uint8_t sname_size = 0;
+	int remaining_length = domain_length - 4;
+
+	while (remaining_length > 0) {
+		uint8_t max_label_length = (remaining_length > 64) ? 64 : remaining_length;
+		uint8_t label_length = 2 + (rand() % (max_label_length - 1));
+		while (remaining_length - label_length == 1)
+			label_length = 2 + (rand() % (max_label_length - 1));
+
+		dname[encoded_size++] = label_length;
+
+		for (uint8_t i = 0; i < label_length - 1; i++) {
+			char rl = 'a' + (rand() % 26);
+			sname[sname_size++] = rl;
+			dname[encoded_size++] = rl;
+		}
+		sname[sname_size++] = '.';
+		remaining_length -= label_length;
+	}
+
+	dname[encoded_size++] = 2;
+	dname[encoded_size++] = 'c';
+	dname[encoded_size++] = 'z';
+	dname[encoded_size++] = 0;
+
+	sname[sname_size++] = 'c';
+	sname[sname_size++] = 'z';
+	sname[sname_size++] = '.';
+	sname[sname_size++] = '\0';
+}
+
+void create_dns_query(uint32_t domain_length, uint8_t *dest, unsigned char* dname) {
+	size_t domain_len = domain_length + 1;
+
+	dns_header_t *header = (dns_header_t *)dest;
+	header->id = htons(0x1234);
+	header->flags = htons(0x0100);
+	header->qdcount = htons(1);
+	header->ancount = 0;
+	header->nscount = 0;
+	header->arcount = 0;
+
+	uint8_t *qname = dest + sizeof(dns_header_t);
+	create_domain_name(qname, domain_len, dname);
+
+	uint16_t *qtype = (uint16_t *)(qname + domain_len);
+	uint16_t *qclass = (uint16_t *)(qtype + 1);
+	*qtype = htons(DNS_QUERY_TYPE_A);
+	*qclass = htons(DNS_QUERY_CLASS_IN);
+}
+
 void fakeclock_init(void)
 {
 	fakeclock_start = kr_now();
@@ -126,6 +200,8 @@ static void test_rrl_avx2(void **state) {
 
 int main(int argc, char *argv[])
 {
+	srand(time(NULL));
+	
 	assert(KRU_GENERIC.initialize != KRU_AVX2.initialize);
 	if (KRU.initialize == KRU_AVX2.initialize) {
 		const UnitTest tests[] = {
