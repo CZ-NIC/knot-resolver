@@ -18,7 +18,7 @@ FilesToWatch = Dict[Path, Optional[str]]
 
 def watched_files_config(config: KresConfig) -> List[Any]:
     return [
-        config.network.tls.files_watchdog,
+        config.network.tls.watchdog,
         config.network.tls.cert_file,
         config.network.tls.key_file,
         config.local_data.rpz,
@@ -154,7 +154,7 @@ async def _init_files_watchdog(config: KresConfig) -> None:
         files_to_watch: FilesToWatch = {}
 
         # network.tls
-        if config.network.tls.files_watchdog and config.network.tls.cert_file and config.network.tls.key_file:
+        if config.network.tls.watchdog and config.network.tls.cert_file and config.network.tls.key_file:
             net_tls = f"net.tls('{config.network.tls.cert_file}', '{config.network.tls.key_file}')"
             files_to_watch[config.network.tls.cert_file.to_path()] = net_tls
             files_to_watch[config.network.tls.key_file.to_path()] = net_tls
