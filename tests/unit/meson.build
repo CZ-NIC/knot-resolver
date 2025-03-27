@@ -16,6 +16,9 @@ mock_cmodule_mod = shared_module(
 
 # executables with tests
 foreach unit_test : unit_tests
+  extra_link_args = []
+  extra_link_libs = []
+
   exec_test = executable(
     unit_test[0],
     unit_test[1],
@@ -30,6 +33,8 @@ foreach unit_test : unit_tests
       libdnssec,
       libm,
     ],
+    link_with: extra_link_libs,
+    link_args: extra_link_args,
   )
 
   # additional suites
