@@ -252,7 +252,7 @@
                     "description": "TLS configuration, also affects DNS over TLS and DNS over HTTPS.",
                     "type": "object",
                     "properties": {
-                        "files-watchdog": {
+                        "watchdog": {
                             "anyOf": [
                                 {
                                     "type": "string",
@@ -264,7 +264,7 @@
                                     "type": "boolean"
                                 }
                             ],
-                            "description": "Enables files watchdog for TLS certificate files. Requires the optional 'watchdog' dependency.",
+                            "description": "Enables watchdog of changes in TLS certificate files. Requires the optional 'watchdog' dependency.",
                             "default": "auto"
                         },
                         "cert-file": {
@@ -300,11 +300,6 @@
                             "description": "Path to file with secret for TLS session resumption via tickets. (RFC 5077).",
                             "default": null
                         },
-                        "auto-discovery": {
-                            "type": "boolean",
-                            "description": "Experimental automatic discovery of authoritative servers supporting DNS-over-TLS.",
-                            "default": false
-                        },
                         "padding": {
                             "anyOf": [
                                 {
@@ -321,12 +316,11 @@
                         }
                     },
                     "default": {
-                        "files_watchdog": true,
+                        "watchdog": true,
                         "cert_file": null,
                         "key_file": null,
                         "sticket_secret": null,
                         "sticket_secret_file": null,
-                        "auto_discovery": false,
                         "padding": true
                     }
                 },
@@ -480,12 +474,11 @@
                 },
                 "address_renumbering": null,
                 "tls": {
-                    "files_watchdog": true,
+                    "watchdog": true,
                     "cert_file": null,
                     "key_file": null,
                     "sticket_secret": null,
                     "sticket_secret_file": null,
-                    "auto_discovery": false,
                     "padding": true
                 },
                 "proxy_protocol": false,

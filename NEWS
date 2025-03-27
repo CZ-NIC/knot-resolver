@@ -11,7 +11,10 @@ Incompatible changes
   These are mostly experimental and debugging/testing options that are not useful for general users (remain in Lua):
   - /logging/debugging
   - /max-workers
+  - /network/tls/auto-discovery
   - /webmgmt
+- Renamed/moved options in the declarative configuration model (YAML).
+  - /network/tls/files-watchdog -> /network/tls/watchdog
 
 
 Knot Resolver 6.0.15 (2025-07-17)
