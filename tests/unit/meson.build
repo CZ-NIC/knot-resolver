@@ -19,7 +19,7 @@ foreach unit_test : unit_tests
   extra_link_args = []
   extra_link_libs = []
 
-  if unit_test[0] == 'dnamelimiting'
+  if unit_test[0] == 'dns_tunnel_filter'
     extra_link_args += ['-lstdc++', '-lc10']
     extra_link_libs += [blcnn_lib]
   endif

@@ -3,7 +3,7 @@
 */
 
 #include <stdatomic.h>
-#include "daemon/dnamelimiting.h"
+#include "daemon/dns_tunnel_filter.h"
 #include "daemon/libblcnn.h"
 #include "lib/mmapped.h"
 #include "lib/utils.h"
@@ -21,7 +21,7 @@
 
 #define DNAME_SCALE_FACTOR 25
 
-struct dnamelimiting {
+struct dns_tunnel_filter {
 	size_t capacity;
 	uint32_t instant_limit;
 	uint32_t rate_limit;
@@ -35,8 +35,8 @@ struct dnamelimiting {
 	kru_price_t v6_prices[V6_PREFIXES_CNT];
 	_Alignas(64) uint8_t kru[];
 };
-struct dnamelimiting *dnamelimiting = NULL;
-struct mmapped dnamelimiting_mmapped = {0};
+struct dns_tunnel_filter *dns_tunnel_filter = NULL;
+struct mmapped dns_tunnel_filter_mmapped = {0};
 
 /// return whether we're using optimized variant right now
 static bool using_avx2(void)
@@ -46,16 +46,16 @@ static bool using_avx2(void)
 	return result;
 }
 
-int dnamelimiting_init(const char *mmap_file, size_t capacity, uint32_t instant_limit,
+int dns_tunnel_filter_init(const char *mmap_file, size_t capacity, uint32_t instant_limit,
 		uint32_t rate_limit, uint16_t slip, uint32_t log_period, bool dry_run)
 {
 
 	size_t capacity_log = 0;
 	for (size_t c = capacity - 1; c > 0; c >>= 1) capacity_log++;
 
-	size_t size = offsetof(struct dnamelimiting, kru) + KRU.get_size(capacity_log);
+	size_t size = offsetof(struct dns_tunnel_filter, kru) + KRU.get_size(capacity_log);
 
-	struct dnamelimiting header = {
+	struct dns_tunnel_filter header = {
 		.capacity = capacity,
 		.instant_limit = instant_limit,
 		.rate_limit = rate_limit,
@@ -65,9 +65,9 @@ int dnamelimiting_init(const char *mmap_file, size_t capacity, uint32_t instant_
 		.using_avx2 = using_avx2()
 	};
 
-	size_t header_size = offsetof(struct dnamelimiting, using_avx2) + sizeof(header.using_avx2);
+	size_t header_size = offsetof(struct dns_tunnel_filter, using_avx2) + sizeof(header.using_avx2);
 	static_assert(  // no padding up to .using_avx2
-		offsetof(struct dnamelimiting, using_avx2) ==
+		offsetof(struct dns_tunnel_filter, using_avx2) ==
 			sizeof(header.capacity) +
 			sizeof(header.instant_limit) +
 			sizeof(header.rate_limit) +
@@ -76,63 +76,63 @@ int dnamelimiting_init(const char *mmap_file, size_t capacity, uint32_t instant_
 			sizeof(header.dry_run),
 		"detected padding with undefined data inside mmapped header");
 
-	int ret = mmapped_init(&dnamelimiting_mmapped, mmap_file, size, &header, header_size);
+	int ret = mmapped_init(&dns_tunnel_filter_mmapped, mmap_file, size, &header, header_size);
 	if (ret == MMAPPED_WAS_FIRST) {
-		kr_log_info(SYSTEM, "Initializing rate-limiting...\n");
+		kr_log_info(SYSTEM, "Initializing DNS tunnel filter...\n");
 
-		dnamelimiting = dnamelimiting_mmapped.mem;
+		dns_tunnel_filter = dns_tunnel_filter_mmapped.mem;
 
 		const kru_price_t base_price = KRU_LIMIT / instant_limit;
 		const kru_price_t max_decay = rate_limit > 1000ll * instant_limit ? base_price :
 			(uint64_t) base_price * rate_limit / 1000;
 
-		bool succ = KRU.initialize((struct kru *)dnamelimiting->kru, capacity_log, max_decay);
+		bool succ = KRU.initialize((struct kru *)dns_tunnel_filter->kru, capacity_log, max_decay);
 		if (!succ) {
-			dnamelimiting = NULL;
+			dns_tunnel_filter = NULL;
 			ret = kr_error(EINVAL);
 			goto fail;
 		}
 
-		dnamelimiting->log_time = kr_now() - log_period;
+		dns_tunnel_filter->log_time = kr_now() - log_period;
 
 		for (size_t i = 0; i < V4_PREFIXES_CNT; i++) {
-			dnamelimiting->v4_prices[i] = base_price / V4_RATE_MULT[i];
+			dns_tunnel_filter->v4_prices[i] = base_price / V4_RATE_MULT[i];
 		}
 
 		for (size_t i = 0; i < V6_PREFIXES_CNT; i++) {
-			dnamelimiting->v6_prices[i] = base_price / V6_RATE_MULT[i];
+			dns_tunnel_filter->v6_prices[i] = base_price / V6_RATE_MULT[i];
 		}
 
-		dnamelimiting->net = load_model();
-		if (!dnamelimiting->net) goto fail;
+		dns_tunnel_filter->net = load_model();
+		if (!dns_tunnel_filter->net) goto fail;
 
-		ret = mmapped_init_continue(&dnamelimiting_mmapped);
+		ret = mmapped_init_continue(&dns_tunnel_filter_mmapped);
 		if (ret != 0) goto fail;
 
-		kr_log_info(SYSTEM, "Rate-limiting initialized (%s).\n", (dnamelimiting->using_avx2 ? "AVX2" : "generic"));
+		kr_log_info(SYSTEM, "DNS tunnel filter initialized (%s).\n", (dns_tunnel_filter->using_avx2 ? "AVX2" : "generic"));
 		return 0;
 	} else if (ret == 0) {
-		dnamelimiting = dnamelimiting_mmapped.mem;
-		kr_log_info(SYSTEM, "Using existing rate-limiting data (%s).\n", (dnamelimiting->using_avx2 ? "AVX2" : "generic"));
+		dns_tunnel_filter = dns_tunnel_filter_mmapped.mem;
+		kr_log_info(SYSTEM, "Using existing DNS tunnel filter data (%s).\n", (dns_tunnel_filter->using_avx2 ? "AVX2" : "generic"));
 		return 0;
 	} // else fail
 
 fail:
 
-	kr_log_crit(SYSTEM, "Initialization of shared rate-limiting data failed.\n");
+	kr_log_crit(SYSTEM, "Initialization of shared DNS tunnel filter data failed.\n");
 	return ret;
 }
 
-void dnamelimiting_deinit(void)
+void dns_tunnel_filter_deinit(void)
 {
-	mmapped_deinit(&dnamelimiting_mmapped);
-	dnamelimiting = NULL;
+	mmapped_deinit(&dns_tunnel_filter_mmapped);
+	dns_tunnel_filter = NULL;
 }
 
 
-bool dnamelimiting_request_begin(struct kr_request *req)
+bool dns_tunnel_filter_request_begin(struct kr_request *req)
 {
-	if (!dnamelimiting) return false;
+	if (!dns_tunnel_filter) return false;
 	if (!req->qsource.addr)
 		return false;  // don't consider internal requests
 	if (req->qsource.price_factor16 == 0)
@@ -160,9 +160,9 @@ bool dnamelimiting_request_begin(struct kr_request *req)
 		kru_price_t prices[V6_PREFIXES_CNT];
 		for (int i = 0; i < V6_PREFIXES_CNT; ++i) {
 			prices[i] = (req->qsource.price_factor16 * (uint64_t)price_scale_factor
-					* (uint64_t)dnamelimiting->v6_prices[i] + (1<<15)) >> 32;
+					* (uint64_t)dns_tunnel_filter->v6_prices[i] + (1<<15)) >> 32;
 		}
-		limited_prefix = KRU.limited_multi_prefix_or((struct kru *)dnamelimiting->kru, time_now,
+		limited_prefix = KRU.limited_multi_prefix_or((struct kru *)dns_tunnel_filter->kru, time_now,
 				1, key, V6_PREFIXES, prices, V6_PREFIXES_CNT, NULL);
 	} else {
 		struct sockaddr_in *ipv4 = (struct sockaddr_in *)req->qsource.addr;
@@ -172,9 +172,9 @@ bool dnamelimiting_request_begin(struct kr_request *req)
 		kru_price_t prices[V4_PREFIXES_CNT];
 		for (int i = 0; i < V4_PREFIXES_CNT; ++i) {
 			prices[i] = (req->qsource.price_factor16 * (uint64_t)price_scale_factor
-					* (uint64_t)dnamelimiting->v4_prices[i] + (1<<15)) >> 32;
+					* (uint64_t)dns_tunnel_filter->v4_prices[i] + (1<<15)) >> 32;
 		}
-		limited_prefix = KRU.limited_multi_prefix_or((struct kru *)dnamelimiting->kru, time_now,
+		limited_prefix = KRU.limited_multi_prefix_or((struct kru *)dns_tunnel_filter->kru, time_now,
 				0, key, V4_PREFIXES, prices, V4_PREFIXES_CNT, NULL);
 	}
 	if (!limited_prefix) return false;  // not limited
@@ -182,7 +182,7 @@ bool dnamelimiting_request_begin(struct kr_request *req)
 	uint8_t *packet = req->qsource.packet->wire;
 	size_t packet_size = req->qsource.size;
 
-	float ret = predict_packet(dnamelimiting->net, packet, packet_size);
+	float ret = predict_packet(dns_tunnel_filter->net, packet, packet_size);
 	if (ret > 0.95)
 		printf("Potentially malicious packet (%f %%)\n", (ret - 0.95) * 100 * 20);
 	return true;

@@ -56,7 +56,7 @@ uint32_t _count_test(int expected_passing, uint32_t dname_length, int addr_famil
 				i % (ip_max_value - ip_min_value + 1) + ip_min_value,
 				i / (ip_max_value - ip_min_value + 1) % 256);
 		kr_straddr_socket_set((struct sockaddr *) &addr, addr_str, 0);
-		if (dnamelimiting_request_begin(&req)) {
+		if (dns_tunnel_filter_request_begin(&req)) {
 			cnt = i;
 			break;
 		}

@@ -56,7 +56,7 @@ unit_tests += [
   # parallel tests timeouts under valgrind; they checks mainly for race conditions, which is not needed there
   ['ratelimiting-parallel', files('ratelimiting.test/tests-parallel.c') + libkres_src, ['skip_valgrind']],
 
-  ['dnamelimiting', files('dnamelimiting.test/tests.c') + libkres_src]
+  ['dns_tunnel_filter', files('dns_tunnel_filter.test/tests.c') + libkres_src]
 ]
 
 config_tests += [
