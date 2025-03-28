@@ -101,7 +101,7 @@ class KresConfig(ConfigSchema):
         forward: List of Forward Zones and its configuration.
         fallback: Config for fallback on resolution failure.
         cache: DNS resolver cache configuration.
-        dnssec: Disable DNSSEC, enable with defaults or set new configuration.
+        dnssec: DNSSEC configuration.
         dns64: Disable DNS64 (RFC 6147), enable with defaults or set new configuration.
         logging: Logging and debugging configuration.
         monitoring: Metrics exposisition configuration (Prometheus, Graphite)
@@ -123,7 +123,7 @@ class KresConfig(ConfigSchema):
         forward: Optional[List[ForwardSchema]] = None
         fallback: FallbackSchema = FallbackSchema()
         cache: CacheSchema = lazy_default(CacheSchema, {})
-        dnssec: Union[bool, DnssecSchema] = True
+        dnssec: DnssecSchema = DnssecSchema()
         dns64: Union[bool, Dns64Schema] = False
         logging: LoggingSchema = LoggingSchema()
         monitoring: MonitoringSchema = MonitoringSchema()
@@ -145,7 +145,7 @@ class KresConfig(ConfigSchema):
     forward: Optional[List[ForwardSchema]]
     fallback: FallbackSchema
     cache: CacheSchema
-    dnssec: Union[Literal[False], DnssecSchema]
+    dnssec: DnssecSchema
     dns64: Union[Literal[False], Dns64Schema]
     logging: LoggingSchema
     monitoring: MonitoringSchema
@@ -168,11 +168,6 @@ class KresConfig(ConfigSchema):
                 "The number of workers can be configured manually in 'workers' option."
             )
         return obj.workers
-
-    def _dnssec(self, obj: Raw) -> Any:
-        if obj.dnssec is True:
-            return DnssecSchema()
-        return obj.dnssec
 
     def _dns64(self, obj: Raw) -> Any:
         if obj.dns64 is True:
