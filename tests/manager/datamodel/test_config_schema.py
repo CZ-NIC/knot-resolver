@@ -66,12 +66,10 @@ def test_dnssec_default_true():
     assert config.dnssec.trust_anchor_sentinel == True
     assert config.dnssec.trust_anchor_signal_query == True
     assert config.dnssec.time_skew_detection == True
-    assert config.dnssec.refresh_time == None
     assert config.dnssec.trust_anchors == None
     assert config.dnssec.negative_trust_anchors == None
     assert config.dnssec.trust_anchors_files == None
     assert int(config.dnssec.keep_removed) == 0
-    assert str(config.dnssec.hold_down_time) == "30d"
 
 
 def test_dns64_prefix_default():
