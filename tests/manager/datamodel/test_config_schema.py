@@ -54,24 +54,22 @@ def test_config_defaults():
 
 
 def test_dnssec_false():
-    config = KresConfig({"dnssec": False})
+    config = KresConfig({"dnssec": {"enabled": False}})
 
-    assert config.dnssec == False
+    assert config.dnssec.enabled == False
 
 
 def test_dnssec_default_true():
     config = KresConfig()
 
     # DNSSEC defaults
-    assert config.dnssec.trust_anchor_sentinel == True
-    assert config.dnssec.trust_anchor_signal_query == True
-    assert config.dnssec.time_skew_detection == True
-    assert config.dnssec.refresh_time == None
+    assert config.dnssec.enabled == True
+    assert config.dnssec.sentinel == True
+    assert config.dnssec.signal_query == True
+    assert int(config.dnssec.trust_anchors_keep_removed) == 0
     assert config.dnssec.trust_anchors == None
-    assert config.dnssec.negative_trust_anchors == None
     assert config.dnssec.trust_anchors_files == None
-    assert int(config.dnssec.keep_removed) == 0
-    assert str(config.dnssec.hold_down_time) == "30d"
+    assert config.dnssec.negative_trust_anchors == None
 
 
 def test_dns64_prefix_default():

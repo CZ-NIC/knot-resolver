@@ -1,41 +1,23 @@
 {% from 'macros/common_macros.lua.j2' import boolean %}
 
-{% if not cfg.dnssec %}
--- disable dnssec
-trust_anchors.remove('.')
-{% else %}
+{% if cfg.dnssec.enabled %}
 
-
--- options.trust-anchor-sentinel
-{% if cfg.dnssec.trust_anchor_sentinel %}
+-- dnssec.sentinel
+{% if cfg.dnssec.sentinel %}
 modules.load('ta_sentinel')
 {% else %}
 modules.unload('ta_sentinel')
 {% endif %}
 
--- options.trust-anchor-signal-query
-{% if cfg.dnssec.trust_anchor_signal_query %}
+-- dnssec.signal-query
+{% if cfg.dnssec.signal_query %}
 modules.load('ta_signal_query')
 {% else %}
 modules.unload('ta_signal_query')
 {% endif %}
 
--- options.time-skew-detection
-{% if cfg.dnssec.time_skew_detection %}
-modules.load('detect_time_skew')
-{% else %}
-modules.unload('detect_time_skew')
-{% endif %}
-
-{% if cfg.dnssec.keep_removed %}
--- dnssec.keep-removed
-trust_anchors.keep_removed = {{ cfg.dnssec.keep_removed }}
-{% endif %}
-
-{% if cfg.dnssec.refresh_time %}
--- dnssec.refresh-time
-trust_anchors.refresh_time = {{ cfg.dnssec.refresh_time.seconds()|string  }}
-{% endif %}
+-- dnssec.trust-anchors-keep-removed
+trust_anchors.keep_removed = {{ cfg.dnssec.trust_anchors_keep_removed }}
 
 {% if cfg.dnssec.trust_anchors %}
 -- dnssec.trust-anchors
@@ -60,5 +42,9 @@ trust_anchors.add_file('{{ taf.file }}', {{ boolean(taf.read_only) }})
 {% endfor %}
 {% endif %}
 
+{% else %}
 
-{% endif %}{# cfg.dnssec #}
+-- Disable DNSSEC
+trust_anchors.remove('.')
+
+{% endif %}
