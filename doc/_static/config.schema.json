@@ -1191,21 +1191,6 @@
                             "description": "How many removed keys should be held in history (and key file) before being purged.",
                             "default": 0
                         },
-                        "refresh-time": {
-                            "type": [
-                                "string",
-                                "null"
-                            ],
-                            "pattern": "^(\\d+)(us|ms|s|m|h|d)$",
-                            "description": "Force trust-anchors to be updated every defined time periodically instead of relying on (RFC 5011) logic and TTLs. Intended only for testing purposes.",
-                            "default": null
-                        },
-                        "hold-down-time": {
-                            "type": "string",
-                            "pattern": "^(\\d+)(us|ms|s|m|h|d)$",
-                            "description": "Modify hold-down timer (RFC 5011). Intended only for testing purposes.",
-                            "default": "30d"
-                        },
                         "trust-anchors": {
                             "type": [
                                 "array",
@@ -1249,7 +1234,7 @@
                                     }
                                 }
                             },
-                            "description": "List of zonefiles where trust-anchors are stored.",
+                            "description": "List of zone-files where trust-anchors are stored.",
                             "default": null
                         }
                     }
