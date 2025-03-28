@@ -1192,101 +1192,86 @@
             }
         },
         "dnssec": {
-            "anyOf": [
-                {
-                    "type": "boolean"
+            "description": "DNSSEC configuration.",
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "description": "Enable/disable DNSSEC.",
+                    "default": true
                 },
-                {
-                    "description": "DNSSEC configuration.",
-                    "type": "object",
-                    "properties": {
-                        "trust-anchor-sentinel": {
-                            "type": "boolean",
-                            "description": "Allows users of DNSSEC validating resolver to detect which root keys are configured in resolver's chain of trust. (RFC 8509)",
-                            "default": true
-                        },
-                        "trust-anchor-signal-query": {
-                            "type": "boolean",
-                            "description": "Signaling Trust Anchor Knowledge in DNSSEC Using Key Tag Query, according to (RFC 8145#section-5).",
-                            "default": true
-                        },
-                        "time-skew-detection": {
-                            "type": "boolean",
-                            "description": "Detection of difference between local system time and expiration time bounds in DNSSEC signatures for '. NS' records.",
-                            "default": true
-                        },
-                        "keep-removed": {
-                            "type": "integer",
-                            "minimum": 0,
-                            "description": "How many removed keys should be held in history (and key file) before being purged.",
-                            "default": 0
-                        },
-                        "refresh-time": {
-                            "type": [
-                                "string",
-                                "null"
-                            ],
-                            "pattern": "^(\\d+)(us|ms|s|m|h|d)$",
-                            "description": "Force trust-anchors to be updated every defined time periodically instead of relying on (RFC 5011) logic and TTLs. Intended only for testing purposes.",
-                            "default": null
-                        },
-                        "hold-down-time": {
-                            "type": "string",
-                            "pattern": "^(\\d+)(us|ms|s|m|h|d)$",
-                            "description": "Modify hold-down timer (RFC 5011). Intended only for testing purposes.",
-                            "default": "30d"
-                        },
-                        "trust-anchors": {
-                            "type": [
-                                "array",
-                                "null"
-                            ],
-                            "items": {
-                                "type": "string"
-                            },
-                            "description": "List of trust-anchors in DS/DNSKEY records format.",
-                            "default": null
-                        },
-                        "negative-trust-anchors": {
-                            "type": [
-                                "array",
-                                "null"
-                            ],
-                            "items": {
+                "sentinel": {
+                    "type": "boolean",
+                    "description": "Allows users of DNSSEC validating resolver to detect which root keys are configured in resolver's chain of trust. (RFC 8509)",
+                    "default": true
+                },
+                "signal-query": {
+                    "type": "boolean",
+                    "description": "Signaling Trust Anchor Knowledge in DNSSEC Using Key Tag Query, according to (RFC 8145#section-5).",
+                    "default": true
+                },
+                "trust-anchors-keep-removed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "How many removed keys should be held in history (and key file) before being purged.",
+                    "default": 0
+                },
+                "trust-anchors": {
+                    "type": [
+                        "array",
+                        "null"
+                    ],
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Trust-anchors configuration.",
+                    "default": null
+                },
+                "trust-anchors-files": {
+                    "type": [
+                        "array",
+                        "null"
+                    ],
+                    "items": {
+                        "description": "Trust-anchor zonefile configuration.",
+                        "type": "object",
+                        "properties": {
+                            "file": {
                                 "type": "string",
-                                "pattern": "(?=^.{,253}\\.?$)(^(?!-)[^.]{,62}[^.-](\\.(?!-)[^.]{,62}[^.-])*\\.?$)|^\\.$"
+                                "description": "Path to the zonefile that stores trust-anchors."
                             },
-                            "description": "List of domain names representing negative trust-anchors. (RFC 7646)",
-                            "default": null
-                        },
-                        "trust-anchors-files": {
-                            "type": [
-                                "array",
-                                "null"
-                            ],
-                            "items": {
-                                "description": "Trust-anchor zonefile configuration.",
-                                "type": "object",
-                                "properties": {
-                                    "file": {
-                                        "type": "string",
-                                        "description": "Path to the zonefile that stores trust-anchors."
-                                    },
-                                    "read-only": {
-                                        "type": "boolean",
-                                        "description": "Blocks zonefile updates according to RFC 5011.",
-                                        "default": false
-                                    }
-                                }
-                            },
-                            "description": "List of zonefiles where trust-anchors are stored.",
-                            "default": null
+                            "read-only": {
+                                "type": "boolean",
+                                "description": "Blocks zonefile updates according to RFC 5011.",
+                                "default": false
+                            }
                         }
-                    }
+                    },
+                    "description": "List of zone-files where trust-anchors are stored.",
+                    "default": null
+                },
+                "negative-trust-anchors": {
+                    "type": [
+                        "array",
+                        "null"
+                    ],
+                    "items": {
+                        "type": "string",
+                        "pattern": "(?=^.{,253}\\.?$)(^(?!-)[^.]{,62}[^.-](\\.(?!-)[^.]{,62}[^.-])*\\.?$)|^\\.$"
+                    },
+                    "description": "List of domain names representing negative trust-anchors. (RFC 7646)",
+                    "default": null
                 }
-            ],
-            "description": "Disable DNSSEC, enable with defaults or set new configuration.",
-            "default": true
+            },
+            "default": {
+                "enabled": true,
+                "sentinel": true,
+                "signal_query": true,
+                "trust_anchors_keep_removed": 0,
+                "trust_anchors": null,
+                "trust_anchors_files": null,
+                "negative_trust_anchors": null
+            }
         },
         "dns64": {
             "anyOf": [

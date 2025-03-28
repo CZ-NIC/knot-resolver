@@ -9,11 +9,18 @@ Incompatible changes
 --------------------
 - Removed options from declarative configuration model (YAML).  
   These are mostly experimental and debugging/testing options that are not useful for general users (remain in Lua):
+  - /dnssec/refresh-time
+  - /dnssec/hold-down-time
+  - /dnssec/time-skew-detection
   - /logging/debugging
   - /max-workers
   - /network/tls/auto-discovery
   - /webmgmt
 - Renamed/moved options in the declarative configuration model (YAML).
+  - /dnssec: true|false -> /dnssec/enabled: true|false
+  - /dnssec/keep-removed -> /dnssec/trust-anchors-keep-removed
+  - /dnssec/trust-anchor-sentinel -> /dnssec/sentinel
+  - /dnssec/trust-anchor-signal-query -> /dnssec/signal-query 
   - /network/tls/files-watchdog -> /network/tls/watchdog
 
 
