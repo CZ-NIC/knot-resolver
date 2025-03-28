@@ -63,18 +63,6 @@ Following :option:`dnssec <dnssec: false|<options>>` section allow to modify DNS
              - file: root.key
                read-only: false
 
-   .. option:: hold-down-time: <time ms|s|m|h|d>
-
-      :default: 30d (30 days)
-
-      Modify :rfc:`5011` hold-down timer to given value. Intended only for testing purposes.
-
-   .. option:: refresh-time: <time ms|s|m|h|d>
-
-      Modify RFC5011 refresh timer to given value (not set by default), this will force trust anchors
-      to be updated every N seconds periodically instead of relying on RFC5011 logic and TTLs.
-      Intended only for testing purposes.
-
    .. option:: keep-removed: <int>
 
       :default: 0
