@@ -1,5 +1,6 @@
-from typing import Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional, Union
 
+from knot_resolver.constants import WATCHDOG_LIB
 from knot_resolver.datamodel.types import (
     DomainName,
     EscapedStr,
@@ -54,16 +55,36 @@ class RuleSchema(ConfigSchema):
 
 
 class RPZSchema(ConfigSchema):
-    """
-    Configuration or Response Policy Zone (RPZ).
+    class Raw(ConfigSchema):
+        """
+        Configuration or Response Policy Zone (RPZ).
 
-    ---
-    file: Path to the RPZ zone file.
-    tags: Tags to link with other policy rules.
-    """
+        ---
+        file: Path to the RPZ zone file.
+        watchdog: Enables files watchdog for configured RPZ file. Requires the optional 'watchdog' dependency.
+        tags: Tags to link with other policy rules.
+        """
+
+        file: ReadableFile
+        watchdog: Union[Literal["auto"], bool] = "auto"
+        tags: Optional[List[IDPattern]] = None
+
+    _LAYER = Raw
 
     file: ReadableFile
-    tags: Optional[List[IDPattern]] = None
+    watchdog: bool
+    tags: Optional[List[IDPattern]]
+
+    def _watchdog(self, obj: Raw) -> Any:
+        if obj.watchdog == "auto":
+            return WATCHDOG_LIB
+        return obj.watchdog
+
+    def _validate(self) -> None:
+        if self.watchdog and not WATCHDOG_LIB:
+            raise ValueError(
+                "'watchdog' is enabled, but the required 'watchdog' dependency (optional) is not installed"
+            )
 
 
 class LocalDataSchema(ConfigSchema):
