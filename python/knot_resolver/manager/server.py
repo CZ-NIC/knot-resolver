@@ -130,13 +130,13 @@ class Server:
                     f"Configuration file was not found at '{self._config_path}'."
                     " Something must have happened to it while we were running."
                 )
-                logger.error("Configuration have NOT been changed.")
+                logger.error("Configuration has NOT been changed.")
             except (DataParsingError, DataValidationError) as e:
                 logger.error(f"Failed to parse the updated configuration file: {e}")
-                logger.error("Configuration have NOT been changed.")
+                logger.error("Configuration has NOT been changed.")
             except KresManagerException as e:
                 logger.error(f"Reloading of the configuration file failed: {e}")
-                logger.error("Configuration have NOT been changed.")
+                logger.error("Configuration has NOT been changed.")
 
     async def _renew_config(self) -> None:
         try:
@@ -144,7 +144,7 @@ class Server:
             logger.info("Configuration successfully renewed")
         except KresManagerException as e:
             logger.error(f"Renewing the configuration failed: {e}")
-            logger.error("Configuration have NOT been renewed.")
+            logger.error("Configuration has NOT been renewed.")
 
     async def sigint_handler(self) -> None:
         logger.info("Received SIGINT, triggering graceful shutdown")
