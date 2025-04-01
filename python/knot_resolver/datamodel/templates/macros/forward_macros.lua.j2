@@ -5,7 +5,7 @@
 {%- endmacro %}
 
 {% macro forward_server(server) -%}
-{%- if server.address -%}
+{%- if server.address is defined and server.address-%}
 {%- for addr in server.address -%}
 {'{{ addr }}',
 {%- if server.transport == 'tls' -%}

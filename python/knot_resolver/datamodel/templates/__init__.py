@@ -1,7 +1,7 @@
 import os
 import sys
 
-from jinja2 import Environment, FileSystemLoader, Template
+from jinja2 import Environment, FileSystemLoader, StrictUndefined, Template
 
 
 def _get_templates_dir() -> str:
@@ -33,7 +33,7 @@ def _import_kresd_policy_config_template() -> Template:
 
 def template_from_str(template: str) -> Template:
     ldr = FileSystemLoader(_TEMPLATES_DIR)
-    env = Environment(trim_blocks=True, lstrip_blocks=True, loader=ldr)
+    env = Environment(trim_blocks=True, lstrip_blocks=True, loader=ldr, undefined=StrictUndefined)
     return env.from_string(template)
 
 
