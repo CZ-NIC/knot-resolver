@@ -954,6 +954,8 @@ policy.layer = {
 
 		if ffi.C.ratelimiting_request_begin(req) then return end
 
+		if ffi.C.dns_tunnel_filter_request_begin(req) then return end
+
 		local qry = req:initial() -- same as :current() but more descriptive
 		return policy.evaluate(policy.rules, req, qry, state)
 			or state

@@ -13,6 +13,7 @@
 #include "daemon/worker.h"
 #include "daemon/ratelimiting.h"
 #include "daemon/defer.h"
+#include "daemon/dns_tunnel_filter.h"
 
 #include "lib/defines.h"
 #include "lib/dnssec.h"
@@ -630,6 +631,15 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
+	if (!dns_tunnel_filter_initialized) {
+		kr_log_warning(TUNNEL, "Tunneling filter not initialized from Lua, using hardcoded default.\n");
+		ret = dns_tunnel_filter_init("dns_tunnel_filter", (1 << 20), (1 << 8), (1 << 17), 0, 0, false);
+		if (ret) {
+			ret = EXIT_FAILURE;
+			goto cleanup;
+		}
+	}
+
 	ret = kr_rules_init_ensure();
 	if (ret) {
 		kr_log_error(RULES, "failed to initialize policy rule engine: %s\n",
@@ -659,7 +669,8 @@ int main(int argc, char **argv)
 cleanup:/* Cleanup. */
 	network_unregister();
 
-	ratelimiting_deinit();
+	dns_tunnel_filter_deinit();
+	ratelimiting_deinit();	
 	kr_resolver_deinit();
 	worker_deinit();
 	engine_deinit();

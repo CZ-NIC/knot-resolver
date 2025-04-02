@@ -7,6 +7,7 @@
  #include "lib/utils.h"
  #include "lib/kru.h"
  struct kr_request;
+ extern bool dns_tunnel_filter_initialized;
  
  /** Initialize rate-limiting with shared mmapped memory.
   * The existing data are used if another instance is already using the file
