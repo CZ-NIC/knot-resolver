@@ -7,7 +7,7 @@ if libtorch.found()
     dependencies: [libtorch]
   )
 
-  blcnn_lib = library('blcnn',
+  blcnn_lib = static_library('blcnn',
     sources: ['libblcnn.cpp'],
     dependencies: [libtorch_dep]
   )
@@ -29,6 +29,7 @@ kresd_src = files([
   'network.c',
   'proxyv2.c',
   'ratelimiting.c',
+  'dns_tunnel_filter.c',
   'session2.c',
   'tls.c',
   'tls_ephemeral_credentials.c',

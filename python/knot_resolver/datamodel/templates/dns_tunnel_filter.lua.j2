@@ -1,0 +1,12 @@
+{% from 'macros/common_macros.lua.j2' import boolean %}
+
+{% if cfg.dns_tunnel_filter.rate_limit is defined and cfg.dns_tunnel_filter.rate_limit -%}
+assert(C.dns_tunnel_filter_init(
+	'{{ cfg.rundir }}/ratelimiting',
+	{{ cfg.dns_tunnel_filter.capacity }},
+	{{ cfg.dns_tunnel_filter.instant_limit }},
+	{{ cfg.dns_tunnel_filter.rate_limit }},
+	{{ cfg.dns_tunnel_filter.slip }},
+	{{ cfg.dns_tunnel_filter.log_period.millis() }},
+	{{ boolean(cfg.dns_tunnel_filter.dry_run) }}) == 0)
+{%- endif %}

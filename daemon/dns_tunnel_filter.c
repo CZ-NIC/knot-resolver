@@ -5,6 +5,7 @@
 #include <stdatomic.h>
 #include "daemon/dns_tunnel_filter.h"
 #include "daemon/libblcnn.h"
+#include "daemon/session2.h"
 #include "lib/mmapped.h"
 #include "lib/utils.h"
 #include "lib/resolve.h"
@@ -20,6 +21,8 @@
 #define MAX_PREFIXES_CNT ((V4_PREFIXES_CNT > V6_PREFIXES_CNT) ? V4_PREFIXES_CNT : V6_PREFIXES_CNT)
 
 #define DNAME_SCALE_FACTOR 25
+
+#define VERBOSE_LOG(...) kr_log_debug(TUNNEL, " | " __VA_ARGS__)
 
 struct dns_tunnel_filter {
 	size_t capacity;
@@ -37,7 +40,7 @@ struct dns_tunnel_filter {
 };
 struct dns_tunnel_filter *dns_tunnel_filter = NULL;
 struct mmapped dns_tunnel_filter_mmapped = {0};
-
+bool dns_tunnel_filter_initialized = false;
 /// return whether we're using optimized variant right now
 static bool using_avx2(void)
 {
@@ -49,7 +52,7 @@ static bool using_avx2(void)
 int dns_tunnel_filter_init(const char *mmap_file, size_t capacity, uint32_t instant_limit,
 		uint32_t rate_limit, uint16_t slip, uint32_t log_period, bool dry_run)
 {
-
+	dns_tunnel_filter_initialized = true;
 	size_t capacity_log = 0;
 	for (size_t c = capacity - 1; c > 0; c >>= 1) capacity_log++;
 
@@ -78,7 +81,7 @@ int dns_tunnel_filter_init(const char *mmap_file, size_t capacity, uint32_t inst
 
 	int ret = mmapped_init(&dns_tunnel_filter_mmapped, mmap_file, size, &header, header_size);
 	if (ret == MMAPPED_WAS_FIRST) {
-		kr_log_info(SYSTEM, "Initializing DNS tunnel filter...\n");
+		kr_log_info(TUNNEL, "Initializing DNS tunnel filter...\n");
 
 		dns_tunnel_filter = dns_tunnel_filter_mmapped.mem;
 
@@ -109,17 +112,17 @@ int dns_tunnel_filter_init(const char *mmap_file, size_t capacity, uint32_t inst
 		ret = mmapped_init_continue(&dns_tunnel_filter_mmapped);
 		if (ret != 0) goto fail;
 
-		kr_log_info(SYSTEM, "DNS tunnel filter initialized (%s).\n", (dns_tunnel_filter->using_avx2 ? "AVX2" : "generic"));
+		kr_log_info(TUNNEL, "DNS tunnel filter initialized (%s).\n", (dns_tunnel_filter->using_avx2 ? "AVX2" : "generic"));
 		return 0;
 	} else if (ret == 0) {
 		dns_tunnel_filter = dns_tunnel_filter_mmapped.mem;
-		kr_log_info(SYSTEM, "Using existing DNS tunnel filter data (%s).\n", (dns_tunnel_filter->using_avx2 ? "AVX2" : "generic"));
+		kr_log_info(TUNNEL, "Using existing DNS tunnel filter data (%s).\n", (dns_tunnel_filter->using_avx2 ? "AVX2" : "generic"));
 		return 0;
 	} // else fail
 
 fail:
 
-	kr_log_crit(SYSTEM, "Initialization of shared DNS tunnel filter data failed.\n");
+	kr_log_crit(TUNNEL, "Initialization of shared DNS tunnel filter data failed.\n");
 	return ret;
 }
 
@@ -129,7 +132,6 @@ void dns_tunnel_filter_deinit(void)
 	mmapped_deinit(&dns_tunnel_filter_mmapped);
 	dns_tunnel_filter = NULL;
 }
-
 
 bool dns_tunnel_filter_request_begin(struct kr_request *req)
 {
@@ -183,8 +185,12 @@ bool dns_tunnel_filter_request_begin(struct kr_request *req)
 	uint8_t *packet = req->qsource.packet->wire;
 	size_t packet_size = req->qsource.size;
 
-	float ret = predict_packet(dns_tunnel_filter->net, packet, packet_size);
-	if (ret > 0.95)
-		printf("Potentially malicious packet (%f %%)\n", (ret - 0.95) * 100 * 20);
-	return true;
+	float tunnel_prob = predict_packet(dns_tunnel_filter->net, packet, packet_size);
+	
+	if (tunnel_prob > 0.95) {
+		kr_log_info(TUNNEL, "Malicious packet detected! (%f %%)\n", (tunnel_prob - 0.95) * 100 * 20);
+		return true;
+	} else {
+		return false;
+	}
 }

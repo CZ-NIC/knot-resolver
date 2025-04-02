@@ -49,6 +49,9 @@ nsid.name('{{ cfg.nsid }}' .. worker.id)
 -- DEFER section ------------------------------------
 {% include "defer.lua.j2" %}
 
+-- DNS_TUNNEL_FILTER section ------------------------
+{% include "dns_tunnel_filter.lua.j2" %}
+
 {% endif %}
 
 -- LUA section --------------------------------------

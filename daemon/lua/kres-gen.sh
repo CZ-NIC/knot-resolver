@@ -356,6 +356,8 @@ ${CDEFS} ${KRESD} functions <<-EOF
 	ratelimiting_init
 	defer_init
 	defer_set_price_factor16
+	dns_tunnel_filter_request_begin
+	dns_tunnel_filter_init
 EOF
 
 echo "struct engine" | ${CDEFS} ${KRESD} types | sed '/module_array_t/,$ d'
