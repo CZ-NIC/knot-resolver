@@ -72,14 +72,14 @@ if get_option('doc') == 'enabled'
 endif
 
 
-make_doc = find_program('../scripts/meson/make-doc.sh')
+make_doc = [find_program('../scripts/meson/make-doc.sh'), '-j', 'auto']
 run_target(
   'doc',
-  command: make_doc
+  command: make_doc,
 )
 
 
 run_target(
   'doc-strict',
-  command: [make_doc, '-W']
+  command: make_doc + ['-W']
 )
