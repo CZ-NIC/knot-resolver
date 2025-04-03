@@ -133,7 +133,7 @@ void dns_tunnel_filter_deinit(void)
 }
 
 bool dns_tunnel_filter_request_begin(struct kr_request *req)
-{
+{	
 	if (!dns_tunnel_filter) return false;
 	if (!req->qsource.addr)
 		return false;  // don't consider internal requests
@@ -141,6 +141,11 @@ bool dns_tunnel_filter_request_begin(struct kr_request *req)
 		return false;  // whitelisted
 	if (!req->current_query)
 		return false;
+	if (!req->current_query->flags)
+		return false;
+	if (req->current_query->flags.CACHED == true) {
+		return false; // don't consider cached results
+	}
 	if (!req->current_query->sname)
 		return false;
 
@@ -188,6 +193,8 @@ bool dns_tunnel_filter_request_begin(struct kr_request *req)
 	
 	if (tunnel_prob > 0.95) {
 		kr_log_info(TUNNEL, "Malicious packet detected! (%f %%)\n", (tunnel_prob - 0.95) * 100 * 20);
+		req->options.NO_ANSWER = true;
+		req->state = KR_STATE_FAIL;
 		return true;
 	} else {
 		return false;
