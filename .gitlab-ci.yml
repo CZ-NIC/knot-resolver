@@ -226,9 +226,9 @@ docker:build:
 docker:build:cross-platform:
   <<: *docker
   stage: build
-  only:
-    - master@knot/knot-resolver
-    - tags
+  # only:
+  #   - master@knot/knot-resolver
+  #   - tags
   before_script:
     - >
       docker buildx create
@@ -246,6 +246,8 @@ docker:build:cross-platform:
       --push
       --tag ${GITLAB_REGISTRY}:${CI_COMMIT_REF_NAME}
       .
+  after_script:
+    - docker buildx stop
 
 docker:test:cross-platform:
   <<: *docker
