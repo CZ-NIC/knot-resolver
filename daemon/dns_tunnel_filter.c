@@ -150,10 +150,6 @@ bool dns_tunnel_filter_request_begin(struct kr_request *req)
 	if (!req->current_query->sname)
 		return false;
 
-	// We only do this on pure UDP.  (also TODO if cookies get implemented)
-	const bool ip_validated = req->qsource.flags.tcp || req->qsource.flags.tls;
-	if (ip_validated) return false;
-
 	const uint32_t time_now = kr_now();
 	uint32_t price_scale_factor = (strlen((char *)req->current_query->sname) << 16)/ DNAME_SCALE_FACTOR;
 
