@@ -227,9 +227,9 @@ docker:build:
 docker:build:cross-platform:
   <<: *docker
   stage: build
-  # only:
-  #   - master-5@knot/knot-resolver
-  #   - tags
+  only:
+    - master-5@knot/knot-resolver
+    - tags
   before_script:
     - >
       docker buildx create
