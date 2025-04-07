@@ -116,6 +116,16 @@ class Server:
             )
         return Result.ok(None)
 
+    async def _deny_cache_garbage_collector_changes(
+        self, config_old: KresConfig, config_new: KresConfig
+    ) -> Result[None, str]:
+        if config_old.cache.garbage_collector != config_new.cache.garbage_collector:
+            return Result.err(
+                "/cache/garbage-collector/*: Changing configuration dynamically is not allowed."
+                " To change this configuration, you must edit the configuration file and restart the entire resolver."
+            )
+        return Result.ok(None)
+
     async def _reload_config(self) -> None:
         if self._config_path is None:
             logger.warning("The manager was started with inlined configuration - can't reload")
@@ -182,6 +192,7 @@ class Server:
         self._setup_routes()
         await self.runner.setup()
         await self.config_store.register_verifier(self._deny_management_changes)
+        await self.config_store.register_verifier(self._deny_cache_garbage_collector_changes)
         await self.config_store.register_on_change_callback(self._reconfigure)
 
     async def wait_for_shutdown(self) -> None:
