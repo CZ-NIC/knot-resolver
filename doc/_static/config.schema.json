@@ -1036,9 +1036,87 @@
                     "default": "100M"
                 },
                 "garbage-collector": {
-                    "type": "boolean",
+                    "anyOf": [
+                        {
+                            "description": "Configuration options of the cache garbage collector (kres-cache-gc).",
+                            "type": "object",
+                            "properties": {
+                                "interval": {
+                                    "type": "string",
+                                    "pattern": "^(\\d+)(us|ms|s|m|h|d)$",
+                                    "description": "Time interval how often the garbage collector will be run.",
+                                    "default": "1s"
+                                },
+                                "threshold": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 100,
+                                    "description": "Cache usage in percent that triggers the garbage collector.",
+                                    "default": 80
+                                },
+                                "release": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 100,
+                                    "description": "Percent of used cache to be freed by the garbage collector.",
+                                    "default": 10
+                                },
+                                "temp-keys-space": {
+                                    "type": "string",
+                                    "pattern": "^(\\d+)(B|K|M|G)$",
+                                    "description": "Maximum amount of temporary memory for copied keys (0 = unlimited).",
+                                    "default": "0M"
+                                },
+                                "rw-deletes": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "description": "Maximum number of deleted records per read-write transaction (0 = unlimited).",
+                                    "default": 100
+                                },
+                                "rw-reads": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "description": "Maximum number of readed records per read-write transaction (0 = unlimited).",
+                                    "default": 200
+                                },
+                                "rw-duration": {
+                                    "type": "string",
+                                    "pattern": "^(\\d+)(us|ms|s|m|h|d)$",
+                                    "description": "Maximum duration of read-write transaction (0 = unlimited).",
+                                    "default": "0us"
+                                },
+                                "rw-delay": {
+                                    "type": "string",
+                                    "pattern": "^(\\d+)(us|ms|s|m|h|d)$",
+                                    "description": "Wait time between two read-write transactions.",
+                                    "default": "0us"
+                                },
+                                "dry-run": {
+                                    "type": "boolean",
+                                    "description": "Run the garbage collector in dry-run mode.",
+                                    "default": false
+                                }
+                            }
+                        },
+                        {
+                            "type": "string",
+                            "enum": [
+                                false
+                            ]
+                        }
+                    ],
                     "description": "Use the garbage collector (kres-cache-gc) to periodically clear cache.",
-                    "default": true
+                    "default": {
+                        "interval": "1s",
+                        "threshold": 80,
+                        "release": 10,
+                        "temp_keys_space": "0M",
+                        "rw_deletes": 100,
+                        "rw_reads": 200,
+                        "rw_duration": "0us",
+                        "rw_delay": "0us",
+                        "dry_run": false
+                    }
                 },
                 "ttl-min": {
                     "type": "string",
@@ -1136,7 +1214,17 @@
             "default": {
                 "storage": "/var/cache/knot-resolver",
                 "size_max": "100M",
-                "garbage_collector": true,
+                "garbage_collector": {
+                    "interval": "1s",
+                    "threshold": 80,
+                    "release": 10,
+                    "temp_keys_space": "0M",
+                    "rw_deletes": 100,
+                    "rw_reads": 200,
+                    "rw_duration": "0us",
+                    "rw_delay": "0us",
+                    "dry_run": false
+                },
                 "ttl_min": "5s",
                 "ttl_max": "1d",
                 "ns_timeout": "1000ms",
