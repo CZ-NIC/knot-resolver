@@ -24,6 +24,7 @@ class DnssecSchema(ConfigSchema):
 
     ---
     enabled: Enable/disable DNSSEC.
+    log_bogus: Enable logging for each DNSSEC validation failure if '/logging/level' is set to at least 'notice'.
     sentinel: Allows users of DNSSEC validating resolver to detect which root keys are configured in resolver's chain of trust. (RFC 8509)
     signal_query: Signaling Trust Anchor Knowledge in DNSSEC Using Key Tag Query, according to (RFC 8145#section-5).
     trust_anchors_keep_removed: How many removed keys should be held in history (and key file) before being purged.
@@ -34,6 +35,7 @@ class DnssecSchema(ConfigSchema):
     """
 
     enabled: bool = True
+    log_bogus: bool = False
     sentinel: bool = True
     signal_query: bool = True
     trust_anchors_keep_removed: IntNonNegative = IntNonNegative(0)

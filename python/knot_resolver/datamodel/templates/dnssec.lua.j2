@@ -2,6 +2,13 @@
 
 {% if cfg.dnssec.enabled %}
 
+-- dnssec.logging-bogus
+{% if cfg.dnssec.log_bogus %}
+modules.load('bogus_log')
+{% else %}
+-- modules.unload('bogus_log')
+{% endif %}
+
 -- dnssec.sentinel
 {% if cfg.dnssec.sentinel %}
 modules.load('ta_sentinel')
