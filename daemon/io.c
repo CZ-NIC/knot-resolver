@@ -275,7 +275,7 @@ static void set_so(int fd, int so_option, int value, const char *descr)
 	}
 }
 
-int io_listen_udp(uv_loop_t *loop, uv_udp_t *handle, int fd)
+int io_listen_udp(uv_loop_t *loop, uv_udp_t *handle, int fd, bool doq)
 {
 	if (!handle) {
 		return kr_error(EINVAL);
@@ -292,7 +292,9 @@ int io_listen_udp(uv_loop_t *loop, uv_udp_t *handle, int fd)
 	uv_handle_t *h = (uv_handle_t *)handle;
 	check_bufsize(h);
 	/* Handle is already created, just create context. */
-	struct session2 *s = session2_new_io(h, KR_PROTO_UDP53, NULL, 0, false);
+	struct session2 *s = session2_new_io(h,
+			doq ? KR_PROTO_DOQ : KR_PROTO_UDP53,
+			NULL, 0, false);
 	kr_require(s);
 
 	int socklen = sizeof(union kr_sockaddr);
