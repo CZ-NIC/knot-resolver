@@ -1244,6 +1244,11 @@
                     "description": "Enable/disable DNSSEC.",
                     "default": true
                 },
+                "log-bogus": {
+                    "type": "boolean",
+                    "description": "Enable logging for each DNSSEC validation failure if '/logging/level' is set to at least 'notice'.",
+                    "default": false
+                },
                 "sentinel": {
                     "type": "boolean",
                     "description": "Allows users of DNSSEC validating resolver to detect which root keys are configured in resolver's chain of trust. (RFC 8509)",
@@ -1309,6 +1314,7 @@
             },
             "default": {
                 "enabled": true,
+                "log_bogus": false,
                 "sentinel": true,
                 "signal_query": true,
                 "trust_anchors_keep_removed": 0,
@@ -1457,11 +1463,6 @@
                     "description": "List of groups for which 'debug' logging level is set.",
                     "default": null
                 },
-                "dnssec-bogus": {
-                    "type": "boolean",
-                    "description": "Logging a message for each DNSSEC validation failure.",
-                    "default": false
-                },
                 "dnstap": {
                     "anyOf": [
                         {
@@ -1504,7 +1505,6 @@
                 "level": "notice",
                 "target": "stdout",
                 "groups": null,
-                "dnssec_bogus": false,
                 "dnstap": false
             }
         },

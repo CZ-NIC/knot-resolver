@@ -13,8 +13,8 @@ Add following line to your configuration file to enable it:
 
 .. code-block:: yaml
 
-   logging:
-      dnssec-bogus: true
+   dnssec:
+      log-bogus: true
 
 Example of error message logged:
 

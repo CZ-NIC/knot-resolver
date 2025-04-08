@@ -21,7 +21,8 @@ Incompatible changes
   - /dnssec: true|false -> /dnssec/enabled: true|false
   - /dnssec/keep-removed -> /dnssec/trust-anchors-keep-removed
   - /dnssec/trust-anchor-sentinel -> /dnssec/sentinel
-  - /dnssec/trust-anchor-signal-query -> /dnssec/signal-query 
+  - /dnssec/trust-anchor-signal-query -> /dnssec/signal-query
+  - /logging/dnssec-bogus -> /dnssec/log-bogus
   - /network/tls/files-watchdog -> /network/tls/watchdog
 
 
