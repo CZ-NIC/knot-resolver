@@ -1,17 +1,24 @@
 {% from 'macros/common_macros.lua.j2' import string_table %}
 
-{% if cfg.dns64 %}
--- load dns64 module
+{% if cfg.dns64.enabled %}
+
+-- Enable DNS64 by loading module
 modules.load('dns64')
 
--- dns64.prefix
+-- Configure DNS64 module
 dns64.config({
     prefix = '{{ cfg.dns64.prefix.to_std().network_address|string }}',
-{% if cfg.dns64.rev_ttl %}
-    rev_ttl = {{ cfg.dns64.rev_ttl.seconds() }},
+{% if cfg.dns64.reverse_ttl %}
+    rev_ttl = {{ cfg.dns64.reverse_ttl.seconds() }},
 {% endif %}
 {% if cfg.dns64.exclude_subnets %}
     exclude_subnets = {{ string_table(cfg.dns64.exclude_subnets) }},
 {% endif %}
 })
+
+{% else %}
+
+-- Disable DNS64 by unloading module
+-- modules.unload('dns64')
+
 {% endif %}
