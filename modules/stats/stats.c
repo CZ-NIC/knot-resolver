@@ -263,8 +263,7 @@ static int collect(kr_layer_t *ctx)
 	/* Count cached and unresolved */
 	if (rplan->resolved.len > 0) {
 		/* Histogram of answer latency. */
-		struct kr_query *first = rplan->resolved.at[0];
-		uint64_t elapsed = kr_now() - first->timestamp_mono;
+		uint64_t elapsed = kr_now() - rplan->initial->creation_time_mono;
 		stat_const_add(data, metric_answer_sum_ms, elapsed);
 		if (elapsed <= 1) {
 			stat_const_add(data, metric_answer_1ms, 1);
