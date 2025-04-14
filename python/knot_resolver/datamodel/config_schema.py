@@ -102,7 +102,7 @@ class KresConfig(ConfigSchema):
         fallback: Config for fallback on resolution failure.
         cache: DNS resolver cache configuration.
         dnssec: DNSSEC configuration.
-        dns64: Disable DNS64 (RFC 6147), enable with defaults or set new configuration.
+        dns64: DNS64 (RFC 6147) configuration.
         logging: Logging and debugging configuration.
         monitoring: Metrics exposisition configuration (Prometheus, Graphite)
         lua: Custom Lua configuration.
@@ -124,7 +124,7 @@ class KresConfig(ConfigSchema):
         fallback: FallbackSchema = FallbackSchema()
         cache: CacheSchema = lazy_default(CacheSchema, {})
         dnssec: DnssecSchema = DnssecSchema()
-        dns64: Union[bool, Dns64Schema] = False
+        dns64: Dns64Schema = Dns64Schema()
         logging: LoggingSchema = LoggingSchema()
         monitoring: MonitoringSchema = MonitoringSchema()
         rate_limiting: Optional[RateLimitingSchema] = None
@@ -146,7 +146,7 @@ class KresConfig(ConfigSchema):
     fallback: FallbackSchema
     cache: CacheSchema
     dnssec: DnssecSchema
-    dns64: Union[Literal[False], Dns64Schema]
+    dns64: Dns64Schema
     logging: LoggingSchema
     monitoring: MonitoringSchema
     rate_limiting: Optional[RateLimitingSchema]
@@ -168,11 +168,6 @@ class KresConfig(ConfigSchema):
                 "The number of workers can be configured manually in 'workers' option."
             )
         return obj.workers
-
-    def _dns64(self, obj: Raw) -> Any:
-        if obj.dns64 is True:
-            return Dns64Schema()
-        return obj.dns64
 
     def _validate(self) -> None:
         # warn about '/management/unix-socket' not located in '/rundir'
