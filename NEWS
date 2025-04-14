@@ -32,6 +32,8 @@ Incompatible changes
   - /workers-max
 - Renamed/moved options in the declarative configuration model (YAML).
   - /network/tls/files-watchdog -> /network/tls/watchdog
+  - /dns64: true -> /dns64/enabled: true
+  - /dns64/rev-ttl -> /dns64/reverse-ttl
   - /dnssec/keep-removed -> /dnssec/trust-anchors-keep-removed
   - /dnssec/trust-anchor-sentinel -> /dnssec/sentinel
   - /dnssec/trust-anchor-signal-query -> /dnssec/signal-query 
