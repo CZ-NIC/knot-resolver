@@ -50,7 +50,7 @@ def test_config_defaults():
     config = KresConfig()
 
     # DNS64 default
-    assert config.dns64 == False
+    assert config.dns64.enabled == False
 
 
 def test_dnssec_false():
@@ -73,7 +73,10 @@ def test_dnssec_default_true():
 
 
 def test_dns64_prefix_default():
-    assert str(KresConfig({"dns64": True}).dns64.prefix) == "64:ff9b::/96"
+    config = KresConfig({"dns64": {"enabled": True}})
+
+    assert config.dns64.enabled == True
+    assert str(config.dns64.prefix) == "64:ff9b::/96"
 
 
 def test_config_json_schema():

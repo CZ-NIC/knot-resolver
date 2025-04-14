@@ -14,14 +14,16 @@ By default, the well-known prefix ``64:ff9b::/96`` is used.
 
 .. code-block:: yaml
 
-    dns64: true
+   dns64:
+     enabled: true
 
 It is also possible to configure own prefix.
 
 .. code-block:: yaml
 
-    dns64:
-      prefix: 2001:db8::aabb:0:0/96
+   dns64:
+     enabled: true
+     prefix: 2001:db8::aabb:0:0/96
 
 .. warning::
 
@@ -39,18 +41,20 @@ TTL in CNAME generated in the reverse ``ip6.arpa.`` subtree is configurable.
 
 .. code-block:: yaml
 
-    dns64:
-      prefix: 2001:db8:77ff::/96
-      ttl-reverse: 300s
+   dns64:
+     enable: true
+     prefix: 2001:db8:77ff::/96
+     reverse-ttl: 300s
 
 You can specify a set of IPv6 subnets that are disallowed in answer.
 If they appear, they will be replaced by AAAAs generated from As.
 
 .. code-block:: yaml
 
-    dns64:
-      prefix: 2001:db8:3::/96
-      exclude: [2001:db8:888::/48, '::ffff/96']
+   dns64:
+     enable: true
+     prefix: 2001:db8:3::/96
+     exclude: [2001:db8:888::/48, '::ffff/96']
 
     # You could even pass '::/0' to always force using generated AAAAs.
 
