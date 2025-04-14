@@ -1324,44 +1324,46 @@
             }
         },
         "dns64": {
-            "anyOf": [
-                {
-                    "type": "boolean"
+            "description": "DNS64 (RFC 6147) configuration.",
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "description": "Enable/disable DNS64.",
+                    "default": false
                 },
-                {
-                    "description": "DNS64 (RFC 6147) configuration.",
-                    "type": "object",
-                    "properties": {
-                        "prefix": {
-                            "type": "string",
-                            "description": "IPv6 prefix to be used for synthesizing AAAA records.",
-                            "default": "64:ff9b::/96"
-                        },
-                        "rev-ttl": {
-                            "type": [
-                                "string",
-                                "null"
-                            ],
-                            "pattern": "^(\\d+)(us|ms|s|m|h|d)$",
-                            "description": "TTL in CNAME generated in the reverse 'ip6.arpa.' subtree.",
-                            "default": null
-                        },
-                        "exclude-subnets": {
-                            "type": [
-                                "array",
-                                "null"
-                            ],
-                            "items": {
-                                "type": "string"
-                            },
-                            "description": "IPv6 subnets that are disallowed in answer.",
-                            "default": null
-                        }
-                    }
+                "prefix": {
+                    "type": "string",
+                    "description": "IPv6 prefix to be used for synthesizing AAAA records.",
+                    "default": "64:ff9b::/96"
+                },
+                "reverse-ttl": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "pattern": "^(\\d+)(us|ms|s|m|h|d)$",
+                    "description": "TTL in CNAME generated in the reverse 'ip6.arpa.' subtree.",
+                    "default": null
+                },
+                "exclude-subnets": {
+                    "type": [
+                        "array",
+                        "null"
+                    ],
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "IPv6 subnets that are disallowed in answer.",
+                    "default": null
                 }
-            ],
-            "description": "Disable DNS64 (RFC 6147), enable with defaults or set new configuration.",
-            "default": false
+            },
+            "default": {
+                "enabled": false,
+                "prefix": "64:ff9b::/96",
+                "reverse_ttl": null,
+                "exclude_subnets": null
+            }
         },
         "logging": {
             "description": "Logging and debugging configuration.",
