@@ -262,8 +262,14 @@ static int collect(kr_layer_t *ctx)
 	collect_answer(data, param->answer);
 	/* Count cached and unresolved */
 	if (rplan->resolved.len > 0) {
-		/* Histogram of answer latency. */
+		/* Histogram of answer latency.
+		 *
+		 * We update the notion of time.  Once per .finish isn't that expensive.
+		 * defer_* also updates this if active, but not in ideal moment for stats.
+		 */
+		uv_update_time(uv_default_loop());
 		uint64_t elapsed = kr_now() - rplan->initial->creation_time_mono;
+
 		stat_const_add(data, metric_answer_sum_ms, elapsed);
 		if (elapsed <= 1) {
 			stat_const_add(data, metric_answer_1ms, 1);

@@ -157,6 +157,8 @@ static struct kr_query *kr_rplan_push_query(struct kr_rplan *rplan,
 	qry->request = rplan->request;
 
 	gettimeofday(&qry->timestamp, NULL);
+	if (!parent)  // start of kr_request; let's make the stamp more precise
+		uv_update_time(uv_default_loop());
 	qry->timestamp_mono = kr_now();
 	qry->creation_time_mono = parent ? parent->creation_time_mono : qry->timestamp_mono;
 	kr_zonecut_init(&qry->zone_cut, (const uint8_t *)"", rplan->pool);
