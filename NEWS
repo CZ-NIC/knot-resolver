@@ -18,6 +18,8 @@ Incompatible changes
   - /network/tls/auto-discovery
   - /webmgmt
 - Renamed/moved options in the declarative configuration model (YAML).
+  - /defer/* -> /prioritization/*
+  - /defer/log-period -> /prioritization/logging-period
   - /dns64: true|false -> /dns64/enabled: true|false
   - /dns64/rev-ttl -> /dns64/reverse-ttl
   - /dnssec: true|false -> /dnssec/enabled: true|false
