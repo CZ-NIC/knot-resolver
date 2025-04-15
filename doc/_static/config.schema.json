@@ -1582,27 +1582,33 @@
         },
         "rate-limiting": {
             "description": "Configuration of rate limiting.",
-            "type": [
-                "object",
-                "null"
-            ],
+            "type": "object",
             "properties": {
-                "capacity": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "description": "Expected maximal number of blocked networks/hosts at the same time.",
-                    "default": 524288
+                "enabled": {
+                    "type": "boolean",
+                    "description": "Enable/disable rate limiting",
+                    "default": false
                 },
                 "rate-limit": {
-                    "type": "integer",
+                    "type": [
+                        "integer",
+                        "null"
+                    ],
                     "minimum": 1,
-                    "description": "Maximal number of allowed queries per second from a single host."
+                    "description": "Maximal number of allowed queries per second from a single host.",
+                    "default": null
                 },
                 "instant-limit": {
                     "type": "integer",
                     "minimum": 1,
                     "description": "Maximal number of allowed queries at a single point in time from a single host.",
                     "default": 50
+                },
+                "capacity": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Expected maximal number of blocked networks/hosts at the same time.",
+                    "default": 524288
                 },
                 "slip": {
                     "type": "integer",
@@ -1623,7 +1629,15 @@
                     "default": false
                 }
             },
-            "default": null
+            "default": {
+                "enabled": false,
+                "rate_limit": null,
+                "instant_limit": 50,
+                "capacity": 524288,
+                "slip": 2,
+                "log_period": "0s",
+                "dry_run": false
+            }
         },
         "prioritization": {
             "description": "Configuration of request prioritization (defer).",
