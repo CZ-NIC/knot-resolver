@@ -31,6 +31,8 @@ Incompatible changes
   - /webmgmt
   - /workers-max
 - Renamed/moved options in the declarative configuration model (YAML).
+  - /defer/* -> /prioritization/*
+  - /defer/log-period -> /defer/logging-period
   - /network/tls/files-watchdog -> /network/tls/watchdog
   - /dns64: true -> /dns64/enabled: true
   - /dns64/rev-ttl -> /dns64/reverse-ttl
