@@ -1625,16 +1625,16 @@
             },
             "default": null
         },
-        "defer": {
+        "prioritization": {
             "description": "Configuration of request prioritization (defer).",
             "type": "object",
             "properties": {
                 "enabled": {
                     "type": "boolean",
-                    "description": "Use request prioritization.",
+                    "description": "Enable/disable request prioritization.",
                     "default": false
                 },
-                "log-period": {
+                "logging-period": {
                     "type": "string",
                     "pattern": "^(\\d+)(us|ms|s|m|h|d)$",
                     "description": "Minimal time between two log messages, or '0s' to disable.",
@@ -1643,7 +1643,7 @@
             },
             "default": {
                 "enabled": false,
-                "log_period": "0s"
+                "logging_period": "0s"
             }
         },
         "lua": {
