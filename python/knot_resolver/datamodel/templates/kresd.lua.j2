@@ -43,8 +43,8 @@ nsid.name('{{ cfg.nsid }}' .. worker.id)
 -- RATE-LIMITING section ------------------------------------
 {% include "rate_limiting.lua.j2" %}
 
--- DEFER section ------------------------------------
-{% include "defer.lua.j2" %}
+-- PRIORITIZATION section ------------------------------------
+{% include "prioritization.lua.j2" %}
 
 {% endif %}
 

@@ -128,9 +128,9 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                 config.dns64,
                 config.logging,
                 config.monitoring,
-                config.lua,
                 config.rate_limiting,
-                config.defer,
+                config.prioritization,
+                config.lua,
             ]
 
         # register and immediately call a verifier that validates config with 'canary' kresd process
@@ -225,7 +225,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                     os.unlink(str(_old.rundir) + "/ratelimiting")
                 except FileNotFoundError:
                     pass
-            if _old.workers != new.workers or _old.defer != new.defer:
+            if _old.workers != new.workers or _old.prioritization != new.prioritization:
                 logger.debug("Unlinking shared defer memory")
                 try:
                     os.unlink(str(_old.rundir) + "/defer")
