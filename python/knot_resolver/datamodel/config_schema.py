@@ -125,7 +125,7 @@ class KresConfig(ConfigSchema):
         dns64: Dns64Schema = Dns64Schema()
         logging: LoggingSchema = LoggingSchema()
         monitoring: MonitoringSchema = MonitoringSchema()
-        rate_limiting: Optional[RateLimitingSchema] = None
+        rate_limiting: RateLimitingSchema = RateLimitingSchema()
         prioritization: PrioritizationSchema = PrioritizationSchema()
         lua: LuaSchema = LuaSchema()
 
@@ -146,7 +146,7 @@ class KresConfig(ConfigSchema):
     dns64: Dns64Schema
     logging: LoggingSchema
     monitoring: MonitoringSchema
-    rate_limiting: Optional[RateLimitingSchema]
+    rate_limiting: RateLimitingSchema
     prioritization: PrioritizationSchema
     lua: LuaSchema
 
