@@ -1,12 +1,15 @@
 {% from 'macros/common_macros.lua.j2' import boolean %}
 
-{% if cfg.rate_limiting.rate_limit is defined and cfg.rate_limiting.rate_limit -%}
-assert(C.ratelimiting_init(
-	'{{ cfg.rundir }}/ratelimiting',
-	{{ cfg.rate_limiting.capacity }},
-	{{ cfg.rate_limiting.instant_limit }},
-	{{ cfg.rate_limiting.rate_limit }},
-	{{ cfg.rate_limiting.slip }},
-	{{ cfg.rate_limiting.log_period.millis() }},
-	{{ boolean(cfg.rate_limiting.dry_run) }}) == 0)
-{%- endif %}
+{% if cfg.rate_limiting.enabled %}
+assert(
+    C.ratelimiting_init(
+        '{{ cfg.rundir }}/ratelimiting',
+        {{ cfg.rate_limiting.capacity }},
+        {{ cfg.rate_limiting.instant_limit }},
+        {{ cfg.rate_limiting.rate_limit }},
+        {{ cfg.rate_limiting.slip }},
+        {{ cfg.rate_limiting.log_period.millis() }},
+        {{ boolean(cfg.rate_limiting.dry_run) }}
+    ) == 0
+)
+{% endif %}
