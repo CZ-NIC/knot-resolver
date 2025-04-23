@@ -5,6 +5,7 @@ Bugfixes
 --------
 - /management/unix-socket: revert to absolute path (#926, !1664)
 - fix `tags` when used in /local-data/rules/*/records (!1670)
+- stats: request latency was very incorrect in some cases (!1676)
 
 Improvements
 ------------
