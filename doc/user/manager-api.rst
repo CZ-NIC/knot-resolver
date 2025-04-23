@@ -12,7 +12,7 @@ See the :ref:`overview <manager-api-overview>` section below.
 
 You can use HTTP API to dynamically change configuration of already running Knot Resolver.
 By default the API is configured as UNIX domain socket located in the resolver's rundir ``/run/knot-resolver/kres-api.sock``.
-This socket is used by ``kresctl`` utility in default.
+This socket is used by ``kresctl`` utility by default.
 
 What can the API do?
 --------------------

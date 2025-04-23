@@ -230,7 +230,7 @@ Tarball
 
 Released tarballs are available from `<https://knot-resolver.cz/download/>`_
 
-To make a release tarball from git, use the following command. The
+To make a release tarball from git, use the following command:
 
 .. code-block:: bash
 
@@ -261,7 +261,7 @@ Recommended build options for packagers:
 Systemd
 -------
 
-It's recommended to use the upstream system unit files. If any customizations
+It's recommended to use the upstream systemd unit files. If any customizations
 are required, drop-in files should be used, instead of patching/changing the
 unit files themselves.
 

@@ -16,7 +16,7 @@ Advantage of using multiple workers is that a problem in a single worker will no
 
    For maximum performance, there should be as many worker processes as there are available CPU threads.
 
-To run multiple workers, configure its number in configuration file.
+To run multiple workers, configure their number in configuration file.
 
 .. code-block:: yaml
 
