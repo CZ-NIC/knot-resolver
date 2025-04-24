@@ -1,6 +1,12 @@
 Knot Resolver 6.0.12 (2025-0m-dd)
 =================================
 
+Security
+--------
+- DoS: fix rare crashes with either of the lines below (!1682)
+  [system] requirement "h && h->end > h->begin" failed in queue_pop_impl
+  [system] requirement "val == task" failed in session2_tasklist_del
+
 Bugfixes
 --------
 - daemon: fix DoH with multiple "parallel" queries in one connection (#931, !1677)

@@ -732,7 +732,14 @@ static int send_waiting(struct session2 *session)
 			session2_close(session);
 			break;
 		}
-		session2_waitinglist_pop(session, true);
+		// Let's be a bit defensive and check that nothing's changed before _pop()
+		// and recover if it has, as qr_task_send() is rather complex.
+		// TODO: fully analyze why the waitinglist could get empty here.
+		if (session2_waitinglist_get(session) == t) {
+			session2_waitinglist_pop(session, true);
+		} else { // a normal assertion could kr_error_log() too much in some rarer cases
+			VERBOSE_MSG(NULL, "soft assertion: waitinglist mismatch in send_waiting()\n");
+		}
 	} while (!session2_waitinglist_is_empty(session));
 	defer_sample_stop(&defer_prev_sample_state, true);
 
@@ -2030,7 +2037,7 @@ static enum protolayer_event_cb_result pl_dns_stream_disconnected(
 	while (!session2_waitinglist_is_empty(session)) {
 		struct qr_task *task = session2_waitinglist_pop(session, false);
 		kr_assert(task->refs > 1);
-		session2_tasklist_del(session, task);
+
 		if (session->outgoing) {
 			if (task->ctx->req.options.FORWARD) {
 				/* We are in TCP_FORWARD mode.

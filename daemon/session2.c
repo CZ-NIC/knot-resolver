@@ -1046,7 +1046,8 @@ int session2_tasklist_del(struct session2 *session, struct qr_task *task)
 	}
 	int ret = trie_del(t, key, key_len, &val);
 	if (ret == KNOT_EOK) {
-		kr_require(val == task);
+		if (kr_fails_assert(val == task)) // internal inconsistency in tasklist
+			return kr_error(EINVAL);
 		worker_task_unref(val);
 	}
 	return ret;
