@@ -1,6 +1,11 @@
 Knot Resolver 5.7.5 (2025-0m-dd)
 ================================
 
+Security
+--------
+- DoS: fix unconfirmed crashes with the line below (!1683)
+  [system] requirement "h && h->end > h->begin" failed in queue_pop_impl
+
 Improvements
 ------------
 - tests: disable problematic config.http test (#925, !1678)
