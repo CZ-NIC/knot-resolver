@@ -266,13 +266,7 @@ are required, drop-in files should be used, instead of patching/changing the
 unit files themselves.
 
 To install systemd unit files, use the ``-Dsystemd_files=enabled`` build option.
-
-To support enabling services after boot, you must also link ``kresd.target`` to
-``multi-user.target.wants``:
-
-.. code-block:: bash
-
-   ln -s ../kresd.target /usr/lib/systemd/system/multi-user.target.wants/kresd.target
+You can enable autostart of Knot Resolver by ``systemctl enable knot-resolver.service``.
 
 Trust anchors
 -------------
