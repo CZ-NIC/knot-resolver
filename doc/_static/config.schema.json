@@ -1,8 +1,8 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$id": "https://www.knot-resolver.cz/documentation/v6.0.11/_static/config.schema.json",
+    "$id": "https://www.knot-resolver.cz/documentation/v6.0.12/_static/config.schema.json",
     "title": "Knot Resolver configuration JSON schema",
-    "description": "Version Knot Resolver 6.0.11",
+    "description": "Version Knot Resolver 6.0.12",
     "type": "object",
     "properties": {
         "version": {
