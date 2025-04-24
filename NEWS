@@ -3,6 +3,7 @@ Knot Resolver 6.0.12 (2025-0m-dd)
 
 Bugfixes
 --------
+- daemon: fix DoH with multiple "parallel" queries in one connection (#931, !1677)
 - /management/unix-socket: revert to absolute path (#926, !1664)
 - fix `tags` when used in /local-data/rules/*/records (!1670)
 - stats: request latency was very incorrect in some cases (!1676)

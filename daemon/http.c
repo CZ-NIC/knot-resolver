@@ -72,7 +72,9 @@ struct pl_http_sess_data {
 	struct protolayer_data h;
 	struct nghttp2_session *h2;
 
-	queue_http_stream streams;  /* Streams present in the wire buffer. */
+	/** Info about streams pending for kr_request creation. */
+	queue_http_stream streams;
+
 	trie_t *stream_write_queues;  /* Dictionary of stream data that needs to be freed after write. */
 	int32_t incomplete_stream;
 	int32_t last_stream;   /* The last used stream - mostly the same as incomplete_stream, but can be used after
@@ -912,12 +914,12 @@ static int pl_http_sess_deinit(struct session2 *session, void *data)
 		http_free_headers(stream->headers);
 		queue_pop(http->streams);
 	}
+	queue_deinit(http->streams);
 
 	trie_apply(http->stream_write_queues, stream_write_data_break_err, NULL);
 	trie_free(http->stream_write_queues);
 
 	http_cleanup_stream(http);
-	queue_deinit(http->streams);
 	wire_buf_deinit(&http->wire_buf);
 	nghttp2_session_del(http->h2);
 
@@ -989,8 +991,8 @@ static enum protolayer_iter_cb_result pl_http_wrap(
 	prov.read_callback = read_callback;
 
 	struct pl_http_sess_data *http = sess_data;
-	int32_t stream_id = http->last_stream;
-	int ret = http_send_response(sess_data, stream_id, &prov, HTTP_STATUS_OK);
+	int32_t stream_id = ctx->req->qsource.stream_id;
+	int ret = http_send_response(http, stream_id, &prov, HTTP_STATUS_OK);
 	if (ret)
 		return protolayer_break(ctx, ret);
 
@@ -1022,10 +1024,11 @@ static void pl_http_request_init(struct session2 *session,
 	struct http_stream *stream = &queue_head(http->streams);
 	req->qsource.stream_id = stream->id;
 	if (stream->headers) {
+		// the request takes ownership of the referred-to memory
 		req->qsource.headers = *stream->headers;
 		free(stream->headers);
-		stream->headers = NULL;
 	}
+	queue_pop(http->streams);
 }
 
 __attribute__((constructor))

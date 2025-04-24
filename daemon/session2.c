@@ -612,7 +612,7 @@ static int session2_submit(
 		struct session2 *session,
 		enum protolayer_direction direction, size_t layer_ix,
 		struct protolayer_payload payload, const struct comm_info *comm,
-		protolayer_finished_cb cb, void *baton)
+		struct kr_request *req, protolayer_finished_cb cb, void *baton)
 {
 	if (session->closing)
 		return kr_error(ECANCELED);
@@ -647,6 +647,7 @@ static int session2_submit(
 		.direction = direction,
 		.layer_ix = layer_ix,
 		.session = session,
+		.req = req,
 		.finished_cb = cb,
 		.finished_cb_baton = baton
 	};
@@ -1259,7 +1260,7 @@ int session2_unwrap(struct session2 *s, struct protolayer_payload payload,
                     void *baton)
 {
 	return session2_submit(s, PROTOLAYER_UNWRAP,
-			0, payload, comm, cb, baton);
+			0, payload, comm, NULL/*req*/, cb, baton);
 }
 
 int session2_unwrap_after(struct session2 *s, enum protolayer_type protocol,
@@ -1272,16 +1273,16 @@ int session2_unwrap_after(struct session2 *s, enum protolayer_type protocol,
 	if (kr_fails_assert(ok)) // not found or "last layer"
 		return kr_error(EINVAL);
 	return session2_submit(s, PROTOLAYER_UNWRAP,
-			layer_ix + 1, payload, comm, cb, baton);
+			layer_ix + 1, payload, comm, NULL/*req*/, cb, baton);
 }
 
 int session2_wrap(struct session2 *s, struct protolayer_payload payload,
-                  const struct comm_info *comm, protolayer_finished_cb cb,
-                  void *baton)
+                  const struct comm_info *comm, struct kr_request *req,
+		  protolayer_finished_cb cb, void *baton)
 {
 	return session2_submit(s, PROTOLAYER_WRAP,
 			protolayer_grps[s->proto].num_layers - 1,
-			payload, comm, cb, baton);
+			payload, comm, req, cb, baton);
 }
 
 int session2_wrap_after(struct session2 *s, enum protolayer_type protocol,
@@ -1293,7 +1294,7 @@ int session2_wrap_after(struct session2 *s, enum protolayer_type protocol,
 	if (kr_fails_assert(layer_ix > 0)) // not found or "last layer"
 		return kr_error(EINVAL);
 	return session2_submit(s, PROTOLAYER_WRAP, layer_ix - 1,
-			payload, comm, cb, baton);
+			payload, comm, NULL/*req*/, cb, baton);
 }
 
 static void session2_event_wrap(struct session2 *s, enum protolayer_event_type event, void *baton)
@@ -1644,8 +1645,8 @@ static int session2_transport_pushv(struct session2 *s,
 		}
 		int ret = session2_wrap(parent,
 				protolayer_payload_iovec(iov, iovcnt, iov_short_lived),
-				comm, session2_transport_parent_pushv_finished,
-				ctx);
+				comm, NULL/*req*/,
+			  	session2_transport_parent_pushv_finished, ctx);
 		return (ret < 0) ? ret : kr_ok();
 
 	default:
