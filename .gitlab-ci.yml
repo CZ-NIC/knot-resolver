@@ -20,7 +20,7 @@ variables:
   # IMAGE_TAG is a Git branch/tag name from https://gitlab.nic.cz/knot/knot-resolver-ci
   # In general, keep it pointing to a tag - use a branch only for development.
   # More info in the knot-resolver-ci repository.
-  IMAGE_TAG: 'v20240506'
+  IMAGE_TAG: 'v20250324'
   IMAGE_PREFIX: '$CI_REGISTRY/knot/knot-resolver-ci'
 
 image: $IMAGE_PREFIX/debian12-knot_3_3:$IMAGE_TAG
@@ -325,12 +325,10 @@ trivial_checks: # aggregated to save some processing
     - ci/no_assert_check.sh
     - ci/deckard_commit_check.sh
 
-lint:other:
+lint:luacheck:
   <<: *sanity
   script:
     - meson build_ci_lint &>/dev/null
-    - ninja -C build_ci* pylint
-    - ninja -C build_ci* flake8
     - ninja -C build_ci* luacheck
 
 lint:pedantic:
@@ -873,6 +871,10 @@ pkg:make-archive:
     - apkg build-dep
     - apkg make-archive
 
+pkg:debian-13:
+  <<: *pkg_test_deb
+  image: $CI_REGISTRY/packaging/apkg/full/debian-13
+
 pkg:debian-12:
   <<: *pkg_test_deb
   <<: *enable_repo_build
@@ -882,6 +884,10 @@ pkg:debian-11:
   <<: *pkg_test_deb
   <<: *enable_repo_build
   image: $CI_REGISTRY/packaging/apkg/full/debian-11
+
+pkg:ubuntu-25.04:
+  <<: *pkg_test_deb
+  image: $CI_REGISTRY/packaging/apkg/full/ubuntu-25.04
 
 pkg:ubuntu-24.04:
   <<: *pkg_test_deb

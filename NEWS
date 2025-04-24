@@ -5,6 +5,15 @@ Bugfixes
 --------
 - daemon/http: DoH stream got stuck after returning an error code (!1652)
 
+Improvements
+------------
+- tests: disable problematic config.http test (#925, !1678)
+- validator: accept a confusing NODATA proof with insecure delegation (!1678)
+
+Bugfixes
+--------
+- stats: request latency was very incorrect in some cases (!1678)
+
 
 Knot Resolver 5.7.4 (2024-07-23)
 ================================

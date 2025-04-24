@@ -161,10 +161,16 @@ int kr_nsec_bitmap_nodata_check(const uint8_t *bm, uint16_t bm_size, uint16_t ty
 		break;
 	default:
 		/* Parent-side delegation record isn't authoritative for non-DS;
-		 * see RFC6840 4.1. */
+		 * see RFC6840 4.1.
+		 *
+		 * Additionally, we signal if the NODATA would belong
+		 * to an *insecure* child zone.
+		 */
 		if (dnssec_nsec_bitmap_contains(bm, bm_size, KNOT_RRTYPE_NS)
 		    && !dnssec_nsec_bitmap_contains(bm, bm_size, KNOT_RRTYPE_SOA)) {
-			return NO_PROOF;
+			return dnssec_nsec_bitmap_contains(bm, bm_size, KNOT_RRTYPE_DS)
+				? NO_PROOF
+				: KNOT_EDOWNGRADED;
 		}
 		/* LATER(opt): perhaps short-circuit test if we repeat it here. */
 	}
@@ -218,9 +224,12 @@ int kr_nsec_negative(const ranked_rr_array_t *rrrs, uint32_t qry_uid,
 			&& kr_rank_test(rrrs->at[i]->rank, KR_RANK_SECURE);
 		if (!ok) continue;
 		const int covers = nsec_covers(nsec, sname);
-		if (covers == abs(EEXIST)
-		    && no_data_response_check_rrtype(nsec, stype) == 0) {
-			return PKT_NODATA; // proven NODATA by matching NSEC
+		if (covers == abs(EEXIST)) {
+			int ret = no_data_response_check_rrtype(nsec, stype);
+			if (ret == 0)
+				return PKT_NODATA; // proven NODATA by matching NSEC
+			if (ret == KNOT_EDOWNGRADED)
+				return ret;
 		}
 		if (covers != 0) continue;
 

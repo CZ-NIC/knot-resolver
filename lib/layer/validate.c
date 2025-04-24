@@ -144,8 +144,6 @@ do_downgrade: // we do this deep inside calls because of having signer name avai
 	return true;
 }
 
-#define KNOT_EDOWNGRADED (KNOT_ERROR_MIN - 1)
-
 static int validate_section(kr_rrset_validation_ctx_t *vctx, struct kr_query *qry,
 			    knot_mm_t *pool)
 {
@@ -1271,6 +1269,12 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 					 * we must continue, validate NSEC\NSEC3 and
 					 * call update_parent_keys() to mark
 					 * parent queries as insecure */
+				} else if (ret == KNOT_EDOWNGRADED) { // either NSEC3 or NSEC
+					VERBOSE_MSG(qry, "<= DNSSEC downgraded by a weird proof confusing NODATA with insecure delegation\n");
+					qry->flags.DNSSEC_WANT = false;
+					qry->flags.DNSSEC_INSECURE = true;
+					rank_records(qry, true, KR_RANK_INSECURE, qry->sname);
+					mark_insecure_parents(qry);
 				} else {
 					VERBOSE_MSG(qry, "<= bad NODATA proof\n");
 					kr_request_set_extended_error(req, KNOT_EDNS_EDE_NSEC_MISS, "AHXI");
