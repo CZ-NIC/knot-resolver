@@ -828,7 +828,15 @@ struct session2 {
 
 	uv_timer_t timer; /**< For session-wide timeout events. */
 	enum protolayer_event_type timer_event; /**< The event fired on timeout. */
-	trie_t *tasks; /**< List of tasks associated with given session. */
+
+ 	/** List of tasks where an unreplied query has been sent over this session.
+	 *
+	 * Use session2_tasklist_*() functions to manipulate this.
+	 *
+	 * In outgoing sessions the tasks are organized by message ID of the unreplied query.
+	 */
+	trie_t *tasks;
+
 	queue_t(struct qr_task *) waiting; /**< List of tasks waiting for
 	                                    * sending to upstream. */
 	struct wire_buf wire_buf;

@@ -2037,7 +2037,7 @@ static enum protolayer_event_cb_result pl_dns_stream_disconnected(
 	while (!session2_waitinglist_is_empty(session)) {
 		struct qr_task *task = session2_waitinglist_pop(session, false);
 		kr_assert(task->refs > 1);
-		session2_tasklist_del(session, task);
+
 		if (session->outgoing) {
 			if (task->ctx->req.options.FORWARD) {
 				/* We are in TCP_FORWARD mode.
