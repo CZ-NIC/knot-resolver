@@ -251,7 +251,11 @@ struct kr_request {
 		uint32_t price_factor16;
 		size_t size; /**< query packet size */
 		int32_t stream_id; /**< HTTP/2 stream ID for DoH requests */
-		kr_http_header_array_t headers;  /**< HTTP/2 headers for DoH requests */
+  		/** HTTP/2 headers for DoH requests
+		 *
+		 * Note that this owns malloc-ed memory inside (outside ->pool).
+		 */
+		kr_http_header_array_t headers;
 	} qsource;
 	struct {
 		unsigned rtt;                  /**< Current upstream RTT */

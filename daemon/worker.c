@@ -667,7 +667,7 @@ static int qr_task_send(struct qr_task *task, struct session2 *session,
 	struct protolayer_payload payload = protolayer_payload_buffer(
 			(char *)pkt->wire, pkt->size, false);
 	payload.ttl = packet_ttl(pkt);
-	ret = session2_wrap(session, payload, comm, qr_task_wrap_finished, task);
+	ret = session2_wrap(session, payload, comm, &task->ctx->req, qr_task_wrap_finished, task);
 
 	if (ret >= 0) {
 		session2_touch(session);

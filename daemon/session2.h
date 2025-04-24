@@ -441,6 +441,10 @@ struct protolayer_iter_ctx {
 	 * automatically - layers may use it to allocate memory. */
 	knot_mm_t pool;
 
+	/** Careful!  It's only present sometimes and read-only really.
+	 * TODO: maybe a better mechanism should be designed instead of this. */
+	struct kr_request *req;
+
 /* callback for when the layer iteration has ended - read-only for layers: */
 	protolayer_finished_cb finished_cb;
 	void *finished_cb_baton;
@@ -1087,8 +1091,8 @@ int session2_unwrap_after(struct session2 *s, enum protolayer_type protocol,
  * Returns one of `enum protolayer_ret` or a negative number
  * indicating an error. */
 int session2_wrap(struct session2 *s, struct protolayer_payload payload,
-                  const struct comm_info *comm, protolayer_finished_cb cb,
-                  void *baton);
+                  const struct comm_info *comm, struct kr_request *req,
+		  protolayer_finished_cb cb, void *baton);
 
 /** Same as `session2_wrap`, but looks up the specified `protocol` in the
  * session's assigned protocol group and sends the `payload` to the layer that
