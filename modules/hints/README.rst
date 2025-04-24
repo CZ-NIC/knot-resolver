@@ -101,6 +101,7 @@ Properties
 .. function:: hints.root_file(path)
 
   Replace current root hints from a zonefile.  If the path is omitted, the compiled-in path is used, i.e. the root hints are reset to the default.
+  Otherwise it's the same as the following option.
 
 .. function:: hints.root(root_hints)
 
@@ -109,8 +110,14 @@ Properties
 
   Replace current root hints and return the current table of root hints.
 
-  These root hints are only used as fallback when addresses of ``NS .`` aren't available,
-  e.g. when cache is completely clear.
+  If a resolver is not set up to forward requests, it must have some method of locating root servers.
+  This is typically done by using a predefined list of root server addresses,
+  referred to as SBELT in :rfc:`1034`, which acts as a fallback.
+
+  Knot Resolver includes an up-to-date list by default, since root server addresses very rarely change.
+  However, this default can be overridden at ``configure`` time (``root_hints`` meson option),
+  and you can also override it via ``hints.root(..)`` or ``hints.root_file(..)`` at runtime.
+  Some Linux distributions maintain it in a separate package.
 
   .. tip:: If no parameters are passed, it only returns current root hints set without changing anything.
 

@@ -70,8 +70,6 @@ The additional considerations for TLS 1.2 required by HTTP/2 are not implemented
    If an unrelated HTTPS service is running on the same port with REUSEPORT enabled, you will end up with both services malfunctioning.
 
 
-.. _dot-doh-config-options:
-
 HTTP status codes
 """""""""""""""""
 
@@ -94,6 +92,8 @@ the following status codes:
  * **501 Not Implemented** when the query uses a method other than
    ``GET``, ``POST``, or ``HEAD``
 
+
+.. _dot-doh-config-options:
 
 Configuration options for DoT and DoH
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
