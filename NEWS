@@ -4,6 +4,7 @@ Knot Resolver 6.0.16 (2025-0m-dd)
 Improvements
 ------------
 - reduce validation strictness for domain names (#934, !1727)
+- kresctl migrate: new command for migrating the configuration to a newer version
 
 Incompatible changes
 --------------------
