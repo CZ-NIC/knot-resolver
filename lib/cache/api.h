@@ -26,6 +26,7 @@ struct kr_cache
 	const struct kr_cdb_api *api; /**< Storage engine */
 	struct kr_cdb_stats stats;
 	uint32_t ttl_min, ttl_max; /**< TTL limits; enforced primarily in iterator actually. */
+	struct kr_cache_top *top;
 
 	/* A pair of stamps for detection of real-time shifts during runtime. */
 	struct timeval checkpoint_walltime; /**< Wall time on the last check-point. */
@@ -154,6 +155,7 @@ int kr_cache_remove(struct kr_cache *cache, const knot_dname_t *name, uint16_t t
  * @return result count or an errcode
  * @note the cache keys are matched by prefix, i.e. it very much depends
  * 	on their structure; CACHE_KEY_DEF.
+ * @note the only usecase is for subtree removal, KRU is thus not involved here
  */
 KR_EXPORT
 int kr_cache_match(struct kr_cache *cache, const knot_dname_t *name,

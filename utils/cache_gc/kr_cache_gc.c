@@ -80,8 +80,7 @@ int cb_compute_categories(const knot_db_val_t * key, gc_record_info_t * info,
 			  void *vctx)
 {
 	ctx_compute_categories_t *ctx = vctx;
-	category_t cat = kr_gc_categorize(info);
-	(void)key;
+	category_t cat = kr_gc_categorize(info, key->data, key->len);
 	ctx->categories_sizes[cat] += info->entry_size;
 	ctx->records++;
 	return KNOT_EOK;
@@ -99,7 +98,7 @@ int cb_delete_categories(const knot_db_val_t * key, gc_record_info_t * info,
 			 void *vctx)
 {
 	ctx_delete_categories_t *ctx = vctx;
-	category_t cat = kr_gc_categorize(info);
+	category_t cat = kr_gc_categorize(info, key->data, key->len);
 	if (cat >= ctx->limit_category) {
 		knot_db_val_t *todelete = dbval_copy(key);
 		size_t used = ctx->used_space + key->len + sizeof(*key);

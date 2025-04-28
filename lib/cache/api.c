@@ -30,6 +30,7 @@
 #include "lib/utils.h"
 
 #include "lib/cache/impl.h"
+#include "lib/cache/top.h"
 
 /* TODO:
  *	- Reconsider when RRSIGs are put in and retrieved from the cache.
@@ -624,6 +625,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 	rdataset_dematerialize(rds_sigs, eh->data + rr_ssize);
 	if (kr_fails_assert(entry_h_consistent_E(val_new_entry, rr->type)))
 		return kr_error(EINVAL);
+	kr_cache_top_access(cache->top, key.data, key.len, "stash_rrset");
 
 	#if 0 /* Occasionally useful when debugging some kinds of changes. */
 	{
@@ -800,6 +802,7 @@ static int stash_nsec_p(const knot_dname_t *dname, const char *nsec_p_v,
 		VERBOSE_MSG(qry, "=> EL write failed (ret: %d)\n", ret);
 		return kr_ok();
 	}
+	kr_cache_top_access(cache->top, key.data, key.len, "stash_nsec_p");
 	if (log_refresh_by) {
 		VERBOSE_MSG(qry, "=> nsec_p stashed for %s (refresh by %d, hash: %x)\n",
 				log_dname, log_refresh_by, log_hash);
@@ -877,6 +880,7 @@ static int peek_exact_real(struct kr_cache *cache, const knot_dname_t *name, uin
 		.raw_data = val.data,
 		.raw_bound = knot_db_val_bound(val),
 	};
+	kr_cache_top_access(cache->top, key.data, key.len, "peek_exact_real"); // hits only
 	return kr_ok();
 }
 int kr_cache_peek_exact(struct kr_cache *cache, const knot_dname_t *name, uint16_t type,
