@@ -3,6 +3,7 @@
  */
 
 #include "lib/cache/impl.h"
+#include "lib/cache/top.h"
 
 #include "lib/dnssec/ta.h"
 #include "lib/layer/iterate.h"
@@ -126,12 +127,13 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 			/* found an entry: test conditions, materialize into pkt, etc. */
 			ret = found_exact_hit(qry, pkt, val, lowest_rank);
 		}
-	}
-	if (!ret) {
-		return KR_STATE_DONE;
-	} else if (kr_fails_assert(ret == kr_error(ENOENT))) {
-		VERBOSE_MSG(qry, "=> exact hit error: %d %s\n", ret, kr_strerror(ret));
-		return ctx->state;
+		if (!ret) {
+			kr_cache_top_access(cache->top, key.data, key.len, "peek_nosync:exact");  // hits only
+			return KR_STATE_DONE;
+		} else if (kr_fails_assert(ret == kr_error(ENOENT))) {
+			VERBOSE_MSG(qry, "=> exact hit error: %d %s\n", ret, kr_strerror(ret));
+			return ctx->state;
+		}
 	}
 
 	/* Avoid aggressive answers in STUB mode.
@@ -274,6 +276,7 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 		ret = entry2answer(&ans, AR_SOA, eh, knot_db_val_bound(val),
 				   k->zname, KNOT_RRTYPE_SOA, new_ttl);
 		if (ret) return ctx->state;
+		kr_cache_top_access(cache->top, key.data, key.len, "peek_nosync:SOA");  // hits only
 	}
 
 	/* Find our target RCODE. */
@@ -592,6 +595,7 @@ static int try_wild(struct key *k, struct answer *ans, const knot_dname_t *clenc
 			ret, (int)new_ttl);
 	if (ret) return kr_error(ret);
 	ans->rcode = PKT_NOERROR;
+	kr_cache_top_access(cache->top, key.data, key.len, "try_wild"); // hits only
 	return kr_ok();
 }
 
@@ -652,10 +656,10 @@ static int closest_NS(struct kr_cache *cache, struct key *k, entry_list_t el,
 	bool exact_match = true;
 	bool need_zero = true;
 	/* Inspect the NS/xNAME entries, shortening by a label on each iteration. */
+	knot_db_val_t key, val;
 	do {
 		k->buf[0] = zlf_len;
-		knot_db_val_t key = key_exact_type(k, KNOT_RRTYPE_NS);
-		knot_db_val_t val;
+		key = key_exact_type(k, KNOT_RRTYPE_NS);
 		int ret = cache_op(cache, read, &key, &val, 1);
 		if (ret == kr_error(ENOENT)) goto next_label;
 		if (kr_fails_assert(ret == 0)) {
@@ -680,8 +684,7 @@ static int closest_NS(struct kr_cache *cache, struct key *k, entry_list_t el,
 			if (ret < 0) goto next_label; else
 			if (!ret) {
 				/* We found our match. */
-				k->zlf_len = zlf_len;
-				return kr_ok();
+				goto success;
 			}
 		}
 		const int el_count = only_NS ? EL_NS + 1 : EL_LENGTH;
@@ -692,8 +695,7 @@ static int closest_NS(struct kr_cache *cache, struct key *k, entry_list_t el,
 			if (ret < 0) goto next_label; else
 			if (!ret) {
 				/* We found our match. */
-				k->zlf_len = zlf_len;
-				return kr_ok();
+				goto success;
 			}
 		}
 
@@ -721,6 +723,11 @@ static int closest_NS(struct kr_cache *cache, struct key *k, entry_list_t el,
 			return kr_error(ENOENT);
 		}
 	} while (true);
+
+success:
+	k->zlf_len = zlf_len;
+	kr_cache_top_access(cache->top, key.data, key.len, "closest_NS"); // hits only
+	return kr_ok();
 }
 
 static int check_NS_entry(struct key *k, const knot_db_val_t entry, const int i,
