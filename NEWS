@@ -7,6 +7,7 @@ Improvements
 - manager: force a configuration reload via management HTTP API 'api/reload/force' (#939, !1748)
   - kresctl: reload: added '--force' flag
 - /fallback: add this feature/module (!1733)
+- kresctl migrate: new command for migrating the configuration to a newer version
 
 Bugfixes
 --------

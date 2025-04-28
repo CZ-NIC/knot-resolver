@@ -157,6 +157,25 @@ single ``kresctl`` command.
 
         $ kresctl config set -p /workers 8
 
+.. option:: migrate
+
+    Migrates JSON or YAML configuration to the newer version.
+
+    .. option:: --json, --yaml
+
+        :default: --yaml
+
+        Optional, get migrated configuration data in JSON or YAML format.
+
+    .. option:: input_file
+
+        File with configuration in YAML or JSON format.
+
+    .. option:: [output_file]
+
+        Optional, output file for migrated configuration in desired output format.
+        If not specified, the migrated configuration is printed into ``stdout``.
+
 .. option:: metrics
 
     Get aggregated metrics from the running resolver in JSON format (default) or optionally in Prometheus format.

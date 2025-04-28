@@ -1,0 +1,41 @@
+# dns64: true
+
+# dnssec: false
+
+dns64:
+  rev-ttl: 1d
+
+dnssec:
+  refresh-time: 10m
+  hold-down-time: 30d
+  time-skew-detection: true
+  keep-removed: 10
+  trust-anchor-sentinel: true
+  trust-anchor-signal-query: true
+
+local-data:
+  root-fallback-addresses:
+    j.root-servers.net.:
+      - 2001:503:c27::2:30
+      - 192.58.128.30
+  root-fallback-addresses-files:
+    - rfa.zone
+
+logging:
+  dnssec-bogus: true
+  debugging:
+    assertion-abort: false
+    assertion-fork: 5m
+
+network:
+  tls:
+    auto-discovery: true
+    files-watchdog: true
+
+webmgmt:
+  interface: 127.0.0.1@5001
+
+max-workers: 64
+
+rate-limiting:
+  rate-limit: 100
