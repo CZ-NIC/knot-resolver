@@ -6,6 +6,10 @@ Bugfixes
 - manager: prometheus metrics update (!1703, #917)
   - added missing metrics split by IPv4 and IPv6
 
+Improvements
+------------
+- kresctl migrate: new command for migrating the configuration to a newer version
+
 Incompatible changes
 --------------------
 - Removed options from declarative configuration model (YAML).  
