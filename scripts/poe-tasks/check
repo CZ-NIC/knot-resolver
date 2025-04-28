@@ -41,6 +41,12 @@ python -m knot_resolver.client schema | diff - doc/_static/config.schema.json
 check_rv $?
 echo
 
+# check etc/config/config.migrate.yaml
+echo -e "${yellow}Checking etc/config/config.migrate.yaml${reset}"
+python -m knot_resolver.client migrate etc/config/config.migrate.yaml > /dev/null
+check_rv $?
+echo
+
 # fancy messages at the end :)
 fancy_message
 
