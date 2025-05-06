@@ -35,10 +35,10 @@ cache.open({{ cfg.cache.size_max.bytes() }}, 'lmdb://{{ cfg.cache.storage }}')
 -- FORWARD section ----------------------------------
 {% include "forward.lua.j2" %}
 
--- PRIORITIZATION section ------------------------------------
+-- DEFER section ------------------------------------
 -- Force-disable defer to avoid the default defer config.
-{% set disable_prioritization = true %}
-{% include "prioritization.lua.j2" %}
+{% set disable_defer = true %}
+{% include "defer.lua.j2" %}
 
 {% endif %}
 
