@@ -387,9 +387,7 @@ static inline struct protolayer_iter_ctx *pop_query(void)
 static inline void break_query(struct protolayer_iter_ctx *ctx, int err)
 {
 	if (ctx->session->stream) {
-		struct session2 *s = ctx->session;
 		struct pl_defer_sess_data *sdata = protolayer_sess_data_get_current(ctx);
-		s->ref_count++; // keep session and sdata alive for a while
 		waiting_requests_size -= sdata->size;
 		if (!ctx->session->closing) {
 			session2_force_close(ctx->session);
@@ -397,7 +395,7 @@ static inline void break_query(struct protolayer_iter_ctx *ctx, int err)
 		kr_assert(ctx == queue_head(sdata->queue));
 		while (true) {
 			queue_pop(sdata->queue);
-			if (ctx) {
+			if (ctx) {  // NULL can be queued to signal EOF
 				struct pl_defer_iter_data *idata = protolayer_iter_data_get_current(ctx);
 				waiting_requests_size -= idata->size;
 				protolayer_break(ctx, kr_error(err));
@@ -405,12 +403,12 @@ static inline void break_query(struct protolayer_iter_ctx *ctx, int err)
 			if (queue_len(sdata->queue) == 0) break;
 			ctx = queue_head(sdata->queue);
 		}
-		session2_unhandle(s); // decrease ref_count
 	} else {
 		struct pl_defer_iter_data *idata = protolayer_iter_data_get_current(ctx);
 		waiting_requests_size -= idata->size;
 		protolayer_break(ctx, kr_error(err));
 	}
+	session2_dec_refs(ctx->session);  // stream/datagram no more deferred
 	kr_assert(waiting_requests ? waiting_requests_size > 0 : waiting_requests_size == 0);
 }
 
@@ -478,6 +476,7 @@ static inline void process_single_deferred(void)
 		if (queue_len(sdata->queue) > 0) {
 			VERBOSE_LOG("    PUSH follow-up to head of %d\n", priority);
 			push_query(queue_head(sdata->queue), priority, true);
+			session2_inc_refs(session);  // still deferred
 		} else {
 			waiting_requests_size -= sdata->size;
 		}
@@ -486,20 +485,14 @@ static inline void process_single_deferred(void)
 	waiting_requests_size -= idata->size;
 	kr_assert(waiting_requests ? waiting_requests_size > 0 : waiting_requests_size == 0);
 
-	if (eof) {
-		// Keep session alive even if it is somehow force-closed during continuation.
-		// TODO Is it possible?
-		session->ref_count++;
-	}
-
 	VERBOSE_LOG("    CONTINUE\n");
 	protolayer_continue(ctx);
 
 	if (eof) {
 		VERBOSE_LOG("    CONTINUE EOF event\n");
 		session2_event_after(session, PROTOLAYER_TYPE_DEFER, PROTOLAYER_EVENT_EOF, NULL);
-		session2_unhandle(session); // decrease ref_count
 	}
+	session2_dec_refs(session); // no more deferred or incremented above
 }
 
 /// Process as many deferred requests as needed to get memory consumption under limit.
@@ -582,6 +575,7 @@ static enum protolayer_iter_cb_result pl_defer_unwrap(
 	push_query(ctx, priority, false);
 	waiting_requests_size += idata->size = protolayer_iter_size_est(ctx, !ctx->session->stream);
 		// for stream, payload is counted in session wire buffer
+	session2_inc_refs(ctx->session);  // keep session alive while deferred (1 per stream/datagram)
 
 	process_deferred_over_size_limit();
 	return protolayer_async();

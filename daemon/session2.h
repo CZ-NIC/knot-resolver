@@ -843,7 +843,7 @@ struct session2 {
 	uint32_t log_id; /**< Session ID for logging. */
 
 	int ref_count; /**< Number of unclosed libUV handles owned by this
-	               * session + iteration contexts referencing the session. */
+	               * session + 1 per deferred datagram/stream. */
 
 	/** Communication information. Typically written into by one of the
 	 * first layers facilitating transport protocol processing.
@@ -934,6 +934,11 @@ struct session2 *session2_new(enum session2_transport_type transport_type,
                               size_t layer_param_count,
                               bool outgoing);
 
+/** Used for counting references from unclosed libUV handles owned by the session and from defer.
+ * Once all owned handles are closed and nothing is deferred, the session is freed. */
+void session2_inc_refs(struct session2 *s);
+void session2_dec_refs(struct session2 *s);
+
 /** Allocates and initializes a new session with the specified protocol layer
  * group, using a *libuv handle* as its transport. */
 static inline struct session2 *session2_new_io(uv_handle_t *handle,
@@ -946,7 +951,7 @@ static inline struct session2 *session2_new_io(uv_handle_t *handle,
 			layer_param, layer_param_count, outgoing);
 	s->transport.io.handle = handle;
 	handle->data = s;
-	s->ref_count++; /* Session owns the handle */
+	session2_inc_refs(s); /* Session owns the handle */
 	return s;
 }
 
@@ -963,10 +968,6 @@ static inline struct session2 *session2_new_child(struct session2 *parent,
 	s->transport.parent = parent;
 	return s;
 }
-
-/** Used when a libUV handle owned by the session is closed. Once all owned
- * handles are closed, the session is freed. */
-void session2_unhandle(struct session2 *s);
 
 /** Start reading from the underlying transport. */
 int session2_start_read(struct session2 *session);
