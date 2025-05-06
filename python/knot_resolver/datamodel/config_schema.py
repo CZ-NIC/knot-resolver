@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 from knot_resolver.constants import API_SOCK_FILE, RUN_DIR, VERSION
 from knot_resolver.datamodel.cache_schema import CacheSchema
+from knot_resolver.datamodel.defer_schema import DeferSchema
 from knot_resolver.datamodel.dns64_schema import Dns64Schema
 from knot_resolver.datamodel.dnssec_schema import DnssecSchema
 from knot_resolver.datamodel.forward_schema import ForwardSchema
@@ -16,7 +17,6 @@ from knot_resolver.datamodel.management_schema import ManagementSchema
 from knot_resolver.datamodel.monitoring_schema import MonitoringSchema
 from knot_resolver.datamodel.network_schema import NetworkSchema
 from knot_resolver.datamodel.options_schema import OptionsSchema
-from knot_resolver.datamodel.prioritization_schema import PrioritizationSchema
 from knot_resolver.datamodel.rate_limiting_schema import RateLimitingSchema
 from knot_resolver.datamodel.templates import POLICY_CONFIG_TEMPLATE, WORKER_CONFIG_TEMPLATE
 from knot_resolver.datamodel.types import EscapedStr, IntPositive, WritableDir
@@ -106,7 +106,7 @@ class KresConfig(ConfigSchema):
         monitoring: Metrics exposisition configuration (Prometheus, Graphite)
         lua: Custom Lua configuration.
         rate_limiting: Configuration of rate limiting.
-        prioritization: Configuration of request prioritization (defer).
+        defer: Configuration of request prioritization (defer).
         """
 
         version: int = 1
@@ -126,7 +126,7 @@ class KresConfig(ConfigSchema):
         logging: LoggingSchema = LoggingSchema()
         monitoring: MonitoringSchema = MonitoringSchema()
         rate_limiting: RateLimitingSchema = RateLimitingSchema()
-        prioritization: PrioritizationSchema = PrioritizationSchema()
+        defer: DeferSchema = DeferSchema()
         lua: LuaSchema = LuaSchema()
 
     _LAYER = Raw
@@ -147,7 +147,7 @@ class KresConfig(ConfigSchema):
     logging: LoggingSchema
     monitoring: MonitoringSchema
     rate_limiting: RateLimitingSchema
-    prioritization: PrioritizationSchema
+    defer: DeferSchema
     lua: LuaSchema
 
     def _hostname(self, obj: Raw) -> Any:
