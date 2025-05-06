@@ -4,6 +4,7 @@ Knot Resolver 6.0.13 (2025-05-dd)
 Bugfixes
 --------
 - fix `dnssec: false` (!1687)
+- fix undefined disable_defer (!1685)
 
 
 Knot Resolver 6.0.12 (2025-04-24)
