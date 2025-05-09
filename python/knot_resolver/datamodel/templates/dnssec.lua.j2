@@ -3,7 +3,8 @@
 {% if not cfg.dnssec %}
 -- disable dnssec
 trust_anchors.remove('.')
-{% endif %}
+{% else %}
+
 
 -- options.trust-anchor-sentinel
 {% if cfg.dnssec.trust_anchor_sentinel %}
@@ -58,3 +59,6 @@ trust_anchors.set_insecure({
 trust_anchors.add_file('{{ taf.file }}',  readonly = {{ boolean(taf.read_only) }})
 {% endfor %}
 {% endif %}
+
+
+{% endif %}{# cfg.dnssec #}
