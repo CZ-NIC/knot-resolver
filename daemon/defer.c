@@ -386,11 +386,12 @@ static inline struct protolayer_iter_ctx *pop_query(void)
 // Break the given query; for streams break also all follow-up queries and force-close the stream.
 static inline void break_query(struct protolayer_iter_ctx *ctx, int err)
 {
-	if (ctx->session->stream) {
+	struct session2 *session = ctx->session;
+	if (session->stream) {
 		struct pl_defer_sess_data *sdata = protolayer_sess_data_get_current(ctx);
 		waiting_requests_size -= sdata->size;
-		if (!ctx->session->closing) {
-			session2_force_close(ctx->session);
+		if (!session->closing) {
+			session2_force_close(session);
 		}
 		kr_assert(ctx == queue_head(sdata->queue));
 		while (true) {
@@ -408,7 +409,7 @@ static inline void break_query(struct protolayer_iter_ctx *ctx, int err)
 		waiting_requests_size -= idata->size;
 		protolayer_break(ctx, kr_error(err));
 	}
-	session2_dec_refs(ctx->session);  // stream/datagram no more deferred
+	session2_dec_refs(session);  // stream/datagram no more deferred
 	kr_assert(waiting_requests ? waiting_requests_size > 0 : waiting_requests_size == 0);
 }
 
