@@ -58,6 +58,8 @@ V6_CONF = {1, V6_PREFIXES_CNT, V6_PREFIXES, V6_RATE_MULT, V6_SUBPRIO};
 
 
 #define VERBOSE_LOG(...) kr_log_debug(DEFER, " | " __VA_ARGS__)
+/// Like VERBOSE_LOG, but avoids evaluating the parameters if not logging.
+#define VERBOSE_LOG_PRICY(...) { if (kr_log_is_debug(DEFER, NULL)) VERBOSE_LOG(__VA_ARGS__); }
 
 struct defer {
 	size_t capacity;
@@ -299,8 +301,10 @@ void defer_charge(uint64_t nsec, union kr_sockaddr *addr, bool stream)
 	uint8_t prefix;
 	kru_charge_classify(kru_conf, key, prices, &load, &prefix);
 
-	VERBOSE_LOG("  %s ADD %4.3f ms * %.2f -> load: %d on /%d\n",
-			kr_straddr(&addr->ip), nsec / 1000000.0, pf16 / (float)(1<<16), load, prefix);
+	VERBOSE_LOG_PRICY(
+		"  %s ADD %4.3f ms * %.2f -> load: %d on /%d\n",
+		kr_straddr(&addr->ip), nsec / 1000000.0, pf16 / (float)(1<<16), load, prefix
+	);
 }
 
 /// Determine priority of the request in [0, QUEUES_CNT - 1];
@@ -427,10 +431,12 @@ static inline void process_single_deferred(void)
 	struct session2 *session = ctx->session;
 	uint64_t age_ns = defer_sample_state.stamp - idata->req_stamp;
 
-	VERBOSE_LOG("  %s POP from %d after %4.3f ms\n",
-			kr_straddr(ctx->comm->src_addr),
-			queue_ix,
-			age_ns / 1000000.0);
+	VERBOSE_LOG_PRICY(
+		"  %s POP from %d after %4.3f ms\n",
+		kr_straddr(ctx->comm->src_addr),
+		queue_ix,
+		age_ns / 1000000.0
+	);
 
 	if (ctx->session->closing) {
 		VERBOSE_LOG("    BREAK (session is closing)\n");
@@ -545,8 +551,7 @@ static enum protolayer_iter_cb_result pl_defer_unwrap(
 	struct pl_defer_sess_data *sdata = sess_data;
 	idata->req_stamp = defer_sample_state.stamp;
 
-	VERBOSE_LOG("  %s UNWRAP\n",
-			kr_straddr(ctx->comm->src_addr));
+	VERBOSE_LOG_PRICY("  %s UNWRAP\n", kr_straddr(ctx->comm->src_addr));
 
 	uv_idle_start(&idle_handle, defer_queues_idle);
 
@@ -596,17 +601,21 @@ static enum protolayer_event_cb_result pl_defer_event_unwrap(
 	if ((event == PROTOLAYER_EVENT_EOF) && (queue_len(sdata->queue) > 0)) {
 		// defer EOF event if unprocessed data remain, baton is dropped if any
 		queue_push(sdata->queue, NULL);
-		VERBOSE_LOG("  %s event %s deferred\n",
-				session->comm_storage.src_addr ? kr_straddr(session->comm_storage.src_addr) : "(null)",
-				protolayer_event_name(event));
+		VERBOSE_LOG_PRICY(
+			"  %s event %s deferred\n",
+			session->comm_storage.src_addr ? kr_straddr(session->comm_storage.src_addr) : "(null)",
+			protolayer_event_name(event)
+		);
 		return PROTOLAYER_EVENT_CONSUME;
 	}
 
-	VERBOSE_LOG("  %s event %s passes through synchronously%s%s\n",
-			session->comm_storage.src_addr ? kr_straddr(session->comm_storage.src_addr) : "(null)",
-			protolayer_event_name(event),
-			queue_len(sdata->queue) > 0 ? " ahead of deferred data" : "",
-			*baton ? " (with baton)" : "");
+	VERBOSE_LOG_PRICY(
+		"  %s event %s passes through synchronously%s%s\n",
+		session->comm_storage.src_addr ? kr_straddr(session->comm_storage.src_addr) : "(null)",
+		protolayer_event_name(event),
+		queue_len(sdata->queue) > 0 ? " ahead of deferred data" : "",
+		*baton ? " (with baton)" : ""
+	);
 	return PROTOLAYER_EVENT_PROPAGATE;
 }
 
