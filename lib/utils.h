@@ -100,8 +100,8 @@ KR_EXPORT KR_COLD void kr_fail(bool is_fatal, const char* expr, const char *func
 
 /** Use kr_require(), kr_assert() or kr_fails_assert() instead of directly this function. */
 __attribute__ ((warn_unused_result))
-static inline bool kr_assert_func(bool result, const char *expr, const char *func,
-				  const char *file, int line)
+KR_EXPORT inline bool kr_assert_func(bool result, const char *expr, const char *func,
+					const char *file, int line)
 {
 	if (!result)
 		kr_fail(false, expr, func, file, line);

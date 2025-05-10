@@ -896,7 +896,7 @@ struct session2 *session2_new(enum session2_transport_type transport_type,
 
 /** De-allocates the session. Must only be called once the underlying IO handle
  * and timer are already closed, otherwise may leak resources. */
-static void session2_free(struct session2 *s)
+void session2_free(struct session2 *s)
 {
 	const struct protolayer_grp *grp = &protolayer_grps[s->proto];
 	for (size_t i = 0; i < grp->num_layers; i++) {
@@ -913,23 +913,8 @@ static void session2_free(struct session2 *s)
 	free(s);
 }
 
-void session2_inc_refs(struct session2 *s)
-{
-	kr_assert(s->ref_count < INT_MAX);
-	s->ref_count++;
-}
-
-void session2_dec_refs(struct session2 *s)
-{
-	if (kr_fails_assert(s->ref_count > 0)) {
-		session2_free(s);
-		return;
-	}
-
-	s->ref_count--;
-	if (s->ref_count <= 0)
-		session2_free(s);
-}
+extern inline void session2_inc_refs(struct session2 *s);
+extern inline void session2_dec_refs(struct session2 *s);
 
 int session2_start_read(struct session2 *session)
 {

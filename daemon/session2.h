@@ -934,10 +934,26 @@ struct session2 *session2_new(enum session2_transport_type transport_type,
                               size_t layer_param_count,
                               bool outgoing);
 
+
+void session2_free(struct session2 *s);
 /** Used for counting references from unclosed libUV handles owned by the session and from defer.
  * Once all owned handles are closed and nothing is deferred, the session is freed. */
-void session2_inc_refs(struct session2 *s);
-void session2_dec_refs(struct session2 *s);
+inline void session2_inc_refs(struct session2 *s)
+{
+	kr_assert(s->ref_count < INT_MAX);
+	s->ref_count++;
+}
+inline void session2_dec_refs(struct session2 *s)
+{
+	if (kr_fails_assert(s->ref_count > 0)) {
+		session2_free(s);
+		return;
+	}
+
+	s->ref_count--;
+	if (s->ref_count <= 0)
+		session2_free(s);
+}
 
 /** Allocates and initializes a new session with the specified protocol layer
  * group, using a *libuv handle* as its transport. */
