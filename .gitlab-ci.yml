@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # vim:foldmethod=marker
 variables:
+  PYTHON_VERSION: '3.12'
   DEBIAN_FRONTEND: noninteractive
   LC_ALL: C.UTF-8
   GIT_SUBMODULE_STRATEGY: recursive
@@ -20,7 +21,7 @@ variables:
   # IMAGE_TAG is a Git branch/tag name from https://gitlab.nic.cz/knot/knot-resolver-ci
   # In general, keep it pointing to a tag - use a branch only for development.
   # More info in the knot-resolver-ci repository.
-  IMAGE_TAG: 'v20250324'
+  IMAGE_TAG: 'v20250429'
   IMAGE_PREFIX: '$CI_REGISTRY/knot/knot-resolver-ci'
 
 image: $IMAGE_PREFIX/debian12-knot_3_3:$IMAGE_TAG
@@ -288,7 +289,7 @@ docker:test:cross-platform:
     - docker
     - ${PLATFORM}
 
-dockerhub:deploy:
+docker:dockerhub:
   <<: *docker
   stage: deploy
   when: manual
@@ -472,20 +473,6 @@ test:valgrind:
         --no-suite skip_valgrind
         --wrap="valgrind --leak-check=full --trace-children=yes --quiet --suppressions=/lj.supp"
         --suite snowflake
-
-manager:
-  stage: test
-  needs: []
-  trigger:
-    include: .gitlab-ci.manager.yml
-    strategy: depend
-  except:
-    refs:
-      - master@knot/knot-resolver
-      - master@knot/security/knot-resolver
-      - tags
-    variables:
-      - $SKIP_CI == "1"
 
 pytests:
   <<: *test_flaky
@@ -686,6 +673,7 @@ obs:odvr:
 # }}}
 
 # pkg {{{
+
 .pkg_deb_extras: &pkg_deb_extras
   before_script:
     - apt update
@@ -835,75 +823,113 @@ docs:build:
     paths:
       - doc/html
 
-# This job deploys the Knot Resolver documentation into a development
-# environment, which may be found at
-# <https://gitlab.nic.cz/knot/knot-resolver/-/environments/folders/docs-develop>.
-# The actual URL is found in the `environment.url` property, where
-# $CI_PROJECT_NAMESPACE will be "knot" on the upstream GitLab.
-docs:develop:
+# Deploys the documentation into a GitLab environment.
+# https://gitlab.nic.cz/knot/knot-resolver/-/environments
+docs:environment:
   stage: deploy
   needs:
     - docs:build
-  except:
-    refs:
-      - tags
   script:
-    - echo "Propagating artifacts into develop environment"
+    - echo "Propagating artifacts into a GitLab environment."
   artifacts:
     paths:
       - doc/html
   environment:
-    name: docs-develop/$CI_COMMIT_REF_NAME
+    name: docs/$CI_COMMIT_REF_NAME
     url: https://www.knot-resolver.cz/documentation/artifacts/$CI_JOB_ID/index.html
 
-# This job deploys the Knot Resolver documentation into a release environment,
-# which may be found at
-# <https://gitlab.nic.cz/knot/knot-resolver/-/environments/folders/docs-release>.
-# The actual URL is found in the `environment.url` property, where
-# $CI_PROJECT_NAMESPACE will be "knot" on the upstream GitLab.
-# The job requires the `DOCS_ENV_NAME` variable to be set by the user.
-docs:release:
-  stage: deploy
-  needs:
-    - docs:build
-  only:
-    refs:
-      - tags
-  script: echo "Propagating artifacts into release environment"
-  artifacts:
-    paths:
-      - doc/html
-  environment:
-    name: docs-release/$CI_COMMIT_TAG
-    url: https://www.knot-resolver.cz/documentation/artifacts/$CI_JOB_ID/index.html
-
-# This job deploys the current docs as <https://knot.pages.nic.cz/knot-resolver>
-pages:
+# Deploys the current documentation to the GitLab pages.
+# https://knot.pages.nic.cz/knot-resolver
+docs:pages:
   stage: deploy
   needs:
     - docs:build
   script: mv doc/html public
+  pages: true
   when: manual
   artifacts:
     paths:
       - public
 
-# This job pushes the Knot Resolver documentation into a new branch of the
-# `websites/knot-resolver.cz` repository.
+# Pushes the documetation as a new branch to the website repository.
+# https://gitlab.nic.cz/websites/knot-resolver.cz
 docs:website:
   stage: deploy
   needs:
     - docs:build
   when: manual
-  variables:
+  only:
+    refs:
+      - tags
   script:
-    - "SRC_COMMIT_REF=\"$CI_COMMIT_TAG$CI_COMMIT_BRANCH$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME\""
-    - "git clone \"https://gitlab-ci-token:$WEBSITE_DOCS_CI_TOKEN@$CI_SERVER_HOST:$CI_SERVER_PORT/websites/knot-resolver.cz.git\" website"
-    - "cp --recursive --verbose \"doc/html\" \"website/content/documentation/$SRC_COMMIT_REF\""
+    - "git clone \"https://gitlab-ci-token:${WEBSITE_DOCS_CI_TOKEN}@${CI_SERVER_HOST}:${CI_SERVER_PORT}/websites/knot-resolver.cz.git\" website"
+    - "cp --recursive --verbose \"doc/html\" \"website/content/documentation/${CI_COMMIT_REF_NAME}\""
     - cd website
-    - "git checkout -b \"docs/$SRC_COMMIT_REF\""
-    - "git add \"content/documentation/$SRC_COMMIT_REF\""
-    - "git commit -m \"docs: $SRC_COMMIT_REF\""
-    - "git push --force --set-upstream origin \"docs/$SRC_COMMIT_REF\""
+    - "git checkout -b \"docs/${CI_COMMIT_REF_NAME}\""
+    - "git add \"content/documentation/${CI_COMMIT_REF_NAME}\""
+    - "git commit -m \"docs: ${CI_COMMIT_REF_NAME}\""
+    - "git push --force --set-upstream origin \"docs/${CI_COMMIT_REF_NAME}\""
+
+# }}}
+
+# python: {{{
+
+.python: &python
+  <<: *nodep
+  image: $IMAGE_PREFIX/manager:$IMAGE_TAG
+  stage: sanity
+  before_script:
+    - poetry --version
+    - poetry env use python${PYTHON_VERSION}
+
+python:examples:
+  <<: *python
+  script:
+    - poetry install --all-extras --only main,dev
+    - poe examples
+
+python:check:
+  <<: *python
+  script:
+    - poetry install --all-extras --only main,dev,lint
+    - poe check
+
+python:format:
+  <<: *python
+  script:
+    - poetry install --all-extras --only main,dev,lint
+    - poe format
+
+python:lint:
+  <<: *python
+  script:
+    - poetry install --all-extras --only main,dev,lint
+    - poe lint
+
+python:unit:
+  <<: *python
+  stage: test
+  parallel:
+    matrix:
+      - PYTHON_VERSION:
+          - '3.8'
+          - '3.9'
+          - '3.10'
+          - '3.11'
+          - '3.12'
+          - '3.13'
+  script:
+    - poetry install --all-extras --only main,dev,test
+    - poe test
+    # the following command makes sure that the source root of the coverage file is at $gitroot
+    - poetry run bash -c "coverage combine .coverage; coverage xml"
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+      junit: unit.junit.xml
+    paths:
+      - unit.junit.xml
 
 # }}}
