@@ -5,6 +5,7 @@ Bugfixes
 --------
 - fix `dnssec: false` (!1687)
 - fix undefined disable_defer (!1685)
+- daemon: fix a memory leak present since v6.0.9 (#927)
 
 
 Knot Resolver 6.0.12 (2025-04-24)

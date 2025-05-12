@@ -58,6 +58,8 @@ V6_CONF = {1, V6_PREFIXES_CNT, V6_PREFIXES, V6_RATE_MULT, V6_SUBPRIO};
 
 
 #define VERBOSE_LOG(...) kr_log_debug(DEFER, " | " __VA_ARGS__)
+/// Like VERBOSE_LOG, but avoids evaluating the parameters if not logging.
+#define VERBOSE_LOG_PRICY(...) { if (kr_log_is_debug(DEFER, NULL)) VERBOSE_LOG(__VA_ARGS__); }
 
 struct defer {
 	size_t capacity;
@@ -299,8 +301,10 @@ void defer_charge(uint64_t nsec, union kr_sockaddr *addr, bool stream)
 	uint8_t prefix;
 	kru_charge_classify(kru_conf, key, prices, &load, &prefix);
 
-	VERBOSE_LOG("  %s ADD %4.3f ms * %.2f -> load: %d on /%d\n",
-			kr_straddr(&addr->ip), nsec / 1000000.0, pf16 / (float)(1<<16), load, prefix);
+	VERBOSE_LOG_PRICY(
+		"  %s ADD %4.3f ms * %.2f -> load: %d on /%d\n",
+		kr_straddr(&addr->ip), nsec / 1000000.0, pf16 / (float)(1<<16), load, prefix
+	);
 }
 
 /// Determine priority of the request in [0, QUEUES_CNT - 1];
@@ -386,18 +390,17 @@ static inline struct protolayer_iter_ctx *pop_query(void)
 // Break the given query; for streams break also all follow-up queries and force-close the stream.
 static inline void break_query(struct protolayer_iter_ctx *ctx, int err)
 {
-	if (ctx->session->stream) {
-		struct session2 *s = ctx->session;
+	struct session2 *session = ctx->session;
+	if (session->stream) {
 		struct pl_defer_sess_data *sdata = protolayer_sess_data_get_current(ctx);
-		s->ref_count++; // keep session and sdata alive for a while
 		waiting_requests_size -= sdata->size;
-		if (!ctx->session->closing) {
-			session2_force_close(ctx->session);
+		if (!session->closing) {
+			session2_force_close(session);
 		}
 		kr_assert(ctx == queue_head(sdata->queue));
 		while (true) {
 			queue_pop(sdata->queue);
-			if (ctx) {
+			if (ctx) {  // NULL can be queued to signal EOF
 				struct pl_defer_iter_data *idata = protolayer_iter_data_get_current(ctx);
 				waiting_requests_size -= idata->size;
 				protolayer_break(ctx, kr_error(err));
@@ -405,12 +408,12 @@ static inline void break_query(struct protolayer_iter_ctx *ctx, int err)
 			if (queue_len(sdata->queue) == 0) break;
 			ctx = queue_head(sdata->queue);
 		}
-		session2_unhandle(s); // decrease ref_count
 	} else {
 		struct pl_defer_iter_data *idata = protolayer_iter_data_get_current(ctx);
 		waiting_requests_size -= idata->size;
 		protolayer_break(ctx, kr_error(err));
 	}
+	session2_dec_refs(session);  // stream/datagram no more deferred
 	kr_assert(waiting_requests ? waiting_requests_size > 0 : waiting_requests_size == 0);
 }
 
@@ -428,10 +431,12 @@ static inline void process_single_deferred(void)
 	struct session2 *session = ctx->session;
 	uint64_t age_ns = defer_sample_state.stamp - idata->req_stamp;
 
-	VERBOSE_LOG("  %s POP from %d after %4.3f ms\n",
-			kr_straddr(ctx->comm->src_addr),
-			queue_ix,
-			age_ns / 1000000.0);
+	VERBOSE_LOG_PRICY(
+		"  %s POP from %d after %4.3f ms\n",
+		kr_straddr(ctx->comm->src_addr),
+		queue_ix,
+		age_ns / 1000000.0
+	);
 
 	if (ctx->session->closing) {
 		VERBOSE_LOG("    BREAK (session is closing)\n");
@@ -478,6 +483,7 @@ static inline void process_single_deferred(void)
 		if (queue_len(sdata->queue) > 0) {
 			VERBOSE_LOG("    PUSH follow-up to head of %d\n", priority);
 			push_query(queue_head(sdata->queue), priority, true);
+			session2_inc_refs(session);  // still deferred
 		} else {
 			waiting_requests_size -= sdata->size;
 		}
@@ -486,20 +492,14 @@ static inline void process_single_deferred(void)
 	waiting_requests_size -= idata->size;
 	kr_assert(waiting_requests ? waiting_requests_size > 0 : waiting_requests_size == 0);
 
-	if (eof) {
-		// Keep session alive even if it is somehow force-closed during continuation.
-		// TODO Is it possible?
-		session->ref_count++;
-	}
-
 	VERBOSE_LOG("    CONTINUE\n");
 	protolayer_continue(ctx);
 
 	if (eof) {
 		VERBOSE_LOG("    CONTINUE EOF event\n");
 		session2_event_after(session, PROTOLAYER_TYPE_DEFER, PROTOLAYER_EVENT_EOF, NULL);
-		session2_unhandle(session); // decrease ref_count
 	}
+	session2_dec_refs(session); // no more deferred or incremented above
 }
 
 /// Process as many deferred requests as needed to get memory consumption under limit.
@@ -551,8 +551,7 @@ static enum protolayer_iter_cb_result pl_defer_unwrap(
 	struct pl_defer_sess_data *sdata = sess_data;
 	idata->req_stamp = defer_sample_state.stamp;
 
-	VERBOSE_LOG("  %s UNWRAP\n",
-			kr_straddr(ctx->comm->src_addr));
+	VERBOSE_LOG_PRICY("  %s UNWRAP\n", kr_straddr(ctx->comm->src_addr));
 
 	uv_idle_start(&idle_handle, defer_queues_idle);
 
@@ -582,6 +581,7 @@ static enum protolayer_iter_cb_result pl_defer_unwrap(
 	push_query(ctx, priority, false);
 	waiting_requests_size += idata->size = protolayer_iter_size_est(ctx, !ctx->session->stream);
 		// for stream, payload is counted in session wire buffer
+	session2_inc_refs(ctx->session);  // keep session alive while deferred (1 per stream/datagram)
 
 	process_deferred_over_size_limit();
 	return protolayer_async();
@@ -601,17 +601,21 @@ static enum protolayer_event_cb_result pl_defer_event_unwrap(
 	if ((event == PROTOLAYER_EVENT_EOF) && (queue_len(sdata->queue) > 0)) {
 		// defer EOF event if unprocessed data remain, baton is dropped if any
 		queue_push(sdata->queue, NULL);
-		VERBOSE_LOG("  %s event %s deferred\n",
-				session->comm_storage.src_addr ? kr_straddr(session->comm_storage.src_addr) : "(null)",
-				protolayer_event_name(event));
+		VERBOSE_LOG_PRICY(
+			"  %s event %s deferred\n",
+			session->comm_storage.src_addr ? kr_straddr(session->comm_storage.src_addr) : "(null)",
+			protolayer_event_name(event)
+		);
 		return PROTOLAYER_EVENT_CONSUME;
 	}
 
-	VERBOSE_LOG("  %s event %s passes through synchronously%s%s\n",
-			session->comm_storage.src_addr ? kr_straddr(session->comm_storage.src_addr) : "(null)",
-			protolayer_event_name(event),
-			queue_len(sdata->queue) > 0 ? " ahead of deferred data" : "",
-			*baton ? " (with baton)" : "");
+	VERBOSE_LOG_PRICY(
+		"  %s event %s passes through synchronously%s%s\n",
+		session->comm_storage.src_addr ? kr_straddr(session->comm_storage.src_addr) : "(null)",
+		protolayer_event_name(event),
+		queue_len(sdata->queue) > 0 ? " ahead of deferred data" : "",
+		*baton ? " (with baton)" : ""
+	);
 	return PROTOLAYER_EVENT_PROPAGATE;
 }
 

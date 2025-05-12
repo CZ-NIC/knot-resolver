@@ -449,7 +449,6 @@ static int protolayer_iter_ctx_finish(struct protolayer_iter_ctx *ctx, int ret)
 
 	mm_ctx_delete(&ctx->pool);
 	free(ctx);
-	session2_unhandle(s);
 
 	return ret;
 }
@@ -616,8 +615,6 @@ static int session2_submit(
 {
 	if (session->closing)
 		return kr_error(ECANCELED);
-	if (session->ref_count >= INT_MAX - 1)
-		return kr_error(ETOOMANYREFS);
 	if (kr_fails_assert(session->proto < KR_PROTO_COUNT))
 		return kr_error(EFAULT);
 
@@ -651,7 +648,6 @@ static int session2_submit(
 		.finished_cb = cb,
 		.finished_cb_baton = baton
 	};
-	session->ref_count++;
 	if (had_comm_param) {
 		struct comm_addr_storage *addrst = &ctx->comm_addr_storage;
 		if (comm->src_addr) {
@@ -877,7 +873,7 @@ struct session2 *session2_new(enum session2_transport_type transport_type,
 	ret = uv_timer_init(uv_default_loop(), &s->timer);
 	kr_require(!ret);
 	s->timer.data = s;
-	s->ref_count++; /* Session owns the timer */
+	session2_inc_refs(s); /* Session owns the timer */
 
 	/* Initialize the layer's session data */
 	for (size_t i = 0; i < grp->num_layers; i++) {
@@ -900,7 +896,7 @@ struct session2 *session2_new(enum session2_transport_type transport_type,
 
 /** De-allocates the session. Must only be called once the underlying IO handle
  * and timer are already closed, otherwise may leak resources. */
-static void session2_free(struct session2 *s)
+void session2_free(struct session2 *s)
 {
 	const struct protolayer_grp *grp = &protolayer_grps[s->proto];
 	for (size_t i = 0; i < grp->num_layers; i++) {
@@ -917,17 +913,8 @@ static void session2_free(struct session2 *s)
 	free(s);
 }
 
-void session2_unhandle(struct session2 *s)
-{
-	if (kr_fails_assert(s->ref_count > 0)) {
-		session2_free(s);
-		return;
-	}
-
-	s->ref_count--;
-	if (s->ref_count <= 0)
-		session2_free(s);
-}
+extern inline void session2_inc_refs(struct session2 *s);
+extern inline void session2_dec_refs(struct session2 *s);
 
 int session2_start_read(struct session2 *session)
 {
@@ -1709,7 +1696,7 @@ static void on_session2_handle_close(uv_handle_t *handle)
 
 static void on_session2_timer_close(uv_handle_t *handle)
 {
-	session2_unhandle(handle->data);
+	session2_dec_refs(handle->data);
 }
 
 static int session2_handle_close(struct session2 *s)
@@ -1724,8 +1711,8 @@ static int session2_handle_close(struct session2 *s)
 		 * been ended. We do not `uv_close` the handles, we just free
 		 * up the memory. */
 
-		session2_unhandle(s); /* For timer handle */
-		io_free(handle); /* This will unhandle the transport handle */
+		session2_dec_refs(s); /* For timer handle */
+		io_free(handle); /* This will decrement refs for the transport handle */
 		return kr_ok();
 	}
 

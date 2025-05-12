@@ -57,6 +57,11 @@ extern inline uint64_t kr_rand_bytes(unsigned int size);
 bool kr_dbg_assertion_abort = DBG_ASSERTION_ABORT;
 int kr_dbg_assertion_fork = DBG_ASSERTION_FORK;
 
+
+// Non-inline instance to allow warn-free use of kr_assert() etc. in other `extern inline`.
+extern inline bool kr_assert_func(bool result, const char *expr, const char *func,
+				  const char *file, int line);
+
 void kr_fail(bool is_fatal, const char *expr, const char *func, const char *file, int line)
 {
 	const int errno_orig = errno;

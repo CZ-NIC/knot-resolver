@@ -955,13 +955,13 @@ static void io_deinit(uv_handle_t *handle)
 		return;
 	}
 	if (handle->type != UV_POLL) {
-		session2_unhandle(handle->data);
+		session2_dec_refs(handle->data);
 	} else {
 	#if ENABLE_XDP
 		xdp_handle_data_t *xhd = handle->data;
 		uv_idle_stop(&xhd->tx_waker);
 		uv_close((uv_handle_t *)&xhd->tx_waker, NULL);
-		session2_unhandle(xhd->session);
+		session2_dec_refs(xhd->session);
 		knot_xdp_deinit(xhd->socket);
 		queue_deinit(xhd->tx_waker_queue);
 		free(xhd);
