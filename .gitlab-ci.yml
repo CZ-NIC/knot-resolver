@@ -845,6 +845,7 @@ docs:pages:
   needs:
     - docs:build
   script: mv doc/html public
+  pages: true
   when: manual
   artifacts:
     paths:
