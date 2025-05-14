@@ -139,18 +139,33 @@ int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct k
 		kr_cache_emergency_file_to_remove = fpath;
 	}
 
-	if (ret == 0 && opts->maxsize) {
-		size_t maxsize = cache->api->get_maxsize(cache->db);
-		if (maxsize > opts->maxsize) kr_log_warning(CACHE,
+	size_t maxsize = 0;
+	if (ret == 0) {
+		maxsize = cache->api->get_maxsize(cache->db);
+		if (opts->maxsize && (maxsize > opts->maxsize)) kr_log_warning(CACHE,
 			"Warning: real cache size is %zu instead of the requested %zu bytes."
 			"  To reduce the size you need to remove the file '%s' by hand.\n",
-			maxsize, opts->maxsize, fpath);
+			maxsize, opts->maxsize, fpath);  // TODO remove file instead
 	}
 	if (ret != 0)
 		return ret;
 	cache->ttl_min = KR_CACHE_DEFAULT_TTL_MIN;
 	cache->ttl_max = KR_CACHE_DEFAULT_TTL_MAX;
 	kr_cache_make_checkpoint(cache);
+
+	char *top_path = kr_absolutize_path(opts->path, "top");
+	if (kr_fails_assert(top_path)) {
+		ret = kr_error(errno);
+	}
+	if (ret == 0) {
+		ret = kr_cache_top_init(&cache->top, top_path, maxsize);
+		free(top_path);
+	}
+	if (ret != 0) {
+		cache->api->close(cache->db, &cache->stats);
+		return ret;
+	}
+
 	return 0;
 }
 
@@ -161,6 +176,7 @@ const char *kr_cache_emergency_file_to_remove = NULL;
 
 void kr_cache_close(struct kr_cache *cache)
 {
+	kr_cache_top_deinit(&cache->top);
 	kr_cache_check_health(cache, -1);
 	if (cache_isvalid(cache)) {
 		cache_op(cache, close);
@@ -625,7 +641,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 	rdataset_dematerialize(rds_sigs, eh->data + rr_ssize);
 	if (kr_fails_assert(entry_h_consistent_E(val_new_entry, rr->type)))
 		return kr_error(EINVAL);
-	kr_cache_top_access(cache->top, key.data, key.len, "stash_rrset");
+	kr_cache_top_access(&cache->top, key.data, key.len, "stash_rrset");
 
 	#if 0 /* Occasionally useful when debugging some kinds of changes. */
 	{
@@ -802,7 +818,7 @@ static int stash_nsec_p(const knot_dname_t *dname, const char *nsec_p_v,
 		VERBOSE_MSG(qry, "=> EL write failed (ret: %d)\n", ret);
 		return kr_ok();
 	}
-	kr_cache_top_access(cache->top, key.data, key.len, "stash_nsec_p");
+	kr_cache_top_access(&cache->top, key.data, key.len, "stash_nsec_p");
 	if (log_refresh_by) {
 		VERBOSE_MSG(qry, "=> nsec_p stashed for %s (refresh by %d, hash: %x)\n",
 				log_dname, log_refresh_by, log_hash);
@@ -880,7 +896,7 @@ static int peek_exact_real(struct kr_cache *cache, const knot_dname_t *name, uin
 		.raw_data = val.data,
 		.raw_bound = knot_db_val_bound(val),
 	};
-	kr_cache_top_access(cache->top, key.data, key.len, "peek_exact_real"); // hits only
+	kr_cache_top_access(&cache->top, key.data, key.len, "peek_exact_real"); // hits only
 	return kr_ok();
 }
 int kr_cache_peek_exact(struct kr_cache *cache, const knot_dname_t *name, uint16_t type,

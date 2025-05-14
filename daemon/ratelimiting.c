@@ -35,14 +35,6 @@ struct ratelimiting {
 struct ratelimiting *ratelimiting = NULL;
 struct mmapped ratelimiting_mmapped = {0};
 
-/// return whether we're using optimized variant right now
-static bool using_avx2(void)
-{
-	bool result = (KRU.initialize == KRU_AVX2.initialize);
-	kr_require(result || KRU.initialize == KRU_GENERIC.initialize);
-	return result;
-}
-
 int ratelimiting_init(const char *mmap_file, size_t capacity, uint32_t instant_limit,
 		uint32_t rate_limit, uint16_t slip, uint32_t log_period, bool dry_run)
 {
@@ -59,7 +51,7 @@ int ratelimiting_init(const char *mmap_file, size_t capacity, uint32_t instant_l
 		.log_period = log_period,
 		.slip = slip,
 		.dry_run = dry_run,
-		.using_avx2 = using_avx2()
+		.using_avx2 = kru_using_avx2()
 	};
 
 	size_t header_size = offsetof(struct ratelimiting, using_avx2) + sizeof(header.using_avx2);
@@ -73,8 +65,8 @@ int ratelimiting_init(const char *mmap_file, size_t capacity, uint32_t instant_l
 			sizeof(header.dry_run),
 		"detected padding with undefined data inside mmapped header");
 
-	int ret = mmapped_init(&ratelimiting_mmapped, mmap_file, size, &header, header_size);
-	if (ret == MMAPPED_WAS_FIRST) {
+	int ret = mmapped_init(&ratelimiting_mmapped, mmap_file, size, &header, header_size, false);
+	if (ret == MMAPPED_PENDING) {
 		kr_log_info(SYSTEM, "Initializing rate-limiting...\n");
 
 		ratelimiting = ratelimiting_mmapped.mem;
@@ -100,16 +92,19 @@ int ratelimiting_init(const char *mmap_file, size_t capacity, uint32_t instant_l
 			ratelimiting->v6_prices[i] = base_price / V6_RATE_MULT[i];
 		}
 
-		ret = mmapped_init_continue(&ratelimiting_mmapped);
+		ret = mmapped_init_finish(&ratelimiting_mmapped);
 		if (ret != 0) goto fail;
 
 		kr_log_info(SYSTEM, "Rate-limiting initialized (%s).\n", (ratelimiting->using_avx2 ? "AVX2" : "generic"));
 		return 0;
-	} else if (ret == 0) {
+	} else if (ret == MMAPPED_EXISTING) {
 		ratelimiting = ratelimiting_mmapped.mem;
 		kr_log_info(SYSTEM, "Using existing rate-limiting data (%s).\n", (ratelimiting->using_avx2 ? "AVX2" : "generic"));
 		return 0;
-	} // else fail
+	} else {
+		kr_assert(ret < 0);  // no other combinations of mmapped state flags are allowed in non-persistent case
+		// fail
+	}
 
 fail:
 
