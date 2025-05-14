@@ -13,6 +13,7 @@
 #include <lib/cache/impl.h>
 #include <lib/defines.h>
 #include "lib/cache/cdb_lmdb.h"
+#include "lib/cache/top.h"
 #include "lib/generic/array.h"
 #include "lib/utils.h"
 
@@ -74,13 +75,14 @@ static void entry_array_deep_free(entry_array_t *d)
 typedef struct {
 	size_t categories_sizes[CATEGORIES];
 	size_t records;
+	union kr_cache_top *top;
 } ctx_compute_categories_t;
 
 int cb_compute_categories(const knot_db_val_t * key, gc_record_info_t * info,
 			  void *vctx)
 {
 	ctx_compute_categories_t *ctx = vctx;
-	category_t cat = kr_gc_categorize(info, key->data, key->len);
+	category_t cat = kr_gc_categorize(ctx->top, info, key->data, key->len);
 	ctx->categories_sizes[cat] += info->entry_size;
 	ctx->records++;
 	return KNOT_EOK;
@@ -92,13 +94,14 @@ typedef struct {
 	size_t cfg_temp_keys_space;
 	size_t used_space;
 	size_t oversize_records;
+	union kr_cache_top *top;
 } ctx_delete_categories_t;
 
 int cb_delete_categories(const knot_db_val_t * key, gc_record_info_t * info,
 			 void *vctx)
 {
 	ctx_delete_categories_t *ctx = vctx;
-	category_t cat = kr_gc_categorize(info, key->data, key->len);
+	category_t cat = kr_gc_categorize(ctx->top, info, key->data, key->len);
 	if (cat >= ctx->limit_category) {
 		knot_db_val_t *todelete = dbval_copy(key);
 		size_t used = ctx->used_space + key->len + sizeof(*key);
@@ -172,7 +175,8 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 	    { 0 }, timer_rw_txn = { 0 };
 
 	kr_timer_start(&timer_analyze);
-	ctx_compute_categories_t cats = { { 0 }
+	ctx_compute_categories_t cats = { { 0 },
+		.top = &(*state)->kres_db.top,
 	};
 	ret = kr_gc_cache_iter(db, cfg, cb_compute_categories, &cats);
 	if (ret != KNOT_EOK) {
@@ -214,7 +218,7 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 
 	//// 3. pass whole cache again to collect a list of keys that should be deleted.
 	kr_timer_start(&timer_choose);
-	ctx_delete_categories_t to_del = { 0 };
+	ctx_delete_categories_t to_del = { .top = &(*state)->kres_db.top };
 	to_del.cfg_temp_keys_space = cfg->temp_keys_space;
 	to_del.limit_category = limit_category;
 	ret = kr_gc_cache_iter(db, cfg, cb_delete_categories, &to_del);
