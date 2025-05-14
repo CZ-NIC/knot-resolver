@@ -19,6 +19,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <assert.h>
 
 #define ALIGNED_CPU_CACHE _Alignas(64)
 
@@ -61,6 +62,11 @@ struct kru_api {
 	/// Calculate size of the KRU structure.
 	size_t (*get_size)(int capacity_log);
 
+	/// Verify that given KRU structure expects just memory of the given size;
+	/// it accesses just the first size bytes of kru.
+	/// If false is returned, the memory is corrupted and calling other methods may cause SIGSEGV.
+	bool (*check_size)(struct kru *kru, size_t size);
+
 	/// Determine if a key should get limited (and update the KRU).
 	/// key needs to be aligned to a multiple of 16 bytes.
 	bool (*limited)(struct kru *kru, uint32_t time_now, uint8_t key[static const 16], kru_price_t price);
@@ -98,9 +104,20 @@ struct kru_api {
 	/// The key of i-th query consists of prefixes[i] bits of key, prefixes[i], and namespace; as above.
 	void (*load_multi_prefix)(struct kru *kru, uint32_t time_now,
 			uint8_t namespace, uint8_t key[static 16], uint8_t *prefixes, kru_price_t *prices, size_t queries_cnt, uint16_t *loads_out);
+
+	// TODO
+	uint16_t (*load_bytes)(struct kru *kru, uint32_t time_now, uint8_t *key, uint8_t key_size, kru_price_t price);
 };
 
 // The functions are stored this way to make it easier to switch
 // implementation based on detected CPU.
 extern struct kru_api KRU;
 extern const struct kru_api KRU_GENERIC, KRU_AVX2;
+
+/// Return whether we're using optimized variant right now.
+static inline bool kru_using_avx2(void)
+{
+	bool result = (KRU.initialize == KRU_AVX2.initialize);
+	assert(result || KRU.initialize == KRU_GENERIC.initialize);
+	return result;
+}
