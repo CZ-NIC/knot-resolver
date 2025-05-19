@@ -10,12 +10,12 @@ logger = logging.getLogger(__name__)
 
 
 async def collect_kresd_workers_metrics(config: KresConfig) -> Optional[Dict[KresID, object]]:
-    if config.monitoring.enabled == "manager-only":
+    if config.monitoring.metrics == "manager-only":
         logger.debug("Skipping kresd stat collection due to configuration")
         return None
 
     cmd = "collect_statistics()"
-    if config.monitoring.enabled == "lazy":
+    if config.monitoring.metrics == "lazy":
         cmd = "collect_lazy_statistics()"
     logger.debug(f"Collecting stats from all kresd workers using method '{cmd}'")
 
