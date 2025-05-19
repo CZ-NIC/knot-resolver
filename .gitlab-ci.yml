@@ -788,6 +788,10 @@ pkg:alma-9:
     # install it using PyPi just for testing
     - pip3 install watchdog
 
+pkg:alma-10:
+  <<: *pkg_test
+  image: $CI_REGISTRY/packaging/apkg/full/alma-10
+
 pkg:arch:
   <<: *pkg_test_user
   image: $CI_REGISTRY/packaging/apkg/full/arch
