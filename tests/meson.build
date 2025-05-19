@@ -58,3 +58,17 @@ if build_extra_tests
   endforeach
   message('--------------------------------')
 endif
+
+if build_extra_tests
+  # Just try that C++ compiler can chew through our library includes.
+  cpp_test = executable(
+    'cpp-lib-includes',
+    files(['lib-includes.cpp']),
+    dependencies: [
+      kresconfig_dep,
+      contrib_dep,
+      libkres_dep,
+      libknot,
+    ],
+  )
+endif
