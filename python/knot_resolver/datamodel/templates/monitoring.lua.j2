@@ -14,7 +14,7 @@ else
 	end
 end
 
-{% if cfg.monitoring.enabled == "always" %}
+{% if cfg.monitoring.metrics == "always" %}
 modules.load('stats')
 {% endif %}
 
