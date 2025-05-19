@@ -4,6 +4,7 @@ import sys
 from typing import Any, Dict, List, Optional, Tuple, Type
 
 from knot_resolver.client.command import Command, CommandArgs, CompWords, comp_get_words, register_command
+from knot_resolver.constants import VERSION
 from knot_resolver.utils.modeling.exceptions import DataParsingError
 from knot_resolver.utils.modeling.parsing import DataFormat, try_to_parse
 
@@ -18,7 +19,7 @@ def _remove(config: Dict[str, Any], path: str) -> Optional[Any]:
             current = current[key]
         else:
             return None
-    if isinstance (current, dict) and last in current:
+    if isinstance(current, dict) and last in current:
         val = copy.copy(current[last])
         del current[last]
         print(f"removed {path}")
@@ -98,7 +99,7 @@ class MigrateCommand(Command):
     def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
         return comp_get_words(args, parser)
 
-    def run(self, args: CommandArgs) -> None:
+    def run(self, args: CommandArgs) -> None:  # noqa: PLR0912, PLR0915
         with open(self.input_file, "r") as f:
             data = f.read()
 
@@ -140,6 +141,16 @@ class MigrateCommand(Command):
         _rename(new, "/dnssec/trust-anchor-sentinel", "/dnssec/sentinel")
         _rename(new, "/dnssec/trust-anchor-signal-query", "/dnssec/signal-query")
         _rename(new, "/logging/dnssec-bogus", "/dnssec/log-bogus")
+        _rename(new, "/monitoring/enabled", "/monitoring/metrics")
+        monitoring_key = "monitoring"
+        if monitoring_key in new:
+            graphite_key = "graphite"
+            if graphite_key in new[monitoring_key]:
+                graphite = new[monitoring_key][graphite_key]
+                if graphite is False:
+                    _add(new, "/monitoring/graphite/enabled", False)
+                else:
+                    _add(new, "/monitoring/graphite/enabled", True)
         _rename(new, "/network/tls/files-watchdog", "/network/tls/watchdog")
         rate_limiting_key = "rate-limiting"
         if rate_limiting_key in new:
@@ -153,6 +164,6 @@ class MigrateCommand(Command):
             with open(self.output_file, "w") as f:
                 f.write(dumped)
         else:
-            print("\nNew migrated configuration:")
+            print(f"\nNew migrated configuration (v{VERSION}):")
             print("---")
             print(dumped)
