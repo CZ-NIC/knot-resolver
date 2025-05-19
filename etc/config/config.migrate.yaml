@@ -27,6 +27,11 @@ logging:
     assertion-abort: false
     assertion-fork: 5m
 
+monitoring:
+  # graphite: false
+  graphite:
+    host: 127.0.0.1
+
 network:
   tls:
     auto-discovery: true
