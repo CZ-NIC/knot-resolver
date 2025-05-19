@@ -1514,70 +1514,82 @@
             "description": "Metrics exposisition configuration (Prometheus, Graphite)",
             "type": "object",
             "properties": {
-                "enabled": {
+                "metrics": {
                     "type": "string",
                     "enum": [
                         "manager-only",
                         "lazy",
                         "always"
                     ],
-                    "description": "configures, whether statistics module will be loaded into resolver",
+                    "description": "configures, whether metrics/statistics will be collected by the resolver",
                     "default": "lazy"
                 },
                 "graphite": {
-                    "anyOf": [
-                        {
-                            "type": "string",
-                            "enum": [
-                                false
-                            ]
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "default": false
                         },
-                        {
-                            "type": "object",
-                            "properties": {
-                                "host": {
-                                    "anyOf": [
-                                        {
-                                            "type": "string"
-                                        },
-                                        {
-                                            "type": "string"
-                                        },
-                                        {
-                                            "type": "string",
-                                            "pattern": "(?=^.{,253}\\.?$)(^(?!-)[^.]{,62}[^.-](\\.(?!-)[^.]{,62}[^.-])*\\.?$)|^\\.$"
-                                        }
-                                    ]
+                        "host": {
+                            "anyOf": [
+                                {
+                                    "type": "null"
                                 },
-                                "port": {
-                                    "type": "integer",
-                                    "minimum": 1,
-                                    "maximum": 65535,
-                                    "default": 2003
+                                {
+                                    "type": "string"
                                 },
-                                "prefix": {
+                                {
+                                    "type": "string"
+                                },
+                                {
                                     "type": "string",
-                                    "default": ""
-                                },
-                                "interval": {
-                                    "type": "string",
-                                    "pattern": "^(\\d+)(us|ms|s|m|h|d)$",
-                                    "default": "5s"
-                                },
-                                "tcp": {
-                                    "type": "boolean",
-                                    "default": false
+                                    "pattern": "(?=^.{,253}\\.?$)(^(?!-)[^.]{,62}[^.-](\\.(?!-)[^.]{,62}[^.-])*\\.?$)|^\\.$"
                                 }
-                            }
+                            ],
+                            "default": null
+                        },
+                        "port": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 65535,
+                            "default": 2003
+                        },
+                        "prefix": {
+                            "type": "string",
+                            "default": ""
+                        },
+                        "interval": {
+                            "type": "string",
+                            "pattern": "^(\\d+)(us|ms|s|m|h|d)$",
+                            "default": "5s"
+                        },
+                        "tcp": {
+                            "type": "boolean",
+                            "default": false
                         }
-                    ],
+                    },
                     "description": "optionally configures where should graphite metrics be sent to",
-                    "default": false
+                    "default": {
+                        "enabled": false,
+                        "host": null,
+                        "port": 2003,
+                        "prefix": "",
+                        "interval": "5s",
+                        "tcp": false
+                    }
                 }
             },
             "default": {
-                "enabled": "lazy",
-                "graphite": false
+                "metrics": "lazy",
+                "graphite": {
+                    "enabled": false,
+                    "host": null,
+                    "port": 2003,
+                    "prefix": "",
+                    "interval": "5s",
+                    "tcp": false
+                }
             }
         },
         "rate-limiting": {

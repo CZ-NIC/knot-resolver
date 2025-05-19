@@ -26,6 +26,8 @@ Incompatible changes
   - /dnssec/trust-anchor-sentinel -> /dnssec/sentinel
   - /dnssec/trust-anchor-signal-query -> /dnssec/signal-query
   - /logging/dnssec-bogus -> /dnssec/log-bogus
+  - /monitoring/enabled -> /monitoring/metrics
+  - /monitoring/graphite -> /monitoring/graphite/enabled
   - /network/tls/files-watchdog -> /network/tls/watchdog
   - /rate-limiting -> /rate-limiting/enabled
 
