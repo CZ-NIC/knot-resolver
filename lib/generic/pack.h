@@ -198,7 +198,7 @@ static inline int pack_clone(pack_t **dst, const pack_t *src, knot_mm_t *pool)
 		return kr_error(EINVAL);
 	/* Get a valid pack_t. */
 	if (!*dst) {
-		*dst = mm_alloc(pool, sizeof(pack_t));
+		*dst = (pack_t *)mm_alloc(pool, sizeof(pack_t));
 		if (!*dst) return kr_error(ENOMEM);
 		pack_init(**dst);
 		/* Clone data only if needed */
