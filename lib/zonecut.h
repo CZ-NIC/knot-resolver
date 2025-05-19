@@ -153,7 +153,7 @@ int kr_zonecut_set_sbelt(struct kr_context *ctx, struct kr_zonecut *cut);
 KR_EXPORT
 int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut,
 			   const knot_dname_t *name, const struct kr_query *qry,
-			   bool * restrict secured);
+			   bool *secured);
 /**
  * Check if any address is present in the zone cut.
  *
