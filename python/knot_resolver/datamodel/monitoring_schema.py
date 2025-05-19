@@ -5,19 +5,24 @@ from knot_resolver.utils.modeling import ConfigSchema
 
 
 class GraphiteSchema(ConfigSchema):
-    host: Union[IPAddress, DomainName]
+    enabled: bool = False
+    host: Union[None, IPAddress, DomainName] = None
     port: PortNumber = PortNumber(2003)
     prefix: EscapedStr = EscapedStr("")
     interval: TimeUnit = TimeUnit("5s")
     tcp: bool = False
 
+    def _validate(self) -> None:
+        if self.enabled and not self.host:
+            raise ValueError("'host' option must be configured to enable graphite bridge")
+
 
 class MonitoringSchema(ConfigSchema):
     """
     ---
-    enabled: configures, whether statistics module will be loaded into resolver
+    metrics: configures, whether metrics/statistics will be collected by the resolver
     graphite: optionally configures where should graphite metrics be sent to
     """
 
-    enabled: Literal["manager-only", "lazy", "always"] = "lazy"
-    graphite: Union[Literal[False], GraphiteSchema] = False
+    metrics: Literal["manager-only", "lazy", "always"] = "lazy"
+    graphite: GraphiteSchema = GraphiteSchema()

@@ -18,15 +18,15 @@ exposed as :ref:`config-monitoring-prometheus`.
 
 .. option:: monitoring:
 
-   .. option:: enabled: manager-only|lazy|always
+   .. option:: metrics: manager-only|lazy|always
 
       :default: lazy
 
       Configures, whether statistics module will be loaded into resolver.
 
-      * ``manager-only`` - Disables statistics collection in all `kresd` workers.
-      * ``lazy`` - Statistics collection is enabled at the time of request.
-      * ``always`` - Statistics collection is always on.
+      * ``manager-only`` - Disables metrics/statistics collection in all `kresd` workers.
+      * ``lazy`` - Metrics/statistics collection is enabled at the time of request.
+      * ``always`` - Metrics/statistics collection is always on.
 
 You can see all built-in statistics in `built-in statistics <./dev/modules-stats.html#mod-stats-list>`_ section.
 
@@ -62,16 +62,19 @@ Example configuration:
 
    monitoring:
      graphite:
+       enabled: true
        host: 127.0.0.1 # graphite server address
        port: 200       # optional graphite server port (2003 is default)
        interval: 5s    # optional publish interval (5s is default)
 
-.. option:: monitoring/graphite: <graphite-config>|false
+.. option:: monitoring/graphite:
 
-   :default: false
+   .. option:: enabled: true|false
 
-   Graphite module is disabled by default.
-   It is automatically enabled when configured.
+      :default: false
+
+      Enabled Graphite bridge module. It is disabled by default.
+      Configured :option:`host <host: <address or hostname>>` is also required to enable Graphite bridge.
 
    .. option:: host: <address or hostname>
 
