@@ -92,7 +92,7 @@ struct local_state {
 	bool force_resolve;
 	/** Used to work around auths with broken TCP. */
 	bool force_udp;
-	void *private; /**< Inner state of the implementation.*/
+	void *priv; /**< Inner state of the implementation.*/
 };
 
 /**

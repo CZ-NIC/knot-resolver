@@ -38,7 +38,7 @@ void forward_choose_transport(struct kr_query *qry,
 			      struct kr_transport **transport)
 {
 	struct forward_local_state *local_state =
-		qry->server_selection.local_state->private;
+		qry->server_selection.local_state->priv;
 	struct choice choices[local_state->targets->len];
 	int valid = 0;
 
@@ -110,7 +110,7 @@ void forward_error(struct kr_query *qry, const struct kr_transport *transport,
 		return;
 	}
 	struct forward_local_state *local_state =
-		qry->server_selection.local_state->private;
+		qry->server_selection.local_state->priv;
 	struct address_state *addr_state =
 		&local_state->addr_states[local_state->last_choice_index];
 	error(qry, addr_state, transport, sel_error);
@@ -128,7 +128,7 @@ void forward_update_rtt(struct kr_query *qry,
 	}
 
 	struct forward_local_state *local_state =
-		qry->server_selection.local_state->private;
+		qry->server_selection.local_state->priv;
 	struct address_state *addr_state =
 		&local_state->addr_states[local_state->last_choice_index];
 
