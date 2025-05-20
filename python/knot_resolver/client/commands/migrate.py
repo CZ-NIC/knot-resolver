@@ -123,6 +123,15 @@ class MigrateCommand(Command):
         _remove(new, "/webmgmt")
 
         # RENAME/MOVE
+        cache_key = "cache"
+        if cache_key in new:
+            gc_key = "garbage-collector"
+            if gc_key in new[cache_key]:
+                gc = new[cache_key][gc_key]
+                if gc is False:
+                    _add(new, "/cache/garbage-collector/enabled", False)
+                else:
+                    _add(new, "/cache/garbage-collector/enabled", True)
         dns64_key = "dns64"
         if dns64_key in new:
             if new[dns64_key] is False:
