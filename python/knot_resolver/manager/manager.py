@@ -291,8 +291,8 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                 await self._rolling_restart(config)
                 await self._ensure_number_of_children(config, int(config.workers))
 
-                if self._is_gc_running() != bool(config.cache.garbage_collector):
-                    if config.cache.garbage_collector:
+                if self._is_gc_running() != config.cache.garbage_collector.enabled:
+                    if config.cache.garbage_collector.enabled:
                         logger.debug("Starting cache GC")
                         await self._start_gc(config)
                     else:
