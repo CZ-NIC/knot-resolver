@@ -341,7 +341,7 @@ static inline void *mp_spread(struct mempool *pool, void *p, size_t size)
  **/
 static inline char *mp_append_char(struct mempool *pool, char *p, uint c)
 {
-  p = mp_spread(pool, p, 1);
+  p = (char *)mp_spread(pool, p, 1);
   *p++ = c;
   return p;
 }
@@ -353,7 +353,7 @@ static inline char *mp_append_char(struct mempool *pool, char *p, uint c)
  **/
 static inline void *mp_append_block(struct mempool *pool, void *p, const void *block, size_t size)
 {
-  char *q = mp_spread(pool, p, size);
+  char *q = (char *)mp_spread(pool, p, size);
   memcpy(q, block, size);
   return q + size;
 }
@@ -385,8 +385,8 @@ static inline void *mp_end(struct mempool *pool, void *end)
  **/
 static inline char *mp_end_string(struct mempool *pool, void *end)
 {
-  end = mp_append_char(pool, end, 0);
-  return mp_end(pool, end);
+  end = mp_append_char(pool, (char *)end, 0);
+  return (char *)mp_end(pool, end);
 }
 
 /**
