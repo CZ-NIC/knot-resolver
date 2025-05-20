@@ -372,7 +372,11 @@ int kr_straddr_subnet(void *dst, const char *addr);
  * \note Only internet addresses are supported, i.e. no AF_UNIX sockets.
  */
 KR_EXPORT
-int kr_straddr_split(const char *instr, char ipaddr[static restrict (INET6_ADDRSTRLEN + 1)],
+int kr_straddr_split(const char *instr, char ipaddr[
+			#ifndef __cplusplus
+			static restrict (INET6_ADDRSTRLEN + 1)
+			#endif
+		     ],
 		     uint16_t *port);
 
 /** Formats ip address and port in "addr#port" format.
@@ -422,7 +426,7 @@ static inline bool kr_sockaddr_link_local(const struct sockaddr *addr)
   * @return key length if successful or an error
   * */
 KR_EXPORT
-int kr_rrkey(char *key, uint16_t class, const knot_dname_t *owner,
+int kr_rrkey(char *key, uint16_t rrclass, const knot_dname_t *owner,
 	     uint16_t type, uint16_t additional);
 
 /** Add RRSet copy to a ranked RR array.

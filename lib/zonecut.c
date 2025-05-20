@@ -532,7 +532,7 @@ static int fetch_secure_rrset(knot_rrset_t **rr, struct kr_cache *cache,
 
 int kr_zonecut_find_cached(struct kr_context *ctx, struct kr_zonecut *cut,
 			   const knot_dname_t *name, const struct kr_query *qry,
-			   bool * restrict secured)
+			   bool *secured)
 {
 	if (!ctx || !cut || !name)
 		return kr_error(EINVAL);
