@@ -1,4 +1,4 @@
-from typing import List, Literal, Optional, Union
+from typing import List, Optional
 
 from knot_resolver.constants import CACHE_DIR
 from knot_resolver.datamodel.templates import template_from_str
@@ -62,6 +62,7 @@ class GarbageCollectorSchema(ConfigSchema):
     Configuration options of the cache garbage collector (kres-cache-gc).
 
     ---
+    enabled: Enable/disable cache garbage collector.
     interval: Time interval how often the garbage collector will be run.
     threshold: Cache usage in percent that triggers the garbage collector.
     release: Percent of used cache to be freed by the garbage collector.
@@ -73,6 +74,7 @@ class GarbageCollectorSchema(ConfigSchema):
     dry_run: Run the garbage collector in dry-run mode.
     """
 
+    enabled: bool = True
     interval: TimeUnit = TimeUnit("1s")
     threshold: Percent = Percent(80)
     release: Percent = Percent(10)
@@ -126,7 +128,7 @@ class CacheSchema(ConfigSchema):
 
     storage: WritableDir = lazy_default(WritableDir, str(CACHE_DIR))
     size_max: SizeUnit = SizeUnit("100M")
-    garbage_collector: Union[GarbageCollectorSchema, Literal[False]] = GarbageCollectorSchema()
+    garbage_collector: GarbageCollectorSchema = GarbageCollectorSchema()
     ttl_min: TimeUnit = TimeUnit("5s")
     ttl_max: TimeUnit = TimeUnit("1d")
     ns_timeout: TimeUnit = TimeUnit("1000ms")
