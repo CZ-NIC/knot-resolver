@@ -1,10 +1,14 @@
+
+cache:
+  # garbage-collector: false
+  garbage-collector:
+    interval: 2s
+
 # dns64: true
-
-# dnssec: false
-
 dns64:
   rev-ttl: 1d
 
+# dnssec: false
 dnssec:
   refresh-time: 10m
   hold-down-time: 30d
