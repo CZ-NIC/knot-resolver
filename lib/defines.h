@@ -41,7 +41,9 @@ static inline int KR_COLD kr_error(int x) {
 
 /* We require C11 but want to avoid including the standard assertion header
  * so we alias it ourselves. */
+#ifndef __cplusplus
 #define static_assert _Static_assert
+#endif
 
 /*
  * Connection limits.

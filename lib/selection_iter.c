@@ -240,7 +240,7 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 	struct knot_mm *mempool = &qry->request->pool;
 	struct iter_local_state *local_state =
 		(struct iter_local_state *)
-			qry->server_selection.local_state->private;
+			qry->server_selection.local_state->priv;
 
 	unpack_state_from_zonecut(local_state, qry);
 
@@ -363,7 +363,7 @@ void iter_error(struct kr_query *qry, const struct kr_transport *transport,
 	if (!qry->server_selection.initialized) {
 		return;
 	}
-	struct iter_local_state *local_state = qry->server_selection.local_state->private;
+	struct iter_local_state *local_state = qry->server_selection.local_state->priv;
 	struct address_state *addr_state = get_address_state(local_state, transport);
 	local_state->last_error = sel_error;
 	error(qry, addr_state, transport, sel_error);
@@ -375,7 +375,7 @@ void iter_update_rtt(struct kr_query *qry, const struct kr_transport *transport,
 	if (!qry->server_selection.initialized) {
 		return;
 	}
-	struct iter_local_state *local_state = qry->server_selection.local_state->private;
+	struct iter_local_state *local_state = qry->server_selection.local_state->priv;
 	struct address_state *addr_state = get_address_state(local_state, transport);
 	update_rtt(qry, addr_state, transport, rtt);
 }

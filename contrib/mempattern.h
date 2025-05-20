@@ -64,7 +64,7 @@ static inline void mm_ctx_delete(knot_mm_t *mm)
 {
 	/* The mp_alloc comparison bears a risk of missing the private symbol from knot. */
 	if (mm && mm->ctx && mm->alloc == (knot_mm_alloc_t)mp_alloc)
-		mp_delete(mm->ctx);
+		mp_delete((struct mempool *)mm->ctx);
 }
 
 /*! \brief Readability: avoid const-casts in code. */

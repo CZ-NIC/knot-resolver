@@ -744,14 +744,14 @@ void kr_bitmask(unsigned char *a, size_t a_len, int bits)
 		a[i] = 0;
 }
 
-int kr_rrkey(char *key, uint16_t class, const knot_dname_t *owner,
+int kr_rrkey(char *key, uint16_t rrclass, const knot_dname_t *owner,
 	     uint16_t type, uint16_t additional)
 {
 	if (!key || !owner) {
 		return kr_error(EINVAL);
 	}
 	uint8_t *key_buf = (uint8_t *)key;
-	int ret = u16tostr(key_buf, class);
+	int ret = u16tostr(key_buf, rrclass);
 	if (ret <= 0) {
 		return ret;
 	}

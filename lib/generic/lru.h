@@ -172,7 +172,7 @@ enum lru_apply_do {
 	enum lru_apply_do (*(name))(const char *key, uint len, val_type *val, void *baton)
 typedef lru_apply_fun_g(lru_apply_fun, void);
 
-#define CACHE_ALIGNED _Alignas(64)
+#define CACHE_ALIGNED alignas(64)
 
 struct lru;
 void lru_free_items_impl(struct lru *lru);

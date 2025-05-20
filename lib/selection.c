@@ -758,7 +758,7 @@ void kr_server_selection_init(struct kr_query *qry)
 			.local_state = local_state,
 		};
 		forward_local_state_alloc(
-			mempool, &qry->server_selection.local_state->private,
+			mempool, &qry->server_selection.local_state->priv,
 			qry->request);
 	} else {
 		qry->server_selection = (struct kr_server_selection){
@@ -769,7 +769,7 @@ void kr_server_selection_init(struct kr_query *qry)
 			.local_state = local_state,
 		};
 		iter_local_state_alloc(
-			mempool, &qry->server_selection.local_state->private);
+			mempool, &qry->server_selection.local_state->priv);
 	}
 }
 void kr_server_selection_cached(struct kr_query *qry)
