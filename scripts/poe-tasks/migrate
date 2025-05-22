@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+
+# ensure consistent behaviour
+src_dir="$(dirname "$(realpath "$0")")"
+source $src_dir/utils/_env.sh
+
+# stop failing early, because we wouldn't do anything else than fail
+set +e
+
+# migrate all testing configuration
+for config in $PWD/etc/config/config.migrate-test*.yaml;
+do
+    python3 -m knot_resolver.client migrate $config migrated.yaml;
+    python3 -m knot_resolver.client validate --no-strict migrated.yaml;
+    check_rv $?
+done
