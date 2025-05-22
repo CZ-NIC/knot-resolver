@@ -1,0 +1,10 @@
+
+cache:
+  garbage-collector: false
+
+dns64: true
+
+dnssec: false
+
+monitoring:
+  graphite: false
