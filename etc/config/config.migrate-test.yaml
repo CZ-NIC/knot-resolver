@@ -1,14 +1,10 @@
-
 cache:
-  # garbage-collector: false
   garbage-collector:
     interval: 2s
 
-# dns64: true
 dns64:
   rev-ttl: 1d
 
-# dnssec: false
 dnssec:
   refresh-time: 10m
   hold-down-time: 30d
@@ -32,7 +28,7 @@ logging:
     assertion-fork: 5m
 
 monitoring:
-  # graphite: false
+  enabled: always
   graphite:
     host: 127.0.0.1
 

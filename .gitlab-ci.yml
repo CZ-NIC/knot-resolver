@@ -855,6 +855,12 @@ python:examples:
     - poetry install --all-extras --only main,dev
     - poe examples
 
+python:migrate:
+  <<: *python
+  script:
+    - poetry install --all-extras --only main,dev
+    - poe test-migrate
+
 python:check:
   <<: *python
   script:
