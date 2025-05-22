@@ -84,6 +84,7 @@ gen-setuppy = { cmd = "scripts/poe-tasks/gen-setuppy", help = "Generate 'setup.p
 format = { cmd = "scripts/poe-tasks/format", help = "Check and fix code formatting using Ruff." }
 kresctl = { cmd = "scripts/poe-tasks/kresctl", help="Run kresctl utility" }
 clean = { cmd = "scripts/poe-tasks/clean", help="Cleanup build directories and files" }
+migrate = { cmd = "scripts/poe-tasks/migrate", help = "Migrate testing configuration using 'kresctl migrate' utility and validate it" }
 
 [tool.ruff]
 line-length = 120
