@@ -14,13 +14,12 @@ export DEB_LDFLAGS_MAINT_APPEND = -Wl,--as-needed
 DPKG_EXPORT_BUILDFLAGS = 1
 include /usr/share/dpkg/default.mk
 
-export ARCH=$(DEB_HOST_GNU_CPU)
 
 %:
-	dh $@
+	dh $@ --buildsystem=meson
 
-override_dh_auto_build:
-	meson build_deb \
+override_dh_auto_configure:
+	dh_auto_configure -- \
 		--buildtype=plain \
 		--prefix=/usr \
 		--libdir=lib \
@@ -33,19 +32,7 @@ override_dh_auto_build:
 		-Dinstall_kresd_conf=enabled \
 		-Dunit_tests=enabled \
 		-Dmalloc=jemalloc \
-		-Dc_args="$${CFLAGS}" \
-		-Dc_link_args="$${LDFLAGS}"
-	ninja -v -C build_deb
-	ninja -v -C build_deb doc
 
-override_dh_auto_install:
-	DESTDIR="${PWD}/debian/tmp" ninja -v -C build_deb install
-
-override_dh_auto_test:
-	meson test -C build_deb
-
-override_dh_missing:
-	dh_missing --fail-missing
-
-override_dh_strip:
-	dh_strip --dbg-package=knot-resolver-dbg
+override_dh_auto_build:
+	dh_auto_build -- doc
+	dh_auto_build
