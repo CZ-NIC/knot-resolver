@@ -415,7 +415,7 @@ static int notify_ready(const char *state)
 		strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path) - 1);
 		addrlen = offsetof(struct sockaddr_un, sun_path) + strlen(addr.sun_path) + 1;
 	}
-	if (sendto(sockfd, state, strlen(state), 0, &addr, addrlen) == -1) {
+	if (sendto(sockfd, state, strlen(state), 0, (struct sockaddr*)&addr, addrlen) == -1) {
 		kr_log_error(WORKER, "Failed to send notify message to '%s': %s\n",
 			socket_path, strerror(errno));
 		close(sockfd);
