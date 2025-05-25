@@ -102,7 +102,7 @@ function watchdog.init()
 	end
 	private.ok_callback = sd_signal_ok
 	if ret < 0 then
-		error('[watchdog] %s', ffi.string(ffi.C.knot_strerror(math.abs(ret))))
+		error('[watchdog] %s', kres.strerror(ret))
 		return
 	elseif ret == 0 then
 		log_info(ffi.C.LOG_GRP_WATCHDOG, 'disabled in systemd (WatchdogSec= not specified)')

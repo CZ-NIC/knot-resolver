@@ -355,7 +355,7 @@ cache.fssize = function ()
 	end
 	local size = tonumber(ffi.C.kr_fssize(path))
 	if size < 0 then
-		panic('cache.fssize(): %s', ffi.string(ffi.C.knot_strerror(size)))
+		panic('cache.fssize(): %s', kres.strerror(size))
 	else
 		return size
 	end
@@ -386,7 +386,7 @@ cache.clear = function (name, exact_name, rr_type, chunk_size, callback, prev_st
 		local apex_array = ffi.new('knot_dname_t *[1]')  -- C: dname **apex_array
 		local ret = ffi.C.kr_cache_closest_apex(cach, dname, false, apex_array)
 		if ret < 0 then
-			error(ffi.string(ffi.C.knot_strerror(ret))) end
+			error(kres.strerror(ret)) end
 		if not ffi.C.knot_dname_is_equal(apex_array[0], dname) then
 			local apex_str = kres.dname2str(apex_array[0])
 			rettable.not_apex = 'to clear proofs of non-existence call '
@@ -403,7 +403,7 @@ cache.clear = function (name, exact_name, rr_type, chunk_size, callback, prev_st
 		if chunk_size or callback
 			then error('cache.clear(): chunk_size and callback parameters not supported with rr_type') end
 		local ret = ffi.C.kr_cache_remove(cach, dname, rr_type)
-		if ret < 0 then error(ffi.string(ffi.C.knot_strerror(ret))) end
+		if ret < 0 then error(kres.strerror(ret)) end
 		return {count = 1}
 	end
 
@@ -424,7 +424,7 @@ cache.clear = function (name, exact_name, rr_type, chunk_size, callback, prev_st
 	-- Default callback function: repeat after 1ms
 	if callback == nil then callback =
 		function (cbname, cbexact_name, cbrr_type, cbchunk_size, cbself, cbprev_state, cbrettable)
-			if cbrettable.count < 0 then error(ffi.string(ffi.C.knot_strerror(cbrettable.count))) end
+			if cbrettable.count < 0 then error(kres.strerror(cbrettable.count)) end
 			if cbprev_state == nil then cbprev_state = { round = 0 } end
 			if type(cbprev_state) ~= 'table'
 				then error('cache.clear() callback: incorrect prev_state passed') end
