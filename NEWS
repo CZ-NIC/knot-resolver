@@ -6,6 +6,7 @@ Bugfixes
 - fix `dnssec: false` (!1687)
 - fix undefined disable_defer (!1685)
 - daemon: fix a memory leak present since v6.0.9 (#927)
+- fix logging `[prefil] empty zone file` (!1688)
 
 Improvements
 ------------
