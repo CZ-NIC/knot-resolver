@@ -5,7 +5,8 @@
 #pragma once
 
 #include <errno.h>
-#include <libknot/errcode.h>
+#include <stdlib.h>
+#include <libknot/error.h>
 #include <libknot/dname.h>
 #include <libknot/rrset.h>
 #include <libknot/version.h>
@@ -34,10 +35,23 @@ typedef unsigned int uint;
  */
 #define kr_ok() 0
 /* Mark as cold to mark all branches as unlikely. */
-static inline int KR_COLD kr_error(int x) {
+KR_COLD static inline
+int kr_error(int x) {
     return x <= 0 ? x : -x;
 }
-#define kr_strerror(x) strerror(abs(x))
+/** Our strerror() variant, covering at least OS and Knot libs. */
+KR_EXPORT KR_COLD inline
+const char * kr_strerror(int e)
+{
+	return e < KNOT_ERROR_MAX ? knot_strerror(e) : strerror(abs(e));
+	/* Inline: we also need it from lua, so that's why there's a non-inline
+	 * instance of this in utils.c (and it's a cold function anyway).
+	 *
+	 * Condition: it's nice to have wider coverage provided by knot_strerror(),
+	 * but that would *redefine* the strings also for some common errors
+	 * like EINVAL, and I'm not sure about that at this point.
+	 */
+}
 
 /* We require C11 but want to avoid including the standard assertion header
  * so we alias it ourselves. */

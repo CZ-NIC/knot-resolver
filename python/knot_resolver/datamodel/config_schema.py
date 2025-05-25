@@ -196,7 +196,7 @@ class KresConfig(ConfigSchema):
         workers_max = _workers_max_count()
         if int(self.workers) > workers_max:
             raise ValueError(
-                f"can't run with more workers then the recommended maximum {workers_max} or hardcoded {WORKERS_MAX}"
+                f"can't run with more workers than the recommended maximum {workers_max} or hardcoded {WORKERS_MAX}"
             )
 
         # sanity check

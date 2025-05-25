@@ -70,20 +70,26 @@ end
 
 local function download(url, fname)
 	local kluautil = require('kluautil')
-	local file, rcode, errmsg
-	file, errmsg = io.open(fname, 'w')
+	local fname_tmp = os.tmpname()
+	local file, ok, errmsg
+	file, errmsg = io.open(fname_tmp, 'w')
 	if not file then
-		error(string.format("[prefil] unable to open file %s (%s)",
-			fname, errmsg))
+		return false, string.format("unable to open file %s: %s", fname_tmp, errmsg)
 	end
 
 	log_info(ffi.C.LOG_GRP_PREFILL, "downloading root zone to file %s ...", fname)
-	rcode, errmsg = kluautil.kr_https_fetch(url, file, rz_ca_file)
-	if rcode == nil then
-		error(string.format("[prefil] fetch of `%s` failed: %s", url, errmsg))
-	end
-
+	ok, errmsg = kluautil.kr_https_fetch(url, file, rz_ca_file)
 	file:close()
+	if not ok then
+		os.remove(fname_tmp) -- try to clean up but ignore errors
+		return false, string.format("fetch of `%s` failed: %s", url, errmsg)
+	end
+	ok, errmsg = os.rename(fname_tmp, fname)
+	if ok == nil then
+		os.remove(fname_tmp) -- try to clean up but ignore errors
+		return false, string.format("unable to move to file %s: %s", fname, errmsg);
+	end
+	return true
 end
 
 local function import(fname)
@@ -93,10 +99,9 @@ local function import(fname)
 	})
 	if ret == 0 then
 		log_info(ffi.C.LOG_GRP_PREFILL, "zone successfully parsed, import started")
+		return true
 	else
-		error(string.format(
-			"[prefil] zone import failed: %s", ffi.C.knot_strerror(ret)
-		))
+		return false
 	end
 end
 
@@ -107,7 +112,7 @@ function forward_references.fill_cache()
 		log_info(ffi.C.LOG_GRP_PREFILL, "root zone file valid for %s, reusing data from disk",
 			display_delay(file_ttl))
 	else
-		local ok, errmsg = pcall(download, rz_url, rz_local_fname)
+		local ok, errmsg = download(rz_url, rz_local_fname)
 		if not ok then
 			rz_cur_interval = rz_https_fail_interval
 						- math.random(rz_interval_randomizer_limit)
@@ -115,15 +120,13 @@ function forward_references.fill_cache()
 				.. "will retry root zone download in %s",
 				errmsg, display_delay(rz_cur_interval))
 			restart_timer(rz_cur_interval)
-			os.remove(rz_local_fname)
 			return
 		end
 		file_ttl = rz_default_interval
 	end
 	-- file is up to date, import
 	-- import/filter function gets executed after resolver/module
-	local ok, errmsg = pcall(import, rz_local_fname)
-	if not ok then
+	if not import(rz_local_fname) then
 		if rz_first_try then
 			rz_first_try = false
 			rz_cur_interval = 1
@@ -131,8 +134,8 @@ function forward_references.fill_cache()
 			rz_cur_interval = rz_import_error_interval
 				- math.random(rz_interval_randomizer_limit)
 		end
-		log_info(ffi.C.LOG_GRP_PREFILL, "root zone import failed (%s), retry in %s",
-			errmsg, display_delay(rz_cur_interval))
+		log_info(ffi.C.LOG_GRP_PREFILL, "root zone import failed, retry in %s",
+			display_delay(rz_cur_interval))
 	else
 		-- re-download before TTL expires
 		rz_cur_interval = (file_ttl - rz_interval_threshold
