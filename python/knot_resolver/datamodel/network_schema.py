@@ -139,7 +139,7 @@ class ListenSchema(ConfigSchema):
             return origin.port
         # default port number based on kind
         if origin.interface:
-            if origin.kind == "dot":
+            if origin.kind == "dot" or origin.kind == "doq":
                 return PortNumber(853)
             if origin.kind in ["doh-legacy", "doh2"]:
                 return PortNumber(443)

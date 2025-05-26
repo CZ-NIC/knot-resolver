@@ -67,11 +67,12 @@ static const enum protolayer_type protolayer_grp_doh[] = {
 };
 
 static const enum protolayer_type protolayer_grp_doq[] = {
-	// PROTOLAYER_TYPE_UDP,
+	PROTOLAYER_TYPE_UDP,
 	// PROTOLAYER_TYPE_PROXYV2_DGRAM,
 	// PROTOLAYER_TYPE_DEFER,
 	PROTOLAYER_TYPE_QUIC,
 	// PROTOLAYER_TYPE_DNS_DGRAM,
+	// PROTOLAYER_TYPE_NULL,
 };
 
 struct protolayer_grp {
@@ -1525,7 +1526,10 @@ static int session2_transport_pushv(struct session2 *s,
 				return kr_ok();
 			} else {
 				int ret = uv_udp_try_send((uv_udp_t*)handle, (uv_buf_t *)iov, iovcnt,
-					the_network->enable_connect_udp ? NULL : comm->comm_addr);
+					the_network->enable_connect_udp
+					&& s->proto != KR_PROTO_DOQ
+					? NULL : comm->comm_addr);
+
 				if (ret > 0) // equals buffer size, only confuses us
 					ret = 0;
 				if (ret == UV_EAGAIN) {

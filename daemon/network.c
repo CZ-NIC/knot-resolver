@@ -439,12 +439,12 @@ static int open_endpoint(const char *addr_str,
 	} /* else */
 
 	if (ep->flags.sock_type == SOCK_DGRAM) {
-		if (kr_fails_assert(!ep->flags.tls))
+		if (kr_fails_assert(!ep->flags.tls || ep->flags.doq))
 			return kr_error(EINVAL);
 		uv_udp_t *ep_handle = malloc(sizeof(uv_udp_t));
 		ep->handle = (uv_handle_t *)ep_handle;
 		ret = !ep->handle ? ENOMEM
-			: io_listen_udp(the_network->loop, ep_handle, ep->fd);
+			: io_listen_udp(the_network->loop, ep_handle, ep->fd, ep->flags.doq);
 		goto finish_ret;
 	} /* else */
 

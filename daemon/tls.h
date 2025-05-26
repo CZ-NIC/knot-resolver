@@ -15,6 +15,7 @@
 
 #define MAX_TLS_PADDING KR_EDNS_PAYLOAD
 #define TLS_MAX_UNCORK_RETRIES 100
+#define ENABLE_QUIC
 
 /* rfc 5476, 7.3 - handshake Protocol overview
  * https://tools.ietf.org/html/rfc5246#page-33
@@ -44,6 +45,10 @@ struct tls_credentials {
 	gnutls_certificate_credentials_t credentials;
 	time_t valid_until;
 	char *ephemeral_servicename;
+#ifdef ENABLE_QUIC
+	gnutls_anti_replay_t tls_anti_replay;
+	// gnutls_datum_t tls_ticket_key;
+#endif /* ENABLE_QUIC */
 };
 
 

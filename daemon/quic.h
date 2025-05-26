@@ -10,6 +10,28 @@
 #include <ngtcp2/ngtcp2_crypto_gnutls.h>
 // #include "daemon/tls.h"
 
+#include <gnutls/x509.h>
+#include <gnutls/gnutls.h>
+#include <gnutls/crypto.h>
+#include "lib/log.h"
+#include "session2.h"
+#include "network.h"
+#include "lib/resolve.h"
+// #include "libknot/quic/quic.h"
+#include "libdnssec/random.h"
+#include <stdint.h>
+#include <contrib/ucw/heap.h>
+#include <contrib/ucw/lists.h>
+#include "contrib/openbsd/siphash.h"
+#include "lib/utils.h"
+#include "libdnssec/error.h"
+
+#include <stddef.h>
+#include <netinet/in.h>
+
+#include <worker.h>
+
+
 #define MAX_QUIC_FRAME_SIZE 65536
 
 typedef enum {
@@ -222,5 +244,5 @@ typedef struct pl_quic_sess_data {
 
 	struct kr_request *req;
 	quic_state_t state;
-	struct wire_buf wire_buf;
+	// struct wire_buf wire_buf;
 } pl_quic_sess_data_t;

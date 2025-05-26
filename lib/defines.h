@@ -81,6 +81,7 @@ const char * kr_strerror(int e)
 #define KR_DNS_PORT   53
 #define KR_DNS_DOH_PORT 443
 #define KR_DNS_TLS_PORT 853
+#define KR_DNS_DOQ_PORT 853
 #define KR_EDNS_VERSION 0
 #define KR_EDNS_PAYLOAD 1232 /* Default UDP payload; see https://www.dnsflagday.net/2020/ */
 #define KR_CACHE_DEFAULT_TTL_MIN (5) /* avoid bursts of queries */

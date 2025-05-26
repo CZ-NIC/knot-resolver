@@ -142,13 +142,20 @@ static bool net_listen_addrs(lua_State *L, int port, endpoint_flags_t flags, int
 			flags.sock_type = SOCK_DGRAM;
 			ret = network_listen(str, port, nic_queue, flags);
 		}
+		if (!flags.kind && flags.doq && ret == 0) {
+			flags.sock_type = SOCK_DGRAM;
+			ret = network_listen(str, port, nic_queue, flags);
+		}
 		if (!flags.kind && !flags.xdp && ret == 0) { /* common for TCP, DoT and DoH (v2) */
 			flags.sock_type = SOCK_STREAM;
 			ret = network_listen(str, port, nic_queue, flags);
 		}
 		if (flags.kind) {
 			flags.kind = strdup(flags.kind);
-			flags.sock_type = SOCK_STREAM; /* TODO: allow to override this? */
+			if (flags.doq)
+				flags.sock_type =  SOCK_DGRAM;
+			else
+				flags.sock_type = SOCK_STREAM; /* TODO: allow to override this? */
 			ret = network_listen(str, (is_unix ? 0 : port), nic_queue, flags);
 		}
 		if (ret == 0) return true; /* success */
