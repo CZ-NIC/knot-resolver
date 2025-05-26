@@ -23,6 +23,7 @@ kresd_src = files([
   'udp_queue.c',
   'worker.c',
   'zimport.c',
+  'quic.c',
 ])
 
 if nghttp2.found()
@@ -63,7 +64,8 @@ kresd_deps = [
   nghttp2,
   malloc,
   libm,
-  libngtcp2
+  libngtcp2,
+  libngtcp2_crypto,
 ]
 
 
