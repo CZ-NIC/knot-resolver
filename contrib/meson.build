@@ -12,6 +12,8 @@ contrib_src = files([
   'base64.c',
   'base64url.c',
   'openbsd/siphash.c',
+  'ucw/lists.c',
+  'ucw/heap.c',
 ])
 
 contrib_inc = include_directories('.', '..')
