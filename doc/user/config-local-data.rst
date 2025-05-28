@@ -100,14 +100,32 @@ It provides various input formats described in following subsections.
 
          Optional, restrict when this RPZ applies.  See :ref:`config-policy-new-tags`.
 
+      .. option:: log: <list, subset of [ name, ip ]>
+
+         Optional, indicate that each application of a rule should log the domain name
+         triggering it and/or the requestor's IP.
+         Logging is then done at the *notice* level.
+
+         .. code-block::
+
+            [rules ] => local data applied, user: ::1, name: foo.bar.93.100.in-addr.arpa.
+
+      .. option:: dry-run: <boolean, false by default>
+
+         Do not apply these rules.  You want to combine this with ``log``.
+
    .. code-block:: yaml
 
       local-data:
         rpz:
           - file: /tmp/adult.rpz
             tags: [ adult ]
-            # security blocklist applied for everyone
+          # security blocklist applied for everyone
           - file: /tmp/security.rpz
+          # log these but do not block them
+          - file: /tmp/suspicious.rpz
+            dry-run: true
+            log: [ name, ip ]
 
    So far, RPZ support is limited to the most common features:
 

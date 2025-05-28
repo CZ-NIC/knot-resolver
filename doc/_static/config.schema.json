@@ -954,6 +954,21 @@
                                 },
                                 "description": "Tags to link with other policy rules.",
                                 "default": null
+                            },
+                            "log": {
+                                "type": [
+                                    "array",
+                                    "null"
+                                ],
+                                "items": {
+                                    "type": "string",
+                                    "enum": [
+                                        "ip",
+                                        "name"
+                                    ]
+                                },
+                                "description": "Enables logging information whenever this RPZ matches.",
+                                "default": null
                             }
                         }
                     },
