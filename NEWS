@@ -11,6 +11,7 @@ Bugfixes
 Improvements
 ------------
 - C++ compatibility of lib/ headers (!1689)
+- /local-data/rpz/*/log: add option to log RPZ matches (!1694)
 
 
 Knot Resolver 6.0.12 (2025-04-24)
