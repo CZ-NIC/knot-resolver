@@ -71,7 +71,7 @@ assert(C.kr_rule_local_hosts('{{ file }}', {{ boolean(nodata) }},
 {# .opts are complicated #}
 {{ id }}.opts = C.KR_RULE_OPTS_DEFAULT
 {% if extra is not none -%}
-{% if extra.dry_run is not none and extra.dry_run -%}
+{% if false and extra.dry_run is not none and extra.dry_run -%}
 {{ id }}.opts.score = 4
 {% else %}
 {{ id }}.opts.score = 9

@@ -110,6 +110,7 @@ It provides various input formats described in following subsections.
 
             [rules ] => local data applied, user: ::1, name: foo.bar.93.100.in-addr.arpa.
 
+   .. hide this for now
       .. option:: dry-run: <boolean, false by default>
 
          Do not apply these rules.  You want to combine this with ``log``.
