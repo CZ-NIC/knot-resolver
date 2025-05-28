@@ -61,7 +61,7 @@ static int rr_trie2rule(const char *key_data, uint32_t key_len, trie_val_t *rr_p
 	const knot_db_val_t key = { .data = (void *)key_data, .len = key_len };
 	const knot_rrset_t *rr = *rr_p;
 	const struct kr_rule_zonefile_config *c = config;
-	return local_data_ins(key, rr, NULL, c->tags);
+	return local_data_ins(key, rr, NULL, c->tags, c->opts);
 	//TODO: check error logging path here (LMDB)
 }
 
@@ -87,19 +87,20 @@ static void cname_scan2rule(zs_scanner_t *s)
 		// Exact RPZ semantics would be hard here, it makes more sense
 		// to apply also to a subtree, and corresponding wildcard rule
 		// usually accompanies this rule anyway.
-		ret = kr_rule_local_subtree(apex, KR_RULE_SUB_NXDOMAIN, s->r_ttl, c->tags);
+		ret = kr_rule_local_subtree(apex, KR_RULE_SUB_NXDOMAIN,
+						s->r_ttl, c->tags, c->opts);
 	} else if (knot_dname_is_wildcard(s->r_data) && s->r_data[2] == 0) {
 		// "CNAME *." -> NODATA
 		knot_dname_t *apex = s->r_owner;
 		if (knot_dname_is_wildcard(apex)) {
 			apex += 2;
 			ret = kr_rule_local_subtree(apex, KR_RULE_SUB_NODATA,
-							s->r_ttl, c->tags);
+							s->r_ttl, c->tags, c->opts);
 		} else { // using special kr_rule_ semantics of empty CNAME RRset
 			knot_rrset_t rrs;
 			knot_rrset_init(&rrs, apex, KNOT_RRTYPE_CNAME,
 					KNOT_CLASS_IN, s->r_ttl);
-			ret = kr_rule_local_data_ins(&rrs, NULL, c->tags);
+			ret = kr_rule_local_data_ins(&rrs, NULL, c->tags, c->opts);
 		}
 	} else {
 		knot_dname_t *target = s->r_owner;
@@ -107,7 +108,7 @@ static void cname_scan2rule(zs_scanner_t *s)
 		knot_rrset_init(&rrs, target, KNOT_RRTYPE_CNAME, KNOT_CLASS_IN, s->r_ttl);
 		// TODO: implement wildcard expansion for target
 		ret = knot_rrset_add_rdata(&rrs, s->r_data, s->r_data_length, NULL);
-		if (!ret) ret = kr_rule_local_data_ins(&rrs, NULL, c->tags);
+		if (!ret) ret = kr_rule_local_data_ins(&rrs, NULL, c->tags, c->opts);
 		knot_rdataset_clear(&rrs.rrs, NULL);
 	}
 	if (ret)

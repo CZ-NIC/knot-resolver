@@ -332,6 +332,18 @@ void rdataset_dematerialize(const knot_rdataset_t *rds, uint8_t * restrict data)
  * Return the number of bytes consumed or an error code. */
 int rdataset_materialize(knot_rdataset_t * restrict rds, const uint8_t * const data,
 				const uint8_t *data_bound, knot_mm_t *pool);
+static inline int rdataset_materialize_val(knot_rdataset_t * restrict rds,
+					knot_db_val_t *val, knot_mm_t *pool)
+{
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpointer-arith"
+	int ret = rdataset_materialize(rds, val->data, val->data + val->len, pool);
+	if (unlikely(ret < 0)) return ret;
+	val->data += ret;
+	val->len -= ret;
+	return ret;
+#pragma GCC diagnostic pop
+}
 
 
 /** Partially constructed answer when gathering RRsets from cache. */

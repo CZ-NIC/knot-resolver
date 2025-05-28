@@ -385,6 +385,9 @@ static struct request_ctx *request_create(struct session2 *session,
 	array_init(req->selection_context.forwarding_targets);
 	array_reserve_mm(req->selection_context.forwarding_targets, 1, kr_memreserve, &req->pool);
 
+	req->rule_score_log = KR_RULE_SCORE_LOG;
+	req->rule_score_apply = KR_RULE_SCORE_APPLY;
+
 	the_worker->stats.rconcurrent += 1;
 
 	return ctx;

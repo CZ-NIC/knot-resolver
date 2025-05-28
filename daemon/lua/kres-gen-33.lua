@@ -203,6 +203,15 @@ struct kr_request_qsource_flags {
 	_Bool xdp : 1;
 };
 typedef unsigned long kr_rule_tags_t;
+struct kr_rule_opts {
+	uint8_t score : 4;
+	_Bool log_ip : 1;
+	_Bool log_name : 1;
+	uint8_t log_level : 2;
+	uint8_t ede_code : 2;
+	uint8_t ede_sub : 3;
+};
+typedef struct kr_rule_opts kr_rule_opts_t;
 struct kr_rule_zonefile_config {
 	const char *filename;
 	const char *input_str;
@@ -212,6 +221,7 @@ struct kr_rule_zonefile_config {
 	kr_rule_tags_t tags;
 	const char *origin;
 	uint32_t ttl;
+	kr_rule_opts_t opts;
 };
 struct kr_rule_fwd_flags {
 	_Bool is_auth : 1;
@@ -253,6 +263,8 @@ struct kr_request {
 	_Bool stale_accounted;
 	_Bool ratelimited;
 	uint8_t rank;
+	uint8_t rule_score_apply;
+	uint8_t rule_score_log;
 	struct kr_rplan rplan;
 	trace_log_f trace_log;
 	trace_callback_f trace_finish;
@@ -360,6 +372,7 @@ kr_layer_t kr_layer_t_static;
 _Bool kr_dbg_assertion_abort;
 int kr_dbg_assertion_fork;
 const uint32_t KR_RULE_TTL_DEFAULT;
+const kr_rule_opts_t KR_RULE_OPTS_DEFAULT;
 
 typedef int32_t (*kr_stale_cb)(int32_t ttl, const knot_dname_t *owner, uint16_t type,
 				const struct kr_query *qry);
@@ -510,11 +523,11 @@ int kr_rules_reset(void);
 int kr_view_insert_action(const char *, const char *, kr_proto_set, const char *);
 int kr_view_select_action(const struct kr_request *, knot_db_val_t *);
 int kr_rule_tag_add(const char *, kr_rule_tags_t *);
-int kr_rule_local_subtree(const knot_dname_t *, enum kr_rule_sub_t, uint32_t, kr_rule_tags_t);
+int kr_rule_local_subtree(const knot_dname_t *, enum kr_rule_sub_t, uint32_t, kr_rule_tags_t, kr_rule_opts_t);
 int kr_rule_zonefile(const struct kr_rule_zonefile_config *);
 int kr_rule_forward(const knot_dname_t *, kr_rule_fwd_flags_t, const struct sockaddr **);
-int kr_rule_local_address(const char *, const char *, _Bool, uint32_t, kr_rule_tags_t);
-int kr_rule_local_hosts(const char *, _Bool, uint32_t, kr_rule_tags_t);
+int kr_rule_local_address(const char *, const char *, _Bool, uint32_t, kr_rule_tags_t, kr_rule_opts_t);
+int kr_rule_local_hosts(const char *, _Bool, uint32_t, kr_rule_tags_t, kr_rule_opts_t);
 struct tls_credentials;
 typedef struct {
 	int sock_type;

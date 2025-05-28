@@ -280,6 +280,9 @@ struct kr_request {
 	 */
 	uint8_t rank;
 
+	uint8_t rule_score_apply;
+	uint8_t rule_score_log;
+
 	struct kr_rplan rplan;
 	trace_log_f trace_log; /**< Logging tracepoint */
 	trace_callback_f trace_finish; /**< Request finish tracepoint */
