@@ -730,7 +730,7 @@ enum protolayer_iter_cb_result protolayer_break(struct protolayer_iter_ctx *ctx,
 }
 
 
-int wire_buf_init(struct wire_buf *wb, size_t initial_size)
+void wire_buf_init(struct wire_buf *wb, size_t initial_size)
 {
 	char *buf = malloc(initial_size);
 	kr_require(buf);
@@ -739,8 +739,6 @@ int wire_buf_init(struct wire_buf *wb, size_t initial_size)
 		.buf = buf,
 		.size = initial_size
 	};
-
-	return kr_ok();
 }
 
 void wire_buf_deinit(struct wire_buf *wb)
@@ -867,10 +865,9 @@ struct session2 *session2_new(enum session2_transport_type transport_type,
 
 	memcpy(&s->layer_data, offsets, sizeof(offsets));
 	queue_init(s->waiting);
-	int ret = wire_buf_init(&s->wire_buf, wire_buf_length);
-	kr_require(!ret);
+	wire_buf_init(&s->wire_buf, wire_buf_length);
 
-	ret = uv_timer_init(uv_default_loop(), &s->timer);
+	int ret = uv_timer_init(uv_default_loop(), &s->timer);
 	kr_require(!ret);
 	s->timer.data = s;
 	session2_inc_refs(s); /* Session owns the timer */
@@ -1097,7 +1094,8 @@ void session2_tasklist_finalize(struct session2 *session, int status)
 		defer_sample_start(&defer_prev_sample_state);
 		do {
 			struct qr_task *t = session2_tasklist_del_first(session, false);
-			kr_require(worker_task_numrefs(t) > 0);
+			if (kr_fails_assert(worker_task_numrefs(t) > 0))
+				continue; // t has been freed already?
 			worker_task_finalize(t, status);
 			worker_task_unref(t);
 			defer_sample_restart();
@@ -1689,7 +1687,7 @@ static inline int session2_transport_push(struct session2 *s,
 static void on_session2_handle_close(uv_handle_t *handle)
 {
 	struct session2 *session = handle->data;
-	kr_require(session->transport.type == SESSION2_TRANSPORT_IO &&
+	kr_assert(session->transport.type == SESSION2_TRANSPORT_IO &&
 			session->transport.io.handle == handle);
 	io_free(handle);
 }
@@ -1738,7 +1736,10 @@ static int session2_transport_event(struct session2 *s,
 	bool is_close_event = (event == PROTOLAYER_EVENT_CLOSE ||
 			event == PROTOLAYER_EVENT_FORCE_CLOSE);
 	if (is_close_event) {
-		kr_require(session2_is_empty(s));
+		if (kr_fails_assert(session2_is_empty(s))) {
+			session2_waitinglist_finalize(s, KR_STATE_FAIL);
+			session2_tasklist_finalize(s, KR_STATE_FAIL);
+		}
 		session2_timer_stop(s);
 		s->closing = true;
 	}
