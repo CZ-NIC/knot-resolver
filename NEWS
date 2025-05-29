@@ -5,6 +5,7 @@ Security
 --------
 - DoS: fix more rare crashes with `requirement` failing (#930, !1696)
   [system] requirement "session2_is_empty(s)" failed in session2_transport_event
+  (and others not observed in practice)
 
 Bugfixes
 --------

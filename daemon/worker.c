@@ -502,10 +502,9 @@ static void qr_task_free(struct qr_task *task)
 {
 	struct request_ctx *ctx = task->ctx;
 
-	if (kr_fails_assert(ctx))
+	if (kr_fails_assert(ctx && ctx->task == NULL))
 		return;
 
-	kr_require(ctx->task == NULL);
 	request_free(ctx);
 
 	/* Update stats */
@@ -549,7 +548,7 @@ static void qr_task_complete(struct qr_task *task)
 
 	struct session2 *s = ctx->source.session;
 	if (s) {
-		kr_require(!s->outgoing && session2_waitinglist_is_empty(s));
+		kr_assert(!s->outgoing && session2_waitinglist_is_empty(s));
 		ctx->source.session = NULL;
 		session2_tasklist_del(s, task);
 	}

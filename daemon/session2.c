@@ -1094,7 +1094,8 @@ void session2_tasklist_finalize(struct session2 *session, int status)
 		defer_sample_start(&defer_prev_sample_state);
 		do {
 			struct qr_task *t = session2_tasklist_del_first(session, false);
-			kr_require(worker_task_numrefs(t) > 0);
+			if (kr_fails_assert(worker_task_numrefs(t) > 0))
+				continue; // t has been freed already?
 			worker_task_finalize(t, status);
 			worker_task_unref(t);
 			defer_sample_restart();
@@ -1686,7 +1687,7 @@ static inline int session2_transport_push(struct session2 *s,
 static void on_session2_handle_close(uv_handle_t *handle)
 {
 	struct session2 *session = handle->data;
-	kr_require(session->transport.type == SESSION2_TRANSPORT_IO &&
+	kr_assert(session->transport.type == SESSION2_TRANSPORT_IO &&
 			session->transport.io.handle == handle);
 	io_free(handle);
 }
