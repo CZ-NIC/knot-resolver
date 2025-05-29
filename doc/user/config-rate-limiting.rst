@@ -27,14 +27,13 @@ The limits can be adjusted for different packet origins using :option:`price-fac
 
   Enable rate limiting.
   
-  To start using rate limiting, you need to set at least the :option: `rate-limit <rate-limiting/rate-limit: <int>>` which has no default value.
+  To start using rate limiting, you need to set at least the :option: `rate-limit <rate-limiting/rate-limit: <int>>`, which has no default value.
 
 
 .. option:: rate-limiting/rate-limit: <int>
 
     Maximal allowed number of UDP queries per second from a single IPv6 or IPv4 address.
     To be set according to the server performance.
-    Setting the value enables rate limiting as the rest of the configuration is optional.
 
     Rate limiting is performed for the whole address and several chosen prefixes.
     The limits of prefixes are constant multiples of :option:`rate-limit <rate-limiting/rate-limit: <int>`.
