@@ -28,7 +28,8 @@ hints.root_file('{{ file }}')
 
 {% macro kr_rule_local_address(name, address, nodata, ttl, tags=none) -%}
 assert(C.kr_rule_local_address('{{ name }}', '{{ address }}',
-    {{ boolean(nodata) }}, {{ local_data_ttl(ttl)}}, {{ policy_get_tagset(tags) }}) == 0)
+    {{ boolean(nodata) }}, {{ local_data_ttl(ttl)}}, {{ policy_get_tagset(tags) }}) == 0,
+    C.KR_RULE_OPTS_DEFAULT)
 {%- endmacro -%}
 
 
@@ -43,7 +44,7 @@ assert(C.kr_rule_local_address('{{ name }}', '{{ address }}',
 
 {% macro kr_rule_local_hosts(file, nodata, ttl, tags=none) -%}
 assert(C.kr_rule_local_hosts('{{ file }}', {{ boolean(nodata) }},
-    {{ local_data_ttl(ttl)}}, {{ policy_get_tagset(tags) }}) == 0)
+    {{ local_data_ttl(ttl)}}, {{ policy_get_tagset(tags) }}) == 0, C.KR_RULE_OPTS_DEFAULT)
 {%- endmacro %}
 
 
@@ -54,10 +55,10 @@ assert(C.kr_rule_local_hosts('{{ file }}', {{ boolean(nodata) }},
 {%- endmacro %}
 
 
-{% macro local_data_records(input_str, is_rpz, nodata, ttl, tags=none, id='rrs') -%}
+{% macro local_data_records(input_str, is_rpz, nodata, ttl, extra, id='rrs') -%}
 {{ id }} = ffi.new('struct kr_rule_zonefile_config')
 {{ id }}.ttl = {{ local_data_ttl(ttl) }}
-{{ id }}.tags = {{ policy_get_tagset(tags) }}
+{{ id }}.tags = {{ policy_get_tagset(extra.tags) }}
 {{ id }}.nodata = {{ boolean(nodata) }}
 {{ id }}.is_rpz = {{ boolean(is_rpz) }}
 {% if is_rpz -%}
@@ -67,13 +68,32 @@ assert(C.kr_rule_local_hosts('{{ file }}', {{ boolean(nodata) }},
 {{ input_str.multiline() }}
 ]]
 {% endif %}
+{# .opts are complicated #}
+{{ id }}.opts = C.KR_RULE_OPTS_DEFAULT
+{% if extra is not none -%}
+{% if false and extra.dry_run is not none and extra.dry_run -%}
+{{ id }}.opts.score = 4
+{% else %}
+{{ id }}.opts.score = 9
+{% endif %}
+{% if extra.log is not none -%}
+{{ id }}.opts.log_level = 3  -- notice
+{% endif %}
+{% if extra.log is not none and 'ip' in extra.log -%}
+{{ id }}.opts.log_ip = true
+{% endif %}
+{% if extra.log is not none and 'name' in extra.log -%}
+{{ id }}.opts.log_name = true
+{% endif %}
+{% endif %}
 assert(C.kr_rule_zonefile({{ id }})==0)
 {%- endmacro %}
 
 
 {% macro kr_rule_local_subtree(name, type, ttl, tags=none) -%}
 assert(C.kr_rule_local_subtree(todname('{{ name }}'),
-    C.KR_RULE_SUB_{{ type.upper() }}, {{ local_data_ttl(ttl) }}, {{ policy_get_tagset(tags) }}) == 0)
+    C.KR_RULE_SUB_{{ type.upper() }}, {{ local_data_ttl(ttl) }}, {{ policy_get_tagset(tags) }}) == 0,
+    C.KR_RULE_OPTS_DEFAULT)
 {%- endmacro %}
 
 
@@ -95,7 +115,7 @@ assert(C.kr_rule_local_subtree(todname('{{ name }}'),
 {{ kr_rule_local_hosts(file, nodata if item.nodata is none else item.nodata, item.ttl or ttl, item.tags) }}
 {% endfor %}
 {% elif item.records %}
-{{ local_data_records(item.records, false, nodata if item.nodata is none else item.nodata, item.ttl or ttl, item.tags) }}
+{{ local_data_records(item.records, false, nodata if item.nodata is none else item.nodata, item.ttl or ttl, item) }}
 {% endif %}
 {% endfor %}
 {%- endmacro %}

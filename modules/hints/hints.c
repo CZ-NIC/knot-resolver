@@ -32,6 +32,7 @@
 struct hints_data {
 	bool use_nodata; /**< See hint_use_nodata() description, exposed via lua. */
 	uint32_t ttl;    /**< TTL used for the hints, exposed via lua. */
+	kr_rule_opts_t opts; /**< Options used for local-data rules.  Not overridable yet. */
 };
 
 /** Useful for returning from module properties. */
@@ -76,7 +77,8 @@ static char* hint_add_hosts(void *env, struct kr_module *module, const char *arg
 	if (!args)
 		args = "/etc/hosts";
 	const struct hints_data *data = module->data;
-	int err = kr_rule_local_hosts(args, data->use_nodata, data->ttl, KR_RULE_TAGS_ALL);
+	int err = kr_rule_local_hosts(args, data->use_nodata, data->ttl,
+					KR_RULE_TAGS_ALL, data->opts);
 	return bool2jsonstr(err == kr_ok());
 }
 
@@ -102,7 +104,7 @@ static char* hint_set(void *env, struct kr_module *module, const char *args)
 		*addr = '\0';
 		++addr;
 		ret = kr_rule_local_address(args_copy, addr,
-				data->use_nodata, data->ttl, KR_RULE_TAGS_ALL);
+				data->use_nodata, data->ttl, KR_RULE_TAGS_ALL, data->opts);
 	}
 
 	return bool2jsonstr(ret == 0);
@@ -299,6 +301,7 @@ int hints_init(struct kr_module *module)
 		return kr_error(ENOMEM);
 	data->use_nodata = true;
 	data->ttl = KR_RULE_TTL_DEFAULT;
+	data->opts = KR_RULE_OPTS_DEFAULT;
 	module->data = data;
 
 	return kr_ok();
@@ -329,7 +332,7 @@ int hints_config(struct kr_module *module, const char *conf)
 	if (conf && conf[0]) {
 		const struct hints_data *data = module->data;
 		return kr_rule_local_hosts(conf,
-				data->use_nodata, data->ttl, KR_RULE_TAGS_ALL);
+				data->use_nodata, data->ttl, KR_RULE_TAGS_ALL, data->opts);
 	}
 	return kr_ok();
 }

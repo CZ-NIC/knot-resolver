@@ -9,6 +9,7 @@
 
 #include <stdlib.h>
 
+
 struct kr_rules *the_rules = NULL;
 
 /* The default TTL value is a compromise and probably of little practical impact.
@@ -17,6 +18,8 @@ struct kr_rules *the_rules = NULL;
  * - on the other hand, rules are not expected to change very dynamically
  */
 const uint32_t KR_RULE_TTL_DEFAULT = 300;
+
+const kr_rule_opts_t KR_RULE_OPTS_DEFAULT = { .score = KR_RULE_SCORE_DEFAULT, /*and zeros*/ };
 
 /* DB key-space summary
 
@@ -42,8 +45,17 @@ static const uint8_t KEY_ZONELIKE_A [1] = "a";
 static const uint8_t KEY_VIEW_SRC4[1] = "4";
 static const uint8_t KEY_VIEW_SRC6[1] = "6";
 
+
+/// Returns for functions below: RET_ANSWERED, RET_CONTINUE, negative error codes for bugs
+// FIXME: doc-comment for kr_rule_local_data_answer(), etc.
+enum ret_codes_ {
+	RET_CONT_CACHE = 0,
+	RET_ANSWERED = 1,
+	RET_CONTINUE,
+};
+
 static int answer_exact_match(struct kr_query *qry, knot_pkt_t *pkt, uint16_t type,
-		const uint8_t *data, const uint8_t *data_bound);
+		knot_db_val_t *val);
 static int answer_zla_empty(val_zla_type_t type, struct kr_query *qry, knot_pkt_t *pkt,
 		knot_db_val_t zla_lf, uint32_t ttl);
 static int answer_zla_dname(val_zla_type_t type, struct kr_query *qry, knot_pkt_t *pkt,
@@ -51,7 +63,8 @@ static int answer_zla_dname(val_zla_type_t type, struct kr_query *qry, knot_pkt_
 static int answer_zla_redirect(struct kr_query *qry, knot_pkt_t *pkt, const char *ruleset_name,
 				knot_db_val_t zla_lf, uint32_t ttl);
 static int rule_local_subtree(const knot_dname_t *apex, enum kr_rule_sub_t type,
-			const knot_dname_t *target, uint32_t ttl, kr_rule_tags_t tags);
+				const knot_dname_t *target, uint32_t ttl,
+				kr_rule_tags_t tags, kr_rule_opts_t opts);
 
 // LATER: doing tag_names_default() and kr_rule_tag_add() inside a RW transaction would be better.
 static int tag_names_default(void)
@@ -230,6 +243,48 @@ static bool kr_rule_consume_tags(knot_db_val_t *val, const struct kr_request *re
 
 
 
+/// Log that we apply a local-data rule (if desired)
+// TODO: we might parametrize by some log string that expresses e.g. the type of rule
+static void log_rule(kr_rule_opts_t opts, const struct kr_query *qry)
+{
+	const struct kr_request *req = qry->request;
+	const int level = map_log_level(opts.log_level);
+	bool do_log = opts.score >= req->rule_score_log
+		&& (kr_log_is_debug(RULES, req) || KR_LOG_LEVEL_IS(level));
+	if (!do_log)
+		return;
+	bool applied = opts.score >= req->rule_score_apply;
+
+	//// Let's construct the log message, piece by piece in `s**` variables.
+	const char * s1a = "=> local data ",
+		*s1b = applied ? "applied" : "dry-run";
+
+	const char *s2a = "";
+	char s2b[INET6_ADDRSTRLEN + 1] = "";
+	if (opts.log_ip) {
+		s2a = ", user: ";
+		const struct sockaddr *addr = req->qsource.addr;
+		if (addr) {
+			bool ok = inet_ntop(addr->sa_family, kr_inaddr(addr), s2b, sizeof(s2b));
+			kr_assert(ok);
+		} else {
+			strcpy(s2b, "internal");
+		}
+	}
+
+	const char *s3a = "";
+	char s3b[KR_DNAME_STR_MAXLEN] = "";
+	if (opts.log_name) {
+		s3a = ", name: ";
+		knot_dname_to_str(s3b, qry->sname, sizeof(s3b));
+		s3b[sizeof(s3b) - 1] = 0;
+	}
+
+	kr_log_fmt(LOG_GRP_RULES, level, SD_JOURNAL_METADATA,
+		"[%-6s] %s%s%s%s%s%s\n",
+		LOG_GRP_RULES_TAG, s1a, s1b, s2a, s2b, s3a, s3b);
+}
+
 /** Add name lookup format on the fixed end-position inside key_data.
  *
  * Note: key_data[KEY_DNAME_END_OFFSET] = '\0' even though
@@ -283,10 +338,6 @@ static size_t key_common_subtree(knot_db_val_t k1, knot_db_val_t k2, size_t lf_s
 
 int rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt)
 {
-	// return shorthands; see doc-comment for kr_rule_local_data_answer()
-	static const int RET_CONT_CACHE = 0;
-	static const int RET_ANSWERED = 1;
-
 	kr_require(the_rules);
 	// TODO: implement EDE codes somehow
 
@@ -348,9 +399,9 @@ int rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt)
 					continue;
 
 				// We found a rule that applies to the dname+rrtype+req.
-				ret = answer_exact_match(qry, pkt, types[i],
-							 val.data, val.data + val.len);
-				return ret ? kr_error(ret) : RET_ANSWERED;
+				ret = answer_exact_match(qry, pkt, types[i], &val);
+				if (ret != RET_CONTINUE)
+					return ret;
 			}
 			if (kr_fails_assert(ret == 0 || ret == -ENOENT))
 				return kr_error(ret);
@@ -418,7 +469,16 @@ int rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt)
 				qry->data_src.rule_depth = knot_dname_labels(apex_name, NULL);
 				return RET_CONT_CACHE;
 			}
-			// The other types optionally specify TTL.
+
+			// Process opts.
+			kr_rule_opts_t opts;
+			if (deserialize_fails_assert(&val, &opts))
+				return kr_error(EILSEQ);
+			log_rule(opts, qry);
+			if (opts.score < qry->request->rule_score_apply)
+				goto shorten; // continue looking for rules
+
+			// The non-forward types optionally specify TTL.
 			uint32_t ttl = KR_RULE_TTL_DEFAULT;
 			if (val.len >= sizeof(ttl)) // allow omitting -> can't kr_assert
 				deserialize_fails_assert(&val, &ttl);
@@ -465,14 +525,19 @@ static const uint8_t soa_rdata[] = "\x09localhost\0\6nobody\7invalid\0"
 } while (false)
 
 static int answer_exact_match(struct kr_query *qry, knot_pkt_t *pkt, uint16_t type,
-		const uint8_t *data, const uint8_t *data_bound)
+		knot_db_val_t *val)
 {
-	/* Extract ttl from data. */
-	uint32_t ttl;
-	if (kr_fails_assert(data + sizeof(ttl) <= data_bound))
+	/* Process opts. */
+	kr_rule_opts_t opts;
+	if (deserialize_fails_assert(val, &opts))
 		return kr_error(EILSEQ);
-	memcpy(&ttl, data, sizeof(ttl));
-	data += sizeof(ttl);
+	log_rule(opts, qry);
+	if (opts.score < qry->request->rule_score_apply)
+		return RET_CONTINUE;
+
+	uint32_t ttl;
+	if (deserialize_fails_assert(val, &ttl))
+		return kr_error(EILSEQ);
 
 	/* Start constructing the (pseudo-)packet. */
 	int ret = pkt_renew(pkt, qry->sname, qry->stype);
@@ -485,21 +550,18 @@ static int answer_exact_match(struct kr_query *qry, knot_pkt_t *pkt, uint16_t ty
 	arrset.set.rr = knot_rrset_new(qry->sname, type, KNOT_CLASS_IN, ttl, &pkt->mm);
 	if (kr_fails_assert(arrset.set.rr))
 		return kr_error(ENOMEM);
-	ret = rdataset_materialize(&arrset.set.rr->rrs, data, data_bound, &pkt->mm);
+	ret = rdataset_materialize_val(&arrset.set.rr->rrs, val, &pkt->mm);
 	CHECK_RET(ret);
-	data += ret;
 	arrset.set.rank = KR_RANK_SECURE | KR_RANK_AUTH; // local data has high trust
 	arrset.set.expiring = false;
 	/* Materialize the RRSIG RRset for the answer in (pseudo-)packet.
 	 * (There will almost never be any RRSIG.) */
-	ret = rdataset_materialize(&arrset.sig_rds, data, data_bound, &pkt->mm);
+	ret = rdataset_materialize_val(&arrset.sig_rds, val, &pkt->mm);
 	CHECK_RET(ret);
-	data += ret;
 
 	/* Sanity check: we consumed exactly all data. */
-	const int unused_bytes = data_bound - data;
-	if (kr_fails_assert(unused_bytes == 0)) {
-		kr_log_error(RULES, "ERROR: unused bytes: %d\n", unused_bytes);
+	if (kr_fails_assert(val->len == 0)) {
+		kr_log_error(RULES, "ERROR: unused bytes: %zu\n", val->len);
 		return kr_error(EILSEQ);
 	}
 
@@ -525,10 +587,7 @@ static int answer_exact_match(struct kr_query *qry, knot_pkt_t *pkt, uint16_t ty
 	qry->flags.EXPIRING = false;
 	qry->flags.CACHED = true;
 	qry->flags.NO_MINIMIZE = true;
-
-	VERBOSE_MSG(qry, "=> satisfied by local data (%s)\n",
-			is_nodata ? "no data" : "positive");
-	return kr_ok();
+	return RET_ANSWERED;
 }
 
 knot_db_val_t local_data_key(const knot_rrset_t *rrs, uint8_t key_data[KEY_MAXLEN],
@@ -551,24 +610,26 @@ knot_db_val_t local_data_key(const knot_rrset_t *rrs, uint8_t key_data[KEY_MAXLE
 	return key;
 }
 int kr_rule_local_data_ins(const knot_rrset_t *rrs, const knot_rdataset_t *sig_rds,
-				kr_rule_tags_t tags)
+				kr_rule_tags_t tags, kr_rule_opts_t opts)
 {
 	ENSURE_the_rules;
 	// Construct the DB key.
 	uint8_t key_data[KEY_MAXLEN];
 	knot_db_val_t key = local_data_key(rrs, key_data, RULESET_DEFAULT);
-	return local_data_ins(key, rrs, sig_rds, tags);
+	return local_data_ins(key, rrs, sig_rds, tags, opts);
 }
-int local_data_ins(knot_db_val_t key, const knot_rrset_t *rrs,
-			const knot_rdataset_t *sig_rds, kr_rule_tags_t tags)
+int local_data_ins(knot_db_val_t key, const knot_rrset_t *rrs, const knot_rdataset_t *sig_rds,
+			kr_rule_tags_t tags, kr_rule_opts_t opts)
 {
 	// Prepare the data into a temporary buffer.
 	const int rr_ssize = rdataset_dematerialize_size(&rrs->rrs);
-	const int val_len = sizeof(tags) + sizeof(rrs->ttl) + rr_ssize
+	const int val_len = sizeof(tags) + sizeof(opts) + sizeof(rrs->ttl) + rr_ssize
 				+ rdataset_dematerialize_size(sig_rds);
 	uint8_t buf[val_len], *data = buf;
 	memcpy(data, &tags, sizeof(tags));
 	data += sizeof(tags);
+	memcpy(data, &opts, sizeof(opts));
+	data += sizeof(opts);
 	memcpy(data, &rrs->ttl, sizeof(rrs->ttl));
 	data += sizeof(rrs->ttl);
 	rdataset_dematerialize(&rrs->rrs, data);
@@ -589,7 +650,7 @@ int local_data_ins(knot_db_val_t key, const knot_rrset_t *rrs,
 	if (kr_fails_assert(rrs->rrs.count))
 		return kr_error(EINVAL);
 	return rule_local_subtree(rrs->owner, KR_RULE_SUB_DNAME,
-				knot_dname_target(rrs->rrs.rdata), rrs->ttl, tags);
+				knot_dname_target(rrs->rrs.rdata), rrs->ttl, tags, opts);
 }
 int kr_rule_local_data_del(const knot_rrset_t *rrs, kr_rule_tags_t tags)
 {
@@ -598,7 +659,7 @@ int kr_rule_local_data_del(const knot_rrset_t *rrs, kr_rule_tags_t tags)
 	knot_db_val_t key = local_data_key(rrs, key_data, RULESET_DEFAULT);
 	return ruledb_op(remove, &key, 1);
 }
-int kr_rule_local_data_merge(const knot_rrset_t *rrs, const kr_rule_tags_t tags)
+int kr_rule_local_data_merge(const knot_rrset_t *rrs, const kr_rule_tags_t tags, kr_rule_opts_t opts)
 {
 	ENSURE_the_rules;
 	// Construct the DB key.
@@ -616,6 +677,9 @@ int kr_rule_local_data_merge(const knot_rrset_t *rrs, const kr_rule_tags_t tags)
 	// check tags
 	kr_rule_tags_t tags_old;
 	if (deserialize_fails_assert(&val, &tags_old) || tags_old != tags)
+		goto fallback;
+	kr_rule_opts_t opts_old;
+	if (deserialize_fails_assert(&val, &opts_old))
 		goto fallback;
 	// merge TTLs
 	uint32_t ttl;
@@ -640,11 +704,11 @@ int kr_rule_local_data_merge(const knot_rrset_t *rrs, const kr_rule_tags_t tags)
 		return kr_error(ret);
 	}
 	// everything is ready to insert the merged RRset
-	ret = local_data_ins(key, &rrs_new, NULL, tags);
+	ret = local_data_ins(key, &rrs_new, NULL, tags, opts);
 	mm_ctx_delete(mm);
 	return ret;
 fallback:
-	return local_data_ins(key, rrs, NULL, tags);
+	return local_data_ins(key, rrs, NULL, tags, opts);
 }
 
 /** Empty or NXDOMAIN or NODATA.  Returning kr_error(EAGAIN) means the rule didn't match. */
@@ -809,9 +873,11 @@ static int answer_zla_redirect(struct kr_query *qry, knot_pkt_t *pkt, const char
 	knot_db_val_t val;
 	// Multiple variants are possible, with different tags.
 	for (ret = ruledb_op(it_first, &key, &val); ret == 0; ret = ruledb_op(it_next, &val)) {
-		if (kr_rule_consume_tags(&val, qry->request))
-			return answer_exact_match(qry, pkt, qry->stype,
-							val.data, val.data + val.len);
+		if (kr_rule_consume_tags(&val, qry->request)) {
+			int ret2 = answer_exact_match(qry, pkt, qry->stype, &val);
+			if (ret2 != RET_CONTINUE)
+				return ret2;
+		}
 	}
 	if (ret && ret != -ENOENT)
 		return ret;
@@ -852,9 +918,9 @@ nodata: // Want NODATA answer (or NOERROR if it hits apex SOA).
 }
 
 int kr_rule_local_subtree(const knot_dname_t *apex, enum kr_rule_sub_t type,
-			  uint32_t ttl, kr_rule_tags_t tags)
+			  uint32_t ttl, kr_rule_tags_t tags, kr_rule_opts_t opts)
 {
-	return rule_local_subtree(apex, type, NULL, ttl, tags);
+	return rule_local_subtree(apex, type, NULL, ttl, tags, opts);
 }
 knot_db_val_t zla_key(const knot_dname_t *apex, uint8_t key_data[KEY_MAXLEN])
 {
@@ -872,7 +938,8 @@ knot_db_val_t zla_key(const knot_dname_t *apex, uint8_t key_data[KEY_MAXLEN])
 	return key;
 }
 static int rule_local_subtree(const knot_dname_t *apex, enum kr_rule_sub_t type,
-			const knot_dname_t *target, uint32_t ttl, kr_rule_tags_t tags)
+				const knot_dname_t *target, uint32_t ttl,
+				kr_rule_tags_t tags, kr_rule_opts_t opts)
 {
 	// type-check
 	const bool has_target = (type == KR_RULE_SUB_DNAME);
@@ -900,13 +967,15 @@ static int rule_local_subtree(const knot_dname_t *apex, enum kr_rule_sub_t type,
 	// Prepare the data into a temporary buffer.
 	const int target_len = has_target ? knot_dname_size(target) : 0;
 	const bool has_ttl = ttl != KR_RULE_TTL_DEFAULT || has_target;
-	const int val_len = sizeof(tags) + sizeof(ztype) + (has_ttl ? sizeof(ttl) : 0)
-			  + target_len;
+	const int val_len = sizeof(tags) + sizeof(ztype) + sizeof(opts)
+			  + (has_ttl ? sizeof(ttl) : 0) + target_len;
 	uint8_t buf[val_len], *data = buf;
 	memcpy(data, &tags, sizeof(tags));
 	data += sizeof(tags);
 	memcpy(data, &ztype, sizeof(ztype));
 	data += sizeof(ztype);
+	memcpy(data, &opts, sizeof(opts));
+	data += sizeof(opts);
 	if (has_ttl) {
 		memcpy(data, &ttl, sizeof(ttl));
 		data += sizeof(ttl);

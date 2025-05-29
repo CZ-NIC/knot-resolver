@@ -36,6 +36,7 @@ class RuleSchema(ConfigSchema):
     tags: Optional[List[IDPattern]] = None
     ttl: Optional[TimeUnit] = None
     nodata: Optional[bool] = None
+    # TODO: probably also implement the rule options from RPZSchema (.log + .dry_run)
 
     def _validate(self) -> None:
         options_sum = sum([bool(self.address), bool(self.subtree), bool(self.file), bool(self.records)])
@@ -63,17 +64,22 @@ class RPZSchema(ConfigSchema):
         file: Path to the RPZ zone file.
         watchdog: Enables files watchdog for configured RPZ file. Requires the optional 'watchdog' dependency.
         tags: Tags to link with other policy rules.
+        log: Enables logging information whenever this RPZ matches.
         """
 
         file: ReadableFile
         watchdog: Union[Literal["auto"], bool] = "auto"
         tags: Optional[List[IDPattern]] = None
+        log: Optional[List[Literal["ip", "name"]]] = None
+        #dry_run: bool = False
 
     _LAYER = Raw
 
     file: ReadableFile
     watchdog: bool
     tags: Optional[List[IDPattern]]
+    log: Optional[List[Literal["ip", "name"]]]
+    #dry_run: bool
 
     def _watchdog(self, obj: Raw) -> Any:
         if obj.watchdog == "auto":

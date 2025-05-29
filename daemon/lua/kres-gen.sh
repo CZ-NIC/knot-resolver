@@ -137,6 +137,8 @@ ${CDEFS} ${LIBKRES} types <<-EOF
 	struct kr_rplan
 	struct kr_request_qsource_flags
 	kr_rule_tags_t
+	struct kr_rule_opts
+	typedef kr_rule_opts_t
 	struct kr_rule_zonefile_config
 	struct kr_rule_fwd_flags
 	typedef kr_rule_fwd_flags_t
@@ -169,6 +171,7 @@ ${CDEFS} ${LIBKRES} variables <<-EOF
 	kr_dbg_assertion_abort
 	kr_dbg_assertion_fork
 	KR_RULE_TTL_DEFAULT
+	KR_RULE_OPTS_DEFAULT
 EOF
 
 printf "

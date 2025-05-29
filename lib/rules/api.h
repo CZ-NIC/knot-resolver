@@ -9,6 +9,8 @@ struct kr_query;
 struct kr_request;
 struct knot_pkt;
 struct sockaddr;
+#include <syslog.h>
+#include <lib/utils.h>
 #include <libknot/db/db.h>
 
 /// Storage for a tag-set.  It's a bitmap, so 64 tags are supported now.
@@ -16,6 +18,46 @@ typedef uint64_t kr_rule_tags_t;
 #define KR_RULE_TAGS_ALL ((kr_rule_tags_t)0)
 /// Tags "capacity", i.e. numbered from 0 to _CAP - 1.
 #define KR_RULE_TAGS_CAP (sizeof(kr_rule_tags_t) * 8)
+
+/// Extra options for a rule (not for forwarding)
+struct kr_rule_opts {
+	/// Degree of severity for the rule;  FIXME: granularity, defaults, etc.
+	uint8_t score : 4;
+
+	bool log_ip : 1, log_name : 1;
+	// +maybe log rule/QNAME/something
+	/// Log level: 0 = debug, 1 = info, ...
+	uint8_t log_level : 2;
+
+	/** Maybe 2 bits: (unset), blocked, censored, filtered
+	    https://www.rfc-editor.org/rfc/rfc8914.html#name-extended-dns-error-code-15-
+	*/
+	uint8_t ede_code : 2;
+	/** Maybe 3 bits: (unset), Malware, Phishing, ... from
+	    https://datatracker.ietf.org/doc/html/draft-ietf-dnsop-structured-dns-error#name-new-registry-for-dns-sub-er
+	*/
+	uint8_t ede_sub : 3;
+};
+typedef struct kr_rule_opts kr_rule_opts_t;
+static_assert(sizeof(kr_rule_opts_t) == 2, "kr_rule_opts_t size changed unexpectedly");
+/// Default opts; in particular used for the RFC-mandated special-use names
+KR_EXPORT extern const kr_rule_opts_t KR_RULE_OPTS_DEFAULT;
+enum { // Default minimal score of a rule to log/apply it.
+	KR_RULE_SCORE_LOG     =  3,
+	KR_RULE_SCORE_APPLY   =  6,
+	KR_RULE_SCORE_DEFAULT = 10,
+};
+
+static inline int map_log_level(uint8_t ll)
+{
+	switch (ll) {
+	case 0: return LOG_DEBUG;
+	case 1: return LOG_INFO;
+	case 2: return LOG_NOTICE;
+	case 3: return LOG_WARNING;
+	}
+	return LOG_DEBUG; // shouldn't happen
+}
 
 /** Open the rule DB.
  *
@@ -56,7 +98,7 @@ int kr_rules_reset(void);
 
 /** Try answering the query from local data; WIP: otherwise determine data source overrides.
  *
- * \return kr_error() on errors, >0 if answered, 0 otherwise (also when forwarding)
+ * \return kr_error() on errors, >0 if answered FIXME, 0 otherwise (also when forwarding)
  *
  * FIXME: we probably want to ensure AA flags in answer as appropriate.
  *   Perhaps approach it like AD?  Tweak flags in ranked_rr_array_entry
@@ -98,7 +140,7 @@ const uint32_t KR_RULE_TTL_DEFAULT;
  * Special NODATA case: use a CNAME type with zero records (TTL matters). */
 KR_EXPORT
 int kr_rule_local_data_ins(const knot_rrset_t *rrs, const knot_rdataset_t *sig_rds,
-				kr_rule_tags_t tags);
+				kr_rule_tags_t tags, kr_rule_opts_t opts);
 /** Merge RRs into a local data rule.
  *
  * - FIXME: with multiple tags variants for the same name-type pair,
@@ -106,9 +148,10 @@ int kr_rule_local_data_ins(const knot_rrset_t *rrs, const knot_rdataset_t *sig_r
  * - RRSIGs get dropped, if any were attached.
  * - We assume that this is called with a RW transaction open already,
  *   which is always true in normal usage (long RW txn covering whole config).
+ * - TODO: what if opts don't match?
  */
 KR_EXPORT
-int kr_rule_local_data_merge(const knot_rrset_t *rrs, kr_rule_tags_t tags);
+int kr_rule_local_data_merge(const knot_rrset_t *rrs, kr_rule_tags_t tags, kr_rule_opts_t opts);
 
 /** Add a name-address pair into rules.
  *
@@ -117,8 +160,8 @@ int kr_rule_local_data_merge(const knot_rrset_t *rrs, kr_rule_tags_t tags);
  * - NODATA is optionally inserted
  */
 KR_EXPORT
-int kr_rule_local_address(const char *name, const char *addr,
-				bool use_nodata, uint32_t ttl, kr_rule_tags_t tags);
+int kr_rule_local_address(const char *name, const char *addr, bool use_nodata,
+				uint32_t ttl, kr_rule_tags_t tags, kr_rule_opts_t opts);
 
 /** For a given name, remove one address  ##or all of them (if == NULL).
  *
@@ -134,7 +177,8 @@ int kr_rule_local_address_del(const char *name, const char *addr,
  * Same as kr_rule_data_address() but from a file.
  */
 KR_EXPORT
-int kr_rule_local_hosts(const char *path, bool use_nodata, uint32_t ttl, kr_rule_tags_t tags);
+int kr_rule_local_hosts(const char *path, bool use_nodata, uint32_t ttl,
+			kr_rule_tags_t tags, kr_rule_opts_t opts);
 
 /** Remove a local data rule.
  *
@@ -167,7 +211,7 @@ enum kr_rule_sub_t {
  */
 KR_EXPORT
 int kr_rule_local_subtree(const knot_dname_t *apex, enum kr_rule_sub_t type,
-			  uint32_t ttl, kr_rule_tags_t tags);
+			  uint32_t ttl, kr_rule_tags_t tags, kr_rule_opts_t opts);
 
 /** Insert a view action into the default ruleset.
  *
@@ -209,6 +253,7 @@ struct kr_rule_zonefile_config {
 	kr_rule_tags_t tags; /// tag-set for the generated rule
 	const char *origin; /// NULL or zone origin if known
 	uint32_t ttl; /// default TTL
+	kr_rule_opts_t opts; /// options for these rules
 };
 /** Load rules from some zonefile format, e.g. RPZ.  Code in ./zonefile.c */
 KR_EXPORT

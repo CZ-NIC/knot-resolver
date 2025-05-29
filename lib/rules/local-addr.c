@@ -22,7 +22,7 @@ static int parse_addr_str(union kr_sockaddr *sa, const char *addr)
 }
 
 static int add_pair(const char *name, const char *addr,
-			bool use_nodata, uint32_t ttl, kr_rule_tags_t tags)
+			bool use_nodata, uint32_t ttl, kr_rule_tags_t tags, kr_rule_opts_t opts)
 {
 	/* Build key */
 	knot_dname_t key[KNOT_DNAME_MAXLEN];
@@ -45,13 +45,13 @@ static int add_pair(const char *name, const char *addr,
 	} else {
 		ret = knot_rrset_add_rdata(&rrs, (const uint8_t *)&ia.ip4.sin_addr, 4, NULL);
 	}
-	if (!ret) ret = kr_rule_local_data_merge(&rrs, tags);
+	if (!ret) ret = kr_rule_local_data_merge(&rrs, tags, opts);
 	if (!ret && use_nodata) {
 		rrs.type = KNOT_RRTYPE_CNAME;
 		rrs.rrs.count = 0;
 		rrs.rrs.size = 0;
 		// no point in the _merge() variant here
-		ret = kr_rule_local_data_ins(&rrs, NULL, tags);
+		ret = kr_rule_local_data_ins(&rrs, NULL, tags, opts);
 	}
 
 	knot_rdataset_clear(&rrs.rrs, NULL);
@@ -105,7 +105,7 @@ static const knot_dname_t * addr2reverse(const char *addr)
 }
 
 static int add_reverse_pair(const char *name, const char *addr,
-			bool use_nodata, uint32_t ttl, kr_rule_tags_t tags)
+			bool use_nodata, uint32_t ttl, kr_rule_tags_t tags, kr_rule_opts_t opts)
 {
 	const knot_dname_t *key = addr2reverse(addr);
 	if (!key)
@@ -120,18 +120,18 @@ static int add_reverse_pair(const char *name, const char *addr,
 	if (!ret) {
 		// We use _merge().  Using multiple PTR RRs is not recommended generally,
 		// but here it seems better than choosing any "arbitrarily".
-		ret = kr_rule_local_data_merge(&rrs, tags);
+		ret = kr_rule_local_data_merge(&rrs, tags, opts);
 		knot_rdataset_clear(&rrs.rrs, NULL);
 	}
 	return ret;
 }
 
-int kr_rule_local_address(const char *name, const char *addr,
-				bool use_nodata, uint32_t ttl, kr_rule_tags_t tags)
+int kr_rule_local_address(const char *name, const char *addr, bool use_nodata,
+				uint32_t ttl, kr_rule_tags_t tags, kr_rule_opts_t opts)
 {
-	int ret = add_reverse_pair(name, addr, use_nodata, ttl, tags);
+	int ret = add_reverse_pair(name, addr, use_nodata, ttl, tags, opts);
 	if (ret) return ret;
-	return add_pair(name, addr, use_nodata, ttl, tags);
+	return add_pair(name, addr, use_nodata, ttl, tags, opts);
 }
 
 int kr_rule_local_address_del(const char *name, const char *addr,
@@ -177,7 +177,8 @@ int kr_rule_local_address_del(const char *name, const char *addr,
 	return ret < 0 ? ret : kr_ok();
 }
 
-int kr_rule_local_hosts(const char *path, bool use_nodata, uint32_t ttl, kr_rule_tags_t tags)
+int kr_rule_local_hosts(const char *path, bool use_nodata, uint32_t ttl,
+			kr_rule_tags_t tags, kr_rule_opts_t opts)
 {
 	auto_fclose FILE *fp = fopen(path, "r");
 	if (fp == NULL) {
@@ -214,14 +215,14 @@ int kr_rule_local_hosts(const char *path, bool use_nodata, uint32_t ttl, kr_rule
 		}
 		const char *name_tok;
 		while ((name_tok = strtok_r(NULL, " \t\n", &saveptr)) != NULL) {
-			ret = add_pair(name_tok, addr, use_nodata, ttl, tags);
+			ret = add_pair(name_tok, addr, use_nodata, ttl, tags, opts);
 			if (ret)
 				goto error;
 			count += 1;
 		}
-		ret = add_pair(canonical_name, addr, use_nodata, ttl, tags);
+		ret = add_pair(canonical_name, addr, use_nodata, ttl, tags, opts);
 		if (!ret) // PTR only to the canonical name
-			ret = add_reverse_pair(canonical_name, addr, use_nodata, ttl, tags);
+			ret = add_reverse_pair(canonical_name, addr, use_nodata, ttl, tags, opts);
 		if (ret)
 			goto error;
 		count += 1;

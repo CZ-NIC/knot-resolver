@@ -141,7 +141,7 @@ int rules_defaults_insert(void)
 		const knot_dname_t *dname =
 			knot_dname_from_str(name_buf, names[i], sizeof(name_buf));
 		int ret = kr_rule_local_subtree(dname, KR_RULE_SUB_EMPTY,
-						TTL, KR_RULE_TAGS_ALL);
+						TTL, KR_RULE_TAGS_ALL, KR_RULE_OPTS_DEFAULT);
 		CHECK_RET(ret);
 		/* The double conversion is perhaps a bit wasteful, but it should be rare. */
 		/* LATER: add extra info with explanation?  policy module had an ADDITIONAL
@@ -153,7 +153,7 @@ int rules_defaults_insert(void)
 	knot_dname_t localhost_dname[] = "\x09localhost\0";
 	{ // forward localhost
 		int ret = kr_rule_local_subtree(localhost_dname, KR_RULE_SUB_REDIRECT,
-						TTL, KR_RULE_TAGS_ALL);
+						TTL, KR_RULE_TAGS_ALL, KR_RULE_OPTS_DEFAULT);
 		CHECK_RET(ret);
 
 		knot_rrset_t rr = {
@@ -165,7 +165,8 @@ int rules_defaults_insert(void)
 		};
 		rr.type = KNOT_RRTYPE_A;
 		ret = knot_rrset_add_rdata(&rr, (const uint8_t *)"\x7f\0\0\1", 4, NULL);
-		if (!ret) ret = kr_rule_local_data_ins(&rr, NULL, KR_RULE_TAGS_ALL);
+		if (!ret) ret = kr_rule_local_data_ins(&rr, NULL,
+					KR_RULE_TAGS_ALL, KR_RULE_OPTS_DEFAULT);
 		knot_rdataset_clear(&rr.rrs, NULL);
 		CHECK_RET(ret);
 
@@ -173,13 +174,15 @@ int rules_defaults_insert(void)
 		ret = knot_rrset_add_rdata(&rr,
 				(const uint8_t *)"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\1",
 				16, NULL);
-		if (!ret) ret = kr_rule_local_data_ins(&rr, NULL, KR_RULE_TAGS_ALL);
+		if (!ret) ret = kr_rule_local_data_ins(&rr, NULL,
+					KR_RULE_TAGS_ALL, KR_RULE_OPTS_DEFAULT);
 		knot_rdataset_clear(&rr.rrs, NULL);
 		CHECK_RET(ret);
 
 		rr.type = KNOT_RRTYPE_NS;
 		ret = knot_rrset_add_rdata(&rr, localhost_dname, 1+9+1, NULL);
-		if (!ret) ret = kr_rule_local_data_ins(&rr, NULL, KR_RULE_TAGS_ALL);
+		if (!ret) ret = kr_rule_local_data_ins(&rr, NULL,
+					KR_RULE_TAGS_ALL, KR_RULE_OPTS_DEFAULT);
 		knot_rdataset_clear(&rr.rrs, NULL);
 		CHECK_RET(ret);
 	}
@@ -194,18 +197,21 @@ int rules_defaults_insert(void)
 			.additional = NULL,
 		};
 		int ret = knot_rrset_add_rdata(&rr, localhost_dname, 1+9+1, NULL);
-		if (!ret) ret = kr_rule_local_data_ins(&rr, NULL, KR_RULE_TAGS_ALL);
+		if (!ret) ret = kr_rule_local_data_ins(&rr, NULL,
+					KR_RULE_TAGS_ALL, KR_RULE_OPTS_DEFAULT);
 
 		knot_dname_t name_buf[KNOT_DNAME_MAXLEN];
 		rr.owner = knot_dname_from_str(name_buf,
 				"1.0.0.127.in-addr.arpa.",
 				sizeof(name_buf));
-		if (!ret) ret = kr_rule_local_data_ins(&rr, NULL, KR_RULE_TAGS_ALL);
+		if (!ret) ret = kr_rule_local_data_ins(&rr, NULL,
+					KR_RULE_TAGS_ALL, KR_RULE_OPTS_DEFAULT);
 
 		rr.owner = knot_dname_from_str(name_buf,
 			"1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.ip6.arpa.",
 			sizeof(name_buf));
-		if (!ret) ret = kr_rule_local_data_ins(&rr, NULL, KR_RULE_TAGS_ALL);
+		if (!ret) ret = kr_rule_local_data_ins(&rr, NULL,
+					KR_RULE_TAGS_ALL, KR_RULE_OPTS_DEFAULT);
 
 		knot_rdataset_clear(&rr.rrs, NULL);
 		CHECK_RET(ret);

@@ -34,8 +34,8 @@ extern struct kr_rules *the_rules;
 knot_db_val_t local_data_key(const knot_rrset_t *rrs, uint8_t key_data[KEY_MAXLEN],
 					const char *ruleset_name);
 /** Same as kr_rule_local_data_ins() but with precomputed `key`. */
-int local_data_ins(knot_db_val_t key, const knot_rrset_t *rrs,
-			const knot_rdataset_t *sig_rds, kr_rule_tags_t tags);
+int local_data_ins(knot_db_val_t key, const knot_rrset_t *rrs, const knot_rdataset_t *sig_rds,
+			kr_rule_tags_t tags, kr_rule_opts_t opts);
 /** Construct key for a zone-like-apex entry.  It's stored in `key_data`. */
 knot_db_val_t zla_key(const knot_dname_t *apex, uint8_t key_data[KEY_MAXLEN]);
 
