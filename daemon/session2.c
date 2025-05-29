@@ -730,7 +730,7 @@ enum protolayer_iter_cb_result protolayer_break(struct protolayer_iter_ctx *ctx,
 }
 
 
-int wire_buf_init(struct wire_buf *wb, size_t initial_size)
+void wire_buf_init(struct wire_buf *wb, size_t initial_size)
 {
 	char *buf = malloc(initial_size);
 	kr_require(buf);
@@ -739,8 +739,6 @@ int wire_buf_init(struct wire_buf *wb, size_t initial_size)
 		.buf = buf,
 		.size = initial_size
 	};
-
-	return kr_ok();
 }
 
 void wire_buf_deinit(struct wire_buf *wb)
@@ -867,10 +865,9 @@ struct session2 *session2_new(enum session2_transport_type transport_type,
 
 	memcpy(&s->layer_data, offsets, sizeof(offsets));
 	queue_init(s->waiting);
-	int ret = wire_buf_init(&s->wire_buf, wire_buf_length);
-	kr_require(!ret);
+	wire_buf_init(&s->wire_buf, wire_buf_length);
 
-	ret = uv_timer_init(uv_default_loop(), &s->timer);
+	int ret = uv_timer_init(uv_default_loop(), &s->timer);
 	kr_require(!ret);
 	s->timer.data = s;
 	session2_inc_refs(s); /* Session owns the timer */
