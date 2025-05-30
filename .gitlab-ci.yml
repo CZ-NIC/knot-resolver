@@ -906,6 +906,15 @@ python:lint:
     - poetry install --all-extras --only main,dev,lint
     - poe lint
 
+python:run:
+  <<: *python
+  stage: test
+  script:
+    - poetry install --all-extras --only main,dev
+    - poe configure
+    # return code 124 is also OK
+    - timeout 3m poe run || ( [[ $? -eq 124 ]] )
+
 python:unit:
   <<: *python
   stage: test
