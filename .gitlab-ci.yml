@@ -913,6 +913,7 @@ python:run:
     - poetry install --all-extras --only main,dev
     - poe configure
     - timeout 3m poe run
+    - test $? = 124
 
 python:unit:
   <<: *python
