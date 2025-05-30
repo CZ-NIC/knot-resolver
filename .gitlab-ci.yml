@@ -906,6 +906,14 @@ python:lint:
     - poetry install --all-extras --only main,dev,lint
     - poe lint
 
+python:run:
+  <<: *python
+  stage: test
+  script:
+    - poetry install --all-extras --only main,dev
+    - poe configure
+    - timeout 3m poe run
+
 python:unit:
   <<: *python
   stage: test
