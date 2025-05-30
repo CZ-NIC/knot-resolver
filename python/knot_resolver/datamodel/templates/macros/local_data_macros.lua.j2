@@ -28,8 +28,8 @@ hints.root_file('{{ file }}')
 
 {% macro kr_rule_local_address(name, address, nodata, ttl, tags=none) -%}
 assert(C.kr_rule_local_address('{{ name }}', '{{ address }}',
-    {{ boolean(nodata) }}, {{ local_data_ttl(ttl)}}, {{ policy_get_tagset(tags) }}) == 0,
-    C.KR_RULE_OPTS_DEFAULT)
+    {{ boolean(nodata) }}, {{ local_data_ttl(ttl)}}, {{ policy_get_tagset(tags) }},
+    C.KR_RULE_OPTS_DEFAULT) == 0)
 {%- endmacro -%}
 
 
@@ -44,7 +44,7 @@ assert(C.kr_rule_local_address('{{ name }}', '{{ address }}',
 
 {% macro kr_rule_local_hosts(file, nodata, ttl, tags=none) -%}
 assert(C.kr_rule_local_hosts('{{ file }}', {{ boolean(nodata) }},
-    {{ local_data_ttl(ttl)}}, {{ policy_get_tagset(tags) }}) == 0, C.KR_RULE_OPTS_DEFAULT)
+    {{ local_data_ttl(ttl)}}, {{ policy_get_tagset(tags) }}, C.KR_RULE_OPTS_DEFAULT) == 0)
 {%- endmacro %}
 
 
@@ -92,8 +92,8 @@ assert(C.kr_rule_zonefile({{ id }})==0)
 
 {% macro kr_rule_local_subtree(name, type, ttl, tags=none) -%}
 assert(C.kr_rule_local_subtree(todname('{{ name }}'),
-    C.KR_RULE_SUB_{{ type.upper() }}, {{ local_data_ttl(ttl) }}, {{ policy_get_tagset(tags) }}) == 0,
-    C.KR_RULE_OPTS_DEFAULT)
+    C.KR_RULE_SUB_{{ type.upper() }}, {{ local_data_ttl(ttl) }}, {{ policy_get_tagset(tags) }},
+    C.KR_RULE_OPTS_DEFAULT) == 0)
 {%- endmacro %}
 
 
