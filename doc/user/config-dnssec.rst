@@ -21,7 +21,7 @@ system by doing so, add the following snippet to your configuration file.
 
    # turns off DNSSEC validation
    dnssec:
-     enabled: false
+     enable: false
 
 The resolver supports DNSSEC including :rfc:`5011` automated DNSSEC TA updates
 and :rfc:`7646` negative trust anchors.  Depending on your distribution, DNSSEC
@@ -37,7 +37,7 @@ Following :option:`dnssec <dnssec: <options>>` section allows to modify DNSSEC c
 
    DNSSEC configuration options.
 
-   .. option:: enabled: true|false
+   .. option:: enable: true|false
 
       :default: true
 
