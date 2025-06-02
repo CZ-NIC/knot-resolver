@@ -5,7 +5,7 @@ from knot_resolver.utils.modeling import ConfigSchema
 
 
 class GraphiteSchema(ConfigSchema):
-    enabled: bool = False
+    enable: bool = False
     host: Union[None, IPAddress, DomainName] = None
     port: PortNumber = PortNumber(2003)
     prefix: EscapedStr = EscapedStr("")
@@ -13,7 +13,7 @@ class GraphiteSchema(ConfigSchema):
     tcp: bool = False
 
     def _validate(self) -> None:
-        if self.enabled and not self.host:
+        if self.enable and not self.host:
             raise ValueError("'host' option must be configured to enable graphite bridge")
 
 

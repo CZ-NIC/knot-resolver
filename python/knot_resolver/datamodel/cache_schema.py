@@ -62,7 +62,7 @@ class GarbageCollectorSchema(ConfigSchema):
     Configuration options of the cache garbage collector (kres-cache-gc).
 
     ---
-    enabled: Enable/disable cache garbage collector.
+    enable: Enable/disable cache garbage collector.
     interval: Time interval how often the garbage collector will be run.
     threshold: Cache usage in percent that triggers the garbage collector.
     release: Percent of used cache to be freed by the garbage collector.
@@ -74,7 +74,7 @@ class GarbageCollectorSchema(ConfigSchema):
     dry_run: Run the garbage collector in dry-run mode.
     """
 
-    enabled: bool = True
+    enable: bool = True
     interval: TimeUnit = TimeUnit("1s")
     threshold: Percent = Percent(80)
     release: Percent = Percent(10)

@@ -11,7 +11,7 @@ and server internals, and offers them as a key-value storage.
 .. code-block:: yaml
 
    monitoring:
-     enabled: always
+     enable: always
 
 These metrics can be either exported to :ref:`config-monitoring-graphite` or
 exposed as :ref:`config-monitoring-prometheus`.
@@ -62,14 +62,14 @@ Example configuration:
 
    monitoring:
      graphite:
-       enabled: true
+       enable: true
        host: 127.0.0.1 # graphite server address
        port: 200       # optional graphite server port (2003 is default)
        interval: 5s    # optional publish interval (5s is default)
 
 .. option:: monitoring/graphite:
 
-   .. option:: enabled: true|false
+   .. option:: enable: true|false
 
       :default: false
 

@@ -129,20 +129,20 @@ class MigrateCommand(Command):
             if gc_key in new[cache_key]:
                 gc = new[cache_key][gc_key]
                 if gc is False:
-                    _add(new, "/cache/garbage-collector/enabled", False)
+                    _add(new, "/cache/garbage-collector/enable", False)
                 else:
-                    _add(new, "/cache/garbage-collector/enabled", True)
+                    _add(new, "/cache/garbage-collector/enable", True)
         dns64_key = "dns64"
         if dns64_key in new:
             if new[dns64_key] is False:
-                _add(new, "/dns64/enabled", False, rewrite=True)
+                _add(new, "/dns64/enable", False, rewrite=True)
             else:
-                _add(new, "/dns64/enabled", True, rewrite=True)
+                _add(new, "/dns64/enable", True, rewrite=True)
         _rename(new, "/dns64/rev-ttl", "/dns64/reverse-ttl")
         dnssec_key = "dnssec"
         if dnssec_key in new:
             if new[dnssec_key] is False:
-                _add(new, "/dnssec/enabled", False, rewrite=True)
+                _add(new, "/dnssec/enable", False, rewrite=True)
             else:
                 # by default the DNSSEC is enabled
                 pass
@@ -157,13 +157,13 @@ class MigrateCommand(Command):
             if graphite_key in new[monitoring_key]:
                 graphite = new[monitoring_key][graphite_key]
                 if graphite is False:
-                    _add(new, "/monitoring/graphite/enabled", False)
+                    _add(new, "/monitoring/graphite/enable", False)
                 else:
-                    _add(new, "/monitoring/graphite/enabled", True)
+                    _add(new, "/monitoring/graphite/enable", True)
         _rename(new, "/network/tls/files-watchdog", "/network/tls/watchdog")
         rate_limiting_key = "rate-limiting"
         if rate_limiting_key in new:
-            _add(new, "/rate-limiting/enabled", True)
+            _add(new, "/rate-limiting/enable", True)
 
         # remove empty dicts
         new = {k: v for k, v in new.items() if v}

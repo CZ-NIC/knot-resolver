@@ -15,14 +15,14 @@ By default, the well-known prefix ``64:ff9b::/96`` is used.
 .. code-block:: yaml
 
    dns64:
-     enabled: true
+     enable: true
 
 It is also possible to configure own prefix.
 
 .. code-block:: yaml
 
    dns64:
-     enabled: true
+     enable: true
      prefix: 2001:db8::aabb:0:0/96
 
 .. warning::

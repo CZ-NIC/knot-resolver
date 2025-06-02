@@ -1144,7 +1144,7 @@
                     "description": "Use the garbage collector (kres-cache-gc) to periodically clear cache.",
                     "type": "object",
                     "properties": {
-                        "enabled": {
+                        "enable": {
                             "type": "boolean",
                             "description": "Enable/disable cache garbage collector.",
                             "default": true
@@ -1206,7 +1206,7 @@
                         }
                     },
                     "default": {
-                        "enabled": true,
+                        "enable": true,
                         "interval": "1s",
                         "threshold": 80,
                         "release": 10,
@@ -1315,7 +1315,7 @@
                 "storage": "/var/cache/knot-resolver",
                 "size_max": "100M",
                 "garbage_collector": {
-                    "enabled": true,
+                    "enable": true,
                     "interval": "1s",
                     "threshold": 80,
                     "release": 10,
@@ -1340,7 +1340,7 @@
             "description": "DNSSEC configuration.",
             "type": "object",
             "properties": {
-                "enabled": {
+                "enable": {
                     "type": "boolean",
                     "description": "Enable/disable DNSSEC.",
                     "default": true
@@ -1414,7 +1414,7 @@
                 }
             },
             "default": {
-                "enabled": true,
+                "enable": true,
                 "log_bogus": false,
                 "sentinel": true,
                 "signal_query": true,
@@ -1428,7 +1428,7 @@
             "description": "DNS64 (RFC 6147) configuration.",
             "type": "object",
             "properties": {
-                "enabled": {
+                "enable": {
                     "type": "boolean",
                     "description": "Enable/disable DNS64.",
                     "default": false
@@ -1460,7 +1460,7 @@
                 }
             },
             "default": {
-                "enabled": false,
+                "enable": false,
                 "prefix": "64:ff9b::/96",
                 "reverse_ttl": null,
                 "exclude_subnets": null
@@ -1628,7 +1628,7 @@
                 "graphite": {
                     "type": "object",
                     "properties": {
-                        "enabled": {
+                        "enable": {
                             "type": "boolean",
                             "default": false
                         },
@@ -1672,7 +1672,7 @@
                     },
                     "description": "optionally configures where should graphite metrics be sent to",
                     "default": {
-                        "enabled": false,
+                        "enable": false,
                         "host": null,
                         "port": 2003,
                         "prefix": "",
@@ -1684,7 +1684,7 @@
             "default": {
                 "metrics": "lazy",
                 "graphite": {
-                    "enabled": false,
+                    "enable": false,
                     "host": null,
                     "port": 2003,
                     "prefix": "",
@@ -1697,7 +1697,7 @@
             "description": "Configuration of rate limiting.",
             "type": "object",
             "properties": {
-                "enabled": {
+                "enable": {
                     "type": "boolean",
                     "description": "Enable/disable rate limiting",
                     "default": false
@@ -1743,7 +1743,7 @@
                 }
             },
             "default": {
-                "enabled": false,
+                "enable": false,
                 "rate_limit": null,
                 "instant_limit": 50,
                 "capacity": 524288,
@@ -1756,7 +1756,7 @@
             "description": "Configuration of request prioritization (defer).",
             "type": "object",
             "properties": {
-                "enabled": {
+                "enable": {
                     "type": "boolean",
                     "description": "Use request prioritization.",
                     "default": false
@@ -1769,7 +1769,7 @@
                 }
             },
             "default": {
-                "enabled": false,
+                "enable": false,
                 "log_period": "0s"
             }
         },

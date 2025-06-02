@@ -50,20 +50,20 @@ def test_config_defaults():
     config = KresConfig()
 
     # DNS64 default
-    assert config.dns64.enabled == False
+    assert config.dns64.enable == False
 
 
 def test_dnssec_false():
-    config = KresConfig({"dnssec": {"enabled": False}})
+    config = KresConfig({"dnssec": {"enable": False}})
 
-    assert config.dnssec.enabled == False
+    assert config.dnssec.enable == False
 
 
 def test_dnssec_default_true():
     config = KresConfig()
 
     # DNSSEC defaults
-    assert config.dnssec.enabled == True
+    assert config.dnssec.enable == True
     assert config.dnssec.sentinel == True
     assert config.dnssec.signal_query == True
     assert int(config.dnssec.trust_anchors_keep_removed) == 0
@@ -73,9 +73,9 @@ def test_dnssec_default_true():
 
 
 def test_dns64_prefix_default():
-    config = KresConfig({"dns64": {"enabled": True}})
+    config = KresConfig({"dns64": {"enable": True}})
 
-    assert config.dns64.enabled == True
+    assert config.dns64.enable == True
     assert str(config.dns64.prefix) == "64:ff9b::/96"
 
 
