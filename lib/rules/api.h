@@ -98,7 +98,7 @@ int kr_rules_reset(void);
 
 /** Try answering the query from local data; WIP: otherwise determine data source overrides.
  *
- * \return kr_error() on errors, >0 if answered FIXME, 0 otherwise (also when forwarding)
+ * \return kr_error() on errors, >0 if answered, 0 otherwise (also when forwarding)
  *
  * FIXME: we probably want to ensure AA flags in answer as appropriate.
  *   Perhaps approach it like AD?  Tweak flags in ranked_rr_array_entry
