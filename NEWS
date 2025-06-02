@@ -19,18 +19,18 @@ Incompatible changes
   - /network/tls/auto-discovery
   - /webmgmt
 - Renamed/moved options in the declarative configuration model (YAML).
-  - /cache/garbage-collector -> /cache/garbage-collector/enabled
-  - /dns64: true|false -> /dns64/enabled: true|false
+  - /cache/garbage-collector -> /cache/garbage-collector/enable
+  - /dns64: true|false -> /dns64/enable: true|false
   - /dns64/rev-ttl -> /dns64/reverse-ttl
-  - /dnssec: true|false -> /dnssec/enabled: true|false
+  - /dnssec: true|false -> /dnssec/enable: true|false
   - /dnssec/keep-removed -> /dnssec/trust-anchors-keep-removed
   - /dnssec/trust-anchor-sentinel -> /dnssec/sentinel
   - /dnssec/trust-anchor-signal-query -> /dnssec/signal-query
   - /logging/dnssec-bogus -> /dnssec/log-bogus
   - /monitoring/enabled -> /monitoring/metrics
-  - /monitoring/graphite -> /monitoring/graphite/enabled
+  - /monitoring/graphite -> /monitoring/graphite/enable
   - /network/tls/files-watchdog -> /network/tls/watchdog
-  - /rate-limiting -> /rate-limiting/enabled
+  - /rate-limiting -> /rate-limiting/enable
 
 
 Knot Resolver 6.0.15 (2025-07-17)

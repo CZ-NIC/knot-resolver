@@ -1,6 +1,6 @@
 {% from 'macros/common_macros.lua.j2' import boolean %}
 
-{% if cfg.defer.enabled and disable_defer is not defined -%}
+{% if cfg.defer.enable and disable_defer is not defined -%}
 assert(C.defer_init(
 	'{{ cfg.rundir }}/defer',
 	{{ cfg.defer.log_period.millis() }},

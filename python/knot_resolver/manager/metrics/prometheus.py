@@ -400,7 +400,7 @@ if PROMETHEUS_LIB:
         Starts graphite bridge if required
         """
         global _graphite_bridge
-        if config.monitoring.graphite.enabled and _graphite_bridge is None:
+        if config.monitoring.graphite.enable and _graphite_bridge is None:
             logger.info(
                 "Starting Graphite metrics exporter for [%s]:%d",
                 str(config.monitoring.graphite.host),
@@ -414,14 +414,14 @@ if PROMETHEUS_LIB:
             )
 
     async def _deny_turning_off_graphite_bridge(old_config: KresConfig, new_config: KresConfig) -> Result[None, str]:
-        if old_config.monitoring.graphite.enabled and not new_config.monitoring.graphite.enabled:
+        if old_config.monitoring.graphite.enable and not new_config.monitoring.graphite.enable:
             return Result.err(
                 "You can't turn off graphite monitoring dynamically. If you really want this feature, please let the developers know."
             )
 
         if (
-            old_config.monitoring.graphite.enabled
-            and new_config.monitoring.graphite.enabled
+            old_config.monitoring.graphite.enable
+            and new_config.monitoring.graphite.enable
             and old_config.monitoring.graphite != new_config.monitoring.graphite
         ):
             return Result.err("Changing graphite exporter configuration in runtime is not allowed.")
