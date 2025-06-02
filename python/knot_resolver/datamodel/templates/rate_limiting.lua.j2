@@ -1,6 +1,6 @@
 {% from 'macros/common_macros.lua.j2' import boolean %}
 
-{% if cfg.rate_limiting.enabled %}
+{% if cfg.rate_limiting.enable %}
 assert(
     C.ratelimiting_init(
         '{{ cfg.rundir }}/ratelimiting',

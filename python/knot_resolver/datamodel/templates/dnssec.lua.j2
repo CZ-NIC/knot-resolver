@@ -1,6 +1,6 @@
 {% from 'macros/common_macros.lua.j2' import boolean %}
 
-{% if cfg.dnssec.enabled %}
+{% if cfg.dnssec.enable %}
 
 -- dnssec.logging-bogus
 {% if cfg.dnssec.log_bogus %}

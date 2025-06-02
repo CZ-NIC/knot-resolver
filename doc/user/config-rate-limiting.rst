@@ -21,7 +21,7 @@ that's common in other DNS servers.
 
 The limits can be adjusted for different packet origins using :option:`price-factor <price-factor: <float>` in :ref:`views <config-views>`.
 
-.. option:: rate-limiting/enabled: true|false
+.. option:: rate-limiting/enable: true|false
 
   :default: false
 
