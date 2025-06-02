@@ -7,7 +7,7 @@ Commentary from @vsraier:
 =========================
 
 While this is not ideal, it is the best we can do at the moment. When I created this module,
-the datamodel was dependent on the global state implicitely. The validation procedures just read
+the datamodel was dependent on the global state implicitly. The validation procedures just read
 the current working directory. This module is the first step in removing the global dependency.
 
 At some point in the future, it might be interesting to add something like a "validation context"
