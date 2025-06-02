@@ -1912,8 +1912,10 @@ static enum protolayer_event_cb_result pl_dns_stream_resolution_timeout(
 				worker_task_finalize(t, KR_STATE_FAIL);
 				worker_task_unref(t);
 				the_worker->stats.timeout += 1;
-				if (s->closing)
+				if (s->closing) {
+					defer_sample_stop(&defer_prev_sample_state, true);
 					return PROTOLAYER_EVENT_PROPAGATE;
+				}
 				defer_sample_restart();
 			} while (!session2_waitinglist_is_empty(s));
 			defer_sample_stop(&defer_prev_sample_state, true);

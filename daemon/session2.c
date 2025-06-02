@@ -1336,7 +1336,7 @@ void session2_event(struct session2 *s, enum protolayer_event_type event, void *
 	 * From inside: close by us, statistics, ...
 	 * From outside: timeout, EOF, close by external reasons, ... */
 	bool defer_accounting_here = false;
-	if (!defer_sample_is_accounting() && s->stream && !s->outgoing) {
+	if (!defer_sample_is_accounting()) {
 		defer_sample_start(NULL);
 		defer_accounting_here = true;
 	}
