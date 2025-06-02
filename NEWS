@@ -1,3 +1,12 @@
+Knot Resolver 6.0.14 (2025-06-dd)
+=================================
+
+Bugfixes
+--------
+- /local-data/addresses*, /local-data/rules/*/subtree: fix 6.0.13 regression (!1697)
+  The error reads as "wrong number of arguments for function call"
+
+
 Knot Resolver 6.0.13 (2025-05-29)
 =================================
 
