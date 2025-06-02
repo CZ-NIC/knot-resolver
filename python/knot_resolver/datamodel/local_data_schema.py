@@ -25,7 +25,7 @@ class RuleSchema(ConfigSchema):
     records: Direct addition of records in DNS zone file format.
     tags: Tags to link with other policy rules.
     ttl: Optional, TTL value used for these answers.
-    nodata: Optional, use NODATA synthesis. NODATA will be synthesised for matching name, but mismatching type(e.g. AAAA query when only A exists).
+    nodata: Optional, use NODATA synthesis. NODATA will be synthesized for matching name, but mismatching type(e.g. AAAA query when only A exists).
     """
 
     name: Optional[ListOrItem[DomainName]] = None
@@ -71,7 +71,7 @@ class RPZSchema(ConfigSchema):
         watchdog: Union[Literal["auto"], bool] = "auto"
         tags: Optional[List[IDPattern]] = None
         log: Optional[List[Literal["ip", "name"]]] = None
-        #dry_run: bool = False
+        # dry_run: bool = False
 
     _LAYER = Raw
 
@@ -79,7 +79,7 @@ class RPZSchema(ConfigSchema):
     watchdog: bool
     tags: Optional[List[IDPattern]]
     log: Optional[List[Literal["ip", "name"]]]
-    #dry_run: bool
+    # dry_run: bool
 
     def _watchdog(self, obj: Raw) -> Any:
         if obj.watchdog == "auto":
@@ -99,7 +99,7 @@ class LocalDataSchema(ConfigSchema):
 
     ---
     ttl: Default TTL value used for added local data/records.
-    nodata: Use NODATA synthesis. NODATA will be synthesised for matching name, but mismatching type(e.g. AAAA query when only A exists).
+    nodata: Use NODATA synthesis. NODATA will be synthesized for matching name, but mismatching type(e.g. AAAA query when only A exists).
     addresses: Direct addition of hostname and IP addresses pairs.
     addresses_files: Direct addition of hostname and IP addresses pairs from files in '/etc/hosts' like format.
     records: Direct addition of records in DNS zone file format.

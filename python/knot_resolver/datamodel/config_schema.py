@@ -103,7 +103,7 @@ class KresConfig(ConfigSchema):
         dnssec: DNSSEC configuration.
         dns64: DNS64 (RFC 6147) configuration.
         logging: Logging and debugging configuration.
-        monitoring: Metrics exposisition configuration (Prometheus, Graphite)
+        monitoring: Metrics exposition configuration (Prometheus, Graphite)
         lua: Custom Lua configuration.
         rate_limiting: Configuration of rate limiting.
         defer: Configuration of request prioritization (defer).
