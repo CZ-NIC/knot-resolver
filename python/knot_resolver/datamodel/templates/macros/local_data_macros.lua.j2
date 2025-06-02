@@ -71,20 +71,20 @@ assert(C.kr_rule_local_hosts('{{ file }}', {{ boolean(nodata) }},
 {# .opts are complicated #}
 {{ id }}.opts = C.KR_RULE_OPTS_DEFAULT
 {% if extra is not none -%}
-{% if false and extra.dry_run is not none and extra.dry_run -%}
-{{ id }}.opts.score = 4
-{% else %}
-{{ id }}.opts.score = 9
-{% endif %}
-{% if extra.log is not none -%}
-{{ id }}.opts.log_level = 3  -- notice
-{% endif %}
-{% if extra.log is not none and 'ip' in extra.log -%}
-{{ id }}.opts.log_ip = true
-{% endif %}
-{% if extra.log is not none and 'name' in extra.log -%}
-{{ id }}.opts.log_name = true
-{% endif %}
+{%   if false and extra.dry_run is not none and extra.dry_run -%}
+{{     id }}.opts.score = 4
+{%   else %}
+{{     id }}.opts.score = 9
+{%   endif %}
+{%   if 'log' in extra and extra.log is not none -%}
+{{     id }}.opts.log_level = 3  -- notice
+{%     if 'ip' in extra.log -%}
+{{       id }}.opts.log_ip = true
+{%     endif %}
+{%     if 'name' in extra.log -%}
+{{       id }}.opts.log_name = true
+{%     endif %}
+{%   endif %}
 {% endif %}
 assert(C.kr_rule_zonefile({{ id }})==0)
 {%- endmacro %}
