@@ -84,7 +84,7 @@
                         "strict",
                         "permissive"
                     ],
-                    "description": "Glue records scrictness checking level.",
+                    "description": "Glue records strictness checking level.",
                     "default": "normal"
                 },
                 "minimize": {
@@ -618,7 +618,7 @@
                 },
                 "nodata": {
                     "type": "boolean",
-                    "description": "Use NODATA synthesis. NODATA will be synthesised for matching name, but mismatching type(e.g. AAAA query when only A exists).",
+                    "description": "Use NODATA synthesis. NODATA will be synthesized for matching name, but mismatching type(e.g. AAAA query when only A exists).",
                     "default": true
                 },
                 "addresses": {
@@ -805,7 +805,7 @@
                                     "boolean",
                                     "null"
                                 ],
-                                "description": "Optional, use NODATA synthesis. NODATA will be synthesised for matching name, but mismatching type(e.g. AAAA query when only A exists).",
+                                "description": "Optional, use NODATA synthesis. NODATA will be synthesized for matching name, but mismatching type(e.g. AAAA query when only A exists).",
                                 "default": null
                             }
                         }
@@ -1079,7 +1079,7 @@
                         "rw-reads": {
                             "type": "integer",
                             "minimum": 0,
-                            "description": "Maximum number of readed records per read-write transaction (0 = unlimited).",
+                            "description": "Maximum number of read records per read-write transaction (0 = unlimited).",
                             "default": 200
                         },
                         "rw-duration": {
@@ -1507,7 +1507,7 @@
             }
         },
         "monitoring": {
-            "description": "Metrics exposisition configuration (Prometheus, Graphite)",
+            "description": "Metrics exposition configuration (Prometheus, Graphite)",
             "type": "object",
             "properties": {
                 "metrics": {
