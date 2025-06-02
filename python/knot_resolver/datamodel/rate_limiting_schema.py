@@ -13,7 +13,7 @@ class RateLimitingSchema(ConfigSchema):
     Configuration of rate limiting.
 
     ---
-    enabled: Enable/disable rate limiting
+    enable: Enable/disable rate limiting
     rate_limit: Maximal number of allowed queries per second from a single host.
     instant_limit: Maximal number of allowed queries at a single point in time from a single host.
     capacity: Expected maximal number of blocked networks/hosts at the same time.
@@ -22,7 +22,7 @@ class RateLimitingSchema(ConfigSchema):
     dry_run: Perform only classification and logging but no restrictions.
     """
 
-    enabled: bool = False
+    enable: bool = False
     rate_limit: Optional[IntPositive] = None
     instant_limit: IntPositive = IntPositive(50)
     capacity: IntPositive = IntPositive(524288)
@@ -31,7 +31,7 @@ class RateLimitingSchema(ConfigSchema):
     dry_run: bool = False
 
     def _validate(self) -> None:
-        if self.enabled and not self.rate_limit:
+        if self.enable and not self.rate_limit:
             raise ValueError("'rate-limit' has to be configured to enable rate limiting")
 
         max_instant_limit = int(2**32 // 768 - 1)
