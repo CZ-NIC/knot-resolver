@@ -10,7 +10,7 @@ class OptionsSchema(ConfigSchema):
     Fine-tuning global parameters of DNS resolver operation.
 
     ---
-    glue_checking: Glue records scrictness checking level.
+    glue_checking: Glue records strictness checking level.
     minimize: Send minimum amount of information in recursive queries to enhance privacy.
     query_loopback: Permits queries to loopback addresses.
     reorder_rrset: Controls whether resource records within a RRSet are reordered each time it is served from the cache.

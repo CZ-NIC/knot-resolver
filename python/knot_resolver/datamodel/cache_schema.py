@@ -68,7 +68,7 @@ class GarbageCollectorSchema(ConfigSchema):
     release: Percent of used cache to be freed by the garbage collector.
     temp_keys_space: Maximum amount of temporary memory for copied keys (0 = unlimited).
     rw_deletes: Maximum number of deleted records per read-write transaction (0 = unlimited).
-    rw_reads: Maximum number of readed records per read-write transaction (0 = unlimited).
+    rw_reads: Maximum number of read records per read-write transaction (0 = unlimited).
     rw_duration: Maximum duration of read-write transaction (0 = unlimited).
     rw_delay: Wait time between two read-write transactions.
     dry_run: Run the garbage collector in dry-run mode.
