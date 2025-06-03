@@ -47,7 +47,6 @@ static const uint8_t KEY_VIEW_SRC6[1] = "6";
 
 
 /// Returns for functions below: RET_ANSWERED, RET_CONTINUE, negative error codes for bugs
-// FIXME: doc-comment for kr_rule_local_data_answer(), etc.
 enum ret_codes_ {
 	RET_CONT_CACHE = 0,
 	RET_ANSWERED = 1,
