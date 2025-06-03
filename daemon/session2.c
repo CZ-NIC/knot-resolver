@@ -673,6 +673,7 @@ static int session2_submit(
 			ctx->comm_storage.dst_addr = &addrst->dst_addr.ip;
 		}
 		ctx->comm = &ctx->comm_storage;
+		ctx->comm->target = comm->target;
 	} else {
 		ctx->comm = &session->comm_storage;
 	}
