@@ -4,11 +4,13 @@ Knot Resolver 6.0.16 (2025-0m-dd)
 Improvements
 ------------
 - reduce validation strictness for domain names (#934, !1727)
-- kresctl migrate: new command for migrating the configuration to a newer version
+- kresctl migrate: new command for migrating the configuration to a newer version (!1672)
 
 Incompatible changes
 --------------------
-- Removed options from declarative configuration model (YAML).  
+See upgrading guide for incompatible configuration changes:  
+https://www.knot-resolver.cz/documentation/v6.0.16/upgrading.html
+- Removed options from declarative configuration model (YAML). (!1672)  
   These are mostly experimental and debugging/testing options that are not useful for general users (remain in Lua):
   - /dnssec/refresh-time
   - /dnssec/hold-down-time
@@ -18,7 +20,7 @@ Incompatible changes
   - /max-workers
   - /network/tls/auto-discovery
   - /webmgmt
-- Renamed/moved options in the declarative configuration model (YAML).
+- Renamed/moved options in the declarative configuration model (YAML). (!1672)
   - /cache/garbage-collector -> /cache/garbage-collector/enable
   - /dns64: true|false -> /dns64/enable: true|false
   - /dns64/rev-ttl -> /dns64/reverse-ttl
