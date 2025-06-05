@@ -68,16 +68,22 @@ class DnstapSchema(ConfigSchema):
     Logging DNS queries and responses to a unix socket.
 
     ---
+    enable: Enable/disable DNS queries logging.
     unix_socket: Path to unix domain socket where dnstap messages will be sent.
     log_queries: Log queries from downstream in wire format.
     log_responses: Log responses to downstream in wire format.
     log_tcp_rtt: Log TCP RTT (Round-trip time).
     """
 
-    unix_socket: WritableFilePath
+    enable: bool = False
+    unix_socket: Optional[WritableFilePath] = None
     log_queries: bool = True
     log_responses: bool = True
     log_tcp_rtt: bool = True
+
+    def _validate(self) -> None:
+        if self.enable and self.unix_socket is None:
+            raise ValueError("DNS queries logging enabled, but 'unix-socket' not specified")
 
 
 class LoggingSchema(ConfigSchema):
@@ -95,14 +101,14 @@ class LoggingSchema(ConfigSchema):
         level: LogLevelEnum = "notice"
         target: Union[LogTargetEnum, Literal["from-env"]] = "from-env"
         groups: Optional[List[LogGroupsEnum]] = None
-        dnstap: Union[Literal[False], DnstapSchema] = False
+        dnstap: DnstapSchema = DnstapSchema()
 
     _LAYER = Raw
 
     level: LogLevelEnum
     target: LogTargetEnum
     groups: Optional[List[LogGroupsEnum]]
-    dnstap: Union[Literal[False], DnstapSchema]
+    dnstap: DnstapSchema
 
     def _target(self, raw: Raw) -> LogTargetEnum:
         if raw.target == "from-env":
