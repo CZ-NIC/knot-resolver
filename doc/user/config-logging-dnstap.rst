@@ -29,6 +29,7 @@ Tunables:
 
     logging:
       dnstap:
+        enable: true
         unix-socket: /tmp/dnstap.sock
         # by default log is enabled for all
         log-queries: true

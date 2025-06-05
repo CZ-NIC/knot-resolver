@@ -325,39 +325,40 @@
                     }
                 },
                 "proxy-protocol": {
-                    "anyOf": [
-                        {
-                            "type": "string",
-                            "enum": [
-                                false
-                            ]
-                        },
-                        {
-                            "description": "PROXYv2 protocol configuration.",
-                            "type": "object",
-                            "properties": {
-                                "allow": {
-                                    "type": "array",
-                                    "items": {
-                                        "anyOf": [
-                                            {
-                                                "type": "string"
-                                            },
-                                            {
-                                                "type": "string"
-                                            },
-                                            {
-                                                "type": "string"
-                                            }
-                                        ]
-                                    },
-                                    "description": "Allow usage of the PROXYv2 protocol headers by clients on the specified addresses."
-                                }
-                            }
-                        }
-                    ],
                     "description": "PROXYv2 protocol configuration.",
-                    "default": false
+                    "type": "object",
+                    "properties": {
+                        "enable": {
+                            "type": "boolean",
+                            "description": "Enable/disable PROXYv2 protocol.",
+                            "default": false
+                        },
+                        "allow": {
+                            "type": [
+                                "array",
+                                "null"
+                            ],
+                            "items": {
+                                "anyOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "string"
+                                    }
+                                ]
+                            },
+                            "description": "Allow usage of the PROXYv2 protocol headers by clients on the specified addresses.",
+                            "default": null
+                        }
+                    },
+                    "default": {
+                        "enable": false,
+                        "allow": null
+                    }
                 },
                 "listen": {
                     "type": "array",
@@ -481,7 +482,10 @@
                     "sticket_secret_file": null,
                     "padding": true
                 },
-                "proxy_protocol": false,
+                "proxy_protocol": {
+                    "enable": false,
+                    "allow": null
+                },
                 "listen": [
                     {
                         "interface": [
@@ -1179,11 +1183,13 @@
                         },
                         "prediction": {
                             "description": "Prefetch record by predicting based on usage patterns and repetitive queries.",
-                            "type": [
-                                "object",
-                                "null"
-                            ],
+                            "type": "object",
                             "properties": {
+                                "enable": {
+                                    "type": "boolean",
+                                    "description": "Enable/disable prediction.",
+                                    "default": false
+                                },
                                 "window": {
                                     "type": "string",
                                     "pattern": "^(\\d+)(us|ms|s|m|h|d)$",
@@ -1197,12 +1203,20 @@
                                     "default": 24
                                 }
                             },
-                            "default": null
+                            "default": {
+                                "enable": false,
+                                "window": "15m",
+                                "period": 24
+                            }
                         }
                     },
                     "default": {
                         "expiring": false,
-                        "prediction": null
+                        "prediction": {
+                            "enable": false,
+                            "window": "15m",
+                            "period": 24
+                        }
                     }
                 }
             },
@@ -1227,7 +1241,11 @@
                 "prefill": null,
                 "prefetch": {
                     "expiring": false,
-                    "prediction": null
+                    "prediction": {
+                        "enable": false,
+                        "window": "15m",
+                        "period": 24
+                    }
                 }
             }
         },
@@ -1462,48 +1480,58 @@
                     "default": null
                 },
                 "dnstap": {
-                    "anyOf": [
-                        {
-                            "type": "string",
-                            "enum": [
-                                false
-                            ]
-                        },
-                        {
-                            "description": "Logging DNS queries and responses to a unix socket.",
-                            "type": "object",
-                            "properties": {
-                                "unix-socket": {
-                                    "type": "string",
-                                    "description": "Path to unix domain socket where dnstap messages will be sent."
-                                },
-                                "log-queries": {
-                                    "type": "boolean",
-                                    "description": "Log queries from downstream in wire format.",
-                                    "default": true
-                                },
-                                "log-responses": {
-                                    "type": "boolean",
-                                    "description": "Log responses to downstream in wire format.",
-                                    "default": true
-                                },
-                                "log-tcp-rtt": {
-                                    "type": "boolean",
-                                    "description": "Log TCP RTT (Round-trip time).",
-                                    "default": true
-                                }
-                            }
-                        }
-                    ],
                     "description": "Logging DNS requests and responses to a unix socket.",
-                    "default": false
+                    "type": "object",
+                    "properties": {
+                        "enable": {
+                            "type": "boolean",
+                            "description": "Enable/disable DNS queries logging.",
+                            "default": false
+                        },
+                        "unix-socket": {
+                            "type": [
+                                "string",
+                                "null"
+                            ],
+                            "description": "Path to unix domain socket where dnstap messages will be sent.",
+                            "default": null
+                        },
+                        "log-queries": {
+                            "type": "boolean",
+                            "description": "Log queries from downstream in wire format.",
+                            "default": true
+                        },
+                        "log-responses": {
+                            "type": "boolean",
+                            "description": "Log responses to downstream in wire format.",
+                            "default": true
+                        },
+                        "log-tcp-rtt": {
+                            "type": "boolean",
+                            "description": "Log TCP RTT (Round-trip time).",
+                            "default": true
+                        }
+                    },
+                    "default": {
+                        "enable": false,
+                        "unix_socket": null,
+                        "log_queries": true,
+                        "log_responses": true,
+                        "log_tcp_rtt": true
+                    }
                 }
             },
             "default": {
                 "level": "notice",
                 "target": "stdout",
                 "groups": null,
-                "dnstap": false
+                "dnstap": {
+                    "enable": false,
+                    "unix_socket": null,
+                    "log_queries": true,
+                    "log_responses": true,
+                    "log_tcp_rtt": true
+                }
             }
         },
         "monitoring": {

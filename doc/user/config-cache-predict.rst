@@ -35,8 +35,10 @@ though this mechanism is a prototype and **not recommended** for use in producti
      prefetch:
        # this mode is NOT RECOMMENDED for use in production
        prediction:
-          window: 15m  # 15 minutes sampling window
-          period: 24   # track last 6 hours
+         enable: true
+         # optionally, you can edit prediction configuration
+         window: 15m  # default, 15 minutes sampling window
+         period: 24   # default, track last 6 hours
 
 
 Window length is in minutes, period is a number of windows that can be kept in memory.
