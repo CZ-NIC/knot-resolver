@@ -919,6 +919,10 @@ pkg:alma-9:
   <<: *pkg_test
   image: $CI_REGISTRY/packaging/apkg/full/alma-9
 
+pkg:alma-10:
+  <<: *pkg_test
+  image: $CI_REGISTRY/packaging/apkg/full/alma-10
+
 pkg:arch:
   <<: *pkg_test_user
   image: $CI_REGISTRY/packaging/apkg/full/arch
