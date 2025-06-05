@@ -161,10 +161,12 @@ class ProxyProtocolSchema(ConfigSchema):
     PROXYv2 protocol configuration.
 
     ---
+    enable: Enable/disable PROXYv2 protocol.
     allow: Allow usage of the PROXYv2 protocol headers by clients on the specified addresses.
     """
 
-    allow: List[Union[IPAddress, IPNetwork]]
+    enable: bool = False
+    allow: Optional[List[Union[IPAddress, IPNetwork]]] = None
 
 
 class NetworkSchema(ConfigSchema):
@@ -194,7 +196,7 @@ class NetworkSchema(ConfigSchema):
     edns_buffer_size: EdnsBufferSizeSchema = EdnsBufferSizeSchema()
     address_renumbering: Optional[List[AddressRenumberingSchema]] = None
     tls: TLSSchema = TLSSchema()
-    proxy_protocol: Union[Literal[False], ProxyProtocolSchema] = False
+    proxy_protocol: ProxyProtocolSchema = ProxyProtocolSchema()
     listen: List[ListenSchema] = [
         ListenSchema({"interface": "127.0.0.1"}),
         ListenSchema({"interface": "::1", "freebind": True}),

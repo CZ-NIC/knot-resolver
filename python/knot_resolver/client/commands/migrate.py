@@ -132,6 +132,15 @@ class MigrateCommand(Command):
                     _add(new, "/cache/garbage-collector/enable", False)
                 else:
                     _add(new, "/cache/garbage-collector/enable", True)
+            prefetch_key = "prefetch"
+            if prefetch_key in new[cache_key]:
+                prediction_key = "prediction"
+                if prediction_key in new[cache_key][prefetch_key]:
+                    prediction = new[cache_key][prefetch_key][prediction_key]
+                    if prediction is None:
+                        _add(new, "/cache/prefetch/prediction/enable", False)
+                    else:
+                        _add(new, "/cache/prefetch/prediction/enable", True)
         dns64_key = "dns64"
         if dns64_key in new:
             if new[dns64_key] is False:
@@ -149,6 +158,16 @@ class MigrateCommand(Command):
         _rename(new, "/dnssec/keep-removed", "/dnssec/trust-anchors-keep-removed")
         _rename(new, "/dnssec/trust-anchor-sentinel", "/dnssec/sentinel")
         _rename(new, "/dnssec/trust-anchor-signal-query", "/dnssec/signal-query")
+        logging_key = "logging"
+        if logging_key in new:
+            dnstap_key = "dnstap"
+            if dnstap_key in new[logging_key]:
+                dnstap = new[logging_key][dnstap_key]
+                if dnstap is None:
+                    _add(new, "/logging/dnstap/enable", False)
+                else:
+                    _add(new, "/logging/dnstap/enable", True)
+
         _rename(new, "/logging/dnssec-bogus", "/dnssec/log-bogus")
         _rename(new, "/monitoring/enabled", "/monitoring/metrics")
         monitoring_key = "monitoring"
@@ -160,6 +179,15 @@ class MigrateCommand(Command):
                     _add(new, "/monitoring/graphite/enable", False)
                 else:
                     _add(new, "/monitoring/graphite/enable", True)
+        network_key = "network"
+        if network_key in new:
+            proxy_protocol_key = "proxy-protocol"
+            if proxy_protocol_key in new[network_key]:
+                proxy_protocol = new[network_key][proxy_protocol_key]
+                if proxy_protocol is None:
+                    _add(new, "/network/proxy-protocol/enable", False)
+                else:
+                    _add(new, "/network/proxy-protocol/enable", True)
         _rename(new, "/network/tls/files-watchdog", "/network/tls/watchdog")
         rate_limiting_key = "rate-limiting"
         if rate_limiting_key in new:

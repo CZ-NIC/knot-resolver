@@ -1,6 +1,10 @@
 cache:
   garbage-collector:
     interval: 2s
+  prefetch:
+    prediction:
+      window: 15m
+      period: 24
 
 dns64:
   rev-ttl: 1d
@@ -22,6 +26,8 @@ local-data:
     - rfa.zone
 
 logging:
+  dnstap:
+    unix-socket: dnstap.sock
   dnssec-bogus: true
   debugging:
     assertion-abort: false
@@ -33,6 +39,8 @@ monitoring:
     host: 127.0.0.1
 
 network:
+  proxy-protocol:
+    allow: [172.22.0.1]
   tls:
     auto-discovery: true
     files-watchdog: true

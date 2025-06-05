@@ -19,7 +19,7 @@ log_groups({
 })
 {% endif %}
 
-{% if cfg.logging.dnstap -%}
+{% if cfg.logging.dnstap.enable -%}
 -- logging.dnstap
 modules.load('dnstap')
 dnstap.config({
