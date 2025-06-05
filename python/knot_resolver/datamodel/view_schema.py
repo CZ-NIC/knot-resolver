@@ -35,7 +35,6 @@ class ViewSchema(ConfigSchema):
     subnets: List[IPNetwork]
     dst_subnet: Optional[IPNetwork] = None  # could be a list as well, iterated in template
     protocols: Optional[List[Literal["udp53", "tcp53", "dot", "doh", "doq"]]] = None
-
     tags: Optional[List[IDPattern]] = None
     answer: Optional[Literal["allow", "refused", "noanswer"]] = None
     options: ViewOptionsSchema = ViewOptionsSchema()

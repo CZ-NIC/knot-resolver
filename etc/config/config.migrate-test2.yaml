@@ -1,10 +1,18 @@
 
 cache:
   garbage-collector: false
+  prefetch:
+    prediction: null
 
 dns64: true
 
 dnssec: false
 
+logging:
+  dnstap: null
+
 monitoring:
   graphite: false
+
+network:
+  proxy-protocol: null
