@@ -91,10 +91,12 @@ class PredictionSchema(ConfigSchema):
     Helps keep the cache hot by prefetching expiring records and learning usage patterns and repetitive queries.
 
     ---
+    enable: Enable/disable prediction.
     window: Sampling window length.
     period: Number of windows that can be kept in memory.
     """
 
+    enable: bool = False
     window: TimeUnit = TimeUnit("15m")
     period: IntPositive = IntPositive(24)
 
@@ -108,7 +110,7 @@ class PrefetchSchema(ConfigSchema):
     """
 
     expiring: bool = False
-    prediction: Optional[PredictionSchema] = None
+    prediction: PredictionSchema = PredictionSchema()
 
 
 class CacheSchema(ConfigSchema):
