@@ -77,9 +77,9 @@ class DnstapSchema(ConfigSchema):
 
     enable: bool = False
     unix_socket: Optional[WritableFilePath] = None
-    log_queries: bool = True
-    log_responses: bool = True
-    log_tcp_rtt: bool = True
+    log_queries: bool = False
+    log_responses: bool = False
+    log_tcp_rtt: bool = False
 
     def _validate(self) -> None:
         if self.enable and self.unix_socket is None:
