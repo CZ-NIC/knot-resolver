@@ -36,6 +36,10 @@ https://www.knot-resolver.cz/documentation/v6.0.16/upgrading.html
   - /network/proxy_protocol -> /network/proxy_protocol/enable
   - /network/tls/files-watchdog -> /network/tls/watchdog
   - /rate-limiting -> /rate-limiting/enable
+- Changed default values in declarative configuration model (YAML). (!1672)
+  - /logging/dnstap/log-queries: true -> false
+  - /logging/dnstap/log-responses: true -> false
+  - /logging/dnstap/log-tcp-rtt: true -> false
 
 
 Knot Resolver 6.0.15 (2025-07-17)
