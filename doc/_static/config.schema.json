@@ -1499,25 +1499,25 @@
                         "log-queries": {
                             "type": "boolean",
                             "description": "Log queries from downstream in wire format.",
-                            "default": true
+                            "default": false
                         },
                         "log-responses": {
                             "type": "boolean",
                             "description": "Log responses to downstream in wire format.",
-                            "default": true
+                            "default": false
                         },
                         "log-tcp-rtt": {
                             "type": "boolean",
                             "description": "Log TCP RTT (Round-trip time).",
-                            "default": true
+                            "default": false
                         }
                     },
                     "default": {
                         "enable": false,
                         "unix_socket": null,
-                        "log_queries": true,
-                        "log_responses": true,
-                        "log_tcp_rtt": true
+                        "log_queries": false,
+                        "log_responses": false,
+                        "log_tcp_rtt": false
                     }
                 }
             },
@@ -1528,9 +1528,9 @@
                 "dnstap": {
                     "enable": false,
                     "unix_socket": null,
-                    "log_queries": true,
-                    "log_responses": true,
-                    "log_tcp_rtt": true
+                    "log_queries": false,
+                    "log_responses": false,
+                    "log_tcp_rtt": false
                 }
             }
         },
