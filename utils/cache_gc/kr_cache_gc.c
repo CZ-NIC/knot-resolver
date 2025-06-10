@@ -218,9 +218,11 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 
 	//// 3. pass whole cache again to collect a list of keys that should be deleted.
 	kr_timer_start(&timer_choose);
-	ctx_delete_categories_t to_del = { .top = &(*state)->kres_db.top };
-	to_del.cfg_temp_keys_space = cfg->temp_keys_space;
-	to_del.limit_category = limit_category;
+	ctx_delete_categories_t to_del = {
+		.top = &(*state)->kres_db.top,
+		.cfg_temp_keys_space = cfg->temp_keys_space,
+		.limit_category = limit_category,
+	};
 	ret = kr_gc_cache_iter(db, cfg, cb_delete_categories, &to_del);
 	if (ret != KNOT_EOK) {
 		entry_array_deep_free(&to_del.to_delete);
@@ -240,6 +242,7 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 	kr_timer_start(&timer_delete);
 	kr_timer_start(&timer_rw_txn);
 	rrtype_array_t deleted_rrtypes = { 0 };
+	bool deleted_rtt = false;
 
 	ret = api->txn_begin(db, &txn, 0);
 	if (ret != KNOT_EOK) {
@@ -257,8 +260,13 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 		case KNOT_EOK:
 			deleted_records++;
 			const int entry_type = kr_gc_key_consistent(*val);
-			if (entry_type >= 0) // some "inconsistent" entries are OK
-				rrtypelist_add(&deleted_rrtypes, entry_type);
+			if (entry_type >= 0) { // some "inconsistent" entries are OK
+				if (entry_type == KNOT_CACHE_RTT) {
+					deleted_rtt = true;
+				} else {
+					rrtypelist_add(&deleted_rrtypes, entry_type);
+				}
+			}
 			break;
 		case KNOT_ENOENT:
 			already_gone++;
@@ -310,6 +318,9 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 finish:
 	printf("Deleted %zu records (%zu already gone) types", deleted_records,
 	       already_gone);
+	if (deleted_rtt) {
+		printf(" RTT");
+	}
 	rrtypelist_print(&deleted_rrtypes);
 	printf("It took %.0lf msecs, %zu transactions (%s)\n\n",
 	       kr_timer_elapsed(&timer_delete) * 1000, rw_txn_count, knot_strerror(ret));
