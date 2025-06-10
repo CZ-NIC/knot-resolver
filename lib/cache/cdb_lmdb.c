@@ -50,7 +50,7 @@ struct lmdb_env
 	} txn;
 
 	bool is_cache; /**< cache vs. rules; from struct kr_cdb_opts::is_cache */
-	union kr_cache_top *top; // TODO remove
+	struct kr_cache_top *top; // TODO remove
 
 	/* Cached part of struct stat for data.mdb. */
 	dev_t st_dev;

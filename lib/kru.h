@@ -28,6 +28,8 @@
 // Exponential decay always uses randomized rounding on 32 bits.
 typedef uint32_t kru_price_t;
 
+typedef uint64_t kru_hash_t;
+
 #define KRU_PRICE_BITS (8 * sizeof(kru_price_t))
 
 // maximal allowed sum of prices without limiting
@@ -106,7 +108,9 @@ struct kru_api {
 			uint8_t namespace, uint8_t key[static 16], uint8_t *prefixes, kru_price_t *prices, size_t queries_cnt, uint16_t *loads_out);
 
 	// TODO
-	uint16_t (*load_bytes)(struct kru *kru, uint32_t time_now, uint8_t *key, uint8_t key_size, kru_price_t price);
+	/// Compute 64-bit hash to be used in load_hash.
+	kru_hash_t (*hash_bytes)(struct kru *kru, uint8_t *key, size_t key_size);
+	uint16_t (*load_hash)(struct kru *kru, uint32_t time_now, kru_hash_t hash, kru_price_t price);
 };
 
 // The functions are stored this way to make it easier to switch
