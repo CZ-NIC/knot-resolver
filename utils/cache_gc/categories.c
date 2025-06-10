@@ -27,7 +27,7 @@ static unsigned int get_random(int to)
 }
 
 // TODO this is just an example, make this more clever
-category_t kr_gc_categorize(union kr_cache_top *top, gc_record_info_t * info, void *key, size_t key_len)
+category_t kr_gc_categorize(struct kr_cache_top *top, gc_record_info_t * info, void *key, size_t key_len)
 {
 	category_t res;
 
