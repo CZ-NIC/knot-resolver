@@ -99,8 +99,8 @@ int kr_gc_key_consistent(knot_db_val_t key)
 		return KNOT_RRTYPE_NSEC;
 	case '3':
 		return KNOT_RRTYPE_NSEC3;
-	case 'S': // the rtt_state entries are considered inconsistent, at least for now
-		return -1;
+	case 'S':
+		return KNOT_CACHE_RTT;
 	default:
 		kr_assert(!EINVAL);
 		return kr_error(EINVAL);
@@ -208,13 +208,15 @@ int kr_gc_cache_iter(knot_db_t * knot_db, const  kr_cache_gc_cfg_t *cfg,
 		info.valid = false;
 		const int entry_type = kr_gc_key_consistent(key);
 		const struct entry_h *entry = NULL;
-		if (entry_type >= 0) {
+		if (entry_type == KNOT_CACHE_RTT) {
+			counter_gc_consistent++;
+			info.valid = true;
+			info.rrtype = entry_type;
+		} else if (entry_type >= 0) {
 			counter_gc_consistent++;
 			entry = val2entry(val, entry_type);
 		}
 		/* TODO: perhaps improve some details around here:
-		 *  - rtt_state entries are considered gc_inconsistent;
-		 *    therefore they'll be the first to get freed (see kr_gc_categorize())
 		 *  - xNAME have .rrtype NS
 		 *  - DNAME hidden on NS name will not be considered here
 		 *  - if zone has NSEC* meta-data but no NS, it will be seen
