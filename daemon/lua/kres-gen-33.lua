@@ -234,6 +234,10 @@ struct kr_extended_error {
 	int32_t info_code;
 	const char *extra_text;
 };
+struct kr_cache_top_context {
+	uint64_t bloom[4];
+	uint32_t cnt;
+};
 struct kr_request {
 	struct kr_context *ctx;
 	knot_pkt_t *answer;
@@ -267,6 +271,7 @@ struct kr_request {
 	uint8_t rule_score_apply;
 	uint8_t rule_score_log;
 	struct kr_rplan rplan;
+	struct kr_cache_top_context cache_top_context;
 	trace_log_f trace_log;
 	trace_callback_f trace_finish;
 	int vars_ref;

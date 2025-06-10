@@ -75,7 +75,7 @@ static void entry_array_deep_free(entry_array_t *d)
 typedef struct {
 	size_t categories_sizes[CATEGORIES];
 	size_t records;
-	union kr_cache_top *top;
+	struct kr_cache_top *top;
 } ctx_compute_categories_t;
 
 int cb_compute_categories(const knot_db_val_t * key, gc_record_info_t * info,
@@ -94,7 +94,7 @@ typedef struct {
 	size_t cfg_temp_keys_space;
 	size_t used_space;
 	size_t oversize_records;
-	union kr_cache_top *top;
+	struct kr_cache_top *top;
 } ctx_delete_categories_t;
 
 int cb_delete_categories(const knot_db_val_t * key, gc_record_info_t * info,
