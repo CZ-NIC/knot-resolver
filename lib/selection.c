@@ -563,6 +563,8 @@ void update_rtt(struct kr_query *qry, struct address_state *addr_state,
 	}
 
 	struct kr_cache *cache = &qry->request->ctx->cache;
+	struct kr_cache_top_context *old_cache_top_ctx =
+		kr_cache_top_context_switch(&the_resolver->cache.top, &qry->request->cache_top_context, "update_rtt");
 
 	uint8_t *address = ip_to_bytes(&transport->address, transport->address_len);
 	/* This construct is a bit racy since the global state may change
@@ -589,6 +591,8 @@ void update_rtt(struct kr_query *qry, struct address_state *addr_state,
 			qry->id, ns_name, ns_str ? ns_str : "", zonecut_str,
 			rtt, new_rtt_state.srtt, new_rtt_state.variance);
 	}
+
+	kr_cache_top_context_switch(&the_resolver->cache.top, old_cache_top_ctx, "update_rtt");
 }
 
 /// Update rtt_state (including caching) after a server timed out.
@@ -598,6 +602,9 @@ static void server_timeout(const struct kr_query *qry, const struct kr_transport
 	// Make sure that the timeout wasn't capped; see kr_transport::timeout_capped
 	if (transport->timeout_capped)
 		return;
+
+	struct kr_cache_top_context *old_cache_top_ctx =
+		kr_cache_top_context_switch(&the_resolver->cache.top, &qry->request->cache_top_context, "server_timeout");
 
 	const uint8_t *address = ip_to_bytes(&transport->address, transport->address_len);
 	if (transport->address_len == sizeof(struct in6_addr))
@@ -625,6 +632,8 @@ static void server_timeout(const struct kr_query *qry, const struct kr_transport
 	} else {
 		kr_cache_commit(cache); // Avoid any risk of long transaction.
 	}
+
+	kr_cache_top_context_switch(&the_resolver->cache.top, old_cache_top_ctx, "server_timeout");
 }
 // Not everything can be checked in nice ways like static_assert()
 static __attribute__((constructor)) void test_RTT_consts(void)

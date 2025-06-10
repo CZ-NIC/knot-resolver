@@ -52,7 +52,6 @@ Size (`loads_bits` = log2 length):
 #include "contrib/ucw/lib.h"
 #include "libdnssec/error.h"
 #include "libdnssec/random.h"
-typedef uint64_t hash_t;
 #if USE_AES
 	/// 4-8 rounds should be an OK choice, most likely.
 	#define AES_ROUNDS 4
@@ -193,7 +192,7 @@ static inline int32_t capacity2loads(int capacity_log)
 static size_t kru_get_size(int capacity_log)
 {
 	uint32_t loads_bits = capacity2loads(capacity_log);
-	if (8 * sizeof(hash_t) < TABLE_COUNT * loads_bits
+	if (8 * sizeof(kru_hash_t) < TABLE_COUNT * loads_bits
 				+ 8 * sizeof(((struct kru *)0)->load_cls[0]->ids[0])) {
 		assert(false);
 		return 0;
@@ -215,7 +214,7 @@ static bool kru_initialize(struct kru *kru, int capacity_log, kru_price_t max_de
 	}
 
 	uint32_t loads_bits = capacity2loads(capacity_log);
-	if (8 * sizeof(hash_t) < TABLE_COUNT * loads_bits
+	if (8 * sizeof(kru_hash_t) < TABLE_COUNT * loads_bits
 				+ 8 * sizeof(((struct kru *)0)->load_cls[0]->ids[0])) {
 		assert(false);
 		return false;
@@ -247,7 +246,8 @@ struct query_ctx {
 static inline void kru_limited_prefetch(struct kru *kru, uint32_t time_now, uint8_t key[static 16], kru_price_t price, struct query_ctx *ctx)
 {
 	// Obtain hash of *buf.
-	hash_t hash;
+	kru_hash_t hash;
+	static_assert(sizeof(kru_hash_t) * 8 <= 64);
 #if !USE_AES
 	hash = SipHash(&kru->hash_key, SIPHASH_RC, SIPHASH_RF, key, 16);
 #else
@@ -283,7 +283,8 @@ static inline void kru_limited_prefetch(struct kru *kru, uint32_t time_now, uint
 static inline void kru_limited_prefetch_prefix(struct kru *kru, uint32_t time_now, uint8_t namespace, uint8_t key[static 16], uint8_t prefix, kru_price_t price, struct query_ctx *ctx)
 {
 	// Obtain hash of *buf.
-	hash_t hash;
+	kru_hash_t hash;
+	static_assert(sizeof(kru_hash_t) * 8 <= 64);
 
 #if !USE_AES
 	{
@@ -353,11 +354,11 @@ static inline void kru_limited_prefetch_prefix(struct kru *kru, uint32_t time_no
 	ctx->id = hash;
 }
 
-/// Phase 1/3 of a query -- hash, prefetch, ctx init. Based on one 16-byte key.
-static inline void kru_limited_prefetch_bytes(struct kru *kru, uint32_t time_now, uint8_t *key, size_t key_size, kru_price_t price, struct query_ctx *ctx)
-{
+static kru_hash_t kru_hash_bytes(struct kru *kru, uint8_t *key, size_t key_size) {
 	// Obtain hash of *buf.
-	hash_t hash;
+	kru_hash_t hash;
+	static_assert(sizeof(kru_hash_t) * 8 <= 64);
+
 #if !USE_AES
 	hash = SipHash(&kru->hash_key, SIPHASH_RC, SIPHASH_RF, key, key_size);
 #else
@@ -368,6 +369,12 @@ static inline void kru_limited_prefetch_bytes(struct kru *kru, uint32_t time_now
 	}
 #endif
 
+	return hash;
+}
+
+/// Phase 1/3 of a query -- hash, prefetch, ctx init. Based on arbitrary-length byte-stream.
+static inline void kru_limited_prefetch_hash(struct kru *kru, uint32_t time_now, kru_hash_t hash, kru_price_t price, struct query_ctx *ctx)
+{
 	// Choose the cache-lines to operate on
 	const uint32_t loads_mask = (1 << kru->loads_bits) - 1;
 	// Fetch the two cache-lines in parallel before we really touch them.
@@ -662,11 +669,11 @@ static uint16_t kru_load_multi_prefix_max(struct kru *kru, uint32_t time_now, ui
 	return max_load;
 }
 
-static uint16_t kru_load_bytes(struct kru *kru, uint32_t time_now, uint8_t *key, uint8_t key_size, kru_price_t price)
+static uint16_t kru_load_hash(struct kru *kru, uint32_t time_now, kru_hash_t hash, kru_price_t price)
 {
 	struct query_ctx ctx;
 
-	kru_limited_prefetch_bytes(kru, time_now, key, key_size, price, &ctx);
+	kru_limited_prefetch_hash(kru, time_now, hash, price, &ctx);
 	kru_limited_fetch(kru, &ctx);
 
 	if (price) {
@@ -692,5 +699,6 @@ static bool kru_limited(struct kru *kru, uint32_t time_now, uint8_t key[static 1
 	.limited_multi_prefix_or = kru_limited_multi_prefix_or, \
 	.load_multi_prefix = kru_load_multi_prefix, \
 	.load_multi_prefix_max = kru_load_multi_prefix_max, \
-	.load_bytes = kru_load_bytes, \
+	.load_hash = kru_load_hash, \
+	.hash_bytes = kru_hash_bytes, \
 }
