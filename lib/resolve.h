@@ -269,7 +269,6 @@ struct kr_request {
 	bool auth_validated; /**< see answ_validated ^^ ; TODO */
 	bool stale_accounted;
 	bool ratelimited; /**< this request shot over the rate limit */
-
 	/** Overall rank for the request.
 	 *
 	 * Values from kr_rank, currently just KR_RANK_SECURE and _INITIAL.
@@ -283,6 +282,7 @@ struct kr_request {
 	uint8_t rule_score_log;
 
 	struct kr_rplan rplan;
+	struct kr_cache_top_context cache_top_context; // divided into two cache lines, TODO change placement (+update kres-gen)
 	trace_log_f trace_log; /**< Logging tracepoint */
 	trace_callback_f trace_finish; /**< Request finish tracepoint */
 	int vars_ref; /**< Reference to per-request variable table. LUA_NOREF if not set. */

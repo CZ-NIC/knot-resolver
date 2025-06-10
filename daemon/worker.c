@@ -2054,6 +2054,7 @@ static enum protolayer_event_cb_result pl_dns_stream_disconnected(
 				qry->flags.TCP = false;
 			}
 			qr_task_step(task, NULL, NULL);
+
 			defer_sample_restart();
 		} else {
 			kr_assert(task->ctx->source.session == session);
