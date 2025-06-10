@@ -17,10 +17,10 @@
 
 #define TICK_MSEC    1000
 #define BASE_PRICE   (((kru_price_t)1) << (KRU_PRICE_BITS - 16))  // increment by ones (16-bit)
-	// -> instant limit: ~2^16
+	// -> instant limit: ~2^16     // TODO -> 2^14 ?
 #define MAX_DECAY    (BASE_PRICE / 2)  // per sec
 	// -> rate limit: 1/2 per sec  (more frequent accesses are incomparable)
-	// -> half-life: ~ 25h 14min
+	// -> half-life: ~ 25h 14min   // TODO -> 5h ?
 
 struct top_data {
 	uint32_t version;
@@ -29,13 +29,55 @@ struct top_data {
 	_Alignas(64) uint8_t kru[];
 };
 
+
 static inline uint32_t ticks_now(void)
 {
 	// TODO use clock_gettime directly or maintain time offset
 	return kr_now() / TICK_MSEC;  // not working over reboots
 }
 
-int kr_cache_top_init(union kr_cache_top *top, char *mmap_file, size_t cache_size) {
+static inline bool first_access_ro(struct kr_cache_top_context *ctx, kru_hash_t hash) {
+	// struct kr_cache_top_context { uint64_t bloom[4]; }
+	static_assert(sizeof(((struct kr_cache_top_context *)0)->bloom[0]) * 8 == 64);
+	static_assert(sizeof(((struct kr_cache_top_context *)0)->bloom)    * 8 == 64 * 4);
+		// expected around 16 unique cache accesses per request context;
+		// prob. of collision of the 16th unique access with the preceeding ones: 1/510;
+		// 32nd access: 1/45; 64th access: 1/6
+
+	uint8_t *h = (uint8_t *)&hash;
+	static_assert(sizeof(kru_hash_t) >= 4);
+
+	bool accessed = 1ull &
+		(ctx->bloom[0] >> (h[0] % 64)) &
+		(ctx->bloom[1] >> (h[1] % 64)) &
+		(ctx->bloom[2] >> (h[2] % 64)) &
+		(ctx->bloom[3] >> (h[3] % 64));
+
+	return !accessed;
+}
+
+static inline bool first_access(struct kr_cache_top_context *ctx, kru_hash_t hash) {
+	if (!first_access_ro(ctx, hash)) return false;
+
+	uint8_t *h = (uint8_t *)&hash;
+	static_assert(sizeof(kru_hash_t) >= 4);
+
+	ctx->bloom[0] |= 1ull << (h[0] % 64);
+	ctx->bloom[1] |= 1ull << (h[1] % 64);
+	ctx->bloom[2] |= 1ull << (h[2] % 64);
+	ctx->bloom[3] |= 1ull << (h[3] % 64);
+
+	kr_assert(!first_access_ro(ctx, hash));
+
+	if (++ctx->cnt > 16) {
+		VERBOSE_LOG("BLOOM overfull (%d unique accesses)\n", ctx->cnt);
+	}
+
+	return true;
+}
+
+
+int kr_cache_top_init(struct kr_cache_top *top, char *mmap_file, size_t cache_size) {
 	size_t size = 0, capacity_log = 0;
 	VERBOSE_LOG("INIT, cache size %d\n", cache_size);
 
@@ -64,7 +106,8 @@ int kr_cache_top_init(union kr_cache_top *top, char *mmap_file, size_t cache_siz
 	}
 
 	VERBOSE_LOG("INIT mmapped_init\n");
-	int state = mmapped_init(&top->mmapped, mmap_file, size, &header, header_size, true);  // allocates top->data
+	int state = mmapped_init(&top->mmapped, mmap_file, size, &header, header_size, true);
+	top->data = top->mmapped.mem;
 	bool using_existing = false;
 
 	// try using existing data
@@ -72,6 +115,7 @@ int kr_cache_top_init(union kr_cache_top *top, char *mmap_file, size_t cache_siz
 		if (!KRU.check_size((struct kru *)top->data->kru, top->mmapped.size - offsetof(struct top_data, kru))) {
 			VERBOSE_LOG("INIT reset, wrong size\n");
 			state = mmapped_init_reset(&top->mmapped, mmap_file, size, &header, header_size);
+			top->data = top->mmapped.mem;
 		} else {
 			using_existing = true;
 			VERBOSE_LOG("INIT finish existing\n");
@@ -95,6 +139,7 @@ int kr_cache_top_init(union kr_cache_top *top, char *mmap_file, size_t cache_siz
 	if (state < 0) goto fail;
 	kr_assert(state == 0);
 
+	top->ctx = NULL;
 	kr_log_info(CACHE, "Cache top initialized %s (%s).\n",
 			using_existing ? "using existing data" : "as empty",
 			(kru_using_avx2() ? "AVX2" : "generic"));
@@ -102,13 +147,14 @@ int kr_cache_top_init(union kr_cache_top *top, char *mmap_file, size_t cache_siz
 
 fail:
 	VERBOSE_LOG("INIT error, deinit\n");
-	mmapped_deinit(&top->mmapped);
+	kr_cache_top_deinit(top);
 	kr_log_crit(SYSTEM, "Initialization of cache top failed.\n");
 	return state;
 }
 
-void kr_cache_top_deinit(union kr_cache_top *top) {
-	mmapped_deinit(&top->mmapped);  // sets top->data to NULL
+void kr_cache_top_deinit(struct kr_cache_top *top) {
+	top->data = NULL;
+	mmapped_deinit(&top->mmapped);
 }
 
 /* text mode: '\0' -> '|'
@@ -181,21 +227,34 @@ static char *str_key(void *key, size_t len) {
 	return str;
 }
 
-void kr_cache_top_access(union kr_cache_top *top, void *key, size_t len, char *debug_label)
+void kr_cache_top_access(struct kr_cache_top *top, void *key, size_t len, char *debug_label)
 {
-	VERBOSE_LOG("ACCESS %-19s %s\n", debug_label, str_key(key, len));
-	KRU.load_bytes((struct kru *)&top->data->kru, ticks_now(), (uint8_t *)key, len, top->data->base_price);
+	kru_hash_t hash = KRU.hash_bytes((struct kru *)&top->data->kru, (uint8_t *)key, len);
+	const bool unique = top->ctx ? first_access(top->ctx, hash) : true;
+	if (unique) {
+		KRU.load_hash((struct kru *)&top->data->kru, ticks_now(), hash, top->data->base_price);
+	}
+	VERBOSE_LOG("ACCESS %-19s %s%s%s\n", debug_label, str_key(key, len), unique ? "" : " (SKIP)", top->ctx ? "" : "(NO_CONTEXT, PASS)");
 }
 
 // temporal logging one level under _access
-void kr_cache_top_access_cdb(union kr_cache_top *top, void *key, size_t len, char *debug_label)
+void kr_cache_top_access_cdb(struct kr_cache_top *top, void *key, size_t len, char *debug_label)
 {
 
-	VERBOSE_LOG("ACCESS   %-17s %s\n", debug_label, str_key(key, len));
+	// VERBOSE_LOG("ACCESS   %-17s %s\n", debug_label, str_key(key, len));
 }
 
-uint16_t kr_cache_top_load(union kr_cache_top *top, void *key, size_t len) {
-	uint16_t load = KRU.load_bytes((struct kru *)&top->data->kru, ticks_now(), (uint8_t *)key, len, 0);
+struct kr_cache_top_context *kr_cache_top_context_switch(struct kr_cache_top *top,
+		struct kr_cache_top_context *new_ctx, char *debug_label)
+{
+	struct kr_cache_top_context *old_ctx = top->ctx;
+	top->ctx = new_ctx;
+	return old_ctx;
+}
+
+uint16_t kr_cache_top_load(struct kr_cache_top *top, void *key, size_t len) {
+	kru_hash_t hash = KRU.hash_bytes((struct kru *)&top->data->kru, (uint8_t *)key, len);
+	uint16_t load = KRU.load_hash((struct kru *)&top->data->kru, ticks_now(), hash, 0);
 
 	VERBOSE_LOG("LOAD %s -> %d\n", str_key(key, len), load);
 	return load;
