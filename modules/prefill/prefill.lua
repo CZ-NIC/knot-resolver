@@ -70,7 +70,8 @@ end
 
 local function download(url, fname)
 	local kluautil = require('kluautil')
-	local fname_tmp = os.tmpname()
+	-- fname_tmp is in the same directory, as os.rename below refuses to work across filesystems
+	local fname_tmp = fname .. '.' .. worker.id .. '.tmp'
 	local file, ok, errmsg
 	file, errmsg = io.open(fname_tmp, 'w')
 	if not file then
