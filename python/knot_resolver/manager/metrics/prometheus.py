@@ -63,11 +63,24 @@ if PROMETHEUS_LIB:
             sum_value=metrics["answer"]["sum_ms"] / 1_000,
         )
 
+        # "request" metrics
         yield _counter(
             "resolver_request_total",
             "total number of DNS requests (including internal client requests)",
             label=("instance_id", sid),
             value=metrics["request"]["total"],
+        )
+        yield _counter(
+            "resolver_request_total4",
+            "total number of IPv4 DNS requests",
+            label=("instance_id", sid),
+            value=metrics["request"]["total4"],
+        )
+        yield _counter(
+            "resolver_request_total6",
+            "total number of IPv6 DNS requests",
+            label=("instance_id", sid),
+            value=metrics["request"]["total6"],
         )
         yield _counter(
             "resolver_request_internal",
@@ -82,10 +95,34 @@ if PROMETHEUS_LIB:
             value=metrics["request"]["udp"],
         )
         yield _counter(
+            "resolver_request_udp4",
+            "number of external requests received over IPv4 plain UDP (RFC 1035)",
+            label=("instance_id", sid),
+            value=metrics["request"]["udp4"],
+        )
+        yield _counter(
+            "resolver_request_udp6",
+            "number of external requests received over IPv6 plain UDP (RFC 1035)",
+            label=("instance_id", sid),
+            value=metrics["request"]["udp6"],
+        )
+        yield _counter(
             "resolver_request_tcp",
             "number of external requests received over plain TCP (RFC 1035)",
             label=("instance_id", sid),
             value=metrics["request"]["tcp"],
+        )
+        yield _counter(
+            "resolver_request_tcp4",
+            "number of external requests received over IPv4 plain TCP (RFC 1035)",
+            label=("instance_id", sid),
+            value=metrics["request"]["tcp4"],
+        )
+        yield _counter(
+            "resolver_request_tcp6",
+            "number of external requests received over IPv6 plain TCP (RFC 1035)",
+            label=("instance_id", sid),
+            value=metrics["request"]["tcp6"],
         )
         yield _counter(
             "resolver_request_dot",
@@ -94,10 +131,34 @@ if PROMETHEUS_LIB:
             value=metrics["request"]["dot"],
         )
         yield _counter(
+            "resolver_request_dot4",
+            "number of external requests received over IPv4 DNS-over-TLS (RFC 7858)",
+            label=("instance_id", sid),
+            value=metrics["request"]["dot4"],
+        )
+        yield _counter(
+            "resolver_request_dot6",
+            "number of external requests received over IPv6 DNS-over-TLS (RFC 7858)",
+            label=("instance_id", sid),
+            value=metrics["request"]["dot6"],
+        )
+        yield _counter(
             "resolver_request_doh",
             "number of external requests received over DNS-over-HTTP (RFC 8484)",
             label=("instance_id", sid),
             value=metrics["request"]["doh"],
+        )
+        yield _counter(
+            "resolver_request_doh4",
+            "number of external requests received over IPv4 DNS-over-HTTP (RFC 8484)",
+            label=("instance_id", sid),
+            value=metrics["request"]["doh4"],
+        )
+        yield _counter(
+            "resolver_request_doh6",
+            "number of external requests received over IPv6 DNS-over-HTTP (RFC 8484)",
+            label=("instance_id", sid),
+            value=metrics["request"]["doh6"],
         )
         yield _counter(
             "resolver_request_xdp",
@@ -105,6 +166,20 @@ if PROMETHEUS_LIB:
             label=("instance_id", sid),
             value=metrics["request"]["xdp"],
         )
+        yield _counter(
+            "resolver_request_xdp4",
+            "number of external requests received over IPv4 plain UDP via an AF_XDP socket",
+            label=("instance_id", sid),
+            value=metrics["request"]["xdp4"],
+        )
+        yield _counter(
+            "resolver_request_xdp6",
+            "number of external requests received over IPv6 plain UDP via an AF_XDP socket",
+            label=("instance_id", sid),
+            value=metrics["request"]["xdp6"],
+        )
+
+        # "answer" metrics
         yield _counter(
             "resolver_answer_total",
             "total number of answered queries",
@@ -195,6 +270,8 @@ if PROMETHEUS_LIB:
             label=("instance_id", sid),
             value=metrics["answer"]["edns0"],
         )
+
+        # "query" metrics
         yield _counter(
             "resolver_query_edns",
             "number of queries with EDNS present",
@@ -208,6 +285,7 @@ if PROMETHEUS_LIB:
             value=metrics["query"]["dnssec"],
         )
 
+        # "predict" metrics (optional)
         if "predict" in metrics:
             if "epoch" in metrics["predict"]:
                 yield _counter(
