@@ -56,7 +56,7 @@ trust_anchors.set_insecure({
 {% if cfg.dnssec.trust_anchors_files %}
 -- dnssec.trust-anchors-files
 {% for taf in cfg.dnssec.trust_anchors_files %}
-trust_anchors.add_file('{{ taf.file }}',  readonly = {{ boolean(taf.read_only) }})
+trust_anchors.add_file('{{ taf.file }}', {{ boolean(taf.read_only) }})
 {% endfor %}
 {% endif %}
 
