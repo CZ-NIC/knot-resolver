@@ -624,7 +624,7 @@ class ObjectMapper:
                 keys = ", ".join((f"'{u}'" for u in unused))
                 raise DataValidationError(
                     f"unexpected extra key(s) {keys}",
-                    object_path,
+                    object_path or "/",
                 )
 
         # validate the constructed value
