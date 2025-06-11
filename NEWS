@@ -5,6 +5,7 @@ Bugfixes
 --------
 - manager: prometheus metrics update (!1703, #917)
   - added missing metrics split by IPv4 and IPv6
+- /dnssec/trust-anchors-files: fix resolver startup (!1704)
 
 
 Knot Resolver 6.0.14 (2025-06-03)
