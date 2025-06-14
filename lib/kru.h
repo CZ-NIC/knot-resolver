@@ -109,6 +109,7 @@ struct kru_api {
 
 	// TODO
 	/// Compute 64-bit hash to be used in load_hash.
+	/// The key need not to be aligned as we use always unoptimized variant here.
 	kru_hash_t (*hash_bytes)(struct kru *kru, uint8_t *key, size_t key_size);
 	uint16_t (*load_hash)(struct kru *kru, uint32_t time_now, kru_hash_t hash, kru_price_t price);
 };
