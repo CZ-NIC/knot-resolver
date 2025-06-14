@@ -12,7 +12,7 @@ struct kr_cache_top {
 };
 
 struct kr_cache_top_context {
-	uint64_t bloom[4];
+	uint32_t bloom[16]; // TODO require alignment
 	uint32_t cnt;  // TODO remove this (and propagate to kres-gen)
 };
 

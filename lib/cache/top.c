@@ -38,20 +38,21 @@ static inline uint32_t ticks_now(void)
 
 static inline bool first_access_ro(struct kr_cache_top_context *ctx, kru_hash_t hash) {
 	// struct kr_cache_top_context { uint64_t bloom[4]; }
-	static_assert(sizeof(((struct kr_cache_top_context *)0)->bloom[0]) * 8 == 64);
-	static_assert(sizeof(((struct kr_cache_top_context *)0)->bloom)    * 8 == 64 * 4);
-		// expected around 16 unique cache accesses per request context;
-		// prob. of collision of the 16th unique access with the preceeding ones: 1/510;
-		// 32nd access: 1/45; 64th access: 1/6
+	static_assert(sizeof(((struct kr_cache_top_context *)0)->bloom[0]) * 8 == 32);
+	static_assert(sizeof(((struct kr_cache_top_context *)0)->bloom)    * 8 == 32 * 16);
+		// expected around 40 unique cache accesses per request context, up to ~100;
+		// prob. of collision of 40th unique access with the preceeding ones: ~0.5 %;
+		// 60th: ~1.9 %; 80th: 4.5 %; 100th: 8.4 %; 150th: 22 %; 200th; 39 %
+		//   -> collision means not counting the cache access in KRU while it should be
 
 	uint8_t *h = (uint8_t *)&hash;
-	static_assert(sizeof(kru_hash_t) >= 4);
+	static_assert(sizeof(kru_hash_t) >= 8);
 
-	bool accessed = 1ull &
-		(ctx->bloom[0] >> (h[0] % 64)) &
-		(ctx->bloom[1] >> (h[1] % 64)) &
-		(ctx->bloom[2] >> (h[2] % 64)) &
-		(ctx->bloom[3] >> (h[3] % 64));
+	bool accessed = 1u &
+		(ctx->bloom[h[0] % 16] >> (h[1] % 32)) &
+		(ctx->bloom[h[2] % 16] >> (h[3] % 32)) &
+		(ctx->bloom[h[4] % 16] >> (h[5] % 32)) &
+		(ctx->bloom[h[6] % 16] >> (h[7] % 32));
 
 	return !accessed;
 }
@@ -60,18 +61,29 @@ static inline bool first_access(struct kr_cache_top_context *ctx, kru_hash_t has
 	if (!first_access_ro(ctx, hash)) return false;
 
 	uint8_t *h = (uint8_t *)&hash;
-	static_assert(sizeof(kru_hash_t) >= 4);
+	static_assert(sizeof(kru_hash_t) >= 8);
 
-	ctx->bloom[0] |= 1ull << (h[0] % 64);
-	ctx->bloom[1] |= 1ull << (h[1] % 64);
-	ctx->bloom[2] |= 1ull << (h[2] % 64);
-	ctx->bloom[3] |= 1ull << (h[3] % 64);
+	{ // temporal statistics, TODO remove
+		int ones = 0;
+		for (int i = 0; i < 16; i++) {
+			ones += __builtin_popcount(ctx->bloom[i]);
+		}
+		double collision_prob = ones / 512.0; // 1-bit collision
+		collision_prob *= collision_prob;     // 2-bit collision
+		collision_prob *= collision_prob;     // 4-bit collision
+
+		if (collision_prob > 0.1) {
+			VERBOSE_LOG("BLOOM %d unique accesses, collision prob. %5.3f %% (%d/512 ones)\n", ctx->cnt, 100.0 * collision_prob, ones);
+		}
+		ctx->cnt++;
+	}
+
+	ctx->bloom[h[0] % 16] |= 1u << (h[1] % 32);
+	ctx->bloom[h[2] % 16] |= 1u << (h[3] % 32);
+	ctx->bloom[h[4] % 16] |= 1u << (h[5] % 32);
+	ctx->bloom[h[6] % 16] |= 1u << (h[7] % 32);
 
 	kr_assert(!first_access_ro(ctx, hash));
-
-	if (++ctx->cnt > 16) {
-		VERBOSE_LOG("BLOOM overfull (%d unique accesses)\n", ctx->cnt);
-	}
 
 	return true;
 }

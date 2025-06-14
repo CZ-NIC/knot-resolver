@@ -55,7 +55,8 @@ Size (`loads_bits` = log2 length):
 #if USE_AES
 	/// 4-8 rounds should be an OK choice, most likely.
 	#define AES_ROUNDS 4
-#else
+#endif //#else
+// use SipHash also for variable-length keys with otherwise optimized variant
 	#include "contrib/openbsd/siphash.h"
 
 	/// 1,3 should be OK choice, probably.
@@ -63,7 +64,7 @@ Size (`loads_bits` = log2 length):
 		SIPHASH_RC = 1,
 		SIPHASH_RF = 3,
 	};
-#endif
+//#endif
 
 #if USE_AVX2 || USE_SSE41 || USE_AES
 	#include <immintrin.h>
@@ -359,15 +360,11 @@ static kru_hash_t kru_hash_bytes(struct kru *kru, uint8_t *key, size_t key_size)
 	kru_hash_t hash;
 	static_assert(sizeof(kru_hash_t) * 8 <= 64);
 
-#if !USE_AES
-	hash = SipHash(&kru->hash_key, SIPHASH_RC, SIPHASH_RF, key, key_size);
-#else
-	// TODO
-	hash = 3;
-	for (size_t i = 0; i < key_size; i++) {
-		hash = hash * 257 + key[i];
-	}
-#endif
+	// We use SipHash even for otherwise optimized KRU variant, which has diffent type of hash_key.
+	static_assert(sizeof(kru->hash_key) >= sizeof(SIPHASH_KEY));
+	SIPHASH_KEY *hash_key = (void *)&kru->hash_key;
+
+	hash = SipHash(hash_key, SIPHASH_RC, SIPHASH_RF, key, key_size);
 
 	return hash;
 }
