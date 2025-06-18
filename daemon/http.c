@@ -39,6 +39,10 @@
 #define HTTP_FRAME_HDLEN 9
 #define HTTP_FRAME_PADLEN 1
 
+/* accept any url path,
+ * otherwise only /doh and /dns-query are accepted */
+#define IGNORE_ENDPOINT
+
 struct http_stream {
 	int32_t id;
 	kr_http_header_array_t *headers;
@@ -114,6 +118,9 @@ static inline void set_status(struct pl_http_sess_data *ctx, enum http_status st
  */
 static int check_uri(const char* path)
 {
+#ifdef IGNORE_ENDPOINT
+	return kr_ok();
+#else
 	static const char *endpoints[] = {"dns-query", "doh"};
 	ssize_t endpoint_len;
 	ssize_t ret;
@@ -138,6 +145,7 @@ static int check_uri(const char* path)
 	}
 
 	return (ret) ? kr_error(ENOENT) : kr_ok();
+#endif /* IGNORE_ENDPOINT */
 }
 
 static kr_http_header_array_t *headers_dup(kr_http_header_array_t *src)
