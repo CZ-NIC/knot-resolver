@@ -5,7 +5,6 @@ file to allow us to exclude the __main__.py file from black's autoformatting
 
 import argparse
 import sys
-from pathlib import Path
 from typing import NoReturn
 
 from knot_resolver.constants import CONFIG_FILE, VERSION
@@ -26,11 +25,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "-c",
         "--config",
-        help="Config file to load. Overrides default config location at '" + str(CONFIG_FILE) + "'",
+        help=f"Config file(s) to load. Overrides default config location at '{str(CONFIG_FILE)}'",
         type=str,
-        nargs=1,
+        nargs="+",
         required=False,
-        default=None,
+        default=[str(CONFIG_FILE)],
     )
     return parser.parse_args()
 
@@ -42,11 +41,5 @@ def main() -> NoReturn:
     # parse arguments
     args = parse_args()
 
-    # where to look for config
-    if args.config is not None:
-        config_path = Path(args.config[0])
-    else:
-        config_path = CONFIG_FILE
-
-    exit_code = compat.asyncio.run(start_server(config=config_path))
+    exit_code = compat.asyncio.run(start_server(config=args.config))
     sys.exit(exit_code)
