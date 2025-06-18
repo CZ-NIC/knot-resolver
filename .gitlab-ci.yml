@@ -913,11 +913,15 @@ python:lint:
 python:run:
   <<: *python
   stage: test
+  parallel:
+    matrix:
+      - CONFIG_FILE_NAME:
+          - config.dev.yaml
   script:
     - poetry install --all-extras --only main,dev
     - poe configure
     # return code 124 is also OK
-    - timeout 3m poe run || ( [[ $? -eq 124 ]] )
+    - timeout 1m poe run || ( [[ $? -eq 124 ]] )
 
 python:unit:
   <<: *python
