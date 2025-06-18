@@ -915,13 +915,18 @@ python:run:
   stage: test
   parallel:
     matrix:
-      - CONFIG_FILE_NAME:
-          - config.dev.yaml
+      # additional configuration file
+      - ADD_CONFIG_FILE_NAME:
+          - config.test-defer.yaml
+          - config.test-forward.yaml
+          - config.test-local-data.yaml
+          - config.test-rate-limiting.yaml
   script:
+    - touch etc/config/blocklist.rpz
     - poetry install --all-extras --only main,dev
     - poe configure
     # return code 124 is also OK
-    - timeout 1m poe run || ( [[ $? -eq 124 ]] )
+    - timeout 1m poe run etc/config/${ADD_CONFIG_FILE_NAME} || ( [[ $? -eq 124 ]] )
 
 python:unit:
   <<: *python
