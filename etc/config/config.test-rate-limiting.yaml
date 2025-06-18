@@ -1,0 +1,2 @@
+rate-limiting:
+  rate-limit: 20

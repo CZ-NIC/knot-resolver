@@ -1,0 +1,3 @@
+defer:
+  enabled: true
+  log-period: 1s
