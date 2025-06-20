@@ -36,7 +36,7 @@ from knot_resolver.utils.compat import asyncio as asyncio_compat
 from knot_resolver.utils.etag import structural_etag
 from knot_resolver.utils.functional import Result
 from knot_resolver.utils.modeling.exceptions import AggregateDataValidationError, DataParsingError, DataValidationError
-from knot_resolver.utils.modeling.parsing import DataFormat, try_to_parse
+from knot_resolver.utils.modeling.parsing import DataFormat, data_combine, try_to_parse
 from knot_resolver.utils.modeling.query import query
 from knot_resolver.utils.modeling.types import NoneType
 from knot_resolver.utils.systemd_notify import systemd_notify
@@ -121,10 +121,10 @@ class Server:
             logger.warning("The manager was started with inlined configuration - can't reload")
         else:
             try:
-                data = {}
+                data: Dict[str, Any] = {}
                 for file in self._config_path:
                     file_data = try_to_parse(await readfile(file))
-                    data.update(file_data)
+                    data = data_combine(data, file_data)
 
                 config = KresConfig(data)
                 await self.config_store.update(config)
@@ -566,11 +566,13 @@ async def start_server(config: List[str]) -> int:  # noqa: PLR0915
         # Make sure that the config paths does not change meaning when we change working directory
         config_absolute = [Path(path).absolute() for path in config]
 
-        config_data = {}
+        config_data: Dict[str, Any] = {}
         for file in config_absolute:
             # Preprocess config - load from file or in general take it to the last step before validation.
             config_raw = await _load_raw_config(file)
-            config_data.update(config_raw)
+
+            # combine data from all config files
+            config_data = data_combine(config_data, config_raw)
 
         # before processing any configuration, set validation context
         #  - resolve_root: root against which all relative paths will be resolved
