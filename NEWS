@@ -23,6 +23,7 @@ https://www.knot-resolver.cz/documentation/v6.0.16/upgrading.html
 - Renamed/moved options in the declarative configuration model (YAML). (!1672)
   - /cache/garbage-collector -> /cache/garbage-collector/enable
   - /cache/prefetch/prediction -> /cache/prefetch/prediction/enable
+  - /defer/enabled -> /defer/enable
   - /dns64: true|false -> /dns64/enable: true|false
   - /dns64/rev-ttl -> /dns64/reverse-ttl
   - /dnssec: true|false -> /dnssec/enable: true|false
