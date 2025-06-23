@@ -6,6 +6,9 @@ cache:
       window: 15m
       period: 24
 
+defer:
+  enabled: true
+
 dns64:
   rev-ttl: 1d
 
