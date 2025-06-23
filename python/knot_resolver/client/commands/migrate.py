@@ -141,6 +141,7 @@ class MigrateCommand(Command):
                         _add(new, "/cache/prefetch/prediction/enable", False)
                     else:
                         _add(new, "/cache/prefetch/prediction/enable", True)
+        _rename(new, "/defer/enabled", "/defer/enable")
         dns64_key = "dns64"
         if dns64_key in new:
             if new[dns64_key] is False:
