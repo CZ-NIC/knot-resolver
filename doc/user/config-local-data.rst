@@ -110,10 +110,10 @@ It provides various input formats described in following subsections.
 
             [rules ] => local data applied, user: ::1, name: foo.bar.93.100.in-addr.arpa.
 
-   .. hide this for now
-      .. option:: dry-run: <boolean, false by default>
+      .. hide this for now
+         .. option:: dry-run: <boolean, false by default>
 
-         Do not apply these rules.  You want to combine this with ``log``.
+            Do not apply these rules.  You want to combine this with ``log``.
 
    .. code-block:: yaml
 
@@ -123,6 +123,8 @@ It provides various input formats described in following subsections.
             tags: [ adult ]
           # security blocklist applied for everyone
           - file: /tmp/security.rpz
+
+   .. hide this for now
           # log these but do not block them
           - file: /tmp/suspicious.rpz
             dry-run: true
