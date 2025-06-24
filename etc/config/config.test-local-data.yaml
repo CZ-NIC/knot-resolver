@@ -1,0 +1,12 @@
+local-data:
+  ttl: 60m
+  nodata: false
+  addresses:
+    foo.bar: 127.0.0.1
+  addresses-files:
+    - /etc/hosts
+  records: |
+    example.net. TXT "foo bar"
+     A 192.168.2.3
+     A 192.168.2.4
+    local.example.org AAAA ::1

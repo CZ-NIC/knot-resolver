@@ -6,7 +6,7 @@ import yaml
 from yaml.constructor import ConstructorError
 from yaml.nodes import MappingNode
 
-from .exceptions import DataParsingError
+from .exceptions import DataParsingError, DataValidationError
 from .renaming import Renamed, renamed
 
 
@@ -95,3 +95,18 @@ def try_to_parse(data: str) -> Any:
             raise DataParsingError(  # pylint: disable=raise-missing-from
                 f"failed to parse data, JSON: {je}, YAML: {ye}"
             ) from ye
+
+
+def data_combine(data: Dict[Any, Any], additional_data: Dict[Any, Any], object_path: str = "") -> Dict[Any, Any]:
+    """Combine dictionaries data"""
+    for key in additional_data:
+        if key in data:
+            # if both are dictionaries we can try to combine them deeper
+            if isinstance(data[key], (Dict, dict)) and isinstance(additional_data[key], (Dict, dict)):
+                data[key] = data_combine(data[key], additional_data[key], f"{object_path}/{key}").copy()
+                continue
+            # otherwise we cannot combine them
+            raise DataValidationError(f"duplicity key '{key}' with value in data", object_path)
+        val = additional_data[key]
+        data[key] = val.copy() if hasattr(val, "copy") else val
+    return data
