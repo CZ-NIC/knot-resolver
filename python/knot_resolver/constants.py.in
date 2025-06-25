@@ -26,3 +26,7 @@ if importlib.util.find_spec("watchdog"):
 PROMETHEUS_LIB = False
 if importlib.util.find_spec("prometheus_client"):
     PROMETHEUS_LIB = True
+
+KAFKA_LIB = False
+if importlib.util.find_spec("kafka"):
+    KAFKA_LIB = True
