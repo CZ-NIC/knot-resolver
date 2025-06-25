@@ -241,7 +241,7 @@ if PROMETHEUS_LIB:
             value=metrics["answer"]["ra"],
         )
         yield _counter(
-            "resolver_answer_flags_rd",
+            "resolver_answer_flag_rd",
             "number of recursion desired (in answer!)",
             label=("instance_id", sid),
             value=metrics["answer"]["rd"],
