@@ -276,7 +276,6 @@ struct kr_request {
 	uint8_t rank;
 
 	struct kr_rplan rplan;
-	struct kr_cache_top_context cache_top_context; // divided into two cache lines, TODO change placement (+update kres-gen)
 	trace_log_f trace_log; /**< Logging tracepoint */
 	trace_callback_f trace_finish; /**< Request finish tracepoint */
 	int vars_ref; /**< Reference to per-request variable table. LUA_NOREF if not set. */
@@ -293,6 +292,7 @@ struct kr_request {
 	alloc_wire_f alloc_wire_cb; /**< CB to allocate answer wire (can be NULL). */
 	kr_rule_tags_t rule_tags; /**< TagSet applying to this request. */
 	struct kr_extended_error extended_error;  /**< EDE info; don't modify directly, use kr_request_set_extended_error() */
+	struct kr_cache_top_context cache_top_context;
 };
 
 /** Initializer for an array of *_selected. */
