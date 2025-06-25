@@ -170,7 +170,6 @@ int kr_gc_cache_iter(knot_db_t * knot_db, const  kr_cache_gc_cfg_t *cfg,
 	knot_db_txn_t txn = { 0 };
 	knot_db_iter_t *it = NULL;
 	const knot_db_api_t *api = knot_db_lmdb_api();
-	gc_record_info_t info = { 0 };
 	int64_t now = time(NULL);
 
 	int ret = api->txn_begin(knot_db, &txn, KNOT_DB_RDONLY);
@@ -204,7 +203,8 @@ int kr_gc_cache_iter(knot_db_t * knot_db, const  kr_cache_gc_cfg_t *cfg,
 			goto error;
 		}
 
-		info.entry_size = key.len + val.len;
+		gc_record_info_t info = { 0 };
+		info.entry_size = kr_cache_top_entry_size(key.len, val.len);
 		info.valid = false;
 		const int entry_type = kr_gc_key_consistent(key);
 		const struct entry_h *entry = NULL;
@@ -230,7 +230,7 @@ int kr_gc_cache_iter(knot_db_t * knot_db, const  kr_cache_gc_cfg_t *cfg,
 		counter_iter++;
 		counter_kr_consistent += info.valid;
 		if (VERBOSE_STATUS) {
-			if (!entry_type || !entry) {	// don't log fully consistent entries
+			if (!entry_type || ((entry_type != KNOT_CACHE_RTT) && !entry)) {  // don't log fully consistent entries
 				printf
 				    ("GC %sconsistent, KR %sconsistent, size %zu, key len %zu: ",
 				     entry_type ? "" : "in", entry ? "" : "IN",
