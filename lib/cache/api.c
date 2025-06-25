@@ -641,7 +641,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 	rdataset_dematerialize(rds_sigs, eh->data + rr_ssize);
 	if (kr_fails_assert(entry_h_consistent_E(val_new_entry, rr->type)))
 		return kr_error(EINVAL);
-	kr_cache_top_access(&cache->top, key.data, key.len, "stash_rrset");
+	kr_cache_top_access(&cache->top, key.data, key.len, val_new_entry.len, "stash_rrset");
 
 	#if 0 /* Occasionally useful when debugging some kinds of changes. */
 	{
@@ -818,7 +818,7 @@ static int stash_nsec_p(const knot_dname_t *dname, const char *nsec_p_v,
 		VERBOSE_MSG(qry, "=> EL write failed (ret: %d)\n", ret);
 		return kr_ok();
 	}
-	kr_cache_top_access(&cache->top, key.data, key.len, "stash_nsec_p");
+	kr_cache_top_access(&cache->top, key.data, key.len, val.len, "stash_nsec_p");
 	if (log_refresh_by) {
 		VERBOSE_MSG(qry, "=> nsec_p stashed for %s (refresh by %d, hash: %x)\n",
 				log_dname, log_refresh_by, log_hash);
@@ -881,7 +881,11 @@ static int peek_exact_real(struct kr_cache *cache, const knot_dname_t *name, uin
 	knot_db_val_t key = key_exact_type(k, type);
 	knot_db_val_t val = { NULL, 0 };
 	ret = cache_op(cache, read, &key, &val, 1);
-	if (!ret) ret = entry_h_seek(&val, type);
+	size_t whole_val_len = 0;
+	if (!ret) {
+		whole_val_len = val.len; // whole size before seeking
+		ret = entry_h_seek(&val, type);
+	}
 	if (ret) return kr_error(ret);
 
 	const struct entry_h *eh = entry_h_consistent_E(val, type);
@@ -896,7 +900,7 @@ static int peek_exact_real(struct kr_cache *cache, const knot_dname_t *name, uin
 		.raw_data = val.data,
 		.raw_bound = knot_db_val_bound(val),
 	};
-	kr_cache_top_access(&cache->top, key.data, key.len, "peek_exact_real"); // hits only
+	kr_cache_top_access(&cache->top, key.data, key.len, whole_val_len, "peek_exact_real"); // hits only
 	return kr_ok();
 }
 int kr_cache_peek_exact(struct kr_cache *cache, const knot_dname_t *name, uint16_t type,

@@ -165,7 +165,7 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 	if (cfg->dry_run || large_usage || VERBOSE_STATUS) {	// don't print this on every size check
 		printf("Usage: %.2lf%%\n", db_usage);
 	}
-	if (cfg->dry_run || !large_usage) {
+	if (!large_usage) {
 		return KNOT_EOK;
 	}
 
@@ -215,6 +215,10 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 
 	printf("Cache analyzed in %.0lf msecs, %zu records, limit category is %d.\n",
 	       kr_timer_elapsed(&timer_analyze) * 1000, cats.records, limit_category);
+
+	if (cfg->dry_run) {
+		return KNOT_EOK;
+	}
 
 	//// 3. pass whole cache again to collect a list of keys that should be deleted.
 	kr_timer_start(&timer_choose);

@@ -270,7 +270,6 @@ struct kr_request {
 	uint8_t rule_score_apply;
 	uint8_t rule_score_log;
 	struct kr_rplan rplan;
-	struct kr_cache_top_context cache_top_context;
 	trace_log_f trace_log;
 	trace_callback_f trace_finish;
 	int vars_ref;
@@ -287,6 +286,7 @@ struct kr_request {
 	alloc_wire_f alloc_wire_cb;
 	kr_rule_tags_t rule_tags;
 	struct kr_extended_error extended_error;
+	struct kr_cache_top_context cache_top_context;
 };
 enum kr_rank {KR_RANK_INITIAL, KR_RANK_OMIT, KR_RANK_TRY, KR_RANK_INDET = 4, KR_RANK_BOGUS, KR_RANK_MISMATCH, KR_RANK_MISSING, KR_RANK_INSECURE, KR_RANK_AUTH = 16, KR_RANK_SECURE = 32};
 typedef struct kr_cdb * kr_cdb_pt;
