@@ -27,8 +27,8 @@ modules.unload('edns_keepalive')
 
 -- network.edns-buffer-size
 net.bufsize(
-    {{ cfg.network.edns_buffer_size.upstream.bytes() }},
-    {{ cfg.network.edns_buffer_size.downstream.bytes() }}
+    {{ cfg.network.edns_buffer_size.downstream.bytes() }},
+    {{ cfg.network.edns_buffer_size.upstream.bytes() }}
 )
 
 {% if cfg.network.tls.cert_file and cfg.network.tls.key_file %}

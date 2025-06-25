@@ -155,10 +155,9 @@ struct kr_context
 	/** Default kr_request flags.  For startup defaults see init_resolver() */
 	struct kr_qflags options;
 
-	/** Default EDNS towards *both* clients and upstream.
-	 * LATER: consider splitting the two, e.g. allow separately
-	 * configured limits for UDP packet size (say, LAN is under control). */
+	/** Default EDNS towards clients */
 	knot_rrset_t *downstream_opt_rr;
+	/** Default EDNS towards authoritative servers or forward targets */
 	knot_rrset_t *upstream_opt_rr;
 
 	trie_t *trust_anchors;
