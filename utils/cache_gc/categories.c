@@ -47,20 +47,23 @@ category_t kr_gc_categorize(struct kr_cache_top *top, gc_record_info_t * info, v
 	uint16_t load = kr_cache_top_load(top, key, key_len);
 	res = load2cat(load);  // 0..64
 
-	// TODO check/reconsider penalties
 	if (info->rrtype == KNOT_CACHE_RTT) {
-		// TODO same priority, or prioritize this
+		// TODO some correction here?
 	} else {
-		if (info->entry_size > 300) {
-			// penalty for big answers
-			res += 4;  // ~1 half-life
-		}
 		if (info->expires_in <= 0) {
-			// penalty for expired
-			res += 28;  // ~7 half-lifes
+			// evict all expired before any non-expired
+			res = res / 2 + 65;  // 65..94
 		}
 	}
-	static_assert(CATEGORIES - 1 > 64 + 4 + 28);
+	static_assert(CATEGORIES - 1 > 94);
+
+	const kru_price_t price = kr_cache_top_entry_price(top, info->entry_size);
+	const double accesses = (double)((kru_price_t)load << (KRU_PRICE_BITS - 16)) / price;
+	printf("cat %02d %6d l %8.1f acc %6ld B %8ld s  %s\n",
+		res, load, accesses, info->entry_size, info->expires_in,
+		kr_cache_top_strkey(key, key_len)
+	);
+
 
 	return res;
 }
