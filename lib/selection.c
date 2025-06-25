@@ -157,7 +157,7 @@ struct rtt_state get_rtt_state(const uint8_t *ip, size_t len,
 		state = default_rtt_state;
 	} else { // memcpy is safe for unaligned case (on non-x86)
 		memcpy(&state, value.data, sizeof(state));
-		kr_cache_top_access(&cache->top, key.data, key.len, "get_rtt");
+		kr_cache_top_access(&cache->top, key.data, key.len, value.len, "get_rtt");
 	}
 
 	free(key.data);
@@ -176,7 +176,7 @@ int put_rtt_state(const uint8_t *ip, size_t len, struct rtt_state state,
 
 	int ret = cache->api->write(db, stats, &key, &value, 1);
 	kr_cache_commit(cache);
-	kr_cache_top_access(&cache->top, key.data, key.len, "put_rtt");
+	kr_cache_top_access(&cache->top, key.data, key.len, value.len, "put_rtt");
 
 	free(key.data);
 	return ret;
