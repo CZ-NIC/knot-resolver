@@ -35,10 +35,12 @@ supervisor = "*"
 typing-extensions = "*"
 prometheus-client = { version = "*", optional = true }
 watchdog = { version = "*", optional = true }
+kafka-python = { version = "*", optional = true }
 
 [tool.poetry.extras]
 prometheus = ["prometheus-client"]
 watchdog = ["watchdog"]
+kafka = ["kafka-python"]
 
 [tool.poetry.group.dev.dependencies]
 poetry = "^1.8.3"
