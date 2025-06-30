@@ -568,6 +568,15 @@ async def start_server(config: List[str]) -> int:  # noqa: PLR0915
 
         config_data: Dict[str, Any] = {}
         for file in config_absolute:
+            # warning about the different parent directories of each config file
+            # compared to the first one which is used as the prefix path
+            if config_absolute[0].parent != file.parent:
+                logger.warning(
+                    f"The configuration file '{file}' has a parent directory that is different"
+                    f" from '{config_absolute[0]}', which is used as the prefix for relative paths."
+                    "This can cause issues with files that are configured with relative paths."
+                )
+
             # Preprocess config - load from file or in general take it to the last step before validation.
             config_raw = await _load_raw_config(file)
 
