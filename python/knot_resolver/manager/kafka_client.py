@@ -43,20 +43,20 @@ if KAFKA_LIB:
             self._consumer_timer.start()
 
         def _consumer_connect(self) -> None:
-            server = self._config.kafka.server
-            broker = f"{self._config.kafka.server.addr}:{server.port if server.port else 9092}"
+            kafka = self._config.kafka
+            broker = f"{kafka.server.addr}:{kafka.server.port if kafka.server.port else 9092}"
 
             logger.info("Connecting to Kafka broker...")
             try:
                 consumer = KafkaConsumer(
-                    str(self._config.kafka.topic),
+                    str(kafka.topic),
                     bootstrap_servers=broker,
                     client_id=str(self._config.hostname),
                 )
                 self._consumer = consumer
                 logger.info("Successfully connected to Kafka broker")
             except NoBrokersAvailable:
-                logger.error(f"Connecting to Kafka broker '{server}' has failed: no broker available")
+                logger.error(f"Connecting to Kafka broker '{kafka.server}' has failed: no broker available")
                 self._consumer = None
 
 
