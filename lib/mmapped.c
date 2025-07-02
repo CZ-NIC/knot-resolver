@@ -58,7 +58,7 @@ int mmapped_init_reset(struct mmapped *mmapped, const char *mmap_file, size_t si
 
 	kr_assert(size >= header_size);
 
-	if (ftruncate(mmapped->fd, 0) == -1 || ftruncate(mmapped->fd, size) == -1) {  // get all zeroed
+	if ((ftruncate(mmapped->fd, 0) == -1) || (ftruncate(mmapped->fd, size) == -1)) {  // get all zeroed
 		int ret = kr_error(errno);
 		kr_log_crit(SYSTEM, "Cannot change size of file %s containing shared data: %s\n",
 				mmap_file, strerror(errno));
@@ -85,6 +85,7 @@ int mmapped_init(struct mmapped *mmapped, const char *mmap_file, size_t size, vo
 				mmap_file, strerror(errno));
 		return fail(mmapped, ret);
 	}
+	mmapped->persistent = persistent;
 
 	// try to acquire write lock; wait for shared lock otherwise
 	if (fcntl_flock_whole(mmapped->fd, F_WRLCK, false)) {
@@ -110,9 +111,7 @@ int mmapped_init(struct mmapped *mmapped, const char *mmap_file, size_t size, vo
 
 	// mmap
 	mmapped->mem = mmap(NULL, mmapped->size, PROT_READ | PROT_WRITE, MAP_SHARED, mmapped->fd, 0);
-	if (mmapped->mem == MAP_FAILED) {
-		return fail(mmapped, 0);
-	}
+	if (mmapped->mem == MAP_FAILED) return fail(mmapped, 0);
 
 	// check header
 	if (memcmp(mmapped->mem, header, header_size) != 0) {
