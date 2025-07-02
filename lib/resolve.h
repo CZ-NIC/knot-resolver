@@ -270,6 +270,8 @@ struct kr_request {
 		 * Note that this owns malloc-ed memory inside (outside ->pool).
 		 */
 		kr_http_header_array_t headers;
+ 		/** Key identifying the user or NULL (DoH only).  Same ownership as `headers`. */
+		const char *user_key;
 	} qsource;
 	struct {
 		unsigned rtt;                  /**< Current upstream RTT */
