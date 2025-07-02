@@ -8,6 +8,8 @@ Bugfixes
   - typo: resolver_answer_flags_rd_total -> resolver_answer_flag_rd_total
 - /dnssec/trust-anchors-files: fix resolver startup (!1704)
 - /network/edns-buffer-size: fix swapped upstream+downstream (!1711)
+- cache: fix a crash in case garbage collection is too slow (!1713)
+  [system] assertion "env->is_cache" failed in cdb_write
 
 
 Knot Resolver 6.0.14 (2025-06-03)
