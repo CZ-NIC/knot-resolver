@@ -29,9 +29,11 @@ struct mmapped {
  * calls mmap, verifies that header is byte-wise identical
  * and returns MMAPPED_EXISTING, possibly ORed with MMAPPED_PENDING based on the lock type.
  *
- * On header mismatch, either the outcome is the same as in the first case (if write flock was acquired),
+ * On header or size mismatch, either the outcome is the same as in the first case (if write flock was acquired),
  * or kr_error(ENOTRECOVERABLE) is returned;
- * on a system error, kr_error(errno) is returned. */
+ * on a system error, kr_error(errno) is returned.
+ *
+ * If size is set to zero, only using existing data is allowed. */
 KR_EXPORT
 int mmapped_init(struct mmapped *mmapped, const char *mmap_file, size_t size, void *header, size_t header_size, bool persistent);
 
@@ -50,41 +52,74 @@ int mmapped_init_reset(struct mmapped *mmapped, const char *mmap_file, size_t si
 KR_EXPORT
 int mmapped_init_finish(struct mmapped *mmapped);
 
-/* Free mmapped memory and, unless the underlying file is used by other processes, truncate it to zero size. */
+/* Free mmapped memory and,
+ * unless the underlying file is used by other processes or persistence is requested, truncate it to zero size. */
 KR_EXPORT
 void mmapped_deinit(struct mmapped *mmapped);
 
 
-
-/* -- example usage, persistent case --
-	mmapped_init
-	if (>=0 && EXISTING) {
-		if (!valid) {
-			mmapped_init_reset
-		}
-		mmapped_init_finish
-	}
-	if (>=0 && !EXISTING && PENDING) {  //  == PENDING
-		// init
-		mmapped_init_finish
-	}
-	if (>=0 && !EXISTING && !PENDING) { //  == 0
-		// done
-	}
+/* Detailed description of init return states:
+	mmapped_init:
+		PENDING:  (size > 0 only)
+			new memory initialized, header copied there; first process with exclusive lock
+			finish initialization and call _init_finish
+		EXISTING | PENDING:  (persistent case only)
+			using existing data with equal header; first process with exclusive lock
+			possibly perform other checks / modifications and call _init_finish
+				or call _init_reset
+		EXISTING:
+			using existing data with equal header; shared lock
+			success; no further action required (but _init_finish possible)
+		kr_error(ENOTRECOVERABLE):
+			file header is not valid and
+				exclusive lock cannot be acquired or
+				reset is not allowed (size == 0)
+		system error (<0)
+	mmapped_init_reset:
+		PENDING:
+			new memory initialized, header copied; still exclusive lock
+		kr_error(ENOTRECOVERABLE):
+			exclusive lock not acquired or
+			reset is not allowed (size == 0)
+		system error (<0)
+	mmapped_init_finish:
+		0:
+			lock degraded to shared (or was already)
+			success; no further action required
+		system error (<0)
 */
 
-/* -- example usage, non-persistent case --
-	mmapped_init
-	if (>=0 && EXISTING) {              //  == EXISTING
-		if (!valid) {
-			// fail
+
+/* Example usage, based on state flags returned by above functions:
+
+	persistent case:
+		mmapped_init
+		if (>=0 && EXISTING) {
+			if (!valid) {
+				mmapped_init_reset   // -> continue with init/fail below
+			} else {
+				mmapped_init_finish  // required only if PENDING
+			}
 		}
-		mmapped_init_finish  // not needed
-	} else if (>=0 && PENDING) {        //  == PENDING
-		// init
-		mmapped_init_finish
-	}
-	if (<0) fail
-	// done
+		if (>=0 && !EXISTING && PENDING) {  //  == PENDING
+			... // init
+			mmapped_init_finish
+		}
+		if (<0) fail + return
+		assert(==0) // if both _finish above were used
+		// done
+
+	non-persistent case:
+		mmapped_init
+		if (>=0 && EXISTING) {              //  == EXISTING
+			if (!valid) fail + return
+			mmapped_init_finish  // not required
+		} else if (>=0 && PENDING) {        //  == PENDING
+			... // init
+			mmapped_init_finish
+		}
+		if (<0) fail + return
+		assert(==0) // no other outcome if both _finish above were used
+		// done
 */
 
