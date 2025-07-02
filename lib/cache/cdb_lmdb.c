@@ -322,7 +322,7 @@ static void cdb_close_env(struct lmdb_env *env, struct kr_cdb_stats *stats)
 	memset(env, 0, sizeof(*env));
 }
 
-/** We assume that *env is zeroed and we return it zeroed on errors. */
+/** We assume that *env is zeroed (except for env->is_cache) and we return it zeroed on errors. */
 static int cdb_open_env(struct lmdb_env *env, const char *path, const size_t mapsize,
 		struct kr_cdb_stats *stats)
 {
@@ -493,7 +493,10 @@ static int reopen_env(struct lmdb_env *env, struct kr_cdb_stats *stats, const si
 		return lmdb_error(env, ret);
 	}
 	auto_free char *path_copy = strdup(path);
+	bool is_cache_copy = env->is_cache;
+
 	cdb_close_env(env, stats);
+	env->is_cache = is_cache_copy;
 	return cdb_open_env(env, path_copy, mapsize, stats);
 }
 
