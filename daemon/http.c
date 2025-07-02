@@ -39,13 +39,14 @@
 #define HTTP_FRAME_HDLEN 9
 #define HTTP_FRAME_PADLEN 1
 
-/* accept any url path,
+/** accept only non-normal URIs,
  * otherwise only /doh and /dns-query are accepted */
-#define IGNORE_ENDPOINT
+#define DOH_IS_PRIVATE 1
 
 struct http_stream {
 	int32_t id;
 	kr_http_header_array_t *headers;
+	char *user_key;
 };
 
 typedef queue_t(struct http_stream) queue_http_stream;
@@ -65,6 +66,7 @@ enum http_method {
 enum http_status {
 	HTTP_STATUS_OK                              = 200,
 	HTTP_STATUS_BAD_REQUEST                     = 400,
+	HTTP_STATUS_FORBIDDEN                       = 403,
 	HTTP_STATUS_NOT_FOUND                       = 404,
 	HTTP_STATUS_PAYLOAD_TOO_LARGE               = 413,
 	HTTP_STATUS_UNSUPPORTED_MEDIA_TYPE          = 415,
@@ -116,17 +118,15 @@ static inline void set_status(struct pl_http_sess_data *ctx, enum http_status st
 /*
  * Check endpoint and uri path
  */
-static int check_uri(const char* path)
+static bool check_uri(struct pl_http_sess_data *ctx, const char *path)
 {
-#ifdef IGNORE_ENDPOINT
-	return kr_ok();
-#else
 	static const char *endpoints[] = {"dns-query", "doh"};
 	ssize_t endpoint_len;
-	ssize_t ret;
 
-	if (!path)
-		return kr_error(EINVAL);
+	if (!path) {
+		set_status(ctx, HTTP_STATUS_BAD_REQUEST);
+		return false;
+	}
 
 	char *query_mark = strstr(path, "?");
 
@@ -134,18 +134,43 @@ static int check_uri(const char* path)
 	endpoint_len = (query_mark) ? query_mark - path - 1 : strlen(path) - 1;
 
 	/* check endpoint */
-	ret = -1;
-	for(int i = 0; i < sizeof(endpoints)/sizeof(*endpoints); i++)
-	{
-		if (strlen(endpoints[i]) != endpoint_len)
-			continue;
-		ret = strncmp(path + 1, endpoints[i], strlen(endpoints[i]));
-		if (!ret)
-			break;
+	bool match_found = false;
+	for (int i = 0; !match_found && i < sizeof(endpoints) / sizeof(*endpoints); ++i) {
+		match_found = strlen(endpoints[i]) == endpoint_len
+			&& !strncmp(path + 1, endpoints[i], strlen(endpoints[i]));
 	}
 
-	return (ret) ? kr_error(ENOENT) : kr_ok();
-#endif /* IGNORE_ENDPOINT */
+	if (DOH_IS_PRIVATE && match_found) { // specifically forbid normal DoH URIs
+		set_status(ctx, HTTP_STATUS_FORBIDDEN);
+		return false;
+	}
+	if (!DOH_IS_PRIVATE && !match_found) {
+		set_status(ctx, HTTP_STATUS_NOT_FOUND);
+		return false;
+	}
+	return true;
+}
+
+/** Return whether the query/URI is allowed.  For now, any query is allowed. */
+static bool check_user_key(const char *path, char **user_key)
+{
+	if (!DOH_IS_PRIVATE) {
+		*user_key = NULL;
+		return true;
+	}
+	if (path[0] != '/')
+		return false;
+	++path;
+	const char *query_mark = strstr(path, "?");
+	if (query_mark) {
+		size_t len = query_mark - path;
+		*user_key = malloc(len + 1);
+		memcpy(*user_key, path, len);
+		(*user_key)[len] = '\0';
+	} else {
+		*user_key = strdup(path);
+	}
+	return true;
 }
 
 static kr_http_header_array_t *headers_dup(kr_http_header_array_t *src)
@@ -213,8 +238,13 @@ static int process_uri_path(struct pl_http_sess_data *ctx, const char* path, int
 
 	struct http_stream stream = {
 		.id = stream_id,
-		.headers = headers_dup(ctx->headers)
 	};
+	if (!check_user_key(path, &stream.user_key)) {
+		wire_buf_reset(wb);
+		kr_log_info(DOH, "[%p] URI failed to pass: %s\n", (void *)ctx->h2, path);
+		return kr_error(EINVAL);
+	}
+	stream.headers = headers_dup(ctx->headers);
 	queue_push(ctx->streams, stream);
 
 	return kr_ok();
@@ -606,15 +636,8 @@ static int header_callback(nghttp2_session *h2, const nghttp2_frame *frame,
 	}
 
 	if (!strcasecmp(":path", (const char *)name)) {
-		int uri_result = check_uri((const char *)value);
-		if (uri_result == kr_error(ENOENT)) {
-			set_status(ctx, HTTP_STATUS_NOT_FOUND);
+		if (!check_uri(ctx, (const char *)value))
 			return 0;
-		} else if (uri_result < 0) {
-			set_status(ctx, HTTP_STATUS_BAD_REQUEST);
-			return 0;
-		}
-
 		kr_assert(ctx->uri_path == NULL);
 		ctx->uri_path = malloc(sizeof(*ctx->uri_path) * (valuelen + 1));
 		if (!ctx->uri_path)
@@ -686,12 +709,23 @@ static int data_chunk_recv_callback(nghttp2_session *h2, uint8_t flags, int32_t 
 	}
 
 	if (is_first) {
+		if (!check_uri(ctx, ctx->uri_path)) {
+			ctx->incomplete_stream = -1;
+			return NGHTTP2_ERR_CALLBACK_FAILURE;
+			// TODO: this gets interpreted as a non-reply, apparently (for GET it works)
+		}
 		/* queue_push() should be moved: see FIXME in
 		 * submit_to_wirebuffer() */
 		struct http_stream stream = {
 			.id = stream_id,
-			.headers = headers_dup(ctx->headers)
 		};
+		if (!check_user_key(ctx->uri_path, &stream.user_key)) {
+			kr_log_info(DOH, "[%p] URI failed to pass: %s\n",
+					(void *)ctx->h2, ctx->uri_path);
+			ctx->incomplete_stream = -1;
+			return NGHTTP2_ERR_CALLBACK_FAILURE;
+		}
+		stream.headers = headers_dup(ctx->headers);
 		queue_push(ctx->streams, stream);
 	}
 
@@ -920,6 +954,7 @@ static int pl_http_sess_deinit(struct session2 *session, void *data)
 	while (queue_len(http->streams) > 0) {
 		struct http_stream *stream = &queue_head(http->streams);
 		http_free_headers(stream->headers);
+		free(stream->user_key);
 		queue_pop(http->streams);
 	}
 	queue_deinit(http->streams);
@@ -1032,10 +1067,12 @@ static void pl_http_request_init(struct session2 *session,
 	struct http_stream *stream = &queue_head(http->streams);
 	req->qsource.stream_id = stream->id;
 	if (stream->headers) {
-		// the request takes ownership of the referred-to memory
+		// the request takes ownership of the referred-to memory and user_key
 		req->qsource.headers = *stream->headers;
 		free(stream->headers);
 	}
+	req->qsource.user_key = stream->user_key;
+	//if (stream->user_key) kr_log_notice(DEVEL, "XXX user_key=%s\n", stream->user_key);
 	queue_pop(http->streams);
 }
 
