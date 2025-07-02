@@ -197,6 +197,7 @@ static int dnstap_log(kr_layer_t *ctx, enum dnstap_log_phase phase) {
 		}
 	}
 
+	auto_free char *user_key_buf = NULL;
 	char dnstap_extra_buf[24];
 	if (phase == CLIENT_QUERY_PHASE) {
 		m.type = DNSTAP__MESSAGE__TYPE__CLIENT_QUERY;
@@ -233,6 +234,19 @@ static int dnstap_log(kr_layer_t *ctx, enum dnstap_log_phase phase) {
 #else
 		(void)dnstap_extra_buf;
 #endif
+
+		if (req->qsource.user_key) {
+			int len = dnstap.has_extra
+				? asprintf(&user_key_buf, "user_key=%s\n%s", req->qsource.user_key,
+	       					(const char *)dnstap.extra.data)
+				: asprintf(&user_key_buf, "user_key=%s\n", req->qsource.user_key);
+			if (len > 0) {
+				dnstap.extra.data = (uint8_t *)user_key_buf;
+				dnstap.extra.len = len;
+				dnstap.has_extra = true;
+			}
+		}
+
 	} else if (phase == CLIENT_RESPONSE_PHASE) {
 		m.type = DNSTAP__MESSAGE__TYPE__CLIENT_RESPONSE;
 
@@ -254,6 +268,15 @@ static int dnstap_log(kr_layer_t *ctx, enum dnstap_log_phase phase) {
 		m.has_response_time_sec = true;
 		m.response_time_nsec = now.tv_usec * 1000;
 		m.has_response_time_nsec = true;
+
+		if (req->qsource.user_key) {
+			int len = asprintf(&user_key_buf, "user_key=%s\n", req->qsource.user_key);
+			if (len > 0) {
+				dnstap.extra.data = (uint8_t *)user_key_buf;
+				dnstap.extra.len = len;
+				dnstap.has_extra = true;
+			}
+		}
 	}
 
 	if (dnstap_dt->identity) {

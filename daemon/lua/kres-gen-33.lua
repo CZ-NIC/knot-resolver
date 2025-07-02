@@ -248,6 +248,7 @@ struct kr_request {
 		size_t size;
 		int32_t stream_id;
 		kr_http_header_array_t headers;
+		const char *user_key;
 	} qsource;
 	struct {
 		unsigned int rtt;
