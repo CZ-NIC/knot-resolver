@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <bits/types/struct_iovec.h>
 #include <stdbool.h>
 #include <ngtcp2/ngtcp2.h>
 #include <ngtcp2/ngtcp2_crypto.h>
@@ -149,20 +150,20 @@ typedef struct quic_ctx {
 	ngtcp2_crypto_conn_ref conn_ref;
 
 	// // Parameters
-	// quic_params_t params;
-	//
-	// // Context
-	// ngtcp2_settings settings;
-	// struct {
-	// 	int64_t id;
-	// 	uint64_t out_ack;
-	// 	struct iovec in_buffer;
-	// 	struct knot_tcp_inbufs_upd_res *in_parsed;
-	// 	size_t in_parsed_it;
-	// 	size_t in_parsed_total;
-	// } stream;
-	// ngtcp2_ccerr last_err;
-	// uint8_t secret[32];
+	quic_params_t params;
+
+	// Context
+	ngtcp2_settings settings;
+	struct {
+		int64_t id;
+		uint64_t out_ack;
+		struct iovec in_buffer;
+		struct knot_tcp_inbufs_upd_res *in_parsed;
+		size_t in_parsed_it;
+		size_t in_parsed_total;
+	} stream;
+	ngtcp2_ccerr last_err;
+	uint8_t secret[32];
 
 	// tls_ctx_t *tls;
 
@@ -211,6 +212,8 @@ typedef struct kr_quic_conn {
 
 	// TODO: Definitelly move
 	ngtcp2_pkt_info pi;
+	ngtcp2_cid *dcid;
+	ngtcp2_cid *scid;
 
 	// back-pointer
 	struct kr_quic_table *quic_table;
@@ -239,6 +242,7 @@ typedef struct pl_quic_sess_data {
 	uint32_t conn_count;
 	protolayer_iter_ctx_queue_t unwrap_queue;
 	protolayer_iter_ctx_queue_t wrap_queue;
+	protolayer_iter_ctx_queue_t resend_queue;
 
 	kr_quic_table_t *conn_table;
 
