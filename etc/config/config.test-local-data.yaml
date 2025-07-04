@@ -1,0 +1,35 @@
+views:
+  - subnets: [127.0.0.0/24]
+    tags: [t01, t02]
+    options:
+      dns64: false
+  - subnets: [0.0.0.0/0, "::/0"]
+    answer: refused
+  - subnets: [10.0.10.0/24]
+    answer: allow
+
+local-data:
+  ttl: 60m
+  nodata: false
+  addresses:
+    foo.bar: 127.0.0.1
+  addresses-files:
+    - /etc/hosts
+  records: |
+    example.net. TXT "foo bar"
+     A 192.168.2.3
+     A 192.168.2.4
+    local.example.org AAAA ::1
+  rules:
+    - name: custom.example
+      address: 1.2.3.4
+      nodata: true
+      tags: [t01]
+    - subtree: empty
+      tags: [ t02 ]
+      name: [ example1.org ]
+    - subtree: nxdomain
+      name: [ sub4.example.org ]
+  rpz:
+    - file: blocklist.rpz
+      tags: [t01, t02]

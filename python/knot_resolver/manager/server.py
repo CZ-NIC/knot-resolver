@@ -18,7 +18,7 @@ from aiohttp.web_app import Application
 from aiohttp.web_response import json_response
 from aiohttp.web_runner import AppRunner, TCPSite, UnixSite
 
-from knot_resolver.constants import CONFIG_FILE, USER
+from knot_resolver.constants import USER
 from knot_resolver.controller import get_best_controller_implementation
 from knot_resolver.controller.exceptions import SubprocessControllerError, SubprocessControllerExecError
 from knot_resolver.controller.interface import SubprocessType
@@ -36,7 +36,7 @@ from knot_resolver.utils.compat import asyncio as asyncio_compat
 from knot_resolver.utils.etag import structural_etag
 from knot_resolver.utils.functional import Result
 from knot_resolver.utils.modeling.exceptions import AggregateDataValidationError, DataParsingError, DataValidationError
-from knot_resolver.utils.modeling.parsing import DataFormat, try_to_parse
+from knot_resolver.utils.modeling.parsing import DataFormat, data_combine, try_to_parse
 from knot_resolver.utils.modeling.query import query
 from knot_resolver.utils.modeling.types import NoneType
 from knot_resolver.utils.systemd_notify import systemd_notify
@@ -88,7 +88,7 @@ class Server:
     # This is top-level class containing pretty much everything. Instead of global
     # variables, we use instance attributes. That's why there are so many and it's
     # ok.
-    def __init__(self, store: ConfigStore, config_path: Optional[Path], manager: KresManager):
+    def __init__(self, store: ConfigStore, config_path: Optional[List[Path]], manager: KresManager):
         # config store & server dynamic reconfiguration
         self.config_store = store
 
@@ -98,7 +98,7 @@ class Server:
         self.listen: Optional[ManagementSchema] = None
         self.site: Union[NoneType, TCPSite, UnixSite] = None
         self.listen_lock = asyncio.Lock()
-        self._config_path: Optional[Path] = config_path
+        self._config_path: Optional[List[Path]] = config_path
         self._exit_code: int = 0
         self._shutdown_event = asyncio.Event()
         self._manager = manager
@@ -121,13 +121,17 @@ class Server:
             logger.warning("The manager was started with inlined configuration - can't reload")
         else:
             try:
-                data = await readfile(self._config_path)
-                config = KresConfig(try_to_parse(data))
+                data: Dict[str, Any] = {}
+                for file in self._config_path:
+                    file_data = try_to_parse(await readfile(file))
+                    data = data_combine(data, file_data)
+
+                config = KresConfig(data)
                 await self.config_store.update(config)
                 logger.info("Configuration file successfully reloaded")
             except FileNotFoundError:
                 logger.error(
-                    f"Configuration file was not found at '{self._config_path}'."
+                    f"Configuration file was not found at '{file}'."
                     " Something must have happened to it while we were running."
                 )
                 logger.error("Configuration has NOT been changed.")
@@ -537,7 +541,7 @@ async def _sigterm_while_shutting_down():
     sys.exit(128 + signal.SIGTERM)
 
 
-async def start_server(config: Path = CONFIG_FILE) -> int:  # noqa: PLR0915
+async def start_server(config: List[str]) -> int:  # noqa: PLR0915
     # This function is quite long, but it describes how manager runs. So let's silence pylint
     # pylint: disable=too-many-statements
 
@@ -559,23 +563,37 @@ async def start_server(config: Path = CONFIG_FILE) -> int:  # noqa: PLR0915
     # before starting server, initialize the subprocess controller, config store, etc. Any errors during inicialization
     # are fatal
     try:
-        # Make sure that the config path does not change meaning when we change working directory
-        config = config.absolute()
+        # Make sure that the config paths does not change meaning when we change working directory
+        config_absolute = [Path(path).absolute() for path in config]
 
-        # Preprocess config - load from file or in general take it to the last step before validation.
-        config_raw = await _load_raw_config(config)
+        config_data: Dict[str, Any] = {}
+        for file in config_absolute:
+            # warning about the different parent directories of each config file
+            # compared to the first one which is used as the prefix path
+            if config_absolute[0].parent != file.parent:
+                logger.warning(
+                    f"The configuration file '{file}' has a parent directory that is different"
+                    f" from '{config_absolute[0]}', which is used as the prefix for relative paths."
+                    "This can cause issues with files that are configured with relative paths."
+                )
+
+            # Preprocess config - load from file or in general take it to the last step before validation.
+            config_raw = await _load_raw_config(file)
+
+            # combine data from all config files
+            config_data = data_combine(config_data, config_raw)
 
         # before processing any configuration, set validation context
         #  - resolve_root: root against which all relative paths will be resolved
         #  - strict_validation: check for path existence during configuration validation
         #  - permissions_default: validate dirs/files rwx permissions against default user:group in constants
-        set_global_validation_context(Context(config.parent, True, False))
+        set_global_validation_context(Context(config_absolute[0].parent, True, False))
 
         # We want to change cwd as soon as possible. Some parts of the codebase are using os.getcwd() to get the
         # working directory.
         #
         # If we fail to read rundir from unparsed config, the first config validation error comes from here
-        _set_working_directory(config_raw)
+        _set_working_directory(config_data)
 
         # We don't want more than one manager in a single working directory. So we lock it with a PID file.
         # Warning - this does not prevent multiple managers with the same naming of kresd service.
@@ -584,7 +602,7 @@ async def start_server(config: Path = CONFIG_FILE) -> int:  # noqa: PLR0915
         # set_global_validation_context(Context(config.parent))
 
         # After the working directory is set, we can initialize proper config store with a newly parsed configuration.
-        config_store = await _init_config_store(config_raw)
+        config_store = await _init_config_store(config_data)
 
         # Some "constants" need to be loaded from the initial config, some need to be stored from the initial run conditions
         await init_user_constants(config_store, working_directory_on_startup)
@@ -608,7 +626,7 @@ async def start_server(config: Path = CONFIG_FILE) -> int:  # noqa: PLR0915
         manager = await _init_manager(config_store)
 
         # prepare instance of the server (no side effects)
-        server = Server(config_store, config, manager)
+        server = Server(config_store, config_absolute, manager)
 
         # add Server's shutdown trigger to the manager
         manager.add_shutdown_trigger(server.trigger_shutdown)
