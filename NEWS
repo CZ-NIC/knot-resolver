@@ -12,6 +12,7 @@ Bugfixes
   [system] assertion "env->is_cache" failed in cdb_write
 - /cache/prefill: fix 6.0.13 regression (!1705)
 - datamodel: improve file permission check (#933, !1714)
+- NO_CACHE flag: fix and tweak its behavior (!1715)
 
 Improvements
 ------------

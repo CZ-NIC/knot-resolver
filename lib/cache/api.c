@@ -334,10 +334,18 @@ int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 	/* We first check various exit-conditions and then call the _real function. */
 	if (!kr_cache_is_open(&req->ctx->cache)
-	    || qry->flags.NO_CACHE
 	    || !check_rrtype(qry->stype, qry) /* LATER: some other behavior for some of these? */
 	    || qry->sclass != KNOT_CLASS_IN) {
 		return ctx->state; /* Already resolved/failed or already tried, etc. */
+	}
+	/* Only skip cache if (flagged and) resolving the origin query or its xNAME chain,
+	 * not when resolving dependencies such as nameserver records or DNSSEC chain. */
+ 	if (qry->flags.NO_CACHE) {
+		const struct kr_query *q = qry;
+		while (q->cname_parent)
+			q = q->cname_parent;
+		if (!q->parent)
+			return ctx->state;
 	}
 
 	if (qry->stype == KNOT_RRTYPE_NSEC) {
