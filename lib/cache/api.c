@@ -314,32 +314,31 @@ int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 	struct kr_request *req = ctx->req;
 	struct kr_query *qry = req->current_query;
 
-	/* TODO: review when to run this?  We want to process rules here
-	 * even when some of the cache exit-conditions happen.  NO_CACHE in particular. */
-	if (!req->options.PASSTHRU_LEGACY && !qry->flags.CACHE_TRIED) {
-		int ret = kr_rule_local_data_answer(qry, pkt);
-		if (ret < 0)
-			ctx->state = KR_STATE_FAIL;
-		if (ret != 0) {
-			qry->flags.CACHE_TRIED = true;
-			return ctx->state;
-		}
-	}
-
-	/* We first check various exit-conditions and then call the _real function. */
-
-	if (!kr_cache_is_open(&req->ctx->cache)
-	    || ctx->state & (KR_STATE_FAIL|KR_STATE_DONE) || qry->flags.NO_CACHE
-	    || (qry->flags.CACHE_TRIED && !qry->stale_cb)
-	    || !check_rrtype(qry->stype, qry) /* LATER: some other behavior for some of these? */
-	    || qry->sclass != KNOT_CLASS_IN) {
-		return ctx->state; /* Already resolved/failed or already tried, etc. */
-	}
+	if (ctx->state & (KR_STATE_FAIL|KR_STATE_DONE))
+		return ctx->state;
 	/* ATM cache only peeks for qry->sname and that would be useless
 	 * to repeat on every iteration, so disable it from now on.
 	 * Note that xNAME causes a followup kr_query, so cache will get re-tried.
 	 * LATER(optim.): assist with more precise QNAME minimization. */
+	if (qry->flags.CACHE_TRIED && !qry->stale_cb)
+		return ctx->state;
 	qry->flags.CACHE_TRIED = true;
+
+	if (!req->options.PASSTHRU_LEGACY) {
+		int ret = kr_rule_local_data_answer(qry, pkt);
+		if (ret < 0)
+			ctx->state = KR_STATE_FAIL;
+		if (ret != 0)
+			return ctx->state;
+	}
+
+	/* We first check various exit-conditions and then call the _real function. */
+	if (!kr_cache_is_open(&req->ctx->cache)
+	    || qry->flags.NO_CACHE
+	    || !check_rrtype(qry->stype, qry) /* LATER: some other behavior for some of these? */
+	    || qry->sclass != KNOT_CLASS_IN) {
+		return ctx->state; /* Already resolved/failed or already tried, etc. */
+	}
 
 	if (qry->stype == KNOT_RRTYPE_NSEC) {
 		VERBOSE_MSG(qry, "=> skipping stype NSEC\n");
