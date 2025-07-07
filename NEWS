@@ -17,6 +17,7 @@ Improvements
 - update/more precise default answers for special names (!1709)
   https://www.iana.org/assignments/special-use-domain-names
   https://www.iana.org/assignments/locally-served-dns-zones
+- kresctl: strict validation is now disabled by default (!1714)
 
 
 Knot Resolver 6.0.14 (2025-06-03)

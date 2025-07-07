@@ -24,11 +24,11 @@ class ConvertCommand(Command):
         subparser: "argparse._SubParsersAction[argparse.ArgumentParser]",
     ) -> Tuple[argparse.ArgumentParser, "Type[Command]"]:
         convert = subparser.add_parser("convert", help="Converts JSON or YAML configuration to Lua script.")
-        convert.set_defaults(strict=True)
+        convert.set_defaults(strict=False)
         convert.add_argument(
-            "--no-strict",
-            help="Ignore strict rules during validation, e.g. path/file existence.",
-            action="store_false",
+            "--strict",
+            help="Enable strict rules during validation, e.g. path/file existence and permissions.",
+            action="store_true",
             dest="strict",
         )
         convert.add_argument(

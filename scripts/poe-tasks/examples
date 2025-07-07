@@ -7,5 +7,5 @@ source $src_dir/utils/_env.sh
 # validate all configuration examples
 for example in $PWD/etc/config/config.example.*.yaml;
 do
-    python3 -m knot_resolver.client validate --no-strict $example;
+    python3 -m knot_resolver.client validate $example;
 done

@@ -22,11 +22,11 @@ class ValidateCommand(Command):
         subparser: "argparse._SubParsersAction[argparse.ArgumentParser]",
     ) -> Tuple[argparse.ArgumentParser, "Type[Command]"]:
         validate = subparser.add_parser("validate", help="Validates configuration in JSON or YAML format.")
-        validate.set_defaults(strict=True)
+        validate.set_defaults(strict=False)
         validate.add_argument(
-            "--no-strict",
-            help="Ignore strict rules during validation, e.g. path/file existence.",
-            action="store_false",
+            "--strict",
+            help="Enable strict rules during validation, e.g. paths/files existence and permissions.",
+            action="store_true",
             dest="strict",
         )
         validate.add_argument(
@@ -57,3 +57,13 @@ class ValidateCommand(Command):
         except (DataParsingError, DataValidationError) as e:
             print(e, file=sys.stderr)
             sys.exit(1)
+        if not self.strict:
+            print(
+                "Basic validation was successful."
+                "\nIf you want more strict validation, you can use the '--strict' switch."
+                "\nDuring strict validation, the existence and access rights of paths are also checked."
+                "\n\nHowever, if you are using an additional file system permission control mechanism,"
+                "\nsuch as access control lists (ACLs), this validation will likely fail."
+                "\nThis is because the validation runs under a different user/group than the resolver itself"
+                "\nand attempts to access the configured paths directly."
+            )
