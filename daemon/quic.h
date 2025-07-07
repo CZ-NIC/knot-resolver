@@ -41,6 +41,29 @@ typedef enum {
 	VERIFIED,  // RTT-1
 } quic_state_t;
 
+typedef enum {
+	/*! No error.  This is used when the connection or stream needs to be
+	    closed, but there is no error to signal. */
+	DOQ_NO_ERROR = 0x0,
+	/*! The DoQ implementation encountered an internal error and is
+	    incapable of pursuing the transaction or the connection. */
+	DOQ_INTERNAL_ERROR = 0x1,
+	/*! The DoQ implementation encountered a protocol error and is forcibly
+	    aborting the connection. */
+	DOQ_PROTOCOL_ERROR = 0x2,
+	/*! A DoQ client uses this to signal that it wants to cancel an
+	    outstanding transaction. */
+	DOQ_REQUEST_CANCELLED = 0x3,
+	/*! A DoQ implementation uses this to signal when closing a connection
+	    due to excessive load. */
+	DOQ_EXCESSIVE_LOAD = 0x4,
+	/*!  A DoQ implementation uses this in the absence of a more specific
+	     error code. */
+	DOQ_UNSPECIFIED_ERROR = 0x5,
+	/*! Alternative error code used for tests. */
+	DOQ_ERROR_RESERVED = 0xd098ea5e
+} quic_doq_error_t;
+
 
 /*! \brief QUIC parameters. */
 typedef struct {
@@ -67,11 +90,10 @@ typedef enum {
 	KR_QUIC_SEND_IGNORE_BLOCKED  = (1 << 1),
 } kr_quic_send_flag_t;
 
-struct quic_ctx;
 // TODO maybe rename to something more in line with iter_data
 struct pl_quic_state {
 	struct protolayer_data h;
-	struct quic_ctx *quic_ctx;
+	struct kr_quic_conn *qconn;
 	/* struct ortt_ NOTE: Or some other data */ ;
 };
 
@@ -93,6 +115,7 @@ typedef struct {
 
 typedef struct kr_quic_table {
 	kr_quic_table_flag_t flags;
+	/* general "settings" for connections */
 	size_t size;
 	size_t usage;
 	size_t pointers;
@@ -131,51 +154,19 @@ typedef struct kr_tcp_inbufs_upd_res {
 	struct iovec inbufs[];
 } kr_tcp_inbufs_udp_res_t;
 
-typedef struct kr_quic_stream {
-	/** the inbuf for small, singlepacket messages
-	 * while the latter is for larger comunications, but still... */
+struct kr_quic_stream {
 	struct iovec inbuf;
 	struct kr_tcp_inbufs_upd_res *inbufs;
 
 	size_t firstib_consumed;
-	/*ucw_*/list_t outbufs;
+	/*ucw_*/queue_t(uint8_t *) outbufs;
+	// /*ucw_*/list_t outbufs;
 	size_t obufs_size;
 
 	kr_quic_obuf_t *unsent_obuf;
 	size_t first_offset;
 	size_t unsent_offset;
-} kr_quic_stream_t;
-
-typedef struct quic_ctx {
-	ngtcp2_crypto_conn_ref conn_ref;
-
-	// // Parameters
-	quic_params_t params;
-
-	// Context
-	ngtcp2_settings settings;
-	struct {
-		int64_t id;
-		uint64_t out_ack;
-		struct iovec in_buffer;
-		struct knot_tcp_inbufs_upd_res *in_parsed;
-		size_t in_parsed_it;
-		size_t in_parsed_total;
-	} stream;
-	ngtcp2_ccerr last_err;
-	uint8_t secret[32];
-
-	// tls_ctx_t *tls;
-
-	// convenient struct to store Connection ID, its associated path, and stateless reset token.
-	ngtcp2_cid_token dcid_token;
-	ngtcp2_cid_token scid_token;
-	// ngtcp2_cid_token odcid_token; // maybe?
-	ngtcp2_conn *conn;
-	ngtcp2_pkt_info pi;
-	ngtcp2_path path;
-	quic_state_t state;
-} quic_ctx_t;
+};
 
 typedef struct kr_quic_conn {
 	int heap_node_placeholder; // MUST be first field of the struct
@@ -194,7 +185,7 @@ typedef struct kr_quic_conn {
 	ngtcp2_crypto_conn_ref crypto_ref;
 
 	 // QUIC stream abstraction
-	kr_quic_stream_t *streams;
+	struct kr_quic_stream *streams;
 	 // number of allocated streams structures
 	int16_t streams_count;
 	 // index of first stream that has complete incomming data to be processed (aka inbuf_fin)
@@ -221,23 +212,8 @@ typedef struct kr_quic_conn {
 
 typedef struct pl_quic_sess_data {
 	struct protolayer_data h;
-	// ngtcp2_conn *conns; This one might be wrong
-	// ngtcp2_crypto_conn_ref conn_ref;
-	// Parameters
 	quic_params_t params;
 	ngtcp2_settings settings;
-
-	// Context
-	// struct {
-	// 	int64_t id;
-	// 	uint64_t out_ack;
-	// 	struct iovec in_buffer;
-	// 	struct knot_tcp_inbufs_upd_res *in_parsed;
-	// 	size_t in_parsed_it;
-	// 	size_t in_parsed_total;
-	// } stream;
-	// ngtcp2_ccerr last_err;
-	// uint8_t secret[32];
 
 	uint32_t conn_count;
 	protolayer_iter_ctx_queue_t unwrap_queue;
@@ -247,6 +223,5 @@ typedef struct pl_quic_sess_data {
 	kr_quic_table_t *conn_table;
 
 	struct kr_request *req;
-	quic_state_t state;
-	// struct wire_buf wire_buf;
+	// quic_state_t state;
 } pl_quic_sess_data_t;

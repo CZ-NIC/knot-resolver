@@ -24,6 +24,7 @@ kresd_src = files([
   'worker.c',
   'zimport.c',
   'quic.c',
+  'quic_stream.c',
 ])
 
 if nghttp2.found()
