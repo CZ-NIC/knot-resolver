@@ -65,6 +65,18 @@ static int rule_local_subtree(const knot_dname_t *apex, enum kr_rule_sub_t type,
 				const knot_dname_t *target, uint32_t ttl,
 				kr_rule_tags_t tags, kr_rule_opts_t opts);
 
+static void qry_set_action(struct kr_query *qry, enum kr_request_rule_action action)
+{
+	// We only set the action if applying on the original QNAME
+	// or the CNAME chain leading from it, not on any other sub-queries.
+	const struct kr_query *q = qry;
+	while (q->cname_parent)
+		q = q->cname_parent;
+	if (q->parent)
+		return;
+	qry->request->rule.action = action;
+}
+
 // LATER: doing tag_names_default() and kr_rule_tag_add() inside a RW transaction would be better.
 static int tag_names_default(void)
 {
@@ -586,6 +598,7 @@ static int answer_exact_match(struct kr_query *qry, knot_pkt_t *pkt, uint16_t ty
 	qry->flags.EXPIRING = false;
 	qry->flags.CACHED = true;
 	qry->flags.NO_MINIMIZE = true;
+	qry_set_action(qry, is_nodata ? KREQ_ACTION_NODATA : KREQ_ACTION_LOCAL_DATA);
 	return RET_ANSWERED;
 }
 
@@ -774,6 +787,14 @@ static int answer_zla_empty(val_zla_type_t type, struct kr_query *qry, knot_pkt_
 	qry->flags.CACHED = true;
 	qry->flags.NO_MINIMIZE = true;
 
+	if (knot_wire_get_rcode(pkt->wire) == KNOT_RCODE_NXDOMAIN) {
+		qry_set_action(qry, KREQ_ACTION_NXDOMAIN);
+	} else if (pkt->current == KNOT_ANSWER) {
+		qry_set_action(qry, KREQ_ACTION_LOCAL_DATA);
+	} else {
+		qry_set_action(qry, KREQ_ACTION_NODATA);
+	}
+
 	VERBOSE_MSG(qry, "=> satisfied by local data (%s zone)\n",
 		     type == KR_RULE_SUB_EMPTY ? "empty" : "nxdomain");
 	return kr_ok();
@@ -846,6 +867,7 @@ static int answer_zla_dname(val_zla_type_t type, struct kr_query *qry, knot_pkt_
 	qry->flags.EXPIRING = false;
 	qry->flags.CACHED = true;
 	qry->flags.NO_MINIMIZE = true;
+	qry_set_action(qry, KREQ_ACTION_LOCAL_DATA);
 
 	VERBOSE_MSG(qry, "=> satisfied by local data (DNAME)\n");
 	return kr_ok();
@@ -911,6 +933,12 @@ nodata: // Want NODATA answer (or NOERROR if it hits apex SOA).
 	qry->flags.EXPIRING = false;
 	qry->flags.CACHED = true;
 	qry->flags.NO_MINIMIZE = true;
+
+	if (sec == KNOT_ANSWER) {
+		qry_set_action(qry, KREQ_ACTION_LOCAL_DATA);
+	} else {
+		qry_set_action(qry, KREQ_ACTION_NODATA);
+	}
 
 	VERBOSE_MSG(qry, "=> satisfied by local data (no data)\n");
 	return kr_ok();
