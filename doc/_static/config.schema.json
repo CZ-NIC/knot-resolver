@@ -1788,6 +1788,32 @@
                 "log_period": "0s"
             }
         },
+        "kafka": {
+            "description": "Configuration of Apache Kafka client. Requires the optional 'kafka-python' dependency.",
+            "type": "object",
+            "properties": {
+                "enable": {
+                    "type": "boolean",
+                    "description": "Enable/disable Kafka client.",
+                    "default": false
+                },
+                "topic": {
+                    "type": "string",
+                    "description": "Topic to subscribe data from.",
+                    "default": "knot-resolver"
+                },
+                "server": {
+                    "type": "string",
+                    "description": "Kafka server to connect.",
+                    "default": "127.0.0.1@9092"
+                }
+            },
+            "default": {
+                "enable": false,
+                "topic": "knot-resolver",
+                "server": "127.0.0.1@9092"
+            }
+        },
         "lua": {
             "description": "Custom Lua configuration.",
             "type": "object",
