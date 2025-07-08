@@ -10,6 +10,7 @@ from knot_resolver.datamodel.dns64_schema import Dns64Schema
 from knot_resolver.datamodel.dnssec_schema import DnssecSchema
 from knot_resolver.datamodel.forward_schema import ForwardSchema
 from knot_resolver.datamodel.globals import Context, get_global_validation_context, set_global_validation_context
+from knot_resolver.datamodel.kafka_schema import KafkaSchema
 from knot_resolver.datamodel.local_data_schema import LocalDataSchema, RPZSchema, RuleSchema
 from knot_resolver.datamodel.logging_schema import LoggingSchema
 from knot_resolver.datamodel.lua_schema import LuaSchema
@@ -110,6 +111,7 @@ class KresConfig(ConfigSchema):
         lua: Custom Lua configuration.
         rate_limiting: Configuration of rate limiting.
         defer: Configuration of request prioritization (defer).
+        kafka: Configuration of Apache Kafka client. Requires the optional 'kafka-python' dependency.
         """
 
         version: int = 1
@@ -132,6 +134,7 @@ class KresConfig(ConfigSchema):
         monitoring: MonitoringSchema = MonitoringSchema()
         rate_limiting: Optional[RateLimitingSchema] = None
         defer: DeferSchema = DeferSchema()
+        kafka: KafkaSchema = KafkaSchema()
         lua: LuaSchema = LuaSchema()
 
     _LAYER = Raw
@@ -155,6 +158,7 @@ class KresConfig(ConfigSchema):
     monitoring: MonitoringSchema
     rate_limiting: Optional[RateLimitingSchema]
     defer: DeferSchema
+    kafka: KafkaSchema
     lua: LuaSchema
 
     def _hostname(self, obj: Raw) -> Any:
