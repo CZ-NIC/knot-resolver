@@ -159,6 +159,8 @@ static int dnstap_log(kr_layer_t *ctx, enum dnstap_log_phase phase) {
 
 	m.base.descriptor = &dnstap__message__descriptor;
 
+	Dnstap__Policy policy = DNSTAP__POLICY__INIT;
+
 	if (req->qsource.addr) {
 		set_address(req->qsource.addr,
 				&m.query_address,
@@ -235,6 +237,12 @@ static int dnstap_log(kr_layer_t *ctx, enum dnstap_log_phase phase) {
 #endif
 	} else if (phase == CLIENT_RESPONSE_PHASE) {
 		m.type = DNSTAP__MESSAGE__TYPE__CLIENT_RESPONSE;
+
+		if (req->rule.action) {
+			policy.action = req->rule.action;
+			policy.has_action = true;
+			m.policy = &policy;
+		}
 
 		/* current time */
 		struct timeval now;
