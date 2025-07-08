@@ -444,6 +444,7 @@ static void request_free(struct request_ctx *ctx)
 		free(ctx->req.qsource.headers.at[i].value);
 	}
 	array_clear(ctx->req.qsource.headers);
+	free_const(ctx->req.qsource.user_key);
 
 	/* Make sure to free XDP buffer in case it wasn't sent. */
 	if (ctx->req.alloc_wire_cb) {

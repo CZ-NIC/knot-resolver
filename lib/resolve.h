@@ -208,6 +208,21 @@ typedef bool (*addr_info_f)(struct sockaddr*);
 typedef void (*async_resolution_f)(knot_dname_t*, enum knot_rr_type);
 typedef array_t(union kr_sockaddr) kr_sockaddr_array_t;
 
+/** Information about rules/policies applied to a kr_request.
+ *
+ * Let's keep this compatible with dnstap, including the number values.
+ * Though the meaning can't "match exactly". */
+struct kr_request_rule {
+	int8_t action;
+};
+enum kr_request_rule_action {
+	// zero == unset
+	KREQ_ACTION_NXDOMAIN = 1,
+	KREQ_ACTION_NODATA = 2,
+	KREQ_ACTION_PASS = 3,
+	KREQ_ACTION_LOCAL_DATA = 6,
+};
+
 /**
  * Name resolution request.
  *
@@ -255,6 +270,8 @@ struct kr_request {
 		 * Note that this owns malloc-ed memory inside (outside ->pool).
 		 */
 		kr_http_header_array_t headers;
+ 		/** Key identifying the user or NULL (DoH only).  Same ownership as `headers`. */
+		const char *user_key;
 	} qsource;
 	struct {
 		unsigned rtt;                  /**< Current upstream RTT */
@@ -281,6 +298,8 @@ struct kr_request {
 
 	uint8_t rule_score_apply;
 	uint8_t rule_score_log;
+
+	struct kr_request_rule rule;
 
 	struct kr_rplan rplan;
 	trace_log_f trace_log; /**< Logging tracepoint */
