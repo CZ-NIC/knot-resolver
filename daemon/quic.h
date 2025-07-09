@@ -41,6 +41,7 @@ typedef enum {
 	VERIFIED,  // RTT-1
 } quic_state_t;
 
+/** RFC 9250 4.3.  DoQ Error Codes */
 typedef enum {
 	/*! No error.  This is used when the connection or stream needs to be
 	    closed, but there is no error to signal. */
@@ -65,7 +66,7 @@ typedef enum {
 } quic_doq_error_t;
 
 
-/*! \brief QUIC parameters. */
+/** QUIC parameters. */
 typedef struct {
 	/*! Use QUIC indicator. */
 	bool enable;
@@ -83,7 +84,9 @@ typedef struct {
 #define QUIC_SEND_STATELESS_RESET        (-NGTCP2_STATELESS_RESET_TOKENLEN)
 #define QUIC_SEND_CONN_CLOSE             (-KNOT_QUIC_HANDLE_RET_CLOSE)
 #define QUIC_SEND_EXCESSIVE_LOAD         (-KNOT_QUIC_ERR_EXCESSIVE_LOAD)
-#define MAX_STREAMS_PER_CONN 10 // this limits the number of un-finished streams per conn (i.e. if response has been recvd with FIN, it doesn't count)
+// this limits the number of un-finished streams per conn
+// i.e. if response has been recvd with FIN, it doesn't count
+#define MAX_STREAMS_PER_CONN 10
 
 typedef enum {
 	KR_QUIC_SEND_IGNORE_LASTBYTE = (1 << 0),
@@ -172,7 +175,7 @@ typedef struct kr_quic_conn {
 	int heap_node_placeholder; // MUST be first field of the struct
 	uint64_t next_expiry;
 
-	 // placeholder for internal struct ngtcp2_crypto_conn_ref
+	// placeholder for internal struct ngtcp2_crypto_conn_ref
 	nc_conn_ref_placeholder_t conn_ref;
 
 	// conn_table next conn link

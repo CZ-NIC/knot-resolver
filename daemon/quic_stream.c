@@ -6,6 +6,7 @@
 #include "quic.h"
 #include <stdint.h>
 #include "quic_stream.h"
+#include "libknot/xdp/tcp_iobuf.h"
 
 typedef queue_t(kr_quic_obuf_t *) q_stream_buf;
 
@@ -129,6 +130,8 @@ struct kr_quic_stream *kr_quic_conn_get_stream(kr_quic_conn_t *conn,
 		size_t new_streams_count;
 		struct kr_quic_stream *new_streams;
 
+		// should we attempt to purge unused streams here?
+		// maybe only when we approach the limit
 		if (conn->streams_count == 0) {
 			new_streams = malloc(sizeof(new_streams[0]));
 			if (new_streams == NULL) {
@@ -192,6 +195,15 @@ void kr_quic_stream_mark_sent(kr_quic_conn_t *conn,
 	}
 }
 
+void stream_inprocess(struct kr_quic_conn *conn, struct kr_quic_stream *stream)
+{
+	int16_t idx = stream - conn->streams;
+	assert(idx >= 0);
+	assert(idx < conn->streams_count);
+	if (conn->stream_inprocess < 0 || conn->stream_inprocess > idx) {
+		conn->stream_inprocess = idx;
+	}
+}
 int kr_quic_stream_recv_data(struct kr_quic_conn *qconn, int64_t stream_id,
                                const uint8_t *data, size_t len, bool fin)
 {
@@ -200,16 +212,21 @@ int kr_quic_stream_recv_data(struct kr_quic_conn *qconn, int64_t stream_id,
 	}
 
 	struct kr_quic_stream *stream = kr_quic_conn_get_stream(qconn, stream_id, true);
+
 	if (stream == NULL) {
 		return KNOT_ENOENT;
 	}
 
 	struct iovec in = { (void *)data, len };
 	ssize_t prev_ibufs_size = qconn->ibufs_size;
+	size_t save_total = qconn->ibufs_size;
+	int ret = knot_tcp_inbufs_upd(&stream->inbuf, in, true,
+			&stream->inbufs, &qconn->ibufs_size);
+
 	// TODO:
 	// int ret = kr_tcp_inbufs_upd(&stream->inbuf, in, true,
 	//                               &stream->inbufs, &conn->ibufs_size);
-	int ret = KNOT_EOK;
+	// int ret = KNOT_EOK;
 
 	qconn->quic_table->ibufs_size += (ssize_t)qconn->ibufs_size - prev_ibufs_size;
 	if (ret != KNOT_EOK) {
@@ -222,7 +239,8 @@ int kr_quic_stream_recv_data(struct kr_quic_conn *qconn, int64_t stream_id,
 
 	if (stream->inbufs != NULL) {
 		// TODO:
-		// stream_inprocess(conn, stream);
+		stream_inprocess(qconn, stream);
 	}
 	return KNOT_EOK;
 }
+
