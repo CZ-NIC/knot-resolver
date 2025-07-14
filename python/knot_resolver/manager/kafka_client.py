@@ -6,6 +6,7 @@ from knot_resolver.constants import KAFKA_LIB
 from knot_resolver.datamodel import KresConfig
 from knot_resolver.manager.config_store import ConfigStore
 from knot_resolver.utils.functional import Result
+from knot_resolver.utils.modeling import parse_json
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,7 @@ if KAFKA_LIB:
     class KresKafkaClient:
         def __init__(self, config: KresConfig) -> None:
             self._config = config
+            self._files: Dict[str, str] = {}
 
             self._consumer: Optional[KafkaConsumer] = None
             self._consumer_timer: Optional[Timer] = None
@@ -42,18 +44,34 @@ if KAFKA_LIB:
 
             for _partition, records in messages.items():
                 for record in records:
-                    key: str = record.key.decode("utf-8")
-                    value: str = record.value.decode("utf-8")
+                    try:
+                        key: str = record.key.decode("utf-8")
+                        value: str = record.value.decode("utf-8")
 
-                    # views and rpz config
-                    if key == "config":
-                        pass
-                    # start of rpz file
-                    elif key[-2] == "." and key[-1].isdigit():
-                        pass
-                    # end of rpz file
-                    elif key.endswith(".END") and value is None:
-                        pass
+                        logger.info(f"Received message with '{key}' key")
+
+                        # configuration
+                        if key == "config":
+                            _new_config = parse_json(value)
+                            logger.info("Configuration applied")
+                        # start of a file
+                        elif key[-2] == ":" and key[-1].isdigit():
+                            file_name = key[:-2]
+                            if file_name in self._files:
+                                self._files[file_name] += value
+                            else:
+                                self._files[file_name] = value
+                            logger.info(f"Received s part of data for '{file_name}' file")
+                        # end of a file
+                        elif key.endswith(":END"):
+                            file_name = key[:-4]
+                            with open(file_name, "w") as file:
+                                file.write(self._files[file_name])
+                            del self._files[file_name]
+                            logger.info(f"Saved data to '{file_name}'")
+                    except Exception as e:
+                        logger.error(f"Processing message failed with error: {e}")
+                        continue
 
             self._consumer_timer = Timer(5, self._consume)
             self._consumer_timer.start()
