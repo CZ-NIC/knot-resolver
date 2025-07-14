@@ -122,6 +122,9 @@ struct network {
 	 * a slight improvement in syscall processing efficiency.
 	 * Note: This does not necessarily lead to overall performance gains. */
 	bool enable_connect_udp;
+
+	/** Low source port (e.g. 53) might be useful for attacks with spoofed source IPs. */
+	uint16_t min_udp_source_port;
 };
 
 /** Pointer to the singleton network state. NULL if not initialized. */

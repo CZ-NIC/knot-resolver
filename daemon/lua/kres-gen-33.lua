@@ -608,6 +608,7 @@ struct network {
 		int rcv;
 	} listen_tcp_buflens;
 	_Bool enable_connect_udp;
+	uint16_t min_udp_source_port;
 };
 struct args *the_args;
 struct endpoint {
