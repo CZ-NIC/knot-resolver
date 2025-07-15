@@ -8,6 +8,7 @@
 #include "quic_stream.h"
 #include "libknot/xdp/tcp_iobuf.h"
 
+
 typedef queue_t(kr_quic_obuf_t *) q_stream_buf;
 
 static void stream_outprocess(struct kr_quic_conn *conn, struct kr_quic_stream *stream)
@@ -195,6 +196,48 @@ void kr_quic_stream_mark_sent(kr_quic_conn_t *conn,
 	}
 }
 
+// TODO: frfee the streams
+// while (stream->inbufs != NULL) {
+// 	knot_tcp_inbufs_upd_res_t *tofree = stream->inbufs;
+// 	stream->inbufs = tofree->next;
+// 	free(tofree);
+// }
+
+uint8_t *knot_quic_stream_add_data(kr_quic_conn_t *conn, int64_t stream_id,
+                                   uint8_t *data, size_t len)
+{
+	struct kr_quic_stream *s = kr_quic_conn_get_stream(conn, stream_id, true);
+	if (s == NULL) {
+		return NULL;
+	}
+
+	size_t prefix = sizeof(uint16_t);
+
+	struct kr_quic_obuf *obuf = malloc(sizeof(*obuf) + prefix + len);
+	if (obuf == NULL) {
+		return NULL;
+	}
+
+	obuf->len = len + prefix;
+	knot_wire_write_u16((uint8_t *)obuf->buf, len);
+	if (data != NULL) {
+		memcpy(obuf->buf + prefix, data, len);
+	}
+
+	// FIXME
+	queue_t(uint8_t) *q = (queue_t(uint8_t)*)&s->outbufs;
+	if (queue_len(*q) == 0) {
+	// if (EMPTY_LIST(*list)) {
+		s->unsent_obuf = obuf;
+	}
+	add_tail((list_t *)&s->outbufs, (node_t *)obuf);
+	s->obufs_size += obuf->len;
+	conn->obufs_size += obuf->len;
+	conn->quic_table->obufs_size += obuf->len;
+
+	return (uint8_t *)obuf->buf + prefix;
+}
+
 void stream_inprocess(struct kr_quic_conn *conn, struct kr_quic_stream *stream)
 {
 	int16_t idx = stream - conn->streams;
@@ -204,6 +247,9 @@ void stream_inprocess(struct kr_quic_conn *conn, struct kr_quic_stream *stream)
 		conn->stream_inprocess = idx;
 	}
 }
+
+/** callback of recv_stream_data,
+ * data passed to this cb function is the actuall query. */
 int kr_quic_stream_recv_data(struct kr_quic_conn *qconn, int64_t stream_id,
                                const uint8_t *data, size_t len, bool fin)
 {
@@ -212,7 +258,6 @@ int kr_quic_stream_recv_data(struct kr_quic_conn *qconn, int64_t stream_id,
 	}
 
 	struct kr_quic_stream *stream = kr_quic_conn_get_stream(qconn, stream_id, true);
-
 	if (stream == NULL) {
 		return KNOT_ENOENT;
 	}
@@ -238,9 +283,9 @@ int kr_quic_stream_recv_data(struct kr_quic_conn *qconn, int64_t stream_id,
 	}
 
 	if (stream->inbufs != NULL) {
-		// TODO:
 		stream_inprocess(qconn, stream);
 	}
+
 	return KNOT_EOK;
 }
 

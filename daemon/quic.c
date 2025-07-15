@@ -17,6 +17,7 @@
 #include "lib/resolve.h"
 // #include "libknot/quic/quic.h"
 #include "libdnssec/random.h"
+#include <libknot/xdp/tcp_iobuf.h>
 #include <stdint.h>
 #include <contrib/ucw/heap.h>
 #include <contrib/ucw/lists.h>
@@ -215,9 +216,10 @@ static int kr_recv_stream_data_cb(ngtcp2_conn *conn, uint32_t flags,
 
 	struct kr_quic_conn *qconn = (struct kr_quic_conn *)user_data;
 	assert(ctx->conn == conn);
+	kr_log_info(DOQ, "recved stream data: %s\n", data);
 
 	int ret = kr_quic_stream_recv_data(qconn, stream_id, data, datalen,
-	                                     (flags & NGTCP2_STREAM_DATA_FLAG_FIN));
+			(flags & NGTCP2_STREAM_DATA_FLAG_FIN));
 
 	return ret == KNOT_EOK ? 0 : NGTCP2_ERR_CALLBACK_FAILURE;
 }
@@ -302,7 +304,7 @@ static int get_new_connection_id(ngtcp2_conn *conn, ngtcp2_cid *cid,
 	(void)addto;
 
 	// FIXME: remove?
-	ctx->dcid = cid;
+	// ctx->dcid = cid;
 
 	if (token != NULL &&
 	    ngtcp2_crypto_generate_stateless_reset_token(
@@ -407,11 +409,35 @@ int do_hp_mask(uint8_t *dest, const ngtcp2_crypto_cipher *hp,
 	return 0;
 }
 
+static int stream_open_cb(ngtcp2_conn *conn, int64_t stream_id, void *user_data)
+{
+	kr_log_info(DOQ, "remote endpoint has opened a stream: %ld\n", stream_id);
+	// knot_quic_conn_t *ctx = (knot_quic_conn_t *)user_data;
+	// assert(ctx->conn == conn);
+	//
+	// // NOTE possible error is stored in (flags & NGTCP2_STREAM_CLOSE_FLAG_APP_ERROR_CODE_SET)
+	//
+	// bool keep = !ngtcp2_conn_is_server(conn); // kxdpgun: process incomming reply after recvd&closed
+	// if (!keep) {
+	// 	knot_quic_conn_stream_free(ctx, stream_id);
+	// }
+	return kr_ok();
+}
+
 // static int stream_close_cb(ngtcp2_conn *conn, uint32_t flags, int64_t stream_id,
 // 			 uint64_t app_error_code, void *user_data, void *stream_user_data)
 // {
-// 	// knot_quic_conn_t *ctx = (knot_quic_conn_t *)user_data;
-// 	// assert(ctx->conn == conn);
+// 	struct kr_quic_conn *qconn = (struct kr_quic_conn *)user_data;
+// 	assert(qconn->conn == conn);
+//
+// 	struct kr_quic_stream *stream = kr_quic_conn_get_stream(qconn, stream_id, true);
+//
+// 	if (stream == NULL) {
+// 		return KNOT_ENOENT;
+// 	}
+//
+// 	// TODO resolve
+//
 // 	//
 // 	// // NOTE possible error is stored in (flags & NGTCP2_STREAM_CLOSE_FLAG_APP_ERROR_CODE_SET)
 // 	//
@@ -445,7 +471,7 @@ static int conn_new_handler(ngtcp2_conn **pconn, const ngtcp2_path *path,
 		.hp_mask = ngtcp2_crypto_hp_mask_cb,
 		.recv_stream_data = kr_recv_stream_data_cb, // recv_stream_data, TODO? - OPTIONAL
 		// NULL, // acked_stream_data_offset_cb, TODO - OPTIONAL
-		// NULL, // stream_opened - OPTIONAL
+		.stream_open = stream_open_cb, // stream_opened - OPTIONAL
 		// .stream_close = stream_close_cb, // stream_closed, TODO - OPTIONAL
 		// NULL,// recv_stateless_rst, TODO - OPTIONAL
 		// ngtcp2_crypto_recv_retry_cb, - OPTIONAL
@@ -805,6 +831,8 @@ static int pl_quic_sess_deinit(struct session2 *session, void *data)
 	queue_deinit(quic->wrap_queue);
 	// heap_deinit(quic->conn_table->expiry_heap);
 	kr_quic_table_free(quic->conn_table);
+
+	return kr_ok();
 }
 
 static int pl_quic_client_init(struct session2 *session,
@@ -997,8 +1025,8 @@ static int quic_init_server_conn(kr_quic_table_t *table,
 			goto finish;
 		}
 
-		(*out_conn)->dcid = dcid;
-		(*out_conn)->scid = scid;
+		// (*out_conn)->dcid = dcid;
+		// (*out_conn)->scid = scid;
 
 		ret = conn_new_handler(&(*out_conn)->conn, &path,
 				&header.scid, dcid, &header.dcid,
@@ -1072,6 +1100,7 @@ static int handle_packet(struct pl_quic_sess_data *quic,
 	int ret = ngtcp2_pkt_decode_version_cid(&decoded_cids, pkt,
 			pktlen, SERVER_DEFAULT_SCIDLEN);
 
+	ssize_t vnegret = 0;
 	uint32_t supported_quic[1] = { NGTCP2_PROTO_VER_V1 };
 	if (ret == NGTCP2_ERR_VERSION_NEGOTIATION) {
 		// FIXME: This will be broken by trimming the pkt below
@@ -1164,6 +1193,10 @@ static int handle_packet(struct pl_quic_sess_data *quic,
 
 	ngtcp2_conn_handle_expiry(qconn->conn, now);
 
+	kr_log_info(DOQ, "About to trim %zu, whils verneg wrote: %ld (appended %ld)\n",
+			wire_buf_data_length(pkt_ctx->payload.wire_buf),
+			vnegret,
+			wire_buf_data_length(pkt_ctx->payload.wire_buf) - pktlen);
 	if (wire_buf_trim(pkt_ctx->payload.wire_buf, wire_buf_data_length(pkt_ctx->payload.wire_buf))) {
 		kr_log_error(DOQ, "Failed to trim wire_buf\n");
 		return ret;
@@ -1180,6 +1213,8 @@ static int handle_packet(struct pl_quic_sess_data *quic,
 	// kr_quic_send(quic->conn_table, qconn, quic, ctx, 4, 0);
 	return kr_ok();
 }
+
+void __attribute__ ((noinline)) empty_call(void) { }
 
 static enum protolayer_iter_cb_result pl_quic_unwrap(void *sess_data,
 		void *iter_data, struct protolayer_iter_ctx *ctx)
@@ -1207,13 +1242,60 @@ static enum protolayer_iter_cb_result pl_quic_unwrap(void *sess_data,
 			protolayer_break(ctx, ret);
 		}
 
+		if (qconn->stream_inprocess >= 0) {
+			// This branch is only accessed once a stream has
+			// finished receiving the query (stream_inprocess received FIN)
+			// TODO: protolayer_continue with the query in the first finished stream
+			empty_call();
+			struct kr_quic_stream *stream = kr_quic_conn_get_stream(
+				qconn, qconn->stream_inprocess, true
+			);
+
+			if (stream == NULL) {
+				return KNOT_ENOENT;
+			}
+
+			// for (int i = 0; i < stream->inbufs->n_inbufs; i++) {
+			// 	pkt_ctx->payload = protolayer_payload_iovec(stream->inbufs, int iovcnt, bool short_lived)
+			// 	protolayer_continue(struct protolayer_iter_ctx *ctx)
+			// 	struct wire_buf new_wb;
+			// 	wire_buf_init(&new_wb, stream->inbufs[i].inbufs->iov_len);
+			// 	struct protolayer_payload pl = protolayer_payload_wire_buf(&new_wb, false);
+			//
+			// 	memcpy(&new_wb.buf,
+			// 		stream->inbufs[i].inbufs->iov_base,
+			// 		stream->inbufs[i].inbufs->iov_len);
+			//
+			// 	if (wire_buf_consume(&new_wb,
+			// 		stream->inbufs[i].inbufs->iov_len)
+			// 			!= kr_ok()) {
+			//
+			// 		kr_log_error(DOQ, "Wire_buf failed to consume finished dns query\n");
+			// 		kr_assert(false);
+			// 		return protolayer_break(pkt_ctx, -1 /* TODO */);
+			// 	}
+			//
+			// 	pkt_ctx->payload = pl;
+			// 	protolayer_continue(pkt_ctx);
+			// }
+		}
+
 		pkt_ctx->comm->target = &dcid;
 		// ctx->comm->target = pkt_ctx->comm->target;
 
-		/* FIXME magic constants */
-		kr_quic_send(quic->conn_table, qconn, quic, ctx, 4, 0);
+		if (qconn->flags & KR_QUIC_CONN_HANDSHAKE_DONE) {
+				// && qconn->flags & ) {
+			kr_log_info(DOQ, "Proceeding to next layer\n");
+			kr_quic_send(quic->conn_table, qconn, quic, ctx, 4, 0);
+			// return protolayer_continue(pkt_ctx);
+		} else {
+			// proceed with nodata handshake process
+			/* FIXME magic constants */
+			kr_quic_send(quic->conn_table, qconn, quic, ctx, 4, 0);
+		}
 	}
 
+	// return protolayer_break(ctx, 0);
 	return protolayer_continue(ctx);
 }
 
@@ -1232,6 +1314,9 @@ static int send_stream(kr_quic_table_t *quic_table, struct protolayer_iter_ctx *
 
 		int ret = ngtcp2_conn_open_bidi_stream(qconn->conn, &opened, NULL);
 		if (ret != kr_ok()) {
+			/** This should not happen */
+			kr_log_info(DOQ, "remote endpoint isn't ready for streams: %s (%d)\n",
+					ngtcp2_strerror(ret), ret);
 			return ret;
 		}
 		assert((bool)(opened == stream_id) == kr_quic_stream_exists(qconn, stream_id));
@@ -1248,7 +1333,6 @@ static int send_stream(kr_quic_table_t *quic_table, struct protolayer_iter_ctx *
 	ngtcp2_conn_get_conn_info(qconn->conn, &info);
 
 	int nwrite = 0;
-
 	nwrite = ngtcp2_conn_writev_stream(qconn->conn, path, &pi,
 			wire_buf_free_space(ctx->payload.wire_buf),
 			wire_buf_free_space_length(ctx->payload.wire_buf),
@@ -1310,7 +1394,7 @@ static int send_stream(kr_quic_table_t *quic_table, struct protolayer_iter_ctx *
 				kr_require(false);
 		}
 
-	} else if (*sent >= 0) { }
+	} else if (*sent >= 0) { /** FIXME */ }
 
 	if (nwrite == 0) {
 		return 0;
@@ -1324,10 +1408,13 @@ static int send_stream(kr_quic_table_t *quic_table, struct protolayer_iter_ctx *
 
 	if (nwrite || *sent) {
 		// written++;
-		int wrap_ret = session2_wrap(ctx->session,
+		int wrap_ret = session2_wrap_after(ctx->session,
+				PROTOLAYER_TYPE_QUIC,
+		// int wrap_ret = session2_wrap(ctx->session,
+
 				ctx->payload,
 				ctx->comm,
-				NULL,/*req*/
+				// NULL,/*req*/
 				ctx->finished_cb,
 				ctx->finished_cb_baton);
 
@@ -1495,6 +1582,7 @@ static void quic_protolayers_init(void)
 		// .iter_init = pl_quic_iter_init,
 		// .iter_deinit = pl_quic_iter_deinit
 		.sess_init = pl_quic_sess_init,
+		.sess_deinit = pl_quic_sess_deinit,
 		.unwrap = pl_quic_unwrap,
 		.wrap = pl_quic_wrap,
 		.event_unwrap = pl_quic_event_unwrap,

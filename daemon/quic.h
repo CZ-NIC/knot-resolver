@@ -157,15 +157,50 @@ typedef struct kr_tcp_inbufs_upd_res {
 	struct iovec inbufs[];
 } kr_tcp_inbufs_udp_res_t;
 
+/**
+ * Inbufs are useless for us since we always receive the entire pkt
+ * as a wire_buf. That means ngtcp2_conn_read_pkt should happily
+ * consume it and we can trim pkt_len off the wire_buf.
+ *
+ * In output we can also manage with just a single buffer,
+ * though this buffer has to remain over N pkts (protolayer cascades).
+ * We can store it in the connection.
+ *
+ * The reason we only need one output buffer thought we deal with two "types" of
+ * output data is because they share their outcome/what we do with them.
+ *
+ * First the output buffer has to store all data we sent out, only forgetting
+ * it once the data is explicitly acked bu the remote endpoint. We clear
+ * this acked data on each pkt read. If there is something left (something
+ * hasn't been acked) we behave the same as if the output buffer was empty.
+ * We just append the new response and send it all.
+ *
+ * Developer NOTE
+ * I might actually need inbuf queue. It might be possible
+ * that I'll receive more than one kr_quic_stream_recv_data
+ * callbacks for a single pkt. Then I could not handle with
+ * a single simple buffer. TODO: investigate
+ *
+ * I actually need a permanent buffer for inbuf. There is no guarantee that
+ * the DNS query will arrive in a single sream pkt. And I'd lose that
+ * bit then since I'd attempt to send it. damn, I really have to think
+ * about this more, the handshake pkt do behave differently to stream ones
+ *
+ * WARNING Turns out ngtcp2 buffers the unacked packets internally,
+ * so there is no reason for us to store them 
+ *
+ */
 struct kr_quic_stream {
 	struct iovec inbuf;
 	struct kr_tcp_inbufs_upd_res *inbufs;
 
 	size_t firstib_consumed;
+	// holds pointers to head and tail of knot_quic_obuf_t
 	/*ucw_*/queue_t(uint8_t *) outbufs;
 	// /*ucw_*/list_t outbufs;
 	size_t obufs_size;
 
+	struct wire_buf *outbuf;
 	kr_quic_obuf_t *unsent_obuf;
 	size_t first_offset;
 	size_t unsent_offset;
@@ -188,6 +223,7 @@ typedef struct kr_quic_conn {
 	ngtcp2_crypto_conn_ref crypto_ref;
 
 	 // QUIC stream abstraction
+	 // TODO sentinel for streams?
 	struct kr_quic_stream *streams;
 	 // number of allocated streams structures
 	int16_t streams_count;
@@ -204,13 +240,15 @@ typedef struct kr_quic_conn {
 	size_t ibufs_size;
 	size_t obufs_size;
 
-	// TODO: Definitelly move
-	ngtcp2_pkt_info pi;
-	ngtcp2_cid *dcid;
-	ngtcp2_cid *scid;
+	// // TODO: Definitelly move
+	// ngtcp2_pkt_info pi;
+	// ngtcp2_cid *dcid;
+	// ngtcp2_cid *scid;
 
 	// back-pointer
+	// FIXME: could this be removed?
 	struct kr_quic_table *quic_table;
+
 } kr_quic_conn_t;
 
 typedef struct pl_quic_sess_data {
