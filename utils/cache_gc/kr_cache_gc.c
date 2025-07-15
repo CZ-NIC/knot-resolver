@@ -213,8 +213,8 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 		amount_tofree -= cat_size;
 	}
 
-	printf("Cache analyzed in %.0lf msecs, %zu records, limit category is %d.\n",
-	       kr_timer_elapsed(&timer_analyze) * 1000, cats.records, limit_category);
+	printf("Cache analyzed in %.0lf msecs, %zu records, %.2f B avg., limit category is %d.\n",
+	       kr_timer_elapsed(&timer_analyze) * 1000, cats.records, (double)cats_sumsize / cats.records, limit_category);
 
 	if (cfg->dry_run) {
 		return KNOT_EOK;

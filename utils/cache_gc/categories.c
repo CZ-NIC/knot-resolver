@@ -59,7 +59,7 @@ category_t kr_gc_categorize(struct kr_cache_top *top, gc_record_info_t * info, v
 
 	const kru_price_t price = kr_cache_top_entry_price(top, info->entry_size);
 	const double accesses = (double)((kru_price_t)load << (KRU_PRICE_BITS - 16)) / price;
-	printf("cat %02d %6d l %8.1f acc %6ld B %8ld s  %s\n",
+	kr_log_debug(CACHE, "cat %02d %6d l %8.1f acc %6ld B %8ld s  %s\n",
 		res, load, accesses, info->entry_size, info->expires_in,
 		kr_cache_top_strkey(key, key_len)
 	);
