@@ -234,7 +234,7 @@ struct kr_extended_error {
 	const char *extra_text;
 };
 struct kr_cache_top_context {
-	uint32_t bloom[16];
+	uint32_t bloom[32];
 	uint32_t cnt;
 };
 struct kr_request {
