@@ -16,8 +16,13 @@
 
 #define FILE_FORMAT_VERSION 1  // fail if different
 
-#define TICK_SEC     1
-#define NORMAL_SIZE  150 // B; normal size of cache entry
+
+#define KRU_CAPACITY(cache_size) (cache_size / 64)   // KRU size is approx. (8 * capacity) B
+	// average entry size seems to be 70-100 B
+	// -> KRU size is around 12.5 % of cache size, so 112.5 % of the set value is required
+#define TICK_SEC        1
+#define NORMAL_SIZE  (150 + KR_CACHE_SIZE_OVERHEAD)  // B; normal size of cache entry
+	// used as baseline for the following
 #define BASE_PRICE   (((kru_price_t)5) << (KRU_PRICE_BITS - 16))
 	// for cache entries of NORMAL_SIZE
 	// -> normal increment: 5 (16-bit)
@@ -37,25 +42,25 @@ static inline uint32_t ticks_now(void)
 static inline bool first_access_ro(struct kr_cache_top_context *ctx, kru_hash_t hash) {
 	// struct kr_cache_top_context { uint64_t bloom[4]; }
 	static_assert(sizeof(((struct kr_cache_top_context *)0)->bloom[0]) * 8 == 32);
-	static_assert(sizeof(((struct kr_cache_top_context *)0)->bloom)    * 8 == 32 * 16);
-		// expected around 40 unique cache accesses per request context, up to ~100;
-		// prob. of collision of 40th unique access with the preceeding ones: ~0.5 %;
-		// 60th: ~1.9 %; 80th: 4.5 %; 100th: 8.4 %; 150th: 22 %; 200th; 39 %
+	static_assert(sizeof(((struct kr_cache_top_context *)0)->bloom)    * 8 == 32 * 32);
+		// expected around 40 unique cache accesses per request context, possibly up to ~200;
+		// prob. of collision of 50th unique access with the preceeding ones: ~0.1 %;
+		// 75th: ~0.4 %; 100th: ~1.1 %; 150th: ~3.9 %; 200th: ~8.7 %; 300th: ~23 %; 400th: ~39 %
 		//   -> collision means not counting the cache access in KRU while it should be
 
 	uint8_t *h = (uint8_t *)&hash;
 	static_assert(sizeof(kru_hash_t) >= 8);
 
 	bool accessed = 1u &
-		(ctx->bloom[h[0] % 16] >> (h[1] % 32)) &
-		(ctx->bloom[h[2] % 16] >> (h[3] % 32)) &
-		(ctx->bloom[h[4] % 16] >> (h[5] % 32)) &
-		(ctx->bloom[h[6] % 16] >> (h[7] % 32));
+		(ctx->bloom[h[0] % 32] >> (h[1] % 32)) &
+		(ctx->bloom[h[2] % 32] >> (h[3] % 32)) &
+		(ctx->bloom[h[4] % 32] >> (h[5] % 32)) &
+		(ctx->bloom[h[6] % 32] >> (h[7] % 32));
 
 	return !accessed;
 }
 
-static inline bool first_access(struct kr_cache_top_context *ctx, kru_hash_t hash) {
+static inline bool first_access(struct kr_cache_top_context *ctx, kru_hash_t hash, bool *overfull) {
 	if (!first_access_ro(ctx, hash)) return false;
 
 	uint8_t *h = (uint8_t *)&hash;
@@ -63,23 +68,24 @@ static inline bool first_access(struct kr_cache_top_context *ctx, kru_hash_t has
 
 	{ // temporal statistics, TODO remove
 		int ones = 0;
-		for (int i = 0; i < 16; i++) {
+		for (int i = 0; i < 32; i++) {
 			ones += __builtin_popcount(ctx->bloom[i]);
 		}
-		double collision_prob = ones / 512.0; // 1-bit collision
-		collision_prob *= collision_prob;     // 2-bit collision
-		collision_prob *= collision_prob;     // 4-bit collision
+		double collision_prob = ones / 1024.0; // 1-bit collision
+		collision_prob *= collision_prob;      // 2-bit collision
+		collision_prob *= collision_prob;      // 4-bit collision
 
 		if (collision_prob > 0.1) {
-			VERBOSE_LOG("BLOOM %d unique accesses, collision prob. %5.3f %% (%d/512 ones)\n", ctx->cnt, 100.0 * collision_prob, ones);
+			VERBOSE_LOG("BLOOM %d unique accesses, collision prob. %5.3f %% (%d/1024 ones)\n", ctx->cnt, 100.0 * collision_prob, ones);
+			*overfull = true;
 		}
 		ctx->cnt++;
 	}
 
-	ctx->bloom[h[0] % 16] |= 1u << (h[1] % 32);
-	ctx->bloom[h[2] % 16] |= 1u << (h[3] % 32);
-	ctx->bloom[h[4] % 16] |= 1u << (h[5] % 32);
-	ctx->bloom[h[6] % 16] |= 1u << (h[7] % 32);
+	ctx->bloom[h[0] % 32] |= 1u << (h[1] % 32);
+	ctx->bloom[h[2] % 32] |= 1u << (h[3] % 32);
+	ctx->bloom[h[4] % 32] |= 1u << (h[5] % 32);
+	ctx->bloom[h[6] % 32] |= 1u << (h[7] % 32);
 
 	kr_assert(!first_access_ro(ctx, hash));
 
@@ -89,14 +95,15 @@ static inline bool first_access(struct kr_cache_top_context *ctx, kru_hash_t has
 
 int kr_cache_top_init(struct kr_cache_top *top, char *mmap_file, size_t cache_size) {
 	size_t size = 0, capacity_log = 0;
-	VERBOSE_LOG("INIT, cache size %d\n", cache_size);
-
 	if (cache_size > 0) {
-		const size_t capacity = 2<<19;  // TODO calculate from cache_size
+		const size_t capacity = KRU_CAPACITY(cache_size);
 		for (size_t c = capacity - 1; c > 0; c >>= 1) capacity_log++;
 
 		size = offsetof(struct top_data, kru) + KRU.get_size(capacity_log);
 	} // else use existing file settings
+
+	VERBOSE_LOG("INIT, cache size %d, KRU capacity_log %d\n", cache_size, capacity_log);
+
 
 	struct top_data header = {
 		.version          = (FILE_FORMAT_VERSION << 1) | kru_using_avx2(),
@@ -239,16 +246,19 @@ char *kr_cache_top_strkey(void *key, size_t len) {
 
 void kr_cache_top_access(struct kr_cache_top *top, void *key, size_t key_len, size_t data_size, char *debug_label)
 {
+	bool bloom_overfull = false; // XXX tmp
 	kru_hash_t hash = KRU.hash_bytes((struct kru *)&top->data->kru, (uint8_t *)key, key_len);
-	const bool unique = top->ctx ? first_access(top->ctx, hash) : true;
+	const bool unique = top->ctx ? first_access(top->ctx, hash, &bloom_overfull) : true;
 	const size_t size = kr_cache_top_entry_size(key_len, data_size);
 	if (unique) {
 		const kru_price_t price = kr_cache_top_entry_price(top, size);
 		KRU.load_hash((struct kru *)&top->data->kru, ticks_now(), hash, price);
 	}
-	VERBOSE_LOG("ACCESS %-19s%4d B %-5s  %s\n", debug_label, size,
-			!top->ctx ? "NO_CTX" : unique ? "" : "SKIP",
-			kr_cache_top_strkey(key, key_len));
+	if (bloom_overfull) {
+		VERBOSE_LOG("ACCESS %-19s%4d B %-5s  %s\n", debug_label, size,
+				!top->ctx ? "NO_CTX" : unique ? "" : "SKIP",
+				kr_cache_top_strkey(key, key_len));
+	}
 }
 
 // temporal logging one level under _access
