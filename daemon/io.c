@@ -78,9 +78,7 @@ void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 		}
 	}
 
-	// We're aware of no use cases for low source ports,
-	// and they might be useful for attacks with spoofed source IPs.
-	if (!s->outgoing && kr_inaddr_port(comm_addr) < 1024) {
+	if (!s->outgoing && kr_inaddr_port(comm_addr) < the_network->min_udp_source_port) {
 		kr_log_debug(IO, "<= ignoring UDP from suspicious port: '%s'\n",
 				kr_straddr(comm_addr));
 		return;
