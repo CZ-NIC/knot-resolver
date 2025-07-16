@@ -93,7 +93,7 @@ static int assert_right_version(struct kr_cache *cache)
 					(int)ver, (int)CACHE_VERSION);
 			}
 		}
-		ret = cache_op(cache, clear);
+		ret = cache_op(cache, clear, 0);
 	}
 	/* Rewrite the entry even if it isn't needed.  Because of cache-size-changing
 	 * possibility it's good to always perform some write during opening of cache. */
@@ -142,10 +142,13 @@ int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct k
 	size_t maxsize = 0;
 	if (ret == 0) {
 		maxsize = cache->api->get_maxsize(cache->db);
-		if (opts->maxsize && (maxsize > opts->maxsize)) kr_log_warning(CACHE,
-			"Warning: real cache size is %zu instead of the requested %zu bytes."
-			"  To reduce the size you need to remove the file '%s' by hand.\n",
-			maxsize, opts->maxsize, fpath);  // TODO remove file instead
+		if (opts->maxsize && (maxsize > opts->maxsize)) {
+			kr_log_notice(CACHE,
+				"real LMDB cache size is %zu instead of the requested %zu bytes, removing all data.\n",
+				maxsize, opts->maxsize, fpath);
+			cache_op(cache, clear, opts->maxsize);
+			maxsize = cache->api->get_maxsize(cache->db);
+		}
 	}
 	if (ret != 0)
 		return ret;
@@ -202,7 +205,7 @@ int kr_cache_clear(struct kr_cache *cache)
 	if (!cache_isvalid(cache)) {
 		return kr_error(EINVAL);
 	}
-	int ret = cache_op(cache, clear);
+	int ret = cache_op(cache, clear, 0);
 	if (ret == 0) {
 		kr_cache_make_checkpoint(cache);
 		ret = assert_right_version(cache);
