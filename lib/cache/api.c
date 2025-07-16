@@ -116,6 +116,15 @@ int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct k
 	if (!api)
 		api = kr_cdb_lmdb();
 	cache->api = api;
+
+	const size_t orig_maxsize = opts->maxsize;
+	if (opts->maxsize) {
+		const size_t top_size = kr_cache_top_get_size(opts->maxsize);
+		if (!kr_fails_assert(top_size < opts->maxsize)) {
+			opts->maxsize -= top_size;
+		}
+	}
+
 	int ret = cache->api->open(&cache->db, &cache->stats, opts, mm);
 	if (ret == 0) {
 		ret = assert_right_version(cache);
@@ -161,7 +170,7 @@ int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct k
 		ret = kr_error(errno);
 	}
 	if (ret == 0) {
-		ret = kr_cache_top_init(&cache->top, top_path, maxsize);
+		ret = kr_cache_top_init(&cache->top, top_path, orig_maxsize);
 		free(top_path);
 	}
 	if (ret != 0) {
