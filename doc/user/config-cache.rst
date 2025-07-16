@@ -134,7 +134,9 @@ Configuration reference
 .. note:: Use ``B, K, M, G`` bytes units prefixes.
 
 Opens cache with a size limit. The cache will be reopened if already open.
-Note that the maximum size cannot be lowered, only increased due to how cache is implemented.
+Note that lowering the maximum size removes all cached data;
+increasing the size removes usage statistics of the stored entries used by garbage collector,
+but keeps the actual data.
 
 .. code-block:: yaml
 

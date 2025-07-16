@@ -333,6 +333,13 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
     async def load_policy_rules(self, _old: KresConfig, new: KresConfig) -> Result[NoneType, str]:
         try:
             async with self._manager_lock:
+                if _old.cache.size_max != new.cache.size_max:
+                    logger.debug("Unlinking shared cache top memory")
+                    try:
+                        os.unlink(str(_old.cache.storage) + "/top")
+                    except FileNotFoundError:
+                        pass
+
                 logger.debug("Running kresd 'policy-loader'")
                 await self._run_policy_loader(new)
 
