@@ -34,6 +34,9 @@ static inline kru_price_t kr_cache_top_entry_price(struct kr_cache_top *top, siz
 }
 
 KR_EXPORT
+int kr_cache_top_get_size(size_t cache_size);
+
+KR_EXPORT
 int kr_cache_top_init(struct kr_cache_top *top, char *mmap_file, size_t cache_size);
 
 KR_EXPORT
