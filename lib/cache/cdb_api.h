@@ -55,7 +55,9 @@ struct kr_cdb_api {
 	int (*open)(kr_cdb_pt *db, struct kr_cdb_stats *stat, struct kr_cdb_opts *opts, knot_mm_t *mm);
 	void (*close)(kr_cdb_pt db, struct kr_cdb_stats *stat);
 	int (*count)(kr_cdb_pt db, struct kr_cdb_stats *stat);
-	int (*clear)(kr_cdb_pt db, struct kr_cdb_stats *stat);
+
+	/** Clear cache, possibly changing its size unless maxsize == 0. */
+	int (*clear)(kr_cdb_pt db, struct kr_cdb_stats *stat, const size_t maxsize);
 
 	/** Run after a row of operations to release transaction/lock if needed.
 	 * \param accept_rw whether the RW transaction should accept changes (commit vs. abort)
