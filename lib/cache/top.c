@@ -17,9 +17,10 @@
 #define FILE_FORMAT_VERSION 1  // fail if different
 
 
-#define KRU_CAPACITY(cache_size) (cache_size / 64)   // KRU size is approx. (8 * capacity) B
-	// average entry size seems to be 70-100 B
-	// -> KRU size is around 12.5 % of cache size, so 112.5 % of the set value is required
+#define KRU_CAPACITY(cache_size) (cache_size / 128)   // KRU size is approx. (8 * capacity) B
+	// average entry size seems to be 100-200 B,
+	// make KRU capacity between cache_size/128 and cache_size/64 (power of two)
+	// -> KRU size: between cache_size/16 and cache_size/8 (cache data size is the rest)
 #define TICK_SEC        1
 #define NORMAL_SIZE  (150 + KR_CACHE_SIZE_OVERHEAD)  // B; normal size of cache entry
 	// used as baseline for the following
@@ -93,13 +94,29 @@ static inline bool first_access(struct kr_cache_top_context *ctx, kru_hash_t has
 }
 
 
-int kr_cache_top_init(struct kr_cache_top *top, char *mmap_file, size_t cache_size) {
+static inline void get_size_capacity(size_t cache_size, size_t *top_size, size_t *capacity_log)
+{
+	*top_size = 0;
+	*capacity_log = 0;
+
+	const size_t capacity = KRU_CAPACITY(cache_size);
+	for (size_t c = capacity - 1; c > 0; c >>= 1) (*capacity_log)++;
+
+	*top_size = offsetof(struct top_data, kru) + KRU.get_size(*capacity_log);
+}
+
+int kr_cache_top_get_size(size_t cache_size)
+{
+	size_t top_size, capacity_log;
+	get_size_capacity(cache_size, &top_size, &capacity_log);
+	return top_size;
+}
+
+int kr_cache_top_init(struct kr_cache_top *top, char *mmap_file, size_t cache_size)
+{
 	size_t size = 0, capacity_log = 0;
 	if (cache_size > 0) {
-		const size_t capacity = KRU_CAPACITY(cache_size);
-		for (size_t c = capacity - 1; c > 0; c >>= 1) capacity_log++;
-
-		size = offsetof(struct top_data, kru) + KRU.get_size(capacity_log);
+		get_size_capacity(cache_size, &size, &capacity_log);
 	} // else use existing file settings
 
 	VERBOSE_LOG("INIT, cache size %d, KRU capacity_log %d\n", cache_size, capacity_log);
