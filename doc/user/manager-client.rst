@@ -241,9 +241,15 @@ single ``kresctl`` command.
 
     Validate declarative configuration.
 
-    .. option:: --no-strict
+    .. option:: --strict
 
-        Ignore strict rules during validation, e.g. path/file existence.
+        Enable strict rules during validation.
+
+        During strict validation, the existence and access rights of paths are also checked.
+        However, if you are using an additional file system permission control mechanism,
+        such as access control lists (ACLs), this validation will likely fail.
+        This is because the validation runs under a different user/group than the resolver
+        itself and attempts to access the configured paths directly.
 
     .. option:: <input_file>
 
@@ -258,9 +264,15 @@ single ``kresctl`` command.
 
     Convert declarative configuration to a Lua script.
 
-    .. option:: --no-strict
+    .. option:: --strict
 
-        Ignore strict rules during validation, e.g. path/file existence.
+        Enable strict rules during validation.
+
+        During strict validation, the existence and access rights of paths are also checked.
+        However, if you are using an additional file system permission control mechanism,
+        such as access control lists (ACLs), this validation will likely fail.
+        This is because the validation runs under a different user/group than the resolver
+        itself and attempts to access the configured paths directly.
 
     .. option:: --type=<worker|policy-loader>
 
