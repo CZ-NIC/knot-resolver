@@ -160,6 +160,7 @@ class _PermissionMode(Flag):
     WRITE = auto()
     EXECUTE = auto()
 
+
 def _check_permission(dest_path: Path, perm_mode: _PermissionMode) -> bool:
     chflags = {
         _PermissionMode.READ: [stat.S_IRUSR, stat.S_IRGRP, stat.S_IROTH],
@@ -262,9 +263,7 @@ class WritableFilePath(FilePath):
                 logger.info(f"{msg}, but the resolver can somehow (ACLs, ...) write to the directory")
 
             # check that existing file is writable
-            if self._value.exists() and not _check_permission(
-                self._value, _PermissionMode.WRITE
-            ):
+            if self._value.exists() and not _check_permission(self._value, _PermissionMode.WRITE):
                 msg = f"{USER}:{GROUP} has insufficient permissions to write/execute '{self._value}'"
                 if not os.access(self._value, os.W_OK):
                     raise ValueError(msg)

@@ -71,7 +71,7 @@ class RPZSchema(ConfigSchema):
         watchdog: Union[Literal["auto"], bool] = "auto"
         tags: Optional[List[IDPattern]] = None
         log: Optional[List[Literal["ip", "name"]]] = None
-        #dry_run: bool = False
+        # dry_run: bool = False
 
     _LAYER = Raw
 
@@ -79,7 +79,7 @@ class RPZSchema(ConfigSchema):
     watchdog: bool
     tags: Optional[List[IDPattern]]
     log: Optional[List[Literal["ip", "name"]]]
-    #dry_run: bool
+    # dry_run: bool
 
     def _watchdog(self, obj: Raw) -> Any:
         if obj.watchdog == "auto":
