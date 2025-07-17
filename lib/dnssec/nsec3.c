@@ -339,7 +339,7 @@ fail:
  *
  * @param tgt  Target buffer to write domain name into.
  * @param name Name to be added to the asterisk.
- * @return     Size of the resulting name or error code.
+ * @return     error code or something positive
  */
 static int prepend_asterisk(uint8_t *tgt, size_t maxlen, const knot_dname_t *name)
 {
@@ -556,7 +556,6 @@ static int matches_closest_encloser_wildcard(const knot_pkt_t *pkt, knot_section
 	int ret = prepend_asterisk(wildcard, sizeof(wildcard), encloser);
 	if (ret < 0)
 		return ret;
-	kr_require(ret >= 3);
 	return nodata_find(pkt, section_id, wildcard, stype);
 }
 
