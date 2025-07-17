@@ -1057,6 +1057,8 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (!query) {
 		return ctx->state;
 	}
+	if (pkt->size == KR_PKT_SIZE_NOWIRE)
+		goto skip_checks; // answers from cache are sane, surely
 	query->flags.PKT_IS_SANE = false;
 
 	WITH_VERBOSE(query) {
@@ -1108,7 +1110,7 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 		}
 		return KR_STATE_CONSUME;
 	}
-
+skip_checks:
 	/* If exiting above here, there's no sense to put it into packet cache.
 	 * Having "extra bytes" at the end of DNS message is considered SANE here.
 	 * The most important part is to check for spoofing: is_paired_to_query() */

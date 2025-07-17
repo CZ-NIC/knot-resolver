@@ -1,3 +1,13 @@
+Knot Resolver 5.7.6 (2025-07-17)
+================================
+
+Security
+--------
+- DoS: fix a rare segfault in `resolve` function (!1720)
+  Someone controlling the DNS traffic might be able
+  to trigger this crash intentionally and too often.
+
+
 Knot Resolver 5.7.5 (2025-04-24)
 ================================
 
