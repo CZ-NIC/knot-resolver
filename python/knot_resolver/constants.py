@@ -1,7 +1,7 @@
 import importlib.util
 from pathlib import Path
 
-VERSION = "6.0.14"
+VERSION = "6.0.15"
 USER = "knot-resolver"
 GROUP = "knot-resolver"
 
