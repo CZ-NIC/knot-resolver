@@ -1,6 +1,12 @@
 Knot Resolver 6.0.15 (2025-06-dd)
 =================================
 
+Security
+--------
+- DoS: fix a rare segfault in `resolve` function (!1717)
+  Someone controlling the DNS traffic might be able
+  to trigger this crash intentionally and too often.
+
 Bugfixes
 --------
 - manager: prometheus metrics update (!1703, #917, !1712)
