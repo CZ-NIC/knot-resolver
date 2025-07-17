@@ -807,13 +807,15 @@ docs:environment:
 
 # Deploys the current documentation to the GitLab pages.
 # https://knot.pages.nic.cz/knot-resolver
+# https://www.knot-resolver.cz/documentation/latest
 docs:pages:
   stage: deploy
   needs:
     - docs:build
+  only:
+    - master@knot/knot-resolver
   script: mv doc/html public
   pages: true
-  when: manual
   artifacts:
     paths:
       - public
