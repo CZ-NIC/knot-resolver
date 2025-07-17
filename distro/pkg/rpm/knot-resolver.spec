@@ -62,7 +62,7 @@ Requires:       systemd
 Requires(post): systemd
 
 # dnstap module dependencies
-# SUSE is missing protoc-c protobuf compiler
+# SUSE is missing protoc protobuf compiler
 %if "x%{?suse_version}" == "x"
 BuildRequires:  pkgconfig(libfstrm)
 BuildRequires:  pkgconfig(libprotobuf-c)
