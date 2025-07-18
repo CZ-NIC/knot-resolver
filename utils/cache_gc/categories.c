@@ -6,28 +6,8 @@
 #include "lib/cache/top.h"
 #include "utils/cache_gc/db.h"
 
-static bool rrtype_is_infrastructure(uint16_t r)  // currently unused
+static inline int load2cat(uint16_t load)  // -> 0..64, reversed
 {
-	switch (r) {
-	case KNOT_RRTYPE_NS:
-	case KNOT_RRTYPE_DS:
-	case KNOT_RRTYPE_DNSKEY:
-	case KNOT_RRTYPE_A:
-	case KNOT_RRTYPE_AAAA:
-		return true;
-	default:
-		return false;
-	}
-}
-
-static unsigned int get_random(int to)  // currently unused
-{
-	// We don't need these to be really unpredictable,
-	// but this should be cheap enough not to be noticeable.
-	return kr_rand_bytes(1) % to;
-}
-
-static inline int load2cat(uint16_t load) { // 0..64, reversed
 	const uint32_t load32 = ((uint32_t)load << 16) | 0xFFFF;
 	const int leading_zeroes = __builtin_clz(load32);  // 0..16
 	const int logss2 =  //  0, 4, 6, 8..64; approx of log with base 2^{1/4}
@@ -41,21 +21,19 @@ category_t kr_gc_categorize(struct kr_cache_top *top, gc_record_info_t * info, v
 {
 	category_t res; // 0..(CATEGORIES - 1), highest will be dropped first
 
-	if (!info->valid)
+	if (!info->valid) {
+		// invalid entries will be evicted first
 		return CATEGORIES - 1;
+	}
 
 	uint16_t load = kr_cache_top_load(top, key, key_len);
 	res = load2cat(load);  // 0..64
 
-	if (info->rrtype == KNOT_CACHE_RTT) {
-		// TODO some correction here?
-	} else {
-		if (info->expires_in <= 0) {
-			// evict all expired before any non-expired
-			res = res / 2 + 65;  // 65..94
-		}
+	if ((info->rrtype != KNOT_CACHE_RTT) && (info->expires_in <= 0)) {
+		// evict all expired before any non-expired (incl. RTT)
+		res = res / 2 + 65;  // 65..97
 	}
-	static_assert(CATEGORIES - 1 > 94);
+	static_assert(CATEGORIES - 1 > 97);
 
 	const kru_price_t price = kr_cache_top_entry_price(top, info->entry_size);
 	const double accesses = (double)((kru_price_t)load << (KRU_PRICE_BITS - 16)) / price;

@@ -67,7 +67,7 @@ struct kru_api {
 	/// Verify that given KRU structure expects just memory of the given size;
 	/// it accesses just the first size bytes of kru.
 	/// If false is returned, the memory is corrupted and calling other methods may cause SIGSEGV.
-	bool (*check_size)(struct kru *kru, size_t size);
+	bool (*check_size)(struct kru *kru, ptrdiff_t size);
 
 	/// Determine if a key should get limited (and update the KRU).
 	/// key needs to be aligned to a multiple of 16 bytes.
@@ -107,10 +107,13 @@ struct kru_api {
 	void (*load_multi_prefix)(struct kru *kru, uint32_t time_now,
 			uint8_t namespace, uint8_t key[static 16], uint8_t *prefixes, kru_price_t *prices, size_t queries_cnt, uint16_t *loads_out);
 
-	// TODO
-	/// Compute 64-bit hash to be used in load_hash.
+	/// Compute 64-bit hash of an arbitrary-size byte array to be used in load_hash function.
 	/// The key need not to be aligned as we use always unoptimized variant here.
 	kru_hash_t (*hash_bytes)(struct kru *kru, uint8_t *key, size_t key_size);
+
+	/// Single query based on the hash computed by the previous function.
+	/// Returns the final value of the counter normalized to the limit 2^16.
+	/// Set price to zero to skip updating; otherwise, KRU is always updated, using maximal allowed value on overflow.
 	uint16_t (*load_hash)(struct kru *kru, uint32_t time_now, kru_hash_t hash, kru_price_t price);
 };
 

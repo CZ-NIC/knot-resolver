@@ -235,7 +235,6 @@ struct kr_extended_error {
 };
 struct kr_cache_top_context {
 	uint32_t bloom[32];
-	uint32_t cnt;
 };
 struct kr_request {
 	struct kr_context *ctx;
@@ -310,12 +309,25 @@ struct kr_cdb_stats {
 	double usage_percent;
 };
 typedef struct uv_timer_s uv_timer_t;
+struct mmapped {
+	void *mem;
+	size_t size;
+	int fd;
+	_Bool write_lock;
+	_Bool persistent;
+};
+struct kr_cache_top {
+	struct mmapped mmapped;
+	struct top_data *data;
+	struct kr_cache_top_context *ctx;
+};
 struct kr_cache {
 	kr_cdb_pt db;
 	const struct kr_cdb_api *api;
 	struct kr_cdb_stats stats;
 	uint32_t ttl_min;
 	uint32_t ttl_max;
+	struct kr_cache_top top;
 	struct timeval checkpoint_walltime;
 	uint64_t checkpoint_monotime;
 	uv_timer_t *health_timer;
