@@ -633,43 +633,6 @@ nightly:copy:
     - '[ "x${STATUS}" == "x200" ] || { cat ${tmp_file}; rm ${tmp_file}; exit 1; }'
     - 'rm ${tmp_file}'
 
-obs:trigger: &obs_trigger
-  stage: deploy
-  only:
-    variables:
-      - $OBS_REPO
-  dependencies:  # wait for previous stages to finish
-    - archive
-  environment:
-    name: OBS/$OBS_REPO
-    url: https://build.opensuse.org/package/show/home:CZ-NIC:$OBS_REPO/knot-resolver
-  tags:
-    - condor
-  allow_failure: false  # required to make when: manual action blocking
-  script:
-    - python3 -m venv ./venv
-    - source ./venv/bin/activate
-    - pip install --upgrade pip
-    - pip install apkg
-    - scripts/ci/make-obs.sh
-    - echo y | scripts/ci/build-in-obs.sh $OBS_REPO
-
-obs:release:
-  <<: *obs_trigger
-  only:
-    - tags
-  variables:
-    OBS_REPO: knot-resolver-latest
-  when: manual
-
-obs:odvr:
-  <<: *obs_trigger
-  stage: pkg  # last stage to ensure it doesn't block anything
-  only:
-    - tags
-  variables:
-    OBS_REPO: knot-resolver-odvr
-  when: manual
 # }}}
 
 # pkg {{{
@@ -842,15 +805,17 @@ docs:environment:
     name: docs/$CI_COMMIT_REF_NAME
     url: https://www.knot-resolver.cz/documentation/artifacts/$CI_JOB_ID/index.html
 
-# Deploys the current documentation to the GitLab pages.
-# https://knot.pages.nic.cz/knot-resolver
-docs:pages:
+# Automatically deploys the latest documentation from the master branch.
+# The latest doc is available at https://www.knot-resolver.cz/documentation/latest/,
+# which redirects to the GitLab pages at https://knot.pages.nic.cz/knot-resolver.
+docs:latest:
   stage: deploy
   needs:
     - docs:build
+  only:
+    - master@knot/knot-resolver
   script: mv doc/html public
   pages: true
-  when: manual
   artifacts:
     paths:
       - public
