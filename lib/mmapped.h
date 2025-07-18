@@ -106,7 +106,7 @@ void mmapped_deinit(struct mmapped *mmapped);
 			mmapped_init_finish
 		}
 		if (<0) fail + return
-		assert(==0) // if both _finish above were used
+		assertion (==0) // if both _finish above were used
 		// done
 
 	non-persistent case:
@@ -119,7 +119,7 @@ void mmapped_deinit(struct mmapped *mmapped);
 			mmapped_init_finish
 		}
 		if (<0) fail + return
-		assert(==0) // no other outcome if both _finish above were used
+		assertion (==0) // no other outcome if both _finish above were used
 		// done
 */
 
