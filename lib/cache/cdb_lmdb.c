@@ -15,10 +15,7 @@
 #include "contrib/ucw/lib.h"
 #include "lib/cache/cdb_lmdb.h"
 #include "lib/cache/cdb_api.h"
-#include "lib/cache/top.h"
 #include "lib/utils.h"
-
-#define kr_cache_top_access_cdb(...) { if (env->is_cache) kr_cache_top_access_cdb(__VA_ARGS__); } // TODO remove
 
 /// A hacky way allowing usual usage of kr_log_error(MDB, ...)
 /// while differentiating between cache and rules in the produced logs.
@@ -50,7 +47,6 @@ struct lmdb_env
 	} txn;
 
 	bool is_cache; /**< cache vs. rules; from struct kr_cdb_opts::is_cache */
-	struct kr_cache_top *top; // TODO remove
 
 	/* Cached part of struct stat for data.mdb. */
 	dev_t st_dev;
@@ -658,7 +654,6 @@ static int cdb_readv(kr_cdb_pt db, struct kr_cdb_stats *stats,
 		MDB_val _key = val_knot2mdb(key[i]);
 		MDB_val _val = val_knot2mdb(val[i]);
 		stats->read++;
-		kr_cache_top_access_cdb(env->top, _key.mv_data, _key.mv_size, "readv");
 		ret = mdb_get(txn, env->dbi, &_key, &_val);
 		if (ret != MDB_SUCCESS) {
 			if (ret == MDB_NOTFOUND) {
@@ -686,7 +681,6 @@ static int cdb_write(struct lmdb_env *env, MDB_txn **txn, const knot_db_val_t *k
 	MDB_val _key = val_knot2mdb(*key);
 	MDB_val _val = val_knot2mdb(*val);
 	stats->write++;
-	kr_cache_top_access_cdb(env->top, _key.mv_data, _key.mv_size, "write");
 
 	/* This is LMDB specific optimisation,
 	 * if caller specifies value with NULL data and non-zero length,
@@ -779,7 +773,6 @@ static int cdb_match(kr_cdb_pt db, struct kr_cdb_stats *stats,
 	MDB_val cur_key = val_knot2mdb(*key);
 	MDB_val cur_val = { 0, NULL };
 	stats->match++;
-	kr_cache_top_access_cdb(env->top, cur_key.mv_data, cur_key.mv_size, "match-prefix");
 	ret = mdb_cursor_get(cur, &cur_key, &cur_val, MDB_SET_RANGE);
 	if (ret != MDB_SUCCESS) {
 		mdb_cursor_close(cur);
@@ -797,7 +790,6 @@ static int cdb_match(kr_cdb_pt db, struct kr_cdb_stats *stats,
 		}
 		/* Add to result set */
 		if (results < maxcount) {
-			kr_cache_top_access_cdb(env->top, cur_key.mv_data, cur_key.mv_size, "matched");
 			keyval[results][0] = val_mdb2knot(cur_key);
 			keyval[results][1] = val_mdb2knot(cur_val);
 			++results;
@@ -832,7 +824,6 @@ static int cdb_read_leq(kr_cdb_pt db, struct kr_cdb_stats *stats,
 	MDB_val key2_m = val_knot2mdb(*key);
 	MDB_val val2_m = { 0, NULL };
 	stats->read_leq++;
-	kr_cache_top_access_cdb(env->top, key2_m.mv_data, key2_m.mv_size, "leq-query");
 	ret = mdb_cursor_get(curs, &key2_m, &val2_m, MDB_SET_RANGE);
 	if (ret) goto failure;
 	/* test for equality //:unlikely */
@@ -850,7 +841,6 @@ static int cdb_read_leq(kr_cdb_pt db, struct kr_cdb_stats *stats,
 	ret = 1;
 success:
 	/* finalize the output */
-	kr_cache_top_access_cdb(env->top, key2_m.mv_data, key2_m.mv_size, "leq");
 	*key = val_mdb2knot(key2_m);
 	*val = val_mdb2knot(val2_m);
 	return ret;
@@ -876,12 +866,10 @@ static int cdb_read_less(kr_cdb_pt db, struct kr_cdb_stats *stats,
 	MDB_val key2_m = val_knot2mdb(*key);
 	MDB_val val2_m = { 0, NULL };
 	stats->read_less++;
-	kr_cache_top_access_cdb(env->top, key2_m.mv_data, key2_m.mv_size, "less-query");
 	// It could keep on the same `key` when MDB_PREV was used.
 	ret = mdb_cursor_get(curs, &key2_m, &val2_m, MDB_PREV_NODUP);
 	if (!ret) {
 		/* finalize the output */
-		kr_cache_top_access_cdb(env->top, key2_m.mv_data, key2_m.mv_size, "less");
 		*key = val_mdb2knot(key2_m);
 		*val = val_mdb2knot(val2_m);
 		return 1;

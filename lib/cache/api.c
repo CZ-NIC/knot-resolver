@@ -154,7 +154,7 @@ int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct k
 		if (opts->maxsize && (maxsize > opts->maxsize)) {
 			kr_log_notice(CACHE,
 				"real LMDB cache size is %zu instead of the requested %zu bytes, removing all data.\n",
-				maxsize, opts->maxsize, fpath);
+				maxsize, opts->maxsize);
 			cache_op(cache, clear, opts->maxsize);
 			maxsize = cache->api->get_maxsize(cache->db);
 		}
