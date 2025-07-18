@@ -203,7 +203,8 @@ static size_t kru_get_size(int capacity_log)
 		    + sizeof(struct load_cl) * TABLE_COUNT * (1 << loads_bits);
 }
 
-static bool kru_check_size(struct kru *kru, size_t size) {
+static bool kru_check_size(struct kru *kru, ptrdiff_t size)
+{
 	if (size < sizeof(struct kru)) return false;
 	return size == kru_get_size(kru->loads_bits + LOADS_CAPACITY_SHIFT);
 }
@@ -355,7 +356,8 @@ static inline void kru_limited_prefetch_prefix(struct kru *kru, uint32_t time_no
 	ctx->id = hash;
 }
 
-static kru_hash_t kru_hash_bytes(struct kru *kru, uint8_t *key, size_t key_size) {
+static kru_hash_t kru_hash_bytes(struct kru *kru, uint8_t *key, size_t key_size)
+{
 	// Obtain hash of *buf.
 	kru_hash_t hash;
 	static_assert(sizeof(kru_hash_t) * 8 <= 64);
