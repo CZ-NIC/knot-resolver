@@ -3,8 +3,11 @@
  */
 
 #include "kresconfig.h"
+#include "lib/proto.h"
+#include "mempattern.h"
 #include "daemon/worker.h"
 
+#include <ngtcp2/ngtcp2.h>
 #include <uv.h>
 #include <lua.h>
 #include <lauxlib.h>
@@ -354,6 +357,7 @@ static struct request_ctx *request_create(struct session2 *session,
 		const struct sockaddr *comm_addr = comm->comm_addr;
 		const struct sockaddr *dst_addr = comm->dst_addr;
 		const struct proxy_result *proxy = comm->proxy;
+		struct ngtcp2_cid *dcid = comm->target;
 
 		req->qsource.stream_id = -1;
 		session2_init_request(session, req);
@@ -377,6 +381,14 @@ static struct request_ctx *request_create(struct session2 *session,
 			dst_addr = session2_get_sockname(session);
 		memcpy(&ctx->source.dst_addr.ip, dst_addr, kr_sockaddr_len(dst_addr));
 		req->qsource.dst_addr = &ctx->source.dst_addr.ip;
+
+#ifdef ENABLE_QUIC
+		if (dcid)
+			ctx->source.session->comm_storage.target = dcid;
+			// memcpy(&ctx->source.session->comm_storage.target, dcid,
+			// 		sizeof(struct ngtcp2_cid));
+		// ctx->source.session->comm_storage.target = dcid;
+#endif /* ENABLE_QUIC */
 	}
 
 	req->selection_context.is_tls_capable = is_tls_capable;
@@ -1017,7 +1029,10 @@ static int qr_task_finalize(struct qr_task *task, int state)
 		.src_addr = &ctx->source.addr.ip,
 		.dst_addr = &ctx->source.dst_addr.ip,
 		.comm_addr = &ctx->source.comm_addr.ip,
-		.xdp = ctx->source.xdp
+		.xdp = ctx->source.xdp,
+#ifdef ENABLE_QUIC
+		.target =  ctx->source.session->comm_storage.target
+#endif /* ENABLE_QUIC */
 	};
 	if (ctx->source.xdp) {
 		memcpy(out_comm.eth_from, ctx->source.eth_from, sizeof(out_comm.eth_from));
@@ -2296,7 +2311,27 @@ struct sized_iovs {
 static enum protolayer_iter_cb_result pl_dns_stream_wrap(
 		void *sess_data, void *iter_data, struct protolayer_iter_ctx *ctx)
 {
-	if (ctx->payload.type == PROTOLAYER_PAYLOAD_BUFFER) {
+	kr_log_info(DOQ, "pl_dns_stream_wrap %s\n", protolayer_payload_name(ctx->payload.type));
+	if (ctx->session->proto == KR_PROTO_DOQ) {
+		kr_require(ctx->payload.type == PROTOLAYER_PAYLOAD_BUFFER);
+		struct wire_buf *wb = mm_calloc(&ctx->pool, 1, sizeof(struct wire_buf));
+		kr_require(wb);
+		/* FIXME should not be a macro
+		 * simply because the communicating parties can negotiate
+		 * a larger udp payload size, and or the buffer might cotain
+		 * more data */
+		wire_buf_init(wb, /* FIXME */NGTCP2_MAX_UDP_PAYLOAD_SIZE);
+
+		kr_require(wb && wire_buf_free_space_length(wb) >= 1200);
+		// wb->buf = ctx->payload.buffer.buf;
+		memcpy(wire_buf_free_space(wb),
+				ctx->payload.buffer.buf,
+				ctx->payload.buffer.len);
+		kr_require(wire_buf_consume(wb, ctx->payload.buffer.len) == kr_ok());
+		ctx->payload = protolayer_payload_wire_buf(wb, false);
+		return protolayer_continue(ctx);
+
+	} else if (ctx->payload.type == PROTOLAYER_PAYLOAD_BUFFER) {
 		if (kr_fails_assert(ctx->payload.buffer.len <= UINT16_MAX))
 			return protolayer_break(ctx, kr_error(EMSGSIZE));
 
