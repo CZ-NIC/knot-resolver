@@ -81,15 +81,31 @@ def construct_include(loader: _RaiseDuplicatesIncludeLoader, node: Any) -> Any:
         return "".join(file.readlines())
 
 
+def include_root(text: str) -> str:
+    ntext = ""
+    for line in iter(text.splitlines()):
+        if line.startswith(_include_key):
+            file_path = line[len(_include_key) + 1 :]
+            with open(file_path, "r") as file:
+                include_text = file.read()
+            ntext += include_root(include_text)
+        else:
+            ntext += line + "\n"
+    return ntext
+
+
 class DataFormat(Enum):
     YAML = auto()
     JSON = auto()
 
     def parse_to_dict(self, text: str) -> Any:
         if self is DataFormat.YAML:
+            # handle root includes separately, pyyaml loader cannot do that
+            included = include_root(text)
+
             # _RaiseDuplicatesIncludeLoader extends yaml.SafeLoader, so this should be safe
             # https://python.land/data-processing/python-yaml#PyYAML_safe_load_vs_load
-            return renamed(yaml.load(text, Loader=_RaiseDuplicatesIncludeLoader))  # type: ignore
+            return renamed(yaml.load(included, Loader=_RaiseDuplicatesIncludeLoader))  # type: ignore
         if self is DataFormat.JSON:
             return renamed(json.loads(text, object_pairs_hook=_json_raise_duplicates))
         raise NotImplementedError(f"Parsing of format '{self}' is not implemented")
