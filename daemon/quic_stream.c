@@ -2,87 +2,90 @@
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#include "lib/defines.h"
 #include "lib/generic/queue.h"
 #include "quic.h"
 #include <stdint.h>
+#include <string.h>
 #include "quic_stream.h"
 #include "libknot/xdp/tcp_iobuf.h"
+#include "session2.h"
 
 
 typedef queue_t(kr_quic_obuf_t *) q_stream_buf;
 
-static void stream_outprocess(struct kr_quic_conn *conn, struct kr_quic_stream *stream)
-{
-	if (stream != &conn->streams[conn->stream_inprocess]) {
-		return;
-	}
+// static void stream_outprocess(struct kr_quic_conn *conn, struct kr_quic_stream *stream)
+// {
+// 	if (stream != &conn->streams[conn->stream_inprocess]) {
+// 		return;
+// 	}
+//
+// 	for (int16_t idx = conn->stream_inprocess + 1; idx < conn->streams_count; idx++) {
+// 		stream = &conn->streams[idx];
+// 		if (stream->inbufs != NULL) {
+// 			conn->stream_inprocess = stream - conn->streams;
+// 			return;
+// 		}
+// 	}
+// 	conn->stream_inprocess = -1;
+// }
 
-	for (int16_t idx = conn->stream_inprocess + 1; idx < conn->streams_count; idx++) {
-		stream = &conn->streams[idx];
-		if (stream->inbufs != NULL) {
-			conn->stream_inprocess = stream - conn->streams;
-			return;
-		}
-	}
-	conn->stream_inprocess = -1;
-}
-
-void kr_quic_stream_ack_data(struct kr_quic_conn *conn, int64_t stream_id,
-                               size_t end_acked, bool keep_stream)
-{
-	struct kr_quic_stream *s = kr_quic_conn_get_stream(conn, stream_id, false);
-	if (s == NULL) {
-		return;
-	}
-
-	q_stream_buf *obs = (q_stream_buf *)&s->outbufs;
-
-	kr_quic_obuf_t *first;
-
-	while (queue_len(*obs) != 0 && end_acked >= (first = queue_head(*obs))->len + s->first_offset) {
-		queue_pop(*obs);
-		assert(queue_head(*obs) != first); // help CLANG analyzer understand what rem_node did and that further usage of HEAD(*obs) is safe
-		s->obufs_size -= first->len;
-		conn->obufs_size -= first->len;
-		conn->quic_table->obufs_size -= first->len;
-		s->first_offset += first->len;
-		free(first);
-		if (s->unsent_obuf == first) {
-			s->unsent_obuf = queue_len(*obs) == 0 ? NULL : queue_head(*obs);
-			s->unsent_offset = 0;
-		}
-	}
-
-	if (queue_len(*obs) == 0 && !keep_stream) {
-		stream_outprocess(conn, s);
-		memset(s, 0, sizeof(*s));
-		init_list((list_t *)&s->outbufs);
-		while (s = &conn->streams[0], s->inbuf.iov_len == 0 && s->inbufs == NULL && s->obufs_size == 0) {
-			assert(conn->streams_count > 0);
-			conn->streams_count--;
-
-			if (conn->streams_count == 0) {
-				free(conn->streams);
-				conn->streams = 0;
-				conn->first_stream_id = 0;
-				break;
-			} else {
-				conn->first_stream_id ++;
-				conn->stream_inprocess--;
-				memmove(s, s + 1, sizeof(*s) * conn->streams_count);
-				// possible realloc to shrink allocated space, but probably useless
-				for (struct kr_quic_stream *si = s;  si < s + conn->streams_count; si++) {
-					if (si->obufs_size == 0) {
-						queue_init(si->outbufs);
-						// init_list((list_t *)&si->outbufs);
-					} else {
-						// fix_list((list_t *)&si->outbufs);
-					}
-				}
-			}
-		}
-	}
-}
+// void kr_quic_stream_ack_data(struct kr_quic_conn *conn, int64_t stream_id,
+//                                size_t end_acked, bool keep_stream)
+// {
+// 	struct kr_quic_stream *s = kr_quic_conn_get_stream(conn, stream_id, false);
+// 	if (s == NULL) {
+// 		return;
+// 	}
+//
+// 	q_stream_buf *obs = (q_stream_buf *)&s->outbufs;
+//
+// 	kr_quic_obuf_t *first;
+//
+// 	while (queue_len(*obs) != 0 && end_acked >= (first = queue_head(*obs))->len + s->first_offset) {
+// 		queue_pop(*obs);
+// 		assert(queue_head(*obs) != first); // help CLANG analyzer understand what rem_node did and that further usage of HEAD(*obs) is safe
+// 		s->obufs_size -= first->len;
+// 		conn->obufs_size -= first->len;
+// 		conn->quic_table->obufs_size -= first->len;
+// 		s->first_offset += first->len;
+// 		free(first);
+// 		if (s->unsent_obuf == first) {
+// 			s->unsent_obuf = queue_len(*obs) == 0 ? NULL : queue_head(*obs);
+// 			s->unsent_offset = 0;
+// 		}
+// 	}
+//
+// 	if (queue_len(*obs) == 0 && !keep_stream) {
+// 		stream_outprocess(conn, s);
+// 		memset(s, 0, sizeof(*s));
+// 		init_list((list_t *)&s->outbufs);
+// 		while (s = &conn->streams[0], s->inbuf.iov_len == 0 && s->inbufs == NULL && s->obufs_size == 0) {
+// 			assert(conn->streams_count > 0);
+// 			conn->streams_count--;
+//
+// 			if (conn->streams_count == 0) {
+// 				free(conn->streams);
+// 				conn->streams = 0;
+// 				conn->first_stream_id = 0;
+// 				break;
+// 			} else {
+// 				conn->first_stream_id ++;
+// 				conn->stream_inprocess--;
+// 				memmove(s, s + 1, sizeof(*s) * conn->streams_count);
+// 				// possible realloc to shrink allocated space, but probably useless
+// 				for (struct kr_quic_stream *si = s;  si < s + conn->streams_count; si++) {
+// 					if (si->obufs_size == 0) {
+// 						queue_init(si->outbufs);
+// 						// init_list((list_t *)&si->outbufs);
+// 					} else {
+// 						// fix_list((list_t *)&si->outbufs);
+// 					}
+// 				}
+// 			}
+// 		}
+// 	}
+// }
 
 void kr_quic_conn_stream_free(kr_quic_conn_t *conn, int64_t stream_id)
 {
@@ -111,6 +114,8 @@ bool kr_quic_stream_exists(kr_quic_conn_t *conn, int64_t stream_id)
 	// TRICK, we never use stream_user_data
 	return (ngtcp2_conn_set_stream_user_data(conn->conn, stream_id, NULL) == NGTCP2_NO_ERROR);
 }
+
+#define QBUFSIZE 256u
 
 struct kr_quic_stream *kr_quic_conn_get_stream(kr_quic_conn_t *conn,
 		int64_t stream_id, bool create)
@@ -156,6 +161,7 @@ struct kr_quic_stream *kr_quic_conn_get_stream(kr_quic_conn_t *conn,
 			if (si->obufs_size == 0) {
 				queue_init(si->outbufs);
 				// init_list(&si->outbufs);
+
 			} else {
 				// fix_list(&si->outbufs);
 			}
@@ -165,6 +171,8 @@ struct kr_quic_stream *kr_quic_conn_get_stream(kr_quic_conn_t *conn,
 		     si < new_streams + new_streams_count; si++) {
 			memset(si, 0, sizeof(*si));
 			queue_init(si->outbufs);
+
+			wire_buf_init(&si->pers_inbuf, /* FIXME */QBUFSIZE);
 			// init_list(&si->outbufs);
 		}
 
@@ -248,6 +256,26 @@ void stream_inprocess(struct kr_quic_conn *conn, struct kr_quic_stream *stream)
 	}
 }
 
+int update_stream_pers_buffer(const uint8_t *data, size_t len,
+		struct kr_quic_stream *stream, int64_t stream_id)
+{
+	kr_require(len > 0 && data && stream);
+
+	// struct wire_buf wb = stream->pers_inbuf;
+	if (wire_buf_free_space_length(&stream->pers_inbuf) < len) {
+		kr_log_error(DOQ, "wire buf for stream no. %ld ran out of available space"
+				" needed: %zu, available: %zu\n",
+				stream_id, len,
+				wire_buf_free_space_length(&stream->pers_inbuf));
+		return kr_error(ENOMEM);
+	}
+
+	memcpy(wire_buf_free_space(&stream->pers_inbuf), data, len);
+	wire_buf_consume(&stream->pers_inbuf, len);
+
+	return kr_ok();
+}
+
 /** callback of recv_stream_data,
  * data passed to this cb function is the actuall query. */
 int kr_quic_stream_recv_data(struct kr_quic_conn *qconn, int64_t stream_id,
@@ -262,30 +290,36 @@ int kr_quic_stream_recv_data(struct kr_quic_conn *qconn, int64_t stream_id,
 		return KNOT_ENOENT;
 	}
 
-	struct iovec in = { (void *)data, len };
-	ssize_t prev_ibufs_size = qconn->ibufs_size;
-	size_t save_total = qconn->ibufs_size;
-	int ret = knot_tcp_inbufs_upd(&stream->inbuf, in, true,
-			&stream->inbufs, &qconn->ibufs_size);
+	// struct iovec in = { (void *)data, len };
+	// ssize_t prev_ibufs_size = qconn->ibufs_size;
+	// size_t save_total = qconn->ibufs_size;
+
+	if (update_stream_pers_buffer(data, len, stream, stream_id) != kr_ok()) {
+		return -1 /* TODO */;
+	}
+
+	// int ret = knot_tcp_inbufs_upd(&stream->inbuf, in, true,
+	// 		&stream->inbufs, &qconn->ibufs_size);
 
 	// TODO:
 	// int ret = kr_tcp_inbufs_upd(&stream->inbuf, in, true,
 	//                               &stream->inbufs, &conn->ibufs_size);
 	// int ret = KNOT_EOK;
 
-	qconn->quic_table->ibufs_size += (ssize_t)qconn->ibufs_size - prev_ibufs_size;
-	if (ret != KNOT_EOK) {
-		return ret;
-	}
+	// qconn->quic_table->ibufs_size += (ssize_t)qconn->ibufs_size - prev_ibufs_size;
+	// if (ret != KNOT_EOK) {
+	// 	return ret;
+	// }
 
-	if (fin && stream->inbufs == NULL) {
-		return KNOT_ESEMCHECK;
-	}
+	// if (fin && stream->inbufs == NULL) {
+	// 	return KNOT_ESEMCHECK;
+	// }
 
-	if (stream->inbufs != NULL) {
+	if (fin) {
+		kr_log_info(DOQ, "wire_buf: %s\n", (char *)wire_buf_data(&stream->pers_inbuf));
 		stream_inprocess(qconn, stream);
 	}
 
-	return KNOT_EOK;
+	return kr_ok();
 }
 

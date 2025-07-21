@@ -6,6 +6,8 @@
 
 #include "quic.h"
 
+#define QUIC_MAX_SEND_PER_RECV	4
+
 bool kr_quic_stream_exists(kr_quic_conn_t *conn, int64_t stream_id);
 
 /** We have to buffer all data that has been send but still waits
