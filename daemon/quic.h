@@ -192,7 +192,8 @@ typedef struct kr_tcp_inbufs_upd_res {
  */
 struct kr_quic_stream {
 	struct iovec inbuf;
-	struct kr_tcp_inbufs_upd_res *inbufs;
+	struct wire_buf pers_inbuf;
+	// struct kr_tcp_inbufs_upd_res *inbufs;
 
 	size_t firstib_consumed;
 	// holds pointers to head and tail of knot_quic_obuf_t
