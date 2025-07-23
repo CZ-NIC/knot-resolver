@@ -1806,12 +1806,49 @@
                     "type": "string",
                     "description": "Kafka server to connect.",
                     "default": "127.0.0.1@9092"
+                },
+                "security-protocol": {
+                    "type": "string",
+                    "enum": [
+                        "plaintext",
+                        "ssl"
+                    ],
+                    "description": "Protocol used to communicate with server(broker).",
+                    "default": "plaintext"
+                },
+                "cert-file": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "description": "Optional, the client's certificate file in PEM format.",
+                    "default": null
+                },
+                "key-file": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "description": "Optional, the client's private key file.",
+                    "default": null
+                },
+                "ca-file": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "description": "Optional, CA file to use in certificate verification.",
+                    "default": null
                 }
             },
             "default": {
                 "enable": false,
                 "topic": "knot-resolver",
-                "server": "127.0.0.1@9092"
+                "server": "127.0.0.1@9092",
+                "security_protocol": "plaintext",
+                "cert_file": null,
+                "key_file": null,
+                "ca_file": null
             }
         },
         "lua": {
