@@ -1,12 +1,15 @@
 import logging
+import os
+import shutil
 from threading import Timer
 from typing import Dict, List, Optional
+from urllib.parse import quote
 
 from knot_resolver.constants import KAFKA_LIB
 from knot_resolver.datamodel import KresConfig
 from knot_resolver.manager.config_store import ConfigStore
 from knot_resolver.utils.functional import Result
-from knot_resolver.utils.modeling import parse_json
+from knot_resolver.utils.requests import SocketDesc, request
 
 logger = logging.getLogger(__name__)
 
@@ -22,20 +25,37 @@ if KAFKA_LIB:
     class KresKafkaClient:
         def __init__(self, config: KresConfig) -> None:
             self._config = config
-            self._files: Dict[str, str] = {}
+            self._reload_timer: Optional[Timer] = None
 
             self._consumer: Optional[KafkaConsumer] = None
-            self._consumer_timer: Optional[Timer] = None
             self._consumer_connect()
-            self._consume()
+            self._consumer_timer = Timer(5, self._consume)
+            self._consumer_timer.start()
 
         def deinit(self) -> None:
             if self._consumer_timer:
                 self._consumer_timer.cancel()
             if self._consumer:
                 self._consumer.close()
+            if self._reload_timer:
+                self._reload_timer.cancel()
 
         def _consume(self) -> None:
+            def reload() -> None:
+                management = self._config.management
+                socket = SocketDesc(
+                    f'http+unix://{quote(str(management.unix_socket), safe="")}/',
+                    'Key "/management/unix-socket" in validated configuration',
+                )
+                if management.interface:
+                    socket = SocketDesc(
+                        f"http://{management.interface.addr}:{management.interface.port}",
+                        'Key "/management/interface" in validated configuration',
+                    )
+                response = request(socket, "POST", "reload")
+                if response.status != 200:
+                    logger.error(f"Failed to reload: {response.body}")
+
             if not self._consumer:
                 return
 
@@ -46,29 +66,44 @@ if KAFKA_LIB:
                 for record in records:
                     try:
                         key: str = record.key.decode("utf-8")
+                        key_split = key.split(":")
                         value: str = record.value.decode("utf-8")
 
                         logger.info(f"Received message with '{key}' key")
 
-                        # configuration
-                        if key == "config":
-                            _new_config = parse_json(value)
-                            logger.info("Configuration applied")
-                        # start of a file
-                        elif key[-2] == ":" and key[-1].isdigit():
-                            file_name = key[:-2]
-                            if file_name in self._files:
-                                self._files[file_name] += value
-                            else:
-                                self._files[file_name] = value
-                            logger.info(f"Received s part of data for '{file_name}' file")
-                        # end of a file
-                        elif key.endswith(":END"):
-                            file_name = key[:-4]
-                            with open(file_name, "w") as file:
-                                file.write(self._files[file_name])
-                            del self._files[file_name]
+                        # prepare files names
+                        file_name = key_split[0]
+                        file_name_tmp = f"{file_name}.tmp"
+                        file_name_backup = f"{file_name}.backup"
+
+                        file_part = key_split[1] if len(key_split) > 1 else None
+                        _, file_extension = os.path.splitext(file_name)
+
+                        # received part of data
+                        if file_part and file_part.isdigit():
+                            # rewrite only on first part, else append
+                            mode = "w" if int(file_part) == 0 else "a"
+                            with open(file_name_tmp, mode) as file:
+                                file.write(value)
+                            logger.debug(f"Saved part {file_part} of data to '{file_name_tmp}' file")
+                        # received END of data
+                        elif file_part and file_part == "END":
+                            shutil.copy(file_name, file_name_backup)
+                            logger.debug(f"Created backup of '{file_name_backup}' file")
+
+                            os.replace(file_name, file_name_tmp)
                             logger.info(f"Saved data to '{file_name}'")
+
+                            # skipping if reload was already triggered
+                            if self._reload_timer and self._reload_timer.is_alive():
+                                logger.info("Skipping reload, it was already triggered")
+                                return
+                            # start a 5sec timer
+                            logger.info("Delayed policy rules reload has started")
+                            self._reload_timer = Timer(5, reload)
+                            self._reload_timer.start()
+                        else:
+                            logger.error("Failed to parse message key")
                     except Exception as e:
                         logger.error(f"Processing message failed with error: {e}")
                         continue
@@ -86,6 +121,10 @@ if KAFKA_LIB:
                     str(kafka.topic),
                     bootstrap_servers=broker,
                     client_id=str(self._config.hostname),
+                    security_protocol=str(kafka.security_protocol).upper(),
+                    ssl_cafile=str(kafka.ca_file) if kafka.ca_file else None,
+                    ssl_certfile=str(kafka.cert_file) if kafka.cert_file else None,
+                    ssl_keyfile=str(kafka.key_file) if kafka.key_file else None,
                 )
                 self._consumer = consumer
                 logger.info("Successfully connected to Kafka broker")
