@@ -28,7 +28,7 @@ function count_errors(){
 }
 
 function count_reloads(){
-    echo "$(journalctl -u knot-resolver.service | grep -c "Reloading policy rules has finished")"
+    echo "$(journalctl -u knot-resolver.service | grep -c "Renewing configuration has finished")"
 }
 
 # test that RPZ watchdog
