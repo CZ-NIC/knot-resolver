@@ -3,29 +3,27 @@ import os
 import shutil
 from threading import Timer
 from typing import Dict, List, Optional
-from urllib.parse import quote
 
 from knot_resolver.constants import KAFKA_LIB
 from knot_resolver.datamodel import KresConfig
 from knot_resolver.manager.config_store import ConfigStore
+from knot_resolver.manager.triggers import trigger_reload
 from knot_resolver.utils.functional import Result
-from knot_resolver.utils.requests import SocketDesc, request
 
 logger = logging.getLogger(__name__)
 
 
 if KAFKA_LIB:
-    from kafka import KafkaConsumer  # type: ignore[import-untyped]
-    from kafka.consumer.fetcher import ConsumerRecord  # type: ignore[import-untyped]
-    from kafka.errors import NoBrokersAvailable  # type: ignore[import-untyped]
-    from kafka.structs import TopicPartition  # type: ignore[import-untyped]
+    from kafka import KafkaConsumer  # type: ignore[import-untyped,import-not-found]
+    from kafka.consumer.fetcher import ConsumerRecord  # type: ignore[import-untyped,import-not-found]
+    from kafka.errors import NoBrokersAvailable  # type: ignore[import-untyped,import-not-found]
+    from kafka.structs import TopicPartition  # type: ignore[import-untyped,import-not-found]
 
     _kafka: Optional["KresKafkaClient"] = None
 
     class KresKafkaClient:
         def __init__(self, config: KresConfig) -> None:
             self._config = config
-            self._reload_timer: Optional[Timer] = None
 
             self._consumer: Optional[KafkaConsumer] = None
             self._consumer_connect()
@@ -37,25 +35,8 @@ if KAFKA_LIB:
                 self._consumer_timer.cancel()
             if self._consumer:
                 self._consumer.close()
-            if self._reload_timer:
-                self._reload_timer.cancel()
 
         def _consume(self) -> None:
-            def reload() -> None:
-                management = self._config.management
-                socket = SocketDesc(
-                    f'http+unix://{quote(str(management.unix_socket), safe="")}/',
-                    'Key "/management/unix-socket" in validated configuration',
-                )
-                if management.interface:
-                    socket = SocketDesc(
-                        f"http://{management.interface.addr}:{management.interface.port}",
-                        'Key "/management/interface" in validated configuration',
-                    )
-                response = request(socket, "POST", "reload")
-                if response.status != 200:
-                    logger.error(f"Failed to reload: {response.body}")
-
             if not self._consumer:
                 return
 
@@ -94,14 +75,8 @@ if KAFKA_LIB:
                             os.replace(file_name, file_name_tmp)
                             logger.info(f"Saved data to '{file_name}'")
 
-                            # skipping if reload was already triggered
-                            if self._reload_timer and self._reload_timer.is_alive():
-                                logger.info("Skipping reload, it was already triggered")
-                                return
-                            # start a 5sec timer
-                            logger.info("Delayed policy rules reload has started")
-                            self._reload_timer = Timer(5, reload)
-                            self._reload_timer.start()
+                            # trigger delayed configuration reload
+                            trigger_reload(self._config)
                         else:
                             logger.error("Failed to parse message key")
                     except Exception as e:
