@@ -1,6 +1,7 @@
 import json
 import os
 from enum import Enum, auto
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import yaml
@@ -9,6 +10,7 @@ from yaml.nodes import MappingNode
 
 from .exceptions import DataParsingError, DataValidationError
 from .renaming import Renamed, renamed
+from .validation_context import get_global_validation_context
 
 _include_key = "!include"
 
@@ -65,13 +67,12 @@ class _RaiseDuplicatesIncludeLoader(yaml.SafeLoader):
 # custom constructor for to detect '!include' keys in the data
 # source: https://gist.github.com/joshbode/569627ced3076931b02f
 def construct_include(loader: _RaiseDuplicatesIncludeLoader, node: Any) -> Any:
-    try:
-        root = os.path.split(loader.stream.name)[0]  # type: ignore
-    except AttributeError:
-        root = os.path.curdir
-
-    file_path = os.path.abspath(os.path.join(root, loader.construct_scalar(node)))
+    file_path = Path(loader.construct_scalar(node))
     extension = os.path.splitext(file_path)[1].lstrip(".")
+
+    context = get_global_validation_context()
+    if not file_path.is_absolute() and context.resolve_root:
+        file_path = context.resolve_root / file_path
 
     with open(file_path, "r") as file:
         if extension in ("yaml", "yml"):
@@ -85,7 +86,12 @@ def include_root(text: str) -> str:
     ntext = ""
     for line in iter(text.splitlines()):
         if line.startswith(_include_key):
-            file_path = line[len(_include_key) + 1 :]
+            file_path = Path(line[len(_include_key) + 1 :])
+
+            context = get_global_validation_context()
+            if not file_path.is_absolute() and context.resolve_root:
+                file_path = context.resolve_root / file_path
+
             with open(file_path, "r") as file:
                 include_text = file.read()
             ntext += include_root(include_text)
