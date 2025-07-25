@@ -174,8 +174,10 @@ def test_domain_name_valid(val: str):
     "val",
     [
         "test.example..com.",
-        # "-example.com",
-        # "test-.example.net",
+        "-example.com",
+        "-test.example.net",
+        "test-.example.net",
+        "test.-example.net",
         ".example.net",
         _rand_domain(64),
         _rand_domain(1, 128),

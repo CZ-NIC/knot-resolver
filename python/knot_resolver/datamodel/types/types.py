@@ -147,8 +147,9 @@ class DomainName(StrBase):
     _re = re.compile(
         r"(?=^.{,253}\.?$)"  # max 253 chars
         r"(^"
-            r"[^.]{1,64}"  # max 63 chars in label except dot
-            r"(\.[^.]{1,64})*"  # start with dot; max 63 chars in label except dot
+            # do not allow hyphen at the start and at the end of label
+            r"(?!-)[^.]{,62}[^.-]"  # max 63 chars in label; except dot
+            r"(\.(?!-)[^.]{,62}[^.-])*"  # start with dot; max 63 chars in label except dot
             r"\.?"  # end with or without dot
         r"$)"
         r"|^\.$"  # allow root-zone
