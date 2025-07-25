@@ -6,10 +6,14 @@ from typing import Any, Dict, List, Optional, Tuple, Type
 from knot_resolver.client.command import Command, CommandArgs, CompWords, comp_get_words, register_command
 from knot_resolver.constants import CONFIG_FILE
 from knot_resolver.datamodel import KresConfig
-from knot_resolver.datamodel.globals import Context, reset_global_validation_context, set_global_validation_context
 from knot_resolver.utils.modeling import try_to_parse
 from knot_resolver.utils.modeling.exceptions import DataParsingError, DataValidationError
 from knot_resolver.utils.modeling.parsing import data_combine
+from knot_resolver.utils.modeling.validation_context import (
+    Context,
+    reset_global_validation_context,
+    set_global_validation_context,
+)
 
 
 @register_command

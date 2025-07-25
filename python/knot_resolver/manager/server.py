@@ -26,7 +26,6 @@ from knot_resolver.controller.registered_workers import command_single_registere
 from knot_resolver.datamodel import kres_config_json_schema
 from knot_resolver.datamodel.cache_schema import CacheClearRPCSchema
 from knot_resolver.datamodel.config_schema import KresConfig, get_rundir_without_validation
-from knot_resolver.datamodel.globals import Context, set_global_validation_context
 from knot_resolver.datamodel.management_schema import ManagementSchema
 from knot_resolver.manager import files, metrics
 from knot_resolver.utils import custom_atexit as atexit
@@ -39,6 +38,7 @@ from knot_resolver.utils.modeling.exceptions import AggregateDataValidationError
 from knot_resolver.utils.modeling.parsing import DataFormat, data_combine, try_to_parse
 from knot_resolver.utils.modeling.query import query
 from knot_resolver.utils.modeling.types import NoneType
+from knot_resolver.utils.modeling.validation_context import Context, set_global_validation_context
 from knot_resolver.utils.systemd_notify import systemd_notify
 
 from .config_store import ConfigStore

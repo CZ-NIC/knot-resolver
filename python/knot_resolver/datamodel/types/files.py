@@ -8,8 +8,12 @@ from pwd import getpwnam, getpwuid
 from typing import Any, Dict, Tuple, Type, TypeVar
 
 from knot_resolver.constants import GROUP, USER
-from knot_resolver.datamodel.globals import get_permissions_default, get_resolve_root, get_strict_validation
 from knot_resolver.utils.modeling.base_value_type import BaseValueType
+from knot_resolver.utils.modeling.validation_context import (
+    get_permissions_default,
+    get_resolve_root,
+    get_strict_validation,
+)
 
 logger = logging.getLogger(__name__)
 
