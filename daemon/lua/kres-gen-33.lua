@@ -373,6 +373,7 @@ _Bool kr_dbg_assertion_abort;
 int kr_dbg_assertion_fork;
 const uint32_t KR_RULE_TTL_DEFAULT;
 const kr_rule_opts_t KR_RULE_OPTS_DEFAULT;
+const size_t KR_SOCKADDR_SIZE;
 
 typedef int32_t (*kr_stale_cb)(int32_t ttl, const knot_dname_t *owner, uint16_t type,
 				const struct kr_query *qry);
@@ -528,6 +529,7 @@ int kr_rule_zonefile(const struct kr_rule_zonefile_config *);
 int kr_rule_forward(const knot_dname_t *, kr_rule_fwd_flags_t, const struct sockaddr **);
 int kr_rule_local_address(const char *, const char *, _Bool, uint32_t, kr_rule_tags_t, kr_rule_opts_t);
 int kr_rule_local_hosts(const char *, _Bool, uint32_t, kr_rule_tags_t, kr_rule_opts_t);
+void kr_rule_coalesce_targets(const struct sockaddr **, void *);
 struct tls_credentials;
 typedef struct {
 	int sock_type;

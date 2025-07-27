@@ -172,6 +172,7 @@ ${CDEFS} ${LIBKRES} variables <<-EOF
 	kr_dbg_assertion_fork
 	KR_RULE_TTL_DEFAULT
 	KR_RULE_OPTS_DEFAULT
+	KR_SOCKADDR_SIZE 
 EOF
 
 printf "
@@ -320,6 +321,7 @@ ${CDEFS} ${LIBKRES} functions <<-EOF
 	kr_rule_forward
 	kr_rule_local_address
 	kr_rule_local_hosts
+	kr_rule_coalesce_targets
 EOF
 
 
