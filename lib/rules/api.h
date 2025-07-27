@@ -259,6 +259,9 @@ struct kr_rule_zonefile_config {
 KR_EXPORT
 int kr_rule_zonefile(const struct kr_rule_zonefile_config *c);
 
+/** FIXME docs */
+KR_EXPORT
+void kr_rule_coalesce_targets(const struct sockaddr * targets[], void *data);
 
 struct kr_rule_fwd_flags {
 	/// Beware of ABI: this struct is memcpy'd to/from rule DB.
