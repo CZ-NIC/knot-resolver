@@ -877,22 +877,9 @@ function policy.COMBINE(list)
 	return r .. 'end'
 end
 
---[[ Insert a forwarding rule, i.e. override upstream for one DNS subtree.
-
-Throws lua exceptions when detecting something fishy.
-
-\param subtree plain string
-\param options
-  .auth targets are authoritative (false by default = resolver)
-  .dnssec if overridden to false, don't validate DNSSEC locally
-    - for resolvers we still do *not* send CD=1 upstream,
-      i.e. we trust their DNSSEC validation.
-    - for auths this inserts a negative trust anchor
-      Beware that setting .set_insecure() *later* would override that.
-\param targets same format as policy.TLS_FORWARD() except that `tls = true`
-               can be specified for each address (defaults to false)
---]]
-function policy.rule_forward_add(subtree, options, targets)
+-- Convert lua targets to C struct sockaddr * targets[]; see .rule_forward_add()
+-- Throws on errors.
+function policy.forward_convert_targets(options, targets)
 	local targets_2 = {}
 	for _, target in ipairs(targets) do
 		local port_default = 53
@@ -913,7 +900,25 @@ function policy.rule_forward_add(subtree, options, targets)
 	end
 	local targets_3 = ffi.new('const struct sockaddr * [?]', #targets_2 + 1, targets_2)
 	targets_3[#targets_2] = nil
+	return targets_3
+end
+--[[ Insert a forwarding rule, i.e. override upstream for one DNS subtree.
 
+Throws lua exceptions when detecting something fishy.
+
+\param subtree plain string
+\param options
+  .auth targets are authoritative (false by default = resolver)
+  .dnssec if overridden to false, don't validate DNSSEC locally
+    - for resolvers we still do *not* send CD=1 upstream,
+      i.e. we trust their DNSSEC validation.
+    - for auths this inserts a negative trust anchor
+      Beware that setting .set_insecure() *later* would override that.
+\param targets same format as policy.TLS_FORWARD() except that `tls = true`
+               can be specified for each address (defaults to false)
+--]]
+function policy.rule_forward_add(subtree, options, targets)
+	local targets_3 = policy.forward_convert_targets(options, targets)
 	local subtree_dname = todname(subtree)
 	assert(ffi.C.kr_rule_forward(subtree_dname,
 			{
