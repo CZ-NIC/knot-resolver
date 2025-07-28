@@ -134,7 +134,7 @@ class KresConfig(ConfigSchema):
         monitoring: MonitoringSchema = MonitoringSchema()
         rate_limiting: Optional[RateLimitingSchema] = None
         defer: DeferSchema = DeferSchema()
-        kafka: KafkaSchema = KafkaSchema()
+        kafka: KafkaSchema = lazy_default(KafkaSchema, {})
         lua: LuaSchema = LuaSchema()
 
     _LAYER = Raw
