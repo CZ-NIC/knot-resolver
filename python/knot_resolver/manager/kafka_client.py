@@ -1,6 +1,7 @@
 import logging
 import os
 import shutil
+from pathlib import Path
 from threading import Timer
 from typing import Dict, List, Optional
 from urllib.parse import quote
@@ -59,11 +60,11 @@ if KAFKA_LIB:
                             parsed = parse_json(value)
                             config_new = data_combine(config_orig, parsed)
 
-                            file_name = "config.kafka.json"
-                            file_name_tmp = f"{file_name}.tmp"
-                            file_name_backup = f"{file_name}.backup"
-                            shutil.copy(file_name, file_name_backup)
-                            with open(file_name_tmp, "w") as file:
+                            file_path = self._config.kafka.files_dir.to_path() / "config.kafka.json"
+                            file_path_tmp = f"{file_path}.tmp"
+                            file_path_backup = f"{file_path}.backup"
+                            shutil.copy(file_path, file_path_backup)
+                            with open(file_path_tmp, "w") as file:
                                 file.write(value)
 
                             management = self._config.management
@@ -83,7 +84,7 @@ if KAFKA_LIB:
                             if response.status != 200:
                                 logger.error(f"Failed to apply new config:\n{response.body}")
                                 continue
-                            os.replace(file_name_tmp, file_name)
+                            os.replace(file_path_tmp, file_path)
                             continue
 
                         # messages with key
@@ -94,8 +95,12 @@ if KAFKA_LIB:
 
                         # prepare files names
                         file_name = key_split[0]
-                        file_name_tmp = f"{file_name}.tmp"
-                        file_name_backup = f"{file_name}.backup"
+                        file_path = Path(file_name)
+                        if not file_path.is_absolute():
+                            file_path = self._config.kafka.files_dir.to_path() / file_name
+
+                        file_path_tmp = f"{file_path}.tmp"
+                        file_path_backup = f"{file_path}.backup"
 
                         file_part = key_split[1] if len(key_split) > 1 else None
                         _, file_extension = os.path.splitext(file_name)
@@ -104,16 +109,16 @@ if KAFKA_LIB:
                         if file_part and file_part.isdigit():
                             # rewrite only on first part, else append
                             mode = "w" if int(file_part) == 0 else "a"
-                            with open(file_name_tmp, mode) as file:
+                            with open(file_path_tmp, mode) as file:
                                 file.write(value)
-                            logger.debug(f"Saved part {file_part} of data to '{file_name_tmp}' file")
+                            logger.debug(f"Saved part {file_part} of data to '{file_path_tmp}' file")
                         # received END of data
                         elif file_part and file_part == "END":
-                            shutil.copy(file_name, file_name_backup)
-                            logger.debug(f"Created backup of '{file_name_backup}' file")
+                            shutil.copy(file_path, file_path_backup)
+                            logger.debug(f"Created backup of '{file_path_backup}' file")
 
-                            os.replace(file_name, file_name_tmp)
-                            logger.info(f"Saved data to '{file_name}'")
+                            os.replace(file_path, file_path_tmp)
+                            logger.info(f"Saved data to '{file_path}'")
 
                             # trigger delayed configuration renew
                             trigger_renew(self._config)
@@ -128,7 +133,11 @@ if KAFKA_LIB:
 
         def _consumer_connect(self) -> None:
             kafka = self._config.kafka
-            broker = f"{kafka.server.addr}:{kafka.server.port if kafka.server.port else 9092}"
+
+            brokers = []
+            for server in kafka.server.to_std():
+                broker = str(server)
+                brokers.append(broker.replace("@", ":") if server.port else f"{broker}:9092")
 
             kafka_logger = logging.getLogger("kafka")
             kafka_logger.setLevel(logging.WARN)
@@ -137,7 +146,7 @@ if KAFKA_LIB:
             try:
                 consumer = KafkaConsumer(
                     str(kafka.topic),
-                    bootstrap_servers=broker,
+                    bootstrap_servers=brokers,
                     # client_id=str(self._config.hostname),
                     # security_protocol=str(kafka.security_protocol).upper(),
                     # ssl_cafile=str(kafka.ca_file) if kafka.ca_file else None,
