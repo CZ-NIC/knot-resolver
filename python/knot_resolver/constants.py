@@ -10,6 +10,7 @@ RUN_DIR = Path("/run/knot-resolver")
 ETC_DIR = Path("/etc/knot-resolver")
 SBIN_DIR = Path("/usr/sbin")
 CACHE_DIR = Path("/var/cache/knot-resolver")
+WORK_DIR = Path("/var/lib/knot-resolver")
 
 # files paths
 CONFIG_FILE = ETC_DIR / "config.yaml"
