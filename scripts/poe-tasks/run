@@ -11,7 +11,7 @@ echo
 echo ------------------------------------
 echo Creating missing runtime directories
 echo ------------------------------------
-mkdir -vp $KRES_DEV_INSTALL_DIR/run/knot-resolver $KRES_DEV_INSTALL_DIR/var/cache/knot-resolver
+mkdir -vp $KRES_DEV_INSTALL_DIR/run/knot-resolver $KRES_DEV_INSTALL_DIR/var/cache/knot-resolver $KRES_DEV_INSTALL_DIR/var/lib/knot-resolver
 echo
 echo ---------------------------------------
 echo Building Python komponents using Poetry
