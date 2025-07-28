@@ -9,6 +9,7 @@ constants_config.set('run_dir', run_dir)
 constants_config.set('etc_dir', etc_dir)
 constants_config.set('sbin_dir', sbin_dir)
 constants_config.set('cache_dir', systemd_cache_dir)
+constants_config.set('work_dir', systemd_work_dir)
 
 configure_file(
   input: 'constants.py.in',

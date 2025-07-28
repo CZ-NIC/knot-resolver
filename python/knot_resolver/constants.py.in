@@ -10,6 +10,7 @@ RUN_DIR = Path("@run_dir@")
 ETC_DIR = Path("@etc_dir@")
 SBIN_DIR = Path("@sbin_dir@")
 CACHE_DIR = Path("@cache_dir@")
+WORK_DIR = Path("@work_dir@")
 
 # files paths
 CONFIG_FILE = ETC_DIR / "config.yaml"
