@@ -12,16 +12,25 @@ function M.config(cfg)
 
 	local targets_split = policy.forward_convert_targets(cfg.options, cfg.targets)
 
-	M.targets_ptr = ffi.new('knot_db_val_t')
-	M.targets_ptr.len = #cfg.targets * ffi.C.KR_SOCKADDR_SIZE
-	M.targets_ptr_data = ffi.new('char [?]', #cfg.targets * ffi.C.KR_SOCKADDR_SIZE)
-	M.targets_ptr.data = M.targets_ptr_data -- TODO: explain
-	ffi.C.kr_rule_coalesce_targets(targets_split, M.targets_ptr.data)
+	M.data_src = ffi.new('struct kr_query_data_src')
+	M.data_src.initialized = true
+	M.data_src.all_set = false
+	M.data_src.rule_depth = 0
+	assert(cfg.options.auth or false == false)
+	M.data_src.flags.is_auth = false
+	M.data_src.flags.is_tcp = false
+	assert(cfg.options.dnssec or true == true)
+	M.data_src.flags.is_nods = false
+
+	M.data_src.targets_ptr.len = #cfg.targets * ffi.C.KR_SOCKADDR_SIZE
+	M.targets_ptr_data = ffi.new('char [?]', M.data_src.targets_ptr.len)
+	M.data_src.targets_ptr.data = M.targets_ptr_data -- TODO: explain
+	ffi.C.kr_rule_coalesce_targets(targets_split, M.targets_ptr_data)
 end
 
 M.layer = {}
 M.layer.produce = function (state, req, pkt)
-	if not M.targets_ptr or state == kres.FAIL or state == kres.DONE then return state end
+	if not M.data_src or state == kres.FAIL or state == kres.DONE then return state end
 
 	local qry = req:current()
 	-- Don't do anything for priming, prefetching, etc.
@@ -35,14 +44,8 @@ M.layer.produce = function (state, req, pkt)
 		log_qry(qry, ffi.C.LOG_GRP_SRVSTALE,
 			'   => no reachable NS, activating fallback forwarding',
 			kres.dname2str(qry:name()))
-		
-		qry.data_src.initialized = true
-		qry.data_src.all_set = false
-		qry.data_src.rule_depth = 0
-		qry.data_src.flags.is_auth = false
-		qry.data_src.flags.is_tcp = true   -- FIXME
-		qry.data_src.flags.is_nods = false
-		qry.data_src.targets_ptr = M.targets_ptr
+
+		qry.data_src = M.data_src
 		qry.flags.FORWARD = true
 		qry.flags.STUB = false
 		if qry.data_src.flags.is_tcp then qry.flags.TCP = true end
