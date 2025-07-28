@@ -9,6 +9,7 @@ from pytest import raises
 from knot_resolver.datamodel.types import (
     Dir,
     DomainName,
+    DomainNameOptionalPort,
     EscapedStr,
     InterfaceName,
     InterfaceOptionalPort,
@@ -259,6 +260,21 @@ def test_ip_address_optional_port_valid(val: str):
 def test_ip_address_optional_port_invalid(val: Any):
     with raises(ValueError):
         IPAddressOptionalPort(val)
+
+
+@pytest.mark.parametrize("val", ["localhost", "localhost@5353"])
+def test_domain_name_optional_port_valid(val: str):
+    o = DomainNameOptionalPort(val)
+    assert str(o) == val
+    assert o == DomainNameOptionalPort(val)
+    assert str(o.name) == (val.split("@", 1)[0] if "@" in val else val)
+    assert o.port == (PortNumber(int(val.split("@", 1)[1])) if "@" in val else None)
+
+
+@pytest.mark.parametrize("val", ["localhost@", "@55"])
+def test_domain_name_optional_port_invalid(val: Any):
+    with raises(ValueError):
+        DomainNameOptionalPort(val)
 
 
 @pytest.mark.parametrize("val", ["123.4.5.6", "192.168.0.1"])

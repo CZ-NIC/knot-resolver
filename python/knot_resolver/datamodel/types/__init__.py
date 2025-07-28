@@ -3,6 +3,7 @@ from .files import AbsoluteDir, Dir, File, FilePath, ReadableFile, WritableDir, 
 from .generic_types import ListOrItem
 from .types import (
     DomainName,
+    DomainNameOptionalPort,
     EscapedStr,
     EscapedStr32B,
     FloatNonNegative,
@@ -36,6 +37,7 @@ __all__ = [
     "PolicyFlagEnum",
     "DNSRecordTypeEnum",
     "DomainName",
+    "DomainNameOptionalPort",
     "EscapedStr",
     "EscapedStr32B",
     "FloatNonNegative",

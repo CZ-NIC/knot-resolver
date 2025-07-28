@@ -296,6 +296,24 @@ class IPAddressOptionalPort(StrBase):
             raise ValueError(f"expected '<ip-address>[@<port>]', got '{parts}'.", object_path)
 
 
+class DomainNameOptionalPort(StrBase):
+    name: DomainName
+    port: Optional[PortNumber] = None
+
+    def __init__(self, source_value: Any, object_path: str = "/") -> None:
+        super().__init__(source_value)
+        parts = source_value.split("@")
+        if 0 < len(parts) < 3:
+            try:
+                self.name = DomainName(parts[0])
+            except ValueError as e:
+                raise ValueError(f"failed to parse domain name '{parts[0]}'.", object_path) from e
+            if len(parts) == 2:
+                self.port = PortNumber.from_str(parts[1], object_path)
+        else:
+            raise ValueError(f"expected '<domain-name>[@<port>]', got '{parts}'.", object_path)
+
+
 class IPv4Address(BaseValueType):
     _value: ipaddress.IPv4Address
 
