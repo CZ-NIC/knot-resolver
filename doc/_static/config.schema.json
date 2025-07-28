@@ -1912,6 +1912,11 @@
                     "description": "Kafka server to connect.",
                     "default": "127.0.0.1@9092"
                 },
+                "files-dir": {
+                    "type": "string",
+                    "description": "Directory for storing files received via Kafka.",
+                    "default": "/var/lib/knot-resolver"
+                },
                 "security-protocol": {
                     "type": "string",
                     "enum": [
