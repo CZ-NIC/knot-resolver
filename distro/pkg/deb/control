@@ -57,6 +57,7 @@ Recommends:
  lua-psl,
  python3-prometheus-client,
  python3-watchdog,
+ python3-kafka,
 Suggests:
  knot-resolver6-module-http,
 Description: caching, DNSSEC-validating DNS resolver - core binaries
