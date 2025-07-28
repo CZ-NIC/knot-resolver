@@ -1803,9 +1803,29 @@
                     "default": "knot-resolver"
                 },
                 "server": {
-                    "type": "string",
-                    "description": "Kafka server to connect.",
-                    "default": "127.0.0.1@9092"
+                    "anyOf": [
+                        {
+                            "type": "array",
+                            "items": {
+                                "anyOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "string"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
+                    "description": "Kafka server(s) to connect.",
+                    "default": "localhost@9092"
                 },
                 "files-dir": {
                     "type": "string",
@@ -1849,7 +1869,10 @@
             "default": {
                 "enable": false,
                 "topic": "knot-resolver",
-                "server": "127.0.0.1@9092",
+                "server": [
+                    "localhost@9092"
+                ],
+                "files_dir": "/var/lib/knot-resolver",
                 "security_protocol": "plaintext",
                 "cert_file": null,
                 "key_file": null,
