@@ -70,10 +70,11 @@ if KAFKA_LIB:
 
                             os.replace(file_path_tmp, file_path)
 
-                            # trigger delayed configuration renew
-                            trigger_reload(self._config)
-                            logger.info(f"Successfully applied config, saved to '{file_path}'")
+                            logger.info(f"Configuration saved to '{file_path}'")
 
+                            # trigger delayed configuration reload
+                            trigger_reload(self._config)
+                            continue
                         # messages with key
                         # RPZ or other files
 
