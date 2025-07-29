@@ -14,6 +14,7 @@
 #include <gnutls/x509.h>
 #include <gnutls/gnutls.h>
 #include <gnutls/crypto.h>
+#include "lib/generic/queue.h"
 #include "lib/log.h"
 #include "session2.h"
 #include "network.h"
@@ -32,6 +33,14 @@
 
 #include <worker.h>
 
+// those are equivalent to contrib/ucw/lists.h  just must not be included.
+// typedef struct kr_quic_ucw_node {
+// 	struct kr_quic_ucw_node *next, *prev;
+// } kr_quic_ucw_node_t;
+// typedef struct kr_quic_ucw_list {
+// 	kr_quic_ucw_node_t head, tail;
+// } kr_quic_ucw_list_t;
+
 
 #define MAX_QUIC_FRAME_SIZE 65536
 
@@ -40,6 +49,8 @@ typedef enum {
 	CONNECTED, // RTT-0
 	VERIFIED,  // RTT-1
 } quic_state_t;
+
+typedef queue_t(struct kr_quic_obuf *) quic_out_q;
 
 /** RFC 9250 4.3.  DoQ Error Codes */
 typedef enum {
@@ -138,7 +149,8 @@ typedef struct kr_quic_table {
 } kr_quic_table_t;
 
 typedef struct kr_quic_obuf {
-	/*ucw_*/node_t node;
+	// struct kr_quic_ucw_list *node;
+	struct node node;
 	size_t len;
 	// struct wire_buf buf;?
 	char buf[];
@@ -157,52 +169,26 @@ typedef struct kr_tcp_inbufs_upd_res {
 	struct iovec inbufs[];
 } kr_tcp_inbufs_udp_res_t;
 
-/**
- * Inbufs are useless for us since we always receive the entire pkt
- * as a wire_buf. That means ngtcp2_conn_read_pkt should happily
- * consume it and we can trim pkt_len off the wire_buf.
- *
- * In output we can also manage with just a single buffer,
- * though this buffer has to remain over N pkts (protolayer cascades).
- * We can store it in the connection.
- *
- * The reason we only need one output buffer thought we deal with two "types" of
- * output data is because they share their outcome/what we do with them.
- *
- * First the output buffer has to store all data we sent out, only forgetting
- * it once the data is explicitly acked bu the remote endpoint. We clear
- * this acked data on each pkt read. If there is something left (something
- * hasn't been acked) we behave the same as if the output buffer was empty.
- * We just append the new response and send it all.
- *
- * Developer NOTE
- * I might actually need inbuf queue. It might be possible
- * that I'll receive more than one kr_quic_stream_recv_data
- * callbacks for a single pkt. Then I could not handle with
- * a single simple buffer. TODO: investigate
- *
- * I actually need a permanent buffer for inbuf. There is no guarantee that
- * the DNS query will arrive in a single sream pkt. And I'd lose that
- * bit then since I'd attempt to send it. damn, I really have to think
- * about this more, the handshake pkt do behave differently to stream ones
- *
- * WARNING Turns out ngtcp2 buffers the unacked packets internally,
- * so there is no reason for us to store them 
- *
- */
 struct kr_quic_stream {
-	struct iovec inbuf;
+	// struct iovec inbuf;
 	struct wire_buf pers_inbuf;
 	// struct kr_tcp_inbufs_upd_res *inbufs;
 
 	size_t firstib_consumed;
-	// holds pointers to head and tail of knot_quic_obuf_t
-	/*ucw_*/queue_t(uint8_t *) outbufs;
+	/* ucw */struct list outbufs;
+	// /* ucw */struct kr_quic_ucw_list outbufs;
+	// /*ucw_*/queue_t(struct kr_quic_obuf) outbufs;
 	// /*ucw_*/list_t outbufs;
+
+	/* FIXME Properly implement everywhere
+	 * kr_quic_stream_ack_data uses this to check the
+	 * stream is really finished, without proper handling
+	 * no stream will ever be deleted */
 	size_t obufs_size;
 
-	struct wire_buf *outbuf;
-	kr_quic_obuf_t *unsent_obuf;
+	// struct wire_buf *outbuf;
+	struct kr_quic_obuf *unsent_obuf;
+	// kr_quic_obuf_t *unsent_obuf;
 	size_t first_offset;
 	size_t unsent_offset;
 };
@@ -223,15 +209,17 @@ typedef struct kr_quic_conn {
 	// crypto callbacks
 	ngtcp2_crypto_conn_ref crypto_ref;
 
-	 // QUIC stream abstraction
-	 // TODO sentinel for streams?
+	// QUIC stream abstraction
+	// TODO sentinel for streams?
 	struct kr_quic_stream *streams;
-	 // number of allocated streams structures
+	// number of allocated streams structures
 	int16_t streams_count;
-	 // index of first stream that has complete incomming data to be processed (aka inbuf_fin)
+	// index of first stream that has complete incomming data to be processed (aka inbuf_fin)
 	int16_t stream_inprocess;
-	 // stream_id/4 of first allocated stream
+	// stream_id/4 of first allocated stream
 	int64_t first_stream_id;
+	// count of streams with finished queries pending a resolution
+	uint16_t streams_pending;
 
 	ngtcp2_ccerr last_error;
 	kr_quic_conn_flag_t flags;
@@ -250,6 +238,8 @@ typedef struct kr_quic_conn {
 	// FIXME: could this be removed?
 	struct kr_quic_table *quic_table;
 
+	struct wire_buf unwrap_buf
+
 } kr_quic_conn_t;
 
 typedef struct pl_quic_sess_data {
@@ -263,6 +253,7 @@ typedef struct pl_quic_sess_data {
 	protolayer_iter_ctx_queue_t resend_queue;
 
 	kr_quic_table_t *conn_table;
+	uint64_t first_stream_id;
 
 	struct kr_request *req;
 	// quic_state_t state;
