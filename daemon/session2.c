@@ -3,6 +3,7 @@
  */
 
 #include "kresconfig.h"
+#include "lib/proto.h"
 
 #include <ucw/lib.h>
 #include <sys/socket.h>
@@ -73,8 +74,8 @@ static const enum protolayer_type protolayer_grp_doq[] = {
 	// PROTOLAYER_TYPE_PROXYV2_DGRAM,
 	// PROTOLAYER_TYPE_DEFER,
 	PROTOLAYER_TYPE_QUIC,
-	// PROTOLAYER_TYPE_DNS_MULTI_STREAM,
 	PROTOLAYER_TYPE_DNS_MULTI_STREAM,
+	// PROTOLAYER_TYPE_DNS_UNSIZED_STREAM,
 	// PROTOLAYER_TYPE_DNS_DGRAM,
 	// PROTOLAYER_TYPE_NULL,
 };
@@ -1508,7 +1509,7 @@ static int session2_transport_pushv(struct session2 *s,
 		}
 
 		if (handle->type == UV_UDP) {
-			if (ENABLE_SENDMMSG && !s->outgoing) {
+			if (ENABLE_SENDMMSG && !s->outgoing && s->proto != KR_PROTO_DOQ) {
 				int fd;
 				int ret = uv_fileno(handle, &fd);
 				if (kr_fails_assert(!ret)) {
@@ -1532,6 +1533,7 @@ static int session2_transport_pushv(struct session2 *s,
 			} else {
 				int ret = uv_udp_try_send((uv_udp_t*)handle, (uv_buf_t *)iov, iovcnt,
 					the_network->enable_connect_udp
+					// TODO check
 					&& s->proto != KR_PROTO_DOQ
 					? NULL : comm->comm_addr);
 

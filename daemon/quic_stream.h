@@ -14,7 +14,7 @@ bool kr_quic_stream_exists(kr_quic_conn_t *conn, int64_t stream_id);
  * to be acked, move the pointer of "yet to be acked" data */
 // void kr_quic_stream_ack_data(struct kr_quic_conn *conn, int64_t stream_id,
 //                                size_t end_acked, bool keep_stream);
-void kr_quic_stream_mark_sent(kr_quic_conn_t *conn,
+void kr_quic_stream_mark_sent(struct kr_quic_conn *conn,
 		int64_t stream_id, size_t amount_sent);
 
 struct kr_quic_stream *quic_conn_get_stream(struct kr_quic_conn *conn,
@@ -22,6 +22,10 @@ struct kr_quic_stream *quic_conn_get_stream(struct kr_quic_conn *conn,
 
 int kr_quic_stream_recv_data(kr_quic_conn_t *conn, int64_t stream_id,
 		const uint8_t *data, size_t len, bool fin);
+
+/* returns the first stream that has received FIN i.e. has full query ready */
+struct kr_quic_stream *kr_quic_stream_get_process(struct kr_quic_conn *conn,
+                                                 int64_t *stream_id);
 
 void kr_quic_conn_stream_free(kr_quic_conn_t *conn, int64_t stream_id);
 

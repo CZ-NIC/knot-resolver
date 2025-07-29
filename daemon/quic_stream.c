@@ -3,8 +3,10 @@
  */
 
 #include "lib/defines.h"
-#include "lib/generic/queue.h"
+// #include "lib/generic/queue.h"
+#include "contrib/ucw/lists.h"
 #include "quic.h"
+#include <asm-generic/errno-base.h>
 #include <stdint.h>
 #include <string.h>
 #include "quic_stream.h"
@@ -14,77 +16,129 @@
 
 typedef queue_t(kr_quic_obuf_t *) q_stream_buf;
 
-// static void stream_outprocess(struct kr_quic_conn *conn, struct kr_quic_stream *stream)
-// {
-// 	if (stream != &conn->streams[conn->stream_inprocess]) {
-// 		return;
-// 	}
-//
-// 	for (int16_t idx = conn->stream_inprocess + 1; idx < conn->streams_count; idx++) {
-// 		stream = &conn->streams[idx];
-// 		if (stream->inbufs != NULL) {
-// 			conn->stream_inprocess = stream - conn->streams;
-// 			return;
-// 		}
-// 	}
-// 	conn->stream_inprocess = -1;
-// }
+static void stream_outprocess(struct kr_quic_conn *conn, struct kr_quic_stream *stream)
+{
+	if (stream != &conn->streams[conn->stream_inprocess]) {
+		return;
+	}
 
-// void kr_quic_stream_ack_data(struct kr_quic_conn *conn, int64_t stream_id,
-//                                size_t end_acked, bool keep_stream)
+	for (int16_t idx = conn->stream_inprocess + 1; idx < conn->streams_count; idx++) {
+		stream = &conn->streams[idx];
+		// if (stream->pers_inbuf != NULL) {
+		// 	conn->stream_inprocess = stream - conn->streams;
+		// 	return;
+		// }
+	}
+
+	conn->stream_inprocess = -1;
+	--conn->streams_pending;
+}
+
+void kr_quic_stream_ack_data(struct kr_quic_conn *conn, int64_t stream_id,
+                               size_t end_acked, bool keep_stream)
+{
+	struct kr_quic_stream *s = kr_quic_conn_get_stream(conn,
+			stream_id, false);
+	if (s == NULL) {
+		return;
+	}
+
+	struct list *obs = &s->outbufs;
+
+	struct kr_quic_obuf *first;
+
+	while (EMPTY_LIST(*obs) != 0 && end_acked >= (first = HEAD(*obs))->len + s->first_offset) {
+		rem_node(&first->node);
+		assert(HEAD(*obs) != first); // help CLANG analyzer understand
+					     // what rem_node did and that
+					     // usage of HEAD(*obs) is safe
+		s->obufs_size -= first->len;
+		conn->obufs_size -= first->len;
+		conn->quic_table->obufs_size -= first->len;
+		s->first_offset += first->len;
+		free(first);
+		if (s->unsent_obuf == first) {
+			s->unsent_obuf = EMPTY_LIST(*obs) == 0
+				? NULL : HEAD(*obs);
+			s->unsent_offset = 0;
+		}
+	}
+
+	if (EMPTY_LIST(*obs) == 0 && !keep_stream) {
+		stream_outprocess(conn, s);
+		memset(s, 0, sizeof(*s));
+		init_list(&s->outbufs);
+		while (s = &conn->streams[0],
+				wire_buf_data_length(&s->pers_inbuf) == 0 &&
+				s->obufs_size == 0) {
+			kr_assert(conn->streams_count > 0);
+			conn->streams_count--;
+
+			if (conn->streams_count == 0) {
+				free(conn->streams);
+				conn->streams = 0;
+				conn->first_stream_id = 0;
+				break;
+			} else {
+				conn->first_stream_id ++;
+				conn->stream_inprocess--;
+				memmove(s, s + 1,
+					sizeof(*s) * conn->streams_count);
+				// possible realloc to shrink allocated space,
+				// but probably useless
+				for (struct kr_quic_stream *si = s;
+						si < s + conn->streams_count;
+						si++) {
+					if (si->obufs_size == 0) {
+						init_list(&si->outbufs);
+					} else {
+						fix_list(&si->outbufs);
+					}
+				}
+			}
+		}
+	}
+}
+
+void kr_quic_stream_mark_sent(struct kr_quic_conn *conn,
+		int64_t stream_id, size_t amount_sent)
+{
+	struct kr_quic_stream *s = kr_quic_conn_get_stream(conn, stream_id, false);
+	if (s == NULL) {
+		return;
+	}
+
+	s->unsent_offset += amount_sent;
+	assert(s->unsent_offset <= s->unsent_obuf->len);
+	if (s->unsent_offset == s->unsent_obuf->len) {
+		s->unsent_offset = 0;
+		s->unsent_obuf = (kr_quic_obuf_t *)s->unsent_obuf->node.next;
+		if (s->unsent_obuf->node.next == NULL) { // already behind the tail of list
+			s->unsent_obuf = NULL;
+		}
+	}
+}
+
+/* TODO header + desc */
+struct kr_quic_stream *kr_quic_stream_get_process(struct kr_quic_conn *conn,
+                                                 int64_t *stream_id)
+{
+	if (conn == NULL || conn->stream_inprocess < 0) {
+		return NULL;
+	}
+
+	struct kr_quic_stream *stream = &conn->streams[conn->stream_inprocess];
+	*stream_id = (conn->first_stream_id + conn->stream_inprocess) * 4;
+	stream_outprocess(conn, stream);
+	return stream;
+}
+
+
+// inline static void params_update_quic_stream(krd_qdata_params_t *params,
+//                                              int64_t stream_id)
 // {
-// 	struct kr_quic_stream *s = kr_quic_conn_get_stream(conn, stream_id, false);
-// 	if (s == NULL) {
-// 		return;
-// 	}
-//
-// 	q_stream_buf *obs = (q_stream_buf *)&s->outbufs;
-//
-// 	kr_quic_obuf_t *first;
-//
-// 	while (queue_len(*obs) != 0 && end_acked >= (first = queue_head(*obs))->len + s->first_offset) {
-// 		queue_pop(*obs);
-// 		assert(queue_head(*obs) != first); // help CLANG analyzer understand what rem_node did and that further usage of HEAD(*obs) is safe
-// 		s->obufs_size -= first->len;
-// 		conn->obufs_size -= first->len;
-// 		conn->quic_table->obufs_size -= first->len;
-// 		s->first_offset += first->len;
-// 		free(first);
-// 		if (s->unsent_obuf == first) {
-// 			s->unsent_obuf = queue_len(*obs) == 0 ? NULL : queue_head(*obs);
-// 			s->unsent_offset = 0;
-// 		}
-// 	}
-//
-// 	if (queue_len(*obs) == 0 && !keep_stream) {
-// 		stream_outprocess(conn, s);
-// 		memset(s, 0, sizeof(*s));
-// 		init_list((list_t *)&s->outbufs);
-// 		while (s = &conn->streams[0], s->inbuf.iov_len == 0 && s->inbufs == NULL && s->obufs_size == 0) {
-// 			assert(conn->streams_count > 0);
-// 			conn->streams_count--;
-//
-// 			if (conn->streams_count == 0) {
-// 				free(conn->streams);
-// 				conn->streams = 0;
-// 				conn->first_stream_id = 0;
-// 				break;
-// 			} else {
-// 				conn->first_stream_id ++;
-// 				conn->stream_inprocess--;
-// 				memmove(s, s + 1, sizeof(*s) * conn->streams_count);
-// 				// possible realloc to shrink allocated space, but probably useless
-// 				for (struct kr_quic_stream *si = s;  si < s + conn->streams_count; si++) {
-// 					if (si->obufs_size == 0) {
-// 						queue_init(si->outbufs);
-// 						// init_list((list_t *)&si->outbufs);
-// 					} else {
-// 						// fix_list((list_t *)&si->outbufs);
-// 					}
-// 				}
-// 			}
-// 		}
-// 	}
+// 	params->quic_stream = stream_id;
+// 	params->measured_rtt = kr_quic_conn_rtt(params->quic_conn);
 // }
 
 void kr_quic_conn_stream_free(kr_quic_conn_t *conn, int64_t stream_id)
@@ -159,21 +213,17 @@ struct kr_quic_stream *kr_quic_conn_get_stream(kr_quic_conn_t *conn,
 		for (struct kr_quic_stream *si = new_streams;
 		     si < new_streams + conn->streams_count; si++) {
 			if (si->obufs_size == 0) {
-				queue_init(si->outbufs);
-				// init_list(&si->outbufs);
-
+				init_list(&si->outbufs);
 			} else {
-				// fix_list(&si->outbufs);
+				fix_list(&si->outbufs);
 			}
 		}
 
 		for (struct kr_quic_stream *si = new_streams + conn->streams_count;
 		     si < new_streams + new_streams_count; si++) {
 			memset(si, 0, sizeof(*si));
-			queue_init(si->outbufs);
-
 			wire_buf_init(&si->pers_inbuf, /* FIXME */QBUFSIZE);
-			// init_list(&si->outbufs);
+			init_list(&si->outbufs);
 		}
 
 		conn->streams = new_streams;
@@ -185,25 +235,6 @@ struct kr_quic_stream *kr_quic_conn_get_stream(kr_quic_conn_t *conn,
 	return NULL;
 }
 
-void kr_quic_stream_mark_sent(kr_quic_conn_t *conn,
-		int64_t stream_id, size_t amount_sent)
-{
-	struct kr_quic_stream *s = kr_quic_conn_get_stream(conn, stream_id, false);
-	if (s == NULL) {
-		return;
-	}
-
-	s->unsent_offset += amount_sent;
-	assert(s->unsent_offset <= s->unsent_obuf->len);
-	if (s->unsent_offset == s->unsent_obuf->len) {
-		s->unsent_offset = 0;
-		s->unsent_obuf = (kr_quic_obuf_t *)s->unsent_obuf->node.next;
-		if (s->unsent_obuf->node.next == NULL) { // already behind the tail of list
-			s->unsent_obuf = NULL;
-		}
-	}
-}
-
 // TODO: frfee the streams
 // while (stream->inbufs != NULL) {
 // 	knot_tcp_inbufs_upd_res_t *tofree = stream->inbufs;
@@ -211,31 +242,27 @@ void kr_quic_stream_mark_sent(kr_quic_conn_t *conn,
 // 	free(tofree);
 // }
 
-uint8_t *knot_quic_stream_add_data(kr_quic_conn_t *conn, int64_t stream_id,
-                                   uint8_t *data, size_t len)
+/** buffer resolved payload in the wire format, this buffer
+ * is used to create quic stream data. Data in this buffer
+ * MUST be kept untill ack frame confirms their retrieval
+ * or the stream gets closed. */
+int kr_quic_stream_add_data(kr_quic_conn_t *conn, int64_t stream_id,
+		uint8_t *data, size_t len)
 {
 	struct kr_quic_stream *s = kr_quic_conn_get_stream(conn, stream_id, true);
-	if (s == NULL) {
-		return NULL;
-	}
+	kr_require(s);
 
-	size_t prefix = sizeof(uint16_t);
+	struct kr_quic_obuf *obuf = malloc(sizeof(*obuf) + len);
+	kr_require(obuf);
+	// if (!obuf)
+	// 	return kr_error(ENOMEM)
 
-	struct kr_quic_obuf *obuf = malloc(sizeof(*obuf) + prefix + len);
-	if (obuf == NULL) {
-		return NULL;
-	}
+	obuf->len = len;
+	if (data)
+		memcpy(obuf->buf, data, len);
 
-	obuf->len = len + prefix;
-	knot_wire_write_u16((uint8_t *)obuf->buf, len);
-	if (data != NULL) {
-		memcpy(obuf->buf + prefix, data, len);
-	}
-
-	// FIXME
-	queue_t(uint8_t) *q = (queue_t(uint8_t)*)&s->outbufs;
-	if (queue_len(*q) == 0) {
-	// if (EMPTY_LIST(*list)) {
+	list_t *list = (list_t *)&s->outbufs;
+	if (EMPTY_LIST(*list)) {
 		s->unsent_obuf = obuf;
 	}
 	add_tail((list_t *)&s->outbufs, (node_t *)obuf);
@@ -243,9 +270,11 @@ uint8_t *knot_quic_stream_add_data(kr_quic_conn_t *conn, int64_t stream_id,
 	conn->obufs_size += obuf->len;
 	conn->quic_table->obufs_size += obuf->len;
 
-	return (uint8_t *)obuf->buf + prefix;
+	return kr_ok();
 }
 
+/* store the index of the first stream that has a
+ * query ready to be resolved in conn->stream_inprocess */
 void stream_inprocess(struct kr_quic_conn *conn, struct kr_quic_stream *stream)
 {
 	int16_t idx = stream - conn->streams;
@@ -271,13 +300,15 @@ int update_stream_pers_buffer(const uint8_t *data, size_t len,
 	}
 
 	memcpy(wire_buf_free_space(&stream->pers_inbuf), data, len);
-	wire_buf_consume(&stream->pers_inbuf, len);
+	/* FIXME reqire for now, though this is hardly the desired check */
+	kr_require(wire_buf_consume(&stream->pers_inbuf, len) == kr_ok());
 
 	return kr_ok();
 }
 
 /** callback of recv_stream_data,
- * data passed to this cb function is the actuall query. */
+ * data passed to this cb function is the actuall query.
+ * */
 int kr_quic_stream_recv_data(struct kr_quic_conn *qconn, int64_t stream_id,
                                const uint8_t *data, size_t len, bool fin)
 {
@@ -289,6 +320,8 @@ int kr_quic_stream_recv_data(struct kr_quic_conn *qconn, int64_t stream_id,
 	if (stream == NULL) {
 		return KNOT_ENOENT;
 	}
+
+	qconn->streams_pending++;
 
 	// struct iovec in = { (void *)data, len };
 	// ssize_t prev_ibufs_size = qconn->ibufs_size;
