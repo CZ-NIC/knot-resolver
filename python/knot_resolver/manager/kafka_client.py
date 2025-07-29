@@ -4,15 +4,13 @@ import shutil
 from pathlib import Path
 from threading import Timer
 from typing import Dict, List, Optional
-from urllib.parse import quote
 
 from knot_resolver.constants import KAFKA_LIB
 from knot_resolver.datamodel import KresConfig
 from knot_resolver.manager.config_store import ConfigStore
-from knot_resolver.manager.triggers import trigger_renew
+from knot_resolver.manager.triggers import trigger_reload, trigger_renew
 from knot_resolver.utils.functional import Result
-from knot_resolver.utils.modeling.parsing import DataFormat, data_combine, parse_json
-from knot_resolver.utils.requests import SocketDesc, request
+from knot_resolver.utils.modeling.parsing import parse_json
 
 logger = logging.getLogger(__name__)
 
@@ -58,9 +56,8 @@ if KAFKA_LIB:
                         if not key:
                             logger.info("Received configuration message")
 
-                            config_orig = self._config.get_unparsed_data()
-                            parsed = parse_json(value)
-                            config_new = data_combine(config_orig, parsed)
+                            # validate config
+                            KresConfig(parse_json(value))
 
                             file_path = self._config.kafka.files_dir.to_path() / "config.json"
                             file_path_tmp = f"{file_path}.tmp"
@@ -71,27 +68,13 @@ if KAFKA_LIB:
                             with open(file_path_tmp, "w") as file:
                                 file.write(value)
 
-                            management = self._config.management
-                            socket = SocketDesc(
-                                f'http+unix://{quote(str(management.unix_socket), safe="")}/',
-                                'Key "/management/unix-socket" in validated configuration',
-                            )
-                            if management.interface:
-                                socket = SocketDesc(
-                                    f"http://{management.interface.addr}:{management.interface.port}",
-                                    'Key "/management/interface" in validated configuration',
-                                )
-
-                            body = DataFormat.JSON.dict_dump(config_new)
-                            response = request(socket, "PUT", "v1/config", body)
-
-                            if response.status != 200:
-                                logger.error(f"Failed to apply new config:\n{response.body}")
-                                continue
                             os.replace(file_path_tmp, file_path)
-                            logger.info(f"Successfully applied config, saved to '{file_path}'")
-                            continue
 
+                            logger.info(f"Configuration saved to '{file_path}'")
+
+                            # trigger delayed configuration reload
+                            trigger_reload(self._config)
+                            continue
                         # messages with key
                         # RPZ or other files
 
