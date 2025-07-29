@@ -143,15 +143,18 @@ class DomainName(StrBase):
     """
 
     _punycode: str
+    # fmt: off
     _re = re.compile(
         r"(?=^.{,253}\.?$)"  # max 253 chars
-        r"(^(?!\.)"  # do not start name with dot
-        r"((?!-)"  # do not start label with hyphen
-        r"\.?[a-zA-Z0-9-]{,62}"  # max 63 chars in label
-        r"[a-zA-Z0-9])+"  # do not end label with hyphen
-        r"\.?$)"  # end with or without '.'
+        r"(^"
+            # do not allow hyphen at the start and at the end of label
+            r"(?!-)[^.]{,62}[^.-]"  # max 63 chars in label; except dot
+            r"(\.(?!-)[^.]{,62}[^.-])*"  # start with dot; max 63 chars in label except dot
+            r"\.?"  # end with or without dot
+        r"$)"
         r"|^\.$"  # allow root-zone
     )
+    # fmt: on
 
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
         super().__init__(source_value, object_path)
