@@ -153,6 +153,7 @@ def test_escaped_str_invalid(val: Any):
     [
         ".",
         "example.com",
+        "_8443._https.example.com.",
         "this.is.example.com.",
         "test.example.com",
         "test-example.com",
@@ -174,7 +175,9 @@ def test_domain_name_valid(val: str):
     [
         "test.example..com.",
         "-example.com",
+        "-test.example.net",
         "test-.example.net",
+        "test.-example.net",
         ".example.net",
         _rand_domain(64),
         _rand_domain(1, 128),
