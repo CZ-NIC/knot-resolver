@@ -20,6 +20,11 @@ void kr_quic_stream_mark_sent(struct kr_quic_conn *conn,
 struct kr_quic_stream *quic_conn_get_stream(struct kr_quic_conn *conn,
 		int64_t stream_id, bool create);
 
+// int kr_quic_stream_add_data(kr_quic_conn_t *conn, int64_t stream_id,
+// 		uint8_t *data, size_t len);
+int kr_quic_stream_add_data(kr_quic_conn_t *conn, int64_t stream_id,
+		struct protolayer_payload *pl);
+
 int kr_quic_stream_recv_data(kr_quic_conn_t *conn, int64_t stream_id,
 		const uint8_t *data, size_t len, bool fin);
 

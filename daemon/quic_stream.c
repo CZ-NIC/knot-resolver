@@ -7,6 +7,7 @@
 #include "contrib/ucw/lists.h"
 #include "quic.h"
 #include <asm-generic/errno-base.h>
+#include <libknot/wire.h>
 #include <stdint.h>
 #include <string.h>
 #include "quic_stream.h"
@@ -24,10 +25,10 @@ static void stream_outprocess(struct kr_quic_conn *conn, struct kr_quic_stream *
 
 	for (int16_t idx = conn->stream_inprocess + 1; idx < conn->streams_count; idx++) {
 		stream = &conn->streams[idx];
-		// if (stream->pers_inbuf != NULL) {
-		// 	conn->stream_inprocess = stream - conn->streams;
-		// 	return;
-		// }
+		if (wire_buf_data_length(&stream->pers_inbuf) != 0) {
+			conn->stream_inprocess = stream - conn->streams;
+			return;
+		}
 	}
 
 	conn->stream_inprocess = -1;
@@ -119,7 +120,6 @@ void kr_quic_stream_mark_sent(struct kr_quic_conn *conn,
 	}
 }
 
-/* TODO header + desc */
 struct kr_quic_stream *kr_quic_stream_get_process(struct kr_quic_conn *conn,
                                                  int64_t *stream_id)
 {
@@ -247,19 +247,36 @@ struct kr_quic_stream *kr_quic_conn_get_stream(kr_quic_conn_t *conn,
  * MUST be kept untill ack frame confirms their retrieval
  * or the stream gets closed. */
 int kr_quic_stream_add_data(kr_quic_conn_t *conn, int64_t stream_id,
-		uint8_t *data, size_t len)
+		struct protolayer_payload *pl)
 {
+
 	struct kr_quic_stream *s = kr_quic_conn_get_stream(conn, stream_id, true);
 	kr_require(s);
 
-	struct kr_quic_obuf *obuf = malloc(sizeof(*obuf) + len);
+#define SIZE_PREFIX 0
+#define DATA 1
+
+	size_t prefix_size = sizeof(uint16_t);
+	size_t prefix = ntohs(*(uint16_t *)pl->iovec.iov[SIZE_PREFIX].iov_base);
+	size_t len = pl->iovec.iov[DATA].iov_len;
+
+	struct kr_quic_obuf *obuf = malloc(sizeof(*obuf) + prefix_size + len);
 	kr_require(obuf);
 	// if (!obuf)
 	// 	return kr_error(ENOMEM)
 
-	obuf->len = len;
-	if (data)
-		memcpy(obuf->buf, data, len);
+	obuf->len = len + prefix_size;
+	kr_log_info(DOQ, "sanity of first 2 bytes in data iovec %hu\n",
+		knot_wire_read_u16(pl->iovec.iov[DATA].iov_base));
+
+
+	knot_wire_write_u16(obuf->buf, prefix);
+	if (len) {
+		memcpy(obuf->buf + prefix_size, pl->iovec.iov[DATA].iov_base, len);
+	}
+
+#undef SIZE_PREFIX
+#undef DATA
 
 	list_t *list = (list_t *)&s->outbufs;
 	if (EMPTY_LIST(*list)) {
@@ -307,8 +324,7 @@ int update_stream_pers_buffer(const uint8_t *data, size_t len,
 }
 
 /** callback of recv_stream_data,
- * data passed to this cb function is the actuall query.
- * */
+ * data passed to this cb function is the actuall query. */
 int kr_quic_stream_recv_data(struct kr_quic_conn *qconn, int64_t stream_id,
                                const uint8_t *data, size_t len, bool fin)
 {
@@ -349,7 +365,6 @@ int kr_quic_stream_recv_data(struct kr_quic_conn *qconn, int64_t stream_id,
 	// }
 
 	if (fin) {
-		kr_log_info(DOQ, "wire_buf: %s\n", (char *)wire_buf_data(&stream->pers_inbuf));
 		stream_inprocess(qconn, stream);
 	}
 

@@ -182,7 +182,10 @@ struct kr_quic_stream {
 	// struct kr_tcp_inbufs_upd_res *inbufs;
 
 	size_t firstib_consumed;
+	/* stores data that has been sent out and awaits acknowledgement and
+	 * data that has just been created and is waiting to be sent out */
 	/* ucw */struct list outbufs;
+
 	// /* ucw */struct kr_quic_ucw_list outbufs;
 	// /*ucw_*/queue_t(struct kr_quic_obuf) outbufs;
 	// /*ucw_*/list_t outbufs;
@@ -191,12 +194,17 @@ struct kr_quic_stream {
 	 * kr_quic_stream_ack_data uses this to check the
 	 * stream is really finished, without proper handling
 	 * no stream will ever be deleted */
+	/* size of all outbufs */
 	size_t obufs_size;
 
-	// struct wire_buf *outbuf;
+	/* pointer to somewhere in outbufs */
 	struct kr_quic_obuf *unsent_obuf;
-	// kr_quic_obuf_t *unsent_obuf;
+	/* offset of the first unacked data in the entire stream
+	 * (not just current unsent_obuf) */
 	size_t first_offset;
+	/* number of sent out bytes in the current unsent_obuf
+	 * if we send >= to the unsent_obuf size the list attemps
+	 * to advance to the next unsent_obuf and this value is reset to 0 */
 	size_t unsent_offset;
 };
 
