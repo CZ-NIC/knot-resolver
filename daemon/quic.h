@@ -111,6 +111,13 @@ struct pl_quic_state {
 	/* struct ortt_ NOTE: Or some other data */ ;
 };
 
+/* here the dcid and per query stream_id
+ * gets stored in quic_unwrap and read in quic_wrap */
+struct quic_target {
+	ngtcp2_cid dcid;
+	uint64_t stream_id;
+};
+
 struct kr_quic_conn;
 typedef struct kr_quic_cid {
 	uint8_t cid_placeholder[32];
@@ -153,7 +160,7 @@ typedef struct kr_quic_obuf {
 	struct node node;
 	size_t len;
 	// struct wire_buf buf;?
-	char buf[];
+	uint8_t buf[];
 } kr_quic_obuf_t;
 
 typedef enum {
