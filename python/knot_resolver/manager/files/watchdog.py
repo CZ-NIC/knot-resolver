@@ -39,6 +39,10 @@ if WATCHDOG_LIB:
             self._policy_timer: Optional[Timer] = None
             self._timers: Dict[str, Timer] = {}
 
+            # reduce the verbosity of watchdog module logger
+            watchdog_logger = logging.getLogger("watchdog")
+            watchdog_logger.setLevel(logging.WARNING)
+
         def _trigger(self, cmd: Optional[str]) -> None:
             def policy_reload() -> None:
                 management = self._config.management
