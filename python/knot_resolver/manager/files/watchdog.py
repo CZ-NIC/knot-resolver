@@ -33,6 +33,10 @@ if WATCHDOG_LIB:
             self._files = files
             self._config = config
 
+            # reduce the verbosity of watchdog module logger
+            watchdog_logger = logging.getLogger("watchdog")
+            watchdog_logger.setLevel(logging.WARNING)
+
         def _trigger(self, cmd: Optional[str]) -> None:
             if cmd:
                 trigger_cmd(self._config, cmd)
