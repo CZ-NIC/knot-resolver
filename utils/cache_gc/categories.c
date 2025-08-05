@@ -4,6 +4,7 @@
 #include <libknot/libknot.h>
 #include "lib/utils.h"
 #include "lib/cache/top.h"
+#include "lib/kru.h"
 #include "utils/cache_gc/db.h"
 
 static inline int load2cat(uint16_t load)  // -> 0..64, reversed

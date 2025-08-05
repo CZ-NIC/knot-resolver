@@ -18,8 +18,8 @@
 /// but there was no need to remove the (possibly expired) entry from the cache.
 
 #pragma once
+#include <stdalign.h>
 #include "lib/mmapped.h"
-#include "lib/kru.h"
 
 /// Data related to open cache.
 struct kr_cache_top {
@@ -33,7 +33,7 @@ struct top_data {
 	uint32_t version;
 	uint32_t base_price_norm;
 	uint32_t max_decay;
-	_Alignas(64) uint8_t kru[];
+	alignas(64) uint8_t kru[];
 };
 
 /// Part of kr_request to avoid counting repeated cache accesses multiple times during single request.
@@ -49,7 +49,7 @@ static inline size_t kr_cache_top_entry_size(size_t key_len, size_t data_size) {
 }
 
 /// Price of a cache entry access in KRU based on the entry size.
-static inline kru_price_t kr_cache_top_entry_price(struct kr_cache_top *top, size_t size) {
+static inline uint32_t kr_cache_top_entry_price(struct kr_cache_top *top, size_t size) {
 	return top->data->base_price_norm / size;
 }
 
