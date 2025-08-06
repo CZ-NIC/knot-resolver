@@ -20,9 +20,12 @@ static inline bool fcntl_flock_whole(int fd, short int type, bool wait)
 	return fcntl(fd, (wait ? F_SETLKW : F_SETLK), &fl) != -1;
 }
 
-static inline int fail(struct mmapped *mmapped, int ret)
+/// Clean up after a failure
+static int fail(struct mmapped *mmapped, int err)
 {
-	if (!ret) ret = kr_error(errno);
+	int ret = kr_error(err);
+	if (kr_fails_assert(err != 0))
+		ret = kr_error(EINVAL);
 	if (mmapped->mem) {
 		munmap(mmapped->mem, mmapped->size);
 		mmapped->mem = NULL;
@@ -41,14 +44,12 @@ int mmapped_init_reset(struct mmapped *mmapped, const char *mmap_file, size_t si
 
 	if (!size) { // reset not allowed
 		kr_log_crit(SYSTEM, "File %s does not contain data in required format.\n", mmap_file);
-		errno = ENOTRECOVERABLE;
-		return fail(mmapped, 0);
+		return fail(mmapped, ENOTRECOVERABLE);
 	}
 
 	if (!mmapped->write_lock) {
 		kr_log_crit(SYSTEM, "Another instance of kresd uses file %s with different configuration.\n", mmap_file);
-		errno = ENOTRECOVERABLE;
-		return fail(mmapped, 0);
+		return fail(mmapped, ENOTRECOVERABLE);
 	}
 
 	if (mmapped->mem) {
@@ -59,15 +60,15 @@ int mmapped_init_reset(struct mmapped *mmapped, const char *mmap_file, size_t si
 	kr_assert(size >= header_size);
 
 	if ((ftruncate(mmapped->fd, 0) == -1) || (ftruncate(mmapped->fd, size) == -1)) {  // get all zeroed
-		int ret = kr_error(errno);
+		int err = errno;
 		kr_log_crit(SYSTEM, "Cannot change size of file %s containing shared data: %s\n",
 				mmap_file, strerror(errno));
-		return fail(mmapped, ret);
+		return fail(mmapped, err);
 	}
 
 	mmapped->size = size;
 	mmapped->mem = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, mmapped->fd, 0);
-	if (mmapped->mem == MAP_FAILED) return fail(mmapped, 0);
+	if (mmapped->mem == MAP_FAILED) return fail(mmapped, errno);
 
 	memcpy(mmapped->mem, header, header_size);
 	return MMAPPED_PENDING;
@@ -77,13 +78,12 @@ int mmapped_init_reset(struct mmapped *mmapped, const char *mmap_file, size_t si
 int mmapped_init(struct mmapped *mmapped, const char *mmap_file, size_t size, void *header, size_t header_size, bool persistent)
 {
 	// open file
-	int ret = 0;
 	mmapped->fd = open(mmap_file, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
 	if (mmapped->fd == -1) {
-		ret = kr_error(errno);
+		int err = errno;
 		kr_log_crit(SYSTEM, "Cannot open file %s with shared data: %s\n",
 				mmap_file, strerror(errno));
-		return fail(mmapped, ret);
+		return fail(mmapped, err);
 	}
 	mmapped->persistent = persistent;
 
@@ -93,14 +93,14 @@ int mmapped_init(struct mmapped *mmapped, const char *mmap_file, size_t size, vo
 	} else if (fcntl_flock_whole(mmapped->fd, F_RDLCK, true)) {
 		mmapped->write_lock = false;
 	} else {
-		return fail(mmapped, 0);
+		return fail(mmapped, errno);
 	}
 
 	// get file size
 	{
 		struct stat s;
 		bool succ = (fstat(mmapped->fd, &s) == 0);
-		if (!succ) return fail(mmapped, 0);
+		if (!succ) return fail(mmapped, errno);
 		mmapped->size = s.st_size;
 	}
 
@@ -111,7 +111,7 @@ int mmapped_init(struct mmapped *mmapped, const char *mmap_file, size_t size, vo
 
 	// mmap
 	mmapped->mem = mmap(NULL, mmapped->size, PROT_READ | PROT_WRITE, MAP_SHARED, mmapped->fd, 0);
-	if (mmapped->mem == MAP_FAILED) return fail(mmapped, 0);
+	if (mmapped->mem == MAP_FAILED) return fail(mmapped, errno);
 
 	// check header
 	if (memcmp(mmapped->mem, header, header_size) != 0) {
