@@ -2,6 +2,11 @@
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+/** \file
+ *
+ * Utils for sharing memory among multiple processes via mmap() on a file.
+ */
+
 #pragma once
 #include "lib/defines.h"
 
