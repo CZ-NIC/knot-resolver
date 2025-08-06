@@ -83,7 +83,8 @@ struct load_cl {
 static_assert(64 == sizeof(struct load_cl), "bad size of struct load_cl");
 
 /// Parametrization for speed of decay.
-struct decay_config {
+//  Packed to allow unpadded following by more data in the USE_AES version of struct kru.
+struct __attribute__((packed)) decay_config {
 	/// Bit shift per tick, fractional
 	double shift_bits;
 
@@ -96,7 +97,7 @@ struct decay_config {
 struct kru {
 #if USE_AES
 	/// Hashing secret.  Random but shared by all users of the table.
-	/// Let's not make it too large, so that header fits into 64 Bytes.
+	/// Let's not make it too large.
 	_Alignas(32) char hash_key[48];
 #else
 	/// Hashing secret.  Random but shared by all users of the table.
