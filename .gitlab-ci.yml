@@ -893,6 +893,17 @@ python:run:
     # return code 124 is also OK
     - timeout 1m poe run etc/config/${ADD_CONFIG_FILE_NAME} || ( [[ $? -eq 124 ]] )
 
+python:kafka:
+  <<: *python
+  stage: test
+  services:
+    - name: apache/kafka:latest
+      alias: kafka
+  script:
+    - poetry install --all-extras --only main,dev
+    - poe configure
+    - poe run etc/config/config.test-kafka.yaml
+
 python:unit:
   <<: *python
   stage: test
