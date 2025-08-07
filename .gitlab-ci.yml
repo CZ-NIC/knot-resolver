@@ -893,6 +893,28 @@ python:run:
     # return code 124 is also OK
     - timeout 1m poe run etc/config/${ADD_CONFIG_FILE_NAME} || ( [[ $? -eq 124 ]] )
 
+python:kafka:
+  <<: *python
+  stage: test
+  services:
+    - name: apache/kafka:latest
+      alias: localhost
+  script:
+    - poetry install --all-extras --only main,dev
+    - poe configure
+    # create topic
+    - poetry run python ./tests/kafka/create_topic.py localhost knot-resolver
+    # run in background and log to file
+    - poe run etc/config/config.test-kafka.yaml > knot-resolver.log 2>&1 &
+    - sleep 30
+    # start kafka test
+    - poetry run ./tests/kafka/kafka_test.sh localhost knot-resolver
+    - sleep 30
+    # kill the resolver
+    - kill %1
+  after_script:
+    - cat knot-resolver.log
+
 python:unit:
   <<: *python
   stage: test

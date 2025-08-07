@@ -1,0 +1,4 @@
+kafka:
+  enable: true
+  topic: knot-resolver
+  server: localhost@9092

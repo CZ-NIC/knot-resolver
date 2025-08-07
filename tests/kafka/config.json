@@ -1,0 +1,30 @@
+{
+    "views": [
+        {
+            "subnets": [
+                "0.0.0.0/0"
+            ],
+            "tags": ["smalllist"]
+        },
+        {
+            "subnets": [
+                "192.168.2.0/24"
+            ],
+            "tags": ["gigalist"]
+        }
+    ],
+    "local-data": {
+        "rpz": [
+            {
+                "watchdog": false,
+                "file": "../../.install_dev/var/lib/knot-resolver/smalllist.rpz",
+                "tags": ["smalllist"]
+            },
+            {
+                "watchdog": false,
+                "file": "../../.install_dev/var/lib/knot-resolver/gigalist.rpz",
+                "tags": ["gigalist"]
+            }
+        ]
+    }
+}

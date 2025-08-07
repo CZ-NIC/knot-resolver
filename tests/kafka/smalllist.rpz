@@ -1,0 +1,14 @@
+$ORIGIN RPZ.EXAMPLE.ORG.
+@       IN SOA ns.example.org admin.example org 1 1h 15m 30d 2h
+        IN NS localhost.
+
+1.example.com   IN CNAME . ; return NXDOMAIN
+*.1.example.com IN CNAME . ; return NXDOMAIN
+
+2.example.com   IN CNAME *. ; return NODATA
+
+3.example.com   IN CNAME rpz-drop. ; drop the query
+
+4.example.com   IN CNAME catchall.example.org. ;redirect
+
+5.example.com   IN CNAME *.catchall.example.org. ;wildcard CNAME
