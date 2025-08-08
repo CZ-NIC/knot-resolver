@@ -904,7 +904,7 @@ python:kafka:
     - poe configure
     - sleep 10
     # create 'test' topic
-    - poetry run python tests/kafka/create_topic.py kafka:9092 test
+    # - poetry run python tests/kafka/create_topic.py kafka:9092 test
     # run in background and log to file
     - poe run etc/config/config.test-kafka.yaml > knot-resolver.log 2>&1 &
     - sleep 10
