@@ -902,7 +902,28 @@ python:kafka:
   script:
     - poetry install --all-extras --only main,dev
     - poe configure
-    - poe run etc/config/config.test-kafka.yaml
+    # create 'test' topic
+    - poetry run python tests/kafka/create_topic.py kafka:9092 test
+    # run in background and log to file
+    - poe run etc/config/config.test-kafka.yaml > knot-resolver.log 2>&1 &
+    - sleep 10
+    # send example1.rpz
+    - poetry run python tests/kafka/send_file.py kafka:9092 test tests/kafka/example1.rpz
+    - sleep 1
+    # send example2.rpz chunks
+    - poetry run python tests/kafka/send_file.py kafka:9092 test tests/kafka/example2.rpz
+    - sleep 1
+    # send config.json
+    - poetry run python tests/kafka/send_file.py kafka:9092 test tests/kafka/config.json
+    -  sleep 10
+    # compare files
+    - diff .install_dev/var/lib/knot-resolver/config.json tests/kafka/config.json
+    - diff .install_dev/var/lib/knot-resolver/example1.rpz tests/kafka/example1.rpz
+    - diff .install_dev/var/lib/knot-resolver/example2.rpz tests/kafka/example1.rpz
+    # turn off the resolver
+    - kill %1
+  after_script:
+    - cat knot-resolver.log
 
 python:unit:
   <<: *python
