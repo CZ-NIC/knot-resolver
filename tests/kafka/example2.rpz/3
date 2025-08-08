@@ -1,0 +1,7 @@
+2.example.com   IN CNAME *. ; return NODATA
+
+3.example.com   IN CNAME rpz-drop. ; drop the query
+
+4.example.com   IN CNAME catchall.example.org. ;redirect
+
+5.example.com   IN CNAME *.catchall.example.org. ;wildcard CNAME

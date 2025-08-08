@@ -1,0 +1,4 @@
+$ORIGIN RPZ.EXAMPLE.ORG.
+@       IN SOA ns.example.org admin.example org 1 1h 15m 30d 2h
+        IN NS localhost.
+
