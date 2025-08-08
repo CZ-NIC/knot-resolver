@@ -104,6 +104,7 @@ if KAFKA_LIB:
         if current_config.local_data.rpz:
             for rpz in current_config.local_data.rpz:
                 used_files.append(rpz.file.to_path())
+                used_files.append(Path(f"{rpz.file.to_path()}.backup"))
 
         # keep backup config functional
         if config_file_backup_path.exists():
@@ -112,6 +113,7 @@ if KAFKA_LIB:
             if backup_config.local_data.rpz:
                 for backup_rpz in backup_config.local_data.rpz:
                     used_files.append(backup_rpz.file.to_path())
+                    used_files.append(Path(f"{backup_rpz.file.to_path()}.backup"))
 
         # delete unused files from current and backup config
         for path in files_dir.iterdir():
@@ -149,7 +151,7 @@ if KAFKA_LIB:
         file_is_ready = False
 
         # received complete data in one message
-        if not index and not total:
+        if not index and not total or index == 1 and total == 1:
             with open(file_tmp_path, "w") as file:
                 file.write(value)
             logger.debug(f"Saved complete data to '{file_tmp_path}' file")
@@ -158,6 +160,8 @@ if KAFKA_LIB:
         # received chunk of data
         elif index and total:
             file_chunk_path = create_file_chunk_path(file_path, index)
+            # create chunks dir if not exists
+            file_chunk_path.parent.mkdir(exist_ok=True)
             with open(file_chunk_path, "w") as file:
                 file.write(value)
             logger.debug(f"Saved chunk {index} of data to '{file_chunk_path}' file")
