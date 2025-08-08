@@ -49,9 +49,9 @@ def send_file(file_path: Path, chunk_index: int) -> None:
             value=value,
             headers=headers
         )
+        print(f"Successfully send file '{file_path}' via kafka")
     except KafkaError as e:
         print(f"Failed to send file '{file_path}': {e}")
-    print(f"Successfully send file '{file_path}' via kafka")
 
 for i in range(0, total_chunks):
     send_file(files_paths[i], i+1)
