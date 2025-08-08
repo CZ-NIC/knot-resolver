@@ -1,3 +1,4 @@
 kafka:
   enable: true
-  server: kafka:9092
+  topic: test
+  server: kafka@9092
