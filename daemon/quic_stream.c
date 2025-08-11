@@ -59,8 +59,7 @@ void kr_quic_stream_ack_data(struct kr_quic_conn *conn, int64_t stream_id,
 		s->first_offset += first->len;
 		free(first);
 		if (s->unsent_obuf == first) {
-			s->unsent_obuf = EMPTY_LIST(*obs) == 0
-				? NULL : HEAD(*obs);
+			s->unsent_obuf = EMPTY_LIST(*obs) == 0 ? NULL : HEAD(*obs);
 			s->unsent_offset = 0;
 		}
 	}
@@ -143,23 +142,26 @@ struct kr_quic_stream *kr_quic_stream_get_process(struct kr_quic_conn *conn,
 
 void kr_quic_conn_stream_free(kr_quic_conn_t *conn, int64_t stream_id)
 {
-	// TODO:
-	// struct kr_quic_stream *s = kr_quic_conn_get_stream(conn, stream_id, false);
-	// if (s != NULL && s->inbuf.iov_len > 0) {
-	// 	free(s->inbuf.iov_base);
-	// 	conn->ibufs_size -= buffer_alloc_size(s->inbuf.iov_len);
-	// 	conn->quic_table->ibufs_size -= buffer_alloc_size(s->inbuf.iov_len);
-	// 	memset(&s->inbuf, 0, sizeof(s->inbuf));
-	// }
-	//
+	struct kr_quic_stream *s = kr_quic_conn_get_stream(conn, stream_id, false);
+	if (s != NULL && /* FIXME this condition */ wire_buf_data_length(&s->pers_inbuf) > 0) {
+		wire_buf_deinit(&s->pers_inbuf);
+		// TODO
+		// conn->ibufs_size -= buffer_alloc_size(s->inbuf.iov_len);
+		// conn->quic_table->ibufs_size -= buffer_alloc_size(s->inbuf.iov_len);
+
+		// overwrite freed memory?
+		// s->pers_inbuf = NULL;
+		// memset(&s->inbuf, 0, sizeof(s->inbuf));
+	}
+
+	// knotdns iovec inbufs specific
 	// while (s != NULL && s->inbufs != NULL) {
 	// 	void *tofree = s->inbufs;
 	// 	s->inbufs = s->inbufs->next;
 	// 	free(tofree);
 	// }
 
-	// TODO:
-	// kr_quic_stream_ack_data(conn, stream_id, SIZE_MAX, false);
+	kr_quic_stream_ack_data(conn, stream_id, SIZE_MAX, false);
 }
 
 bool kr_quic_stream_exists(kr_quic_conn_t *conn, int64_t stream_id)
@@ -204,14 +206,15 @@ struct kr_quic_stream *kr_quic_conn_get_stream(kr_quic_conn_t *conn,
 			if (new_streams_count > MAX_STREAMS_PER_CONN) {
 				return NULL;
 			}
-			new_streams = realloc(conn->streams, new_streams_count * sizeof(*new_streams));
+			new_streams = realloc(conn->streams,
+					new_streams_count * sizeof(*new_streams));
 			if (new_streams == NULL) {
 				return NULL;
 			}
 		}
 
 		for (struct kr_quic_stream *si = new_streams;
-		     si < new_streams + conn->streams_count; si++) {
+				si < new_streams + conn->streams_count; si++) {
 			if (si->obufs_size == 0) {
 				init_list(&si->outbufs);
 			} else {
@@ -235,16 +238,16 @@ struct kr_quic_stream *kr_quic_conn_get_stream(kr_quic_conn_t *conn,
 	return NULL;
 }
 
-// TODO: frfee the streams
+// TODO: free the streams
 // while (stream->inbufs != NULL) {
 // 	knot_tcp_inbufs_upd_res_t *tofree = stream->inbufs;
 // 	stream->inbufs = tofree->next;
 // 	free(tofree);
 // }
 
-/** buffer resolved payload in the wire format, this buffer
+/** buffer resolved payload in wire format, this buffer
  * is used to create quic stream data. Data in this buffer
- * MUST be kept untill ack frame confirms their retrieval
+ * MUST be kept until ack frame confirms their retrieval
  * or the stream gets closed. */
 int kr_quic_stream_add_data(kr_quic_conn_t *conn, int64_t stream_id,
 		struct protolayer_payload *pl)
@@ -257,7 +260,7 @@ int kr_quic_stream_add_data(kr_quic_conn_t *conn, int64_t stream_id,
 #define DATA 1
 
 	size_t prefix_size = sizeof(uint16_t);
-	size_t prefix = ntohs(*(uint16_t *)pl->iovec.iov[SIZE_PREFIX].iov_base);
+	size_t prefix = *(uint16_t *)pl->iovec.iov[SIZE_PREFIX].iov_base;
 	size_t len = pl->iovec.iov[DATA].iov_len;
 
 	struct kr_quic_obuf *obuf = malloc(sizeof(*obuf) + prefix_size + len);
@@ -266,11 +269,11 @@ int kr_quic_stream_add_data(kr_quic_conn_t *conn, int64_t stream_id,
 	// 	return kr_error(ENOMEM)
 
 	obuf->len = len + prefix_size;
-	kr_log_info(DOQ, "sanity of first 2 bytes in data iovec %hu\n",
-		knot_wire_read_u16(pl->iovec.iov[DATA].iov_base));
 
-
-	knot_wire_write_u16(obuf->buf, prefix);
+	kr_require(obuf->buf);
+	// already in big endian
+	memcpy(&obuf->buf, &prefix, prefix_size);
+	// knot_wire_write_u16(obuf->buf, prefix);
 	if (len) {
 		memcpy(obuf->buf + prefix_size, pl->iovec.iov[DATA].iov_base, len);
 	}

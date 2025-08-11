@@ -11,7 +11,7 @@
 #include "lib/defines.h"
 #include "lib/log.h"
 #include "lib/resolve-impl.h"
-// #include "mempattern.h"
+#include "mempattern.h"
 #include "session2.h"
 #include "network.h"
 #include "lib/resolve.h"
@@ -277,8 +277,6 @@ static int get_new_connection_id(ngtcp2_conn *conn, ngtcp2_cid *cid,
                                  uint8_t *token, size_t cidlen,
                                  void *user_data)
 {
-	kr_log_info(DOQ, "Get new connection id\n");
-
 	kr_quic_conn_t *ctx = (kr_quic_conn_t *)user_data;
 	assert(ctx->conn == conn);
 
@@ -345,25 +343,6 @@ static int handshake_completed_cb(ngtcp2_conn *conn, void *user_data)
 	return 0;
 }
 
-static int recv_rx_key_conf_cb(struct ngtcp2_conn *c,
-		enum ngtcp2_encryption_level el, void* _undef)
-{
-	kr_log_info(DOQ, "Decryption key has been installed!\n");
-	return kr_ok();
-}
-
-static int recv_tx_key_conf_cb(struct ngtcp2_conn *c,
-		enum ngtcp2_encryption_level el, void* _undef)
-{
-	kr_log_info(DOQ, "Encryption key has been installed!\n");
-	/*
-	 * Here we can now begin trasmiting non-confidential data
-	 * all sensitive data SHOULD be transfered after the handshake
-	 * completes (after it really gets authenticated)
-	 */
-	return kr_ok();
-}
-
 static void quic_debug_cb(void *user_data, const char *format, ...)
 {
 	char buf[256];
@@ -397,43 +376,29 @@ int do_hp_mask(uint8_t *dest, const ngtcp2_crypto_cipher *hp,
 static int stream_open_cb(ngtcp2_conn *conn, int64_t stream_id, void *user_data)
 {
 	kr_log_info(DOQ, "remote endpoint has opened a stream: %ld\n", stream_id);
-
-	// knot_quic_conn_t *ctx = (knot_quic_conn_t *)user_data;
-	// assert(ctx->conn == conn);
-	//
-	// // NOTE possible error is stored in (flags & NGTCP2_STREAM_CLOSE_FLAG_APP_ERROR_CODE_SET)
-	//
-	// bool keep = !ngtcp2_conn_is_server(conn); // kxdpgun: process incomming reply after recvd&closed
-	// if (!keep) {
-	// 	knot_quic_conn_stream_free(ctx, stream_id);
-	// }
 	return kr_ok();
 }
 
-// static int stream_close_cb(ngtcp2_conn *conn, uint32_t flags, int64_t stream_id,
-// 			 uint64_t app_error_code, void *user_data, void *stream_user_data)
-// {
-// 	struct kr_quic_conn *qconn = (struct kr_quic_conn *)user_data;
-// 	assert(qconn->conn == conn);
-//
-// 	struct kr_quic_stream *stream = kr_quic_conn_get_stream(qconn, stream_id, true);
-//
-// 	if (stream == NULL) {
-// 		return KNOT_ENOENT;
-// 	}
-//
-// 	// TODO resolve
-//
-// 	//
-// 	// // NOTE possible error is stored in (flags & NGTCP2_STREAM_CLOSE_FLAG_APP_ERROR_CODE_SET)
-// 	//
-// 	// bool keep = !ngtcp2_conn_is_server(conn); // kxdpgun: process incomming reply after recvd&closed
-// 	// if (!keep) {
-// 	// 	knot_quic_conn_stream_free(ctx, stream_id);
-// 	// }
-// 	return kr_ok();
-// }
+static int stream_close_cb(ngtcp2_conn *conn, uint32_t flags, int64_t stream_id,
+			 uint64_t app_error_code, void *user_data, void *stream_user_data)
+{
+	struct kr_quic_conn *qconn = (struct kr_quic_conn *)user_data;
+	assert(qconn->conn == conn);
 
+	struct kr_quic_stream *stream = kr_quic_conn_get_stream(qconn, stream_id, true);
+
+	if (stream == NULL) {
+		return KNOT_ENOENT;
+	}
+
+	// NOTE possible error is stored in (flags & NGTCP2_STREAM_CLOSE_FLAG_APP_ERROR_CODE_SET)
+
+	bool keep = !ngtcp2_conn_is_server(conn); // kxdpgun: process incomming reply after recvd&closed
+	if (!keep) {
+		kr_quic_conn_stream_free(qconn, stream_id);
+	}
+	return kr_ok();
+}
 
 // TODO: Perhaps move path creating here, It would make sence even though
 // it is just a simple function call
@@ -458,7 +423,7 @@ static int conn_new_handler(ngtcp2_conn **pconn, const ngtcp2_path *path,
 		.recv_stream_data = kr_recv_stream_data_cb, // recv_stream_data, TODO? - OPTIONAL
 		// NULL, // acked_stream_data_offset_cb, TODO - OPTIONAL
 		.stream_open = stream_open_cb, // stream_opened - OPTIONAL
-		// .stream_close = stream_close_cb, // stream_closed, TODO - OPTIONAL
+		.stream_close = stream_close_cb,
 		// NULL,// recv_stateless_rst, TODO - OPTIONAL
 		// ngtcp2_crypto_recv_retry_cb, - OPTIONAL
 		// NULL, // extend_max_streams_bidi - OPTIONAL
@@ -486,8 +451,8 @@ static int conn_new_handler(ngtcp2_conn **pconn, const ngtcp2_path *path,
 		.version_negotiation = ngtcp2_crypto_version_negotiation_cb,
 		// NULL, // recv_rx_key - OPTIONAL
 		// NULL, // recv_rx_key - OPTIONAL
-		.recv_rx_key = recv_rx_key_conf_cb,
-		.recv_tx_key = recv_tx_key_conf_cb,
+		// .recv_rx_key = recv_rx_key_conf_cb,
+		// .recv_tx_key = recv_tx_key_conf_cb,
 	};
 
 	ngtcp2_settings settings;
@@ -1013,9 +978,6 @@ static int quic_init_server_conn(kr_quic_table_t *table,
 			goto finish;
 		}
 
-		// (*out_conn)->dcid = dcid;
-		// (*out_conn)->scid = scid;
-
 		ret = conn_new_handler(&(*out_conn)->conn, &path,
 				&header.scid, dcid, &header.dcid,
 				decoded_cids.version, now, idle_timeout,
@@ -1046,33 +1008,6 @@ finish:
 	return ret;
 }
 
-// void handle_quic_streams(kr_quic_conn_t *conn, knotd_qdata_params_t *params,
-//                          kr_layer_t *layer)
-// {
-// 	uint8_t ans_buf[KNOT_WIRE_MAX_PKTSIZE];
-//
-// 	params_update_quic(params, conn);
-//
-// 	int64_t stream_id;
-// 	kr_quic_stream_t *stream;
-// 	while (conn != NULL && (stream = kr_quic_stream_get_process(conn, &stream_id)) != NULL) {
-// 		assert(stream->inbufs != NULL);
-// 		assert(stream->inbufs->n_inbufs > 0);
-// 		struct iovec *inbufs = stream->inbufs->inbufs;
-// 		params_update_quic_stream(params, stream_id);
-// 		// NOTE: only the first msg in the stream is used, the rest is dropped.
-// 		handle_quic_stream(conn, stream_id, &inbufs[0], layer, params,
-// 		                   ans_buf, sizeof(ans_buf));
-// 		while (stream->inbufs != NULL) {
-// 			knot_tcp_inbufs_upd_res_t *tofree = stream->inbufs;
-// 			stream->inbufs = tofree->next;
-// 			free(tofree);
-// 		}
-// 	}
-// }
-
-/**
- */
 static int handle_packet(struct pl_quic_sess_data *quic,
 		struct protolayer_iter_ctx *ctx,
 		const uint8_t *pkt, size_t pktlen, ngtcp2_cid *dcid,
@@ -1092,9 +1027,14 @@ static int handle_packet(struct pl_quic_sess_data *quic,
 	if (ret == NGTCP2_ERR_VERSION_NEGOTIATION) {
 		// FIXME: This will be broken by trimming the pkt below
 		// this will need to be sent out immediatelly
-		ngtcp2_pkt_write_version_negotiation(
-			wire_buf_free_space(ctx->payload.wire_buf),
-			wire_buf_free_space_length(ctx->payload.wire_buf),
+
+		struct wire_buf *negotiation_buffer = mm_alloc(&ctx->pool,
+				sizeof(struct wire_buf));
+		wire_buf_init(negotiation_buffer, 1200/* FIXME magic numbers */);
+
+		ssize_t nwrite = ngtcp2_pkt_write_version_negotiation(
+			wire_buf_free_space(negotiation_buffer),
+			wire_buf_free_space_length(negotiation_buffer),
 			random(),
 			// WARNING Maybe switch
 			decoded_cids.scid,
@@ -1104,6 +1044,14 @@ static int handle_packet(struct pl_quic_sess_data *quic,
 			supported_quic,
 			sizeof(supported_quic) / sizeof(*supported_quic));
 
+		if (nwrite == NGTCP2_ERR_NOBUF) {
+			kr_log_error(DOQ, "Buffer for version negotiation pkt was too small\n");
+			return kr_error(ENOSPC);
+		}
+
+		kr_require(wire_buf_consume(negotiation_buffer, nwrite) == kr_ok());
+
+
 		ret = -QUIC_SEND_VERSION_NEGOTIATION;
 		return PROTOLAYER_ITER_CB_RESULT_MAGIC;
 		// goto finish;
@@ -1111,7 +1059,7 @@ static int handle_packet(struct pl_quic_sess_data *quic,
 		kr_log_warning(DOQ, "Could not decode pkt header: (%d) %s \n",
 				ret, ngtcp2_strerror(ret));
 
-		return -1;
+		return ret;
 		// goto finish;
 	}
 
@@ -1155,8 +1103,6 @@ static int handle_packet(struct pl_quic_sess_data *quic,
 			&pi,
 			pkt,
 			pktlen,
-			// wire_buf_data(ctx->payload.wire_buf),
-			// wire_buf_data_length(ctx->payload.wire_buf),
 			now);
 
 	if (ret == NGTCP2_ERR_DRAINING) { // doq received CONNECTION_CLOSE from the counterpart
@@ -1195,7 +1141,6 @@ static int handle_packet(struct pl_quic_sess_data *quic,
 
 	// ctx->comm->target = &dcid;
 
-	// kr_quic_send(quic->conn_table, qconn, quic, ctx, QUIC_MAX_SEND_PER_RECV, 0);
 	return kr_ok();
 }
 
@@ -1281,7 +1226,7 @@ static int collect_queries(struct protolayer_iter_ctx *ctx,
 static enum protolayer_iter_cb_result pl_quic_unwrap(void *sess_data,
 		void *iter_data, struct protolayer_iter_ctx *ctx)
 {
-	int rv = kr_error(ENOSPC);
+	int rv = kr_ok();
 	kr_quic_conn_t *qconn = NULL;
 	struct pl_quic_sess_data *quic = sess_data;
 
@@ -1302,6 +1247,7 @@ static enum protolayer_iter_cb_result pl_quic_unwrap(void *sess_data,
 				&dcid, &qconn);
 
 		if (ret != kr_ok()) {
+			rv = kr_error(ret);
 			goto fail;
 		}
 
@@ -1382,7 +1328,7 @@ static int send_stream(struct protolayer_iter_ctx *ctx,
 	struct wire_buf *wb = mm_alloc(&ctx->pool, sizeof(struct wire_buf));
 	kr_require(wb);
 
-	wire_buf_init(wb, 1200/* TODO perhaps maxudp payload */);
+	wire_buf_init(wb, 1200/* FIXME Magic, and maybe nonsence, number*/);
 	struct protolayer_payload pl = protolayer_payload_wire_buf(wb, false);
 
 	do {
@@ -1398,67 +1344,67 @@ static int send_stream(struct protolayer_iter_ctx *ctx,
 		 * occupy the packet. In that case, *pdatalen would
 		 * be -1 if pdatalen is not NULL.
 		 */
-		// TODO: abstract error printing, likely shared across mane ngtcp2_ calls
+		// TODO: abstract error printing, likely shared across many ngtcp2_ calls
 		if (nwrite < 0) {
-			mm_free(&ctx->pool, wb);
-			switch (nwrite) {
-				case NGTCP2_ERR_NOMEM:
-					kr_log_error(DOQ, "write failed: %s (%d)",
-							ngtcp2_strerror(nwrite), nwrite);
-					// TODO terminal
+			goto exit;
 
-				case NGTCP2_ERR_STREAM_NOT_FOUND:
-					kr_log_error(DOQ, "write stream failed to find: %s (%d)\n",
-							ngtcp2_strerror(nwrite), nwrite);
-					// TODO terminal
-
-				case NGTCP2_ERR_STREAM_SHUT_WR:
-					kr_log_error(DOQ, "local write endpoint is shut or stream is beeing reset: %s (%d)\n",
-							ngtcp2_strerror(nwrite), nwrite);
-					return kr_ok();
-					// TODO attempt later once (if reset)
-
-				case NGTCP2_ERR_PKT_NUM_EXHAUSTED:
-					kr_log_error(DOQ, "no more pkt numbers available: %s (%d)\n",
-							ngtcp2_strerror(nwrite), nwrite);
-					// TODO terminal or reset pktn
-
-				case NGTCP2_ERR_CALLBACK_FAILURE:
-					kr_log_error(DOQ, "user callback failed: %s (%d)\n",
-							ngtcp2_strerror(nwrite), nwrite);
-					// TODO attempt later
-
-				case NGTCP2_ERR_INVALID_ARGUMENT:
-					kr_log_error(DOQ, "The total length of stream data is too large: %s (%d)\n",
-							ngtcp2_strerror(nwrite), nwrite);
-					// TODO attempt differently
-
-				case NGTCP2_ERR_STREAM_DATA_BLOCKED:
-					kr_log_error(DOQ, "stream is blocked due to flow controll: %s (%d)\n",
-							ngtcp2_strerror(nwrite), nwrite);
-					// TODO attempt later
-
-				 /* only when NGTCP2_WRITE_STREAM_FLAG_MORE (currently not used) */
-				case NGTCP2_ERR_WRITE_MORE:
-					kr_log_error(DOQ, "should not happen: %s (%d)\n",
-							ngtcp2_strerror(nwrite), nwrite);
-					kr_require(false);
-				default:
-					kr_log_error(DOQ, "unknown error in writev_stream: %s (%d)\n",
-							ngtcp2_strerror(nwrite), nwrite);
-					kr_require(false);
-			}
+			// switch (nwrite) {
+			// 	case NGTCP2_ERR_NOMEM:
+			// 		kr_log_error(DOQ, "write failed: %s (%d)",
+			// 				ngtcp2_strerror(nwrite), nwrite);
+			// 		// TODO terminal
+			//
+			// 	case NGTCP2_ERR_STREAM_NOT_FOUND:
+			// 		kr_log_error(DOQ, "write stream failed to find: %s (%d)\n",
+			// 				ngtcp2_strerror(nwrite), nwrite);
+			// 		// TODO terminal
+			//
+			// 	case NGTCP2_ERR_STREAM_SHUT_WR:
+			// 		kr_log_error(DOQ, "local write endpoint is shut or stream is beeing reset: %s (%d)\n",
+			// 				ngtcp2_strerror(nwrite), nwrite);
+			// 		return kr_ok();
+			// 		// TODO attempt later once (if reset)
+			//
+			// 	case NGTCP2_ERR_PKT_NUM_EXHAUSTED:
+			// 		kr_log_error(DOQ, "no more pkt numbers available: %s (%d)\n",
+			// 				ngtcp2_strerror(nwrite), nwrite);
+			// 		// TODO terminal or reset pktn
+			//
+			// 	case NGTCP2_ERR_CALLBACK_FAILURE:
+			// 		kr_log_error(DOQ, "user callback failed: %s (%d)\n",
+			// 				ngtcp2_strerror(nwrite), nwrite);
+			// 		// TODO attempt later
+			//
+			// 	case NGTCP2_ERR_INVALID_ARGUMENT:
+			// 		kr_log_error(DOQ, "The total length of stream data is too large: %s (%d)\n",
+			// 				ngtcp2_strerror(nwrite), nwrite);
+			// 		// TODO attempt differently
+			//
+			// 	case NGTCP2_ERR_STREAM_DATA_BLOCKED:
+			// 		kr_log_error(DOQ, "stream is blocked due to flow controll: %s (%d)\n",
+			// 				ngtcp2_strerror(nwrite), nwrite);
+			// 		// TODO attempt later
+			//
+			// 	 /* only when NGTCP2_WRITE_STREAM_FLAG_MORE (currently not used) */
+			// 	case NGTCP2_ERR_WRITE_MORE:
+			// 		kr_log_error(DOQ, "should not happen: %s (%d)\n",
+			// 				ngtcp2_strerror(nwrite), nwrite);
+			// 		kr_require(false);
+			// 	default:
+			// 		kr_log_error(DOQ, "unknown error in writev_stream: %s (%d)\n",
+			// 				ngtcp2_strerror(nwrite), nwrite);
+			// 		kr_require(false);
+			// }
 
 		} else if (*sent >= 0) {
-			/* TODO this data has to be kept untill ack arives */
+			/* TODO this data has to be kept untill acked */
 			vec.len -= *sent;
 		}
 
 		if (wire_buf_consume(pl.wire_buf, nwrite) != kr_ok()) {
 			kr_log_error(DOQ, "Wire_buf failed to consume: %s (%d)\n",
 					ngtcp2_strerror(nwrite), nwrite);
-			mm_free(&ctx->pool, wb);
-			return nwrite;
+			goto exit;
 		}
 
 	} while (nwrite && vec.len > 0);
@@ -1468,6 +1414,7 @@ static int send_stream(struct protolayer_iter_ctx *ctx,
 	/* called from wrap, return the written amount and continue */
 	if (len) {
 		return nwrite;
+		// goto exit;
 	}
 
 	/* case HS has not finished, we have to switch to wrap direction
@@ -1484,14 +1431,17 @@ static int send_stream(struct protolayer_iter_ctx *ctx,
 				ctx->finished_cb,
 				ctx->finished_cb_baton);
 
+		if (wrap_ret < 0) {
+			nwrite = wrap_ret;
+		}
 
-		return nwrite;
 	} else {
-		kr_require(nwrite || *sent);
+		// TODO?
 	}
 
-	/* make sure return is negative
-	 * though the code shouldn't currently get here */
+exit:
+	wire_buf_deinit(wb);
+	mm_free(&ctx->pool, wb);
 	return nwrite <= 0 ? nwrite : -1;
 }
 
@@ -1592,7 +1542,7 @@ static enum protolayer_iter_cb_result pl_quic_wrap(
 		if (!data || !data->comm || !data->comm->target) {
 			kr_log_error(DOQ, "missing required transport information in wrap direction\n");
 			kr_require(false);
-			return protolayer_break(ctx, EINVAL);
+			return protolayer_break(ctx, kr_error(EINVAL));
 		}
 
 		kr_quic_conn_t *conn = kr_quic_table_lookup(dcid, quic->conn_table);
@@ -1609,8 +1559,6 @@ static enum protolayer_iter_cb_result pl_quic_wrap(
 		kr_require(data->payload.type == PROTOLAYER_PAYLOAD_IOVEC);
 		kr_quic_stream_add_data(conn, stream_id,
 				&data->payload);
-				// data->payload.iovec.iov[i].iov_base,
-				// data->payload.iovec.iov[i].iov_len);
 
 		/* Here we will actually have payload to be sent out
 		 * TODO assert that? */
@@ -1624,7 +1572,7 @@ static enum protolayer_iter_cb_result pl_quic_wrap(
 		kr_log_info(DOQ, "About to continue from quic_wrap: %s\n",
 				protolayer_payload_name(data->payload.type));
 
-		if (rv == 0)
+		if (rv <= 0)
 			break;
 
 		return protolayer_continue(ctx);
