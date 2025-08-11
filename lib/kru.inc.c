@@ -245,6 +245,24 @@ struct query_ctx {
 	uint16_t *load;
 };
 
+/// Phase 1/3 of a query -- prefetch, ctx init. Based on a kru_hash_t.
+static inline void kru_limited_prefetch_hash(struct kru *kru, uint32_t time_now, kru_hash_t hash, kru_price_t price, struct query_ctx *ctx)
+{
+	// Choose the cache-lines to operate on
+	const uint32_t loads_mask = (1 << kru->loads_bits) - 1;
+	// Fetch the two cache-lines in parallel before we really touch them.
+	for (int li = 0; li < TABLE_COUNT; ++li) {
+		struct load_cl * const l = &kru->load_cls[hash & loads_mask][li];
+		__builtin_prefetch(l, 0); // hope for read-only access
+		hash >>= kru->loads_bits;
+		ctx->l[li] = l;
+	}
+
+	ctx->time_now = time_now;
+	ctx->price = price;
+	ctx->id = hash;
+}
+
 /// Phase 1/3 of a query -- hash, prefetch, ctx init. Based on one 16-byte key.
 static inline void kru_limited_prefetch(struct kru *kru, uint32_t time_now, uint8_t key[static 16], kru_price_t price, struct query_ctx *ctx)
 {
@@ -266,20 +284,7 @@ static inline void kru_limited_prefetch(struct kru *kru, uint32_t time_now, uint
 		memcpy(&hash, &h, sizeof(hash));
 	}
 #endif
-
-	// Choose the cache-lines to operate on
-	const uint32_t loads_mask = (1 << kru->loads_bits) - 1;
-	// Fetch the two cache-lines in parallel before we really touch them.
-	for (int li = 0; li < TABLE_COUNT; ++li) {
-		struct load_cl * const l = &kru->load_cls[hash & loads_mask][li];
-		__builtin_prefetch(l, 0); // hope for read-only access
-		hash >>= kru->loads_bits;
-		ctx->l[li] = l;
-	}
-
-	ctx->time_now = time_now;
-	ctx->price = price;
-	ctx->id = hash;
+	kru_limited_prefetch_hash(kru, time_now, hash, price, ctx);
 }
 
 /// Phase 1/3 of a query -- hash, prefetch, ctx init. Based on a bit prefix of one 16-byte key.
@@ -342,19 +347,7 @@ static inline void kru_limited_prefetch_prefix(struct kru *kru, uint32_t time_no
 	}
 #endif
 
-	// Choose the cache-lines to operate on
-	const uint32_t loads_mask = (1 << kru->loads_bits) - 1;
-	// Fetch the two cache-lines in parallel before we really touch them.
-	for (int li = 0; li < TABLE_COUNT; ++li) {
-		struct load_cl * const l = &kru->load_cls[hash & loads_mask][li];
-		__builtin_prefetch(l, 0); // hope for read-only access
-		hash >>= kru->loads_bits;
-		ctx->l[li] = l;
-	}
-
-	ctx->time_now = time_now;
-	ctx->price = price;
-	ctx->id = hash;
+	kru_limited_prefetch_hash(kru, time_now, hash, price, ctx);
 }
 
 static kru_hash_t kru_hash_bytes(struct kru *kru, uint8_t *key, size_t key_size)
@@ -370,24 +363,6 @@ static kru_hash_t kru_hash_bytes(struct kru *kru, uint8_t *key, size_t key_size)
 	hash = SipHash(hash_key, SIPHASH_RC, SIPHASH_RF, key, key_size);
 
 	return hash;
-}
-
-/// Phase 1/3 of a query -- hash, prefetch, ctx init. Based on arbitrary-length byte-stream.
-static inline void kru_limited_prefetch_hash(struct kru *kru, uint32_t time_now, kru_hash_t hash, kru_price_t price, struct query_ctx *ctx)
-{
-	// Choose the cache-lines to operate on
-	const uint32_t loads_mask = (1 << kru->loads_bits) - 1;
-	// Fetch the two cache-lines in parallel before we really touch them.
-	for (int li = 0; li < TABLE_COUNT; ++li) {
-		struct load_cl * const l = &kru->load_cls[hash & loads_mask][li];
-		__builtin_prefetch(l, 0); // hope for read-only access
-		hash >>= kru->loads_bits;
-		ctx->l[li] = l;
-	}
-
-	ctx->time_now = time_now;
-	ctx->price = price;
-	ctx->id = hash;
 }
 
 /// Phase 2/3 of a query -- returns answer with no state modification (except update_time).
