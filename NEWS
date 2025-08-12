@@ -4,6 +4,7 @@ Knot Resolver 6.x.y (2026-0m-dd)
 Improvements:
 -------------
 - /local-data/rpz: support  *.some.name. CNAME block.page. (!1808)
+- /local-data/rpz: print line number in the RPZ on error (!1823)
 - /local-data/nodata: also apply to `rpz:` and `records:` (!1812)
 - reply BADVERS on unsupported EDNS versions (#404, !1599)
 
