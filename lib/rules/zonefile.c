@@ -233,6 +233,15 @@ static void process_record(zs_scanner_t *s)
 	rr_scan2trie(s);
 }
 
+// Let's pull the last error line number from a callback and saving it,
+// as zs_parse_all() would apparently lose the information before returning.
+// An uint64_t would be harder to print and overflowing 32 bits on a 32bit build seems unlikely.
+size_t error_line;
+static void process_error(zs_scanner_t *s)
+{
+	error_line = s->line_counter;
+}
+
 int kr_rule_zonefile(const struct kr_rule_zonefile_config *c)
 {
 	ENSURE_the_rules;
@@ -240,6 +249,7 @@ int kr_rule_zonefile(const struct kr_rule_zonefile_config *c)
 	/* zs_init(), zs_set_input_file(), zs_set_processing() returns -1 in case of error,
 	 * so don't print error code as it meaningless. */
 	uint32_t ttl = c->ttl ? c->ttl : KR_RULE_TTL_DEFAULT; // 0 would be nonsense
+	error_line = -1;
 	int ret = zs_init(s, NULL, KNOT_CLASS_IN, ttl);
 	if (ret) {
 		kr_log_error(RULES, "error initializing zone scanner instance, error: %i (%s)\n",
@@ -251,7 +261,7 @@ int kr_rule_zonefile(const struct kr_rule_zonefile_config *c)
 	s_data.c = c;
 	s_data.pool = mm_ctx_mempool2((size_t)64 * 1024);
 	s_data.rrs = trie_create(s_data.pool);
-	ret = zs_set_processing(s, process_record, NULL, &s_data);
+	ret = zs_set_processing(s, process_record, process_error, &s_data);
 	if (kr_fails_assert(ret == 0))
 		goto finish;
 
@@ -282,8 +292,8 @@ int kr_rule_zonefile(const struct kr_rule_zonefile_config *c)
 	 */
 	ret = zs_parse_all(s);
 	if (ret != 0) {
-		kr_log_error(RULES, "error parsing zone file `%s`, error %i: %s\n",
-			c->filename, s->error.code, zs_strerror(s->error.code));
+		kr_log_error(RULES, "error parsing zone file `%s`:%zu, error %i: %s\n",
+			c->filename, error_line, s->error.code, zs_strerror(s->error.code));
 	} else if (s->state == ZS_STATE_STOP) { // interrupted inside
 		ret = kr_error(EINVAL);
 	} else { // no fatal error so far
