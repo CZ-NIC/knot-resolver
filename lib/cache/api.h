@@ -41,8 +41,8 @@ struct kr_cache
 /**
  * Open/create cache with provided storage options.
  * @param cache cache structure to be initialized
- * @param api   storage engine API
- * @param opts  storage-specific options (may be NULL for default)
+ * @param api   storage engine API (may be NULL for default)
+ * @param opts  storage-specific options
  * @param mm    memory context.
  * @return 0 or an error code
  */

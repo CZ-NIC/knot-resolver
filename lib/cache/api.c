@@ -109,7 +109,7 @@ static int assert_right_version(struct kr_cache *cache)
 
 int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct kr_cdb_opts *opts, knot_mm_t *mm)
 {
-	if (kr_fails_assert(cache))
+	if (kr_fails_assert(cache && opts))
 		return kr_error(EINVAL);
 	memset(cache, 0, sizeof(*cache));
 	/* Open cache */
