@@ -9,6 +9,7 @@
 #include "lib/cache/top.h"
 #include "lib/cache/impl.h"
 #include "lib/mmapped.h"
+#include "lib/resolve.h"
 #include "lib/kru.h"
 
 #define FILE_FORMAT_VERSION 1  // fail if different
@@ -146,7 +147,6 @@ int kr_cache_top_init(struct kr_cache_top *top, char *mmap_file, size_t cache_si
 	if (state < 0) goto fail;
 	kr_assert(state == 0);
 
-	top->ctx = NULL;
 	kr_log_info(CACHE, "Cache top initialized %s (%s).\n",
 			using_existing ? "using existing data" : "as empty",
 			(kru_using_avx2() ? "AVX2" : "generic"));
@@ -236,23 +236,17 @@ char *kr_cache_top_strkey(void *key, size_t len)
 	return str;
 }
 
-void kr_cache_top_access(struct kr_cache_top *top, void *key, size_t key_len, size_t data_size, char *debug_label)
+void kr_cache_top_access(struct kr_request *req, void *key, size_t key_len, size_t data_size, char *debug_label)
 {
+	struct kr_cache_top *top = &req->ctx->cache.top;
+	struct kr_cache_top_context *ctx = &req->cache_top_context;
 	kru_hash_t hash = KRU.hash_bytes((struct kru *)&top->data->kru, (uint8_t *)key, key_len);
-	const bool unique = top->ctx ? first_access(top->ctx, hash) : true;
+	const bool unique = ctx ? first_access(ctx, hash) : true;
 	if (!unique) return;
 
 	const size_t size = kr_cache_top_entry_size(key_len, data_size);
 	const kru_price_t price = kr_cache_top_entry_price(top, size);
 	KRU.load_hash((struct kru *)&top->data->kru, ticks_now(), hash, price);
-}
-
-struct kr_cache_top_context *kr_cache_top_context_switch(struct kr_cache_top *top,
-		struct kr_cache_top_context *new_ctx, char *debug_label)
-{
-	struct kr_cache_top_context *old_ctx = top->ctx;
-	top->ctx = new_ctx;
-	return old_ctx;
 }
 
 uint16_t kr_cache_top_load(struct kr_cache_top *top, void *key, size_t len)

@@ -267,7 +267,7 @@ void entry_list_memcpy(struct entry_apex *ea, entry_list_t list);
  * 		see stash_rrset() for details
  * It assumes check_dname_for_lf(). */
 void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
-		const struct kr_request *req, bool needs_pkt);
+		struct kr_request *req, bool needs_pkt);
 
 /** Try answering from packet cache, given an entry_h.
  *

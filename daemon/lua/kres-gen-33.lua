@@ -319,7 +319,6 @@ struct mmapped {
 struct kr_cache_top {
 	struct mmapped mmapped;
 	struct top_data *data;
-	struct kr_cache_top_context *ctx;
 };
 struct kr_cache {
 	kr_cdb_pt db;

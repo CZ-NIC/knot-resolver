@@ -141,7 +141,7 @@ static const struct rtt_state default_rtt_state = { .srtt = 0,
 						    .dead_since = 0 };
 
 struct rtt_state get_rtt_state(const uint8_t *ip, size_t len,
-			       struct kr_cache *cache)
+			       struct kr_cache *cache, struct kr_request *req)
 {
 	struct rtt_state state;
 	knot_db_val_t value;
@@ -157,7 +157,7 @@ struct rtt_state get_rtt_state(const uint8_t *ip, size_t len,
 		state = default_rtt_state;
 	} else { // memcpy is safe for unaligned case (on non-x86)
 		memcpy(&state, value.data, sizeof(state));
-		kr_cache_top_access(&cache->top, key.data, key.len, value.len, "get_rtt");
+		kr_cache_top_access(req, key.data, key.len, value.len, "get_rtt");
 	}
 
 	free(key.data);
@@ -165,7 +165,7 @@ struct rtt_state get_rtt_state(const uint8_t *ip, size_t len,
 }
 
 int put_rtt_state(const uint8_t *ip, size_t len, struct rtt_state state,
-		  struct kr_cache *cache)
+		  struct kr_cache *cache, struct kr_request *req)
 {
 	knot_db_t *db = cache->db;
 	struct kr_cdb_stats *stats = &cache->stats;
@@ -176,7 +176,7 @@ int put_rtt_state(const uint8_t *ip, size_t len, struct rtt_state state,
 
 	int ret = cache->api->write(db, stats, &key, &value, 1);
 	kr_cache_commit(cache);
-	kr_cache_top_access(&cache->top, key.data, key.len, value.len, "put_rtt");
+	kr_cache_top_access(req, key.data, key.len, value.len, "put_rtt");
 
 	free(key.data);
 	return ret;
@@ -324,7 +324,7 @@ void update_address_state(struct address_state *state, union kr_sockaddr *addres
 			       qry->flags.NO_IPV6);
 	state->rtt_state =
 		get_rtt_state(ip_to_bytes(address, address_len),
-		              address_len, &qry->request->ctx->cache);
+		              address_len, &qry->request->ctx->cache, qry->request);
 	invalidate_dead_upstream(
 		state, qry->request->ctx->cache_rtt_tout_retry_interval);
 #ifdef SELECTION_CHOICE_LOGGING
@@ -562,9 +562,8 @@ void update_rtt(struct kr_query *qry, struct address_state *addr_state,
 		return;
 	}
 
-	struct kr_cache *cache = &qry->request->ctx->cache;
-	struct kr_cache_top_context *old_cache_top_ctx =
-		kr_cache_top_context_switch(&the_resolver->cache.top, &qry->request->cache_top_context, "update_rtt");
+	struct kr_request *req = qry->request;
+	struct kr_cache *cache = &req->ctx->cache;
 
 	uint8_t *address = ip_to_bytes(&transport->address, transport->address_len);
 	/* This construct is a bit racy since the global state may change
@@ -572,9 +571,9 @@ void update_rtt(struct kr_query *qry, struct address_state *addr_state,
 	 * care that much since it is rare and we only risk slightly suboptimal
 	 * transport choice. */
 	struct rtt_state cur_rtt_state =
-		get_rtt_state(address, transport->address_len, cache);
+		get_rtt_state(address, transport->address_len, cache, req);
 	struct rtt_state new_rtt_state = calc_rtt_state(cur_rtt_state, rtt);
-	put_rtt_state(address, transport->address_len, new_rtt_state, cache);
+	put_rtt_state(address, transport->address_len, new_rtt_state, cache, req);
 
 	if (transport->address_len == sizeof(struct in6_addr))
 		no6_success(qry);
@@ -591,8 +590,6 @@ void update_rtt(struct kr_query *qry, struct address_state *addr_state,
 			qry->id, ns_name, ns_str ? ns_str : "", zonecut_str,
 			rtt, new_rtt_state.srtt, new_rtt_state.variance);
 	}
-
-	kr_cache_top_context_switch(&the_resolver->cache.top, old_cache_top_ctx, "update_rtt");
 }
 
 /// Update rtt_state (including caching) after a server timed out.
@@ -603,9 +600,6 @@ static void server_timeout(const struct kr_query *qry, const struct kr_transport
 	if (transport->timeout_capped)
 		return;
 
-	struct kr_cache_top_context *old_cache_top_ctx =
-		kr_cache_top_context_switch(&the_resolver->cache.top, &qry->request->cache_top_context, "server_timeout");
-
 	const uint8_t *address = ip_to_bytes(&transport->address, transport->address_len);
 	if (transport->address_len == sizeof(struct in6_addr))
 		no6_timed_out(qry, address);
@@ -614,7 +608,7 @@ static void server_timeout(const struct kr_query *qry, const struct kr_transport
 	// While we were waiting for timeout, the stats might have changed considerably,
 	// so let's overwrite what we had by fresh cache contents.
 	// This is useful when the address is busy (we query it concurrently).
-	*state = get_rtt_state(address, transport->address_len, cache);
+	*state = get_rtt_state(address, transport->address_len, cache, qry->request);
 
 	++state->consecutive_timeouts;
 	// Avoid overflow; we don't utilize very high values anyway (arbitrary limit).
@@ -628,12 +622,10 @@ static void server_timeout(const struct kr_query *qry, const struct kr_transport
 
 	// If transport was chosen by a different query, that one will cache it.
 	if (!transport->deduplicated) {
-		put_rtt_state(address, transport->address_len, *state, cache);
+		put_rtt_state(address, transport->address_len, *state, cache, qry->request);
 	} else {
 		kr_cache_commit(cache); // Avoid any risk of long transaction.
 	}
-
-	kr_cache_top_context_switch(&the_resolver->cache.top, old_cache_top_ctx, "server_timeout");
 }
 // Not everything can be checked in nice ways like static_assert()
 static __attribute__((constructor)) void test_RTT_consts(void)

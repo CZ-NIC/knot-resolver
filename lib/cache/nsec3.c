@@ -219,7 +219,7 @@ static const char * find_leq_NSEC3(struct kr_cache *cache, const struct kr_query
 
 success:
 
-	kr_cache_top_access(&cache->top, key_found.data, key_found.len, val.len, "leq_nsec3");  // hits only
+	kr_cache_top_access(qry->request, key_found.data, key_found.len, val.len, "leq_nsec3");  // hits only
 	return NULL;
 }
 

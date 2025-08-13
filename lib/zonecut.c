@@ -304,7 +304,7 @@ static addrset_info_t fetch_addr(pack_t *addrs, const knot_dname_t *ns, uint16_t
 
 	struct kr_context *ctx = qry->request->ctx;
 	struct kr_cache_p peek;
-	if (kr_cache_peek_exact(&ctx->cache, ns, rrtype, &peek) != 0) {
+	if (kr_cache_peek_exact(&ctx->cache, qry->request, ns, rrtype, &peek) != 0) {
 		return AI_UNKNOWN;
 	}
 	int32_t new_ttl = kr_cache_ttl(&peek, qry, ns, rrtype);
@@ -369,7 +369,7 @@ static int fetch_ns(struct kr_context *ctx, struct kr_zonecut *cut,
 		    uint8_t * restrict rank)
 {
 	struct kr_cache_p peek;
-	int ret = kr_cache_peek_exact(&ctx->cache, name, KNOT_RRTYPE_NS, &peek);
+	int ret = kr_cache_peek_exact(&ctx->cache, qry->request, name, KNOT_RRTYPE_NS, &peek);
 	if (ret != 0) {
 		return ret;
 	}
@@ -499,7 +499,7 @@ static int fetch_secure_rrset(knot_rrset_t **rr, struct kr_cache *cache,
 		return kr_error(EINVAL);
 	/* peek, check rank and TTL */
 	struct kr_cache_p peek;
-	int ret = kr_cache_peek_exact(cache, owner, type, &peek);
+	int ret = kr_cache_peek_exact(cache, qry->request, owner, type, &peek);
 	if (ret != 0)
 		return ret;
 	if (!kr_rank_test(peek.rank, KR_RANK_SECURE))
