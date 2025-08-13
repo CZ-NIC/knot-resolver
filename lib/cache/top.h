@@ -50,7 +50,9 @@ static inline size_t kr_cache_top_entry_size(size_t key_len, size_t data_size) {
 }
 
 /// Price of a cache entry access in KRU based on the entry size.
-static inline uint32_t kr_cache_top_entry_price(struct kr_cache_top *top, size_t size) {
+static inline uint32_t kr_cache_top_entry_price(struct kr_cache_top *top, uint32_t size) {
+	// Optim. nit: division by a 64-bit number can be pretty expensive to compute,
+	// and the size of a cache entry can't be even megabytes, so it's 32-bit here.
 	return top->data->base_price_norm / size;
 }
 

@@ -77,7 +77,9 @@ static inline bool first_access(struct kr_cache_top_context *ctx, kru_hash_t has
 	ctx->bloom[h[4] % 32] |= 1u << (h[5] % 32);
 	ctx->bloom[h[6] % 32] |= 1u << (h[7] % 32);
 
+#ifndef NDEBUG // performance vs. benefits; doesn't seem worth doing in production by default
 	kr_assert(!first_access_ro(ctx, hash));
+#endif
 
 	return true;
 }

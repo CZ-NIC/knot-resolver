@@ -36,6 +36,9 @@ category_t kr_gc_categorize(struct kr_cache_top *top, gc_record_info_t * info, v
 	}
 	static_assert(CATEGORIES - 1 > 97);
 
+	if (!kr_log_is_debug(CACHE, NULL)) // skip these computations if not needed
+		goto finish;
+
 	const kru_price_t price = kr_cache_top_entry_price(top, info->entry_size);
 	const double accesses = (double)((kru_price_t)load << (KRU_PRICE_BITS - 16)) / price;
 	kr_log_debug(CACHE, "cat %02d %6d l %8.1f acc %6ld B %8ld s  %s\n",
@@ -43,6 +46,6 @@ category_t kr_gc_categorize(struct kr_cache_top *top, gc_record_info_t * info, v
 		kr_cache_top_strkey(key, key_len)
 	);
 
-
+finish:
 	return res;
 }
