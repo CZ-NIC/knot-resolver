@@ -673,13 +673,10 @@ fail:
 int kr_resolve_consume(struct kr_request *request, struct kr_transport **transport, knot_pkt_t *packet)
 {
 	struct kr_rplan *rplan = &request->rplan;
-	kr_cache_top_context_switch(&the_resolver->cache.top, &request->cache_top_context, "consume");
 
 	/* Empty resolution plan, push packet as the new query */
 	if (packet && kr_rplan_empty(rplan)) {
-		int ret = resolve_query(request, packet);
-		kr_cache_top_context_switch(&the_resolver->cache.top, NULL, "consume");
-		return ret;
+		return resolve_query(request, packet);
 	}
 
 	/* Different processing for network error */
@@ -687,14 +684,11 @@ int kr_resolve_consume(struct kr_request *request, struct kr_transport **transpo
 	/* Check overall resolution time */
 	if (kr_now() - qry->creation_time_mono >= KR_RESOLVE_TIME_LIMIT) {
 		kr_query_inform_timeout(request, qry);
-		kr_cache_top_context_switch(&the_resolver->cache.top, NULL, "consume");
 		return KR_STATE_FAIL;
 	}
 	bool tried_tcp = (qry->flags.TCP);
-	if (!packet || packet->size == 0) {
-		kr_cache_top_context_switch(&the_resolver->cache.top, NULL, "consume");
+	if (!packet || packet->size == 0)
 		return KR_STATE_PRODUCE;
-	}
 
 	/* Packet cleared, derandomize QNAME. */
 	knot_dname_t *qname_raw = kr_pkt_qname_raw(packet);
@@ -717,10 +711,8 @@ int kr_resolve_consume(struct kr_request *request, struct kr_transport **transpo
 	if (transport && !qry->flags.CACHED) {
 		if (!(request->state & KR_STATE_FAIL)) {
 			/* Do not complete NS address resolution on soft-fail. */
-			if (kr_fails_assert(packet->wire)) {
-				kr_cache_top_context_switch(&the_resolver->cache.top, NULL, "consume");
+			if (kr_fails_assert(packet->wire))
 				return KR_STATE_FAIL;
-			}
 			const int rcode = knot_wire_get_rcode(packet->wire);
 			if (rcode != KNOT_RCODE_SERVFAIL && rcode != KNOT_RCODE_REFUSED) {
 				qry->flags.AWAIT_IPV6 = false;
@@ -744,7 +736,6 @@ int kr_resolve_consume(struct kr_request *request, struct kr_transport **transpo
 				}
 				if (!qry->flags.NO_NS_FOUND) {
 					qry->flags.NO_NS_FOUND = true;
-					kr_cache_top_context_switch(&the_resolver->cache.top, NULL, "consume");
 					return KR_STATE_PRODUCE;
 				}
 
@@ -758,7 +749,6 @@ int kr_resolve_consume(struct kr_request *request, struct kr_transport **transpo
 							"OLX2: delegation ", cut_buf);
 				}
 				kr_request_set_extended_error(request, KNOT_EDNS_EDE_NREACH_AUTH, msg);
-				kr_cache_top_context_switch(&the_resolver->cache.top, NULL, "consume");
 				return KR_STATE_FAIL;
 			}
 		} else {
@@ -768,12 +758,10 @@ int kr_resolve_consume(struct kr_request *request, struct kr_transport **transpo
 
 	/* Pop query if resolved. */
 	if (request->state == KR_STATE_YIELD) { // NOLINT(bugprone-branch-clone)
-		kr_cache_top_context_switch(&the_resolver->cache.top, NULL, "consume");
 		return KR_STATE_PRODUCE; /* Requery */
 	} else if (qry->flags.RESOLVED) {
 		kr_rplan_pop(rplan, qry);
 	} else if (!tried_tcp && (qry->flags.TCP)) {
-		kr_cache_top_context_switch(&the_resolver->cache.top, NULL, "consume");
 		return KR_STATE_PRODUCE; /* Requery over TCP */
 	} else { /* Clear query flags for next attempt */
 		qry->flags.CACHED = false;
@@ -789,16 +777,13 @@ int kr_resolve_consume(struct kr_request *request, struct kr_transport **transpo
 		if (qry->flags.FORWARD || qry->flags.STUB
 				/* Probably CPU exhaustion attempt, so do not retry. */
 				|| qry->vld_limit_crypto_remains <= 0) {
-			kr_cache_top_context_switch(&the_resolver->cache.top, NULL, "consume");
 			return KR_STATE_FAIL;
 		}
 		/* Other servers might not have broken DNSSEC. */
 		qry->flags.DNSSEC_BOGUS = false;
-		kr_cache_top_context_switch(&the_resolver->cache.top, NULL, "consume");
 		return KR_STATE_PRODUCE;
 	}
 
-	kr_cache_top_context_switch(&the_resolver->cache.top, NULL, "consume");
 	return kr_rplan_empty(&request->rplan) ? KR_STATE_DONE : KR_STATE_PRODUCE;
 }
 
@@ -938,7 +923,6 @@ int kr_resolve_checkout(struct kr_request *request, const struct sockaddr *src,
 
 int kr_resolve_finish(struct kr_request *request, int state)
 {
-	kr_cache_top_context_switch(&the_resolver->cache.top, &request->cache_top_context, "finish");
 	request->state = state;
 	/* Finalize answer and construct whole wire-format (unless dropping). */
 	knot_pkt_t *answer = kr_request_ensure_answer(request);
@@ -977,7 +961,6 @@ int kr_resolve_finish(struct kr_request *request, int state)
 	request->trace_finish = NULL;
 	request->trace_log = NULL;
 
-	kr_cache_top_context_switch(&the_resolver->cache.top, NULL, "finish");
 	return KR_STATE_DONE;
 }
 

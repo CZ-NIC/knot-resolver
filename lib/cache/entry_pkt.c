@@ -33,7 +33,7 @@ uint32_t packet_ttl(const knot_pkt_t *pkt)
 
 
 void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
-		const struct kr_request *req, const bool needs_pkt)
+		struct kr_request *req, const bool needs_pkt)
 {
 	/* In some cases, stash also the packet. */
 	const bool is_negative = kr_response_classify(pkt)
@@ -114,7 +114,7 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 	eh->has_optout = qf->DNSSEC_OPTOUT;
 	memcpy(eh->data, &pkt_size, sizeof(pkt_size));
 	memcpy(eh->data + sizeof(pkt_size), pkt->wire, pkt_size);
-	kr_cache_top_access(&cache->top, key.data, key.len, val_new_entry.len, "stash_pkt");
+	kr_cache_top_access(req, key.data, key.len, val_new_entry.len, "stash_pkt");
 
 	WITH_VERBOSE(qry) {
 		auto_free char *type_str = kr_rrtype_text(pkt_type),

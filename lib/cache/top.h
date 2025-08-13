@@ -21,11 +21,12 @@
 #include <stdalign.h>
 #include "lib/mmapped.h"
 
+struct kr_request;
+
 /// Data related to open cache.
 struct kr_cache_top {
 	struct mmapped mmapped;
 	struct top_data *data;
-	struct kr_cache_top_context *ctx;
 };
 
 /// Part of the previous, shared between all processes.
@@ -71,22 +72,12 @@ void kr_cache_top_deinit(struct kr_cache_top *top);
 /// Charge cache access to the accessed key
 /// unless it was already accessed in the current request context.
 KR_EXPORT
-void kr_cache_top_access(struct kr_cache_top *top, void *key, size_t key_len, size_t data_size, char *debug_label);
+void kr_cache_top_access(struct kr_request *req, void *key, size_t key_len, size_t data_size, char *debug_label);
 	// debug_label is currently not used, TODO remove?
 
 /// Get current KRU load value assigned to the given cache entry key.
 KR_EXPORT
 uint16_t kr_cache_top_load(struct kr_cache_top *top, void *key, size_t len);
-
-/// Switch request context; the ctx has to be kept valid until next call.
-/// The context of a new kr_request has to be initialized with zeroes.
-/// Use NULL as ctx to stop using current context;
-/// all cache accesses in such a state are considered unique,
-/// but no such access is expected to happen.
-/// Returns the previous context.
-KR_EXPORT
-struct kr_cache_top_context *kr_cache_top_context_switch(struct kr_cache_top *top, struct kr_cache_top_context *ctx, char *debug_label);
-	// debug_label is currently not used, TODO remove?
 
 /// Return readable string representation of a cache key in a statically allocated memory.
 /// By default printable characters are kept unchanged and NULL-bytes are printed as '|'.

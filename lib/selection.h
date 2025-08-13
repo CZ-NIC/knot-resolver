@@ -246,10 +246,10 @@ void error(struct kr_query *qry, struct address_state *addr_state,
  * (e.g. calling kr_cache_commit).
  */
 struct rtt_state get_rtt_state(const uint8_t *ip, size_t len,
-			       struct kr_cache *cache);
+			       struct kr_cache *cache, struct kr_request *req);
 
 int put_rtt_state(const uint8_t *ip, size_t len, struct rtt_state state,
-		  struct kr_cache *cache);
+		  struct kr_cache *cache, struct kr_request *req);
 
 /**
  * @internal Helper function for conversion between different IP representations.
