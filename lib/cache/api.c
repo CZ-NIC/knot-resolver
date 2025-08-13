@@ -399,7 +399,7 @@ static int stash_rrarray_entry(ranked_rr_array_t *arr, int arr_i,
 /** Stash a single nsec_p.  \return 0 (errors are ignored). */
 static int stash_nsec_p(const knot_dname_t *dname, const char *nsec_p_v,
 			struct kr_cache *cache, uint32_t timestamp, knot_mm_t *pool,
-			const struct kr_query *qry/*logging*/);
+			const struct kr_query *qry/*logging + cache_top*/);
 
 /** The whole .consume phase for the cache module. */
 int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
@@ -458,7 +458,7 @@ int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 	for (it = trie_it_begin(nsec_pmap); !trie_it_finished(it); trie_it_next(it)) {
 		stash_nsec_p((const knot_dname_t *)trie_it_key(it, NULL),
 				(const char *)*trie_it_val(it),
-				cache, qry->timestamp.tv_sec, &req->pool, req->current_query);
+				cache, qry->timestamp.tv_sec, &req->pool, qry);
 	}
 	trie_it_free(it);
 	/* LATER(optim.): typically we also have corresponding NS record in the list,
@@ -653,7 +653,8 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 	rdataset_dematerialize(rds_sigs, eh->data + rr_ssize);
 	if (kr_fails_assert(entry_h_consistent_E(val_new_entry, rr->type)))
 		return kr_error(EINVAL);
-	kr_cache_top_access(&cache->top, key.data, key.len, val_new_entry.len, "stash_rrset");
+	if (qry) // it's possible to insert outside a request
+		kr_cache_top_access(qry->request, key.data, key.len, val_new_entry.len, "stash_rrset");
 
 	#if 0 /* Occasionally useful when debugging some kinds of changes. */
 	{
@@ -830,7 +831,8 @@ static int stash_nsec_p(const knot_dname_t *dname, const char *nsec_p_v,
 		VERBOSE_MSG(qry, "=> EL write failed (ret: %d)\n", ret);
 		return kr_ok();
 	}
-	kr_cache_top_access(&cache->top, key.data, key.len, val.len, "stash_nsec_p");
+	if (qry)
+		kr_cache_top_access(qry->request, key.data, key.len, val.len, "stash_nsec_p");
 	if (log_refresh_by) {
 		VERBOSE_MSG(qry, "=> nsec_p stashed for %s (refresh by %d, hash: %x)\n",
 				log_dname, log_refresh_by, log_hash);
@@ -879,7 +881,8 @@ int kr_cache_insert_rr(struct kr_cache *cache,
 	return (int) written;
 }
 
-static int peek_exact_real(struct kr_cache *cache, const knot_dname_t *name, uint16_t type,
+static int peek_exact_real(struct kr_cache *cache, struct kr_request *req,
+			const knot_dname_t *name, uint16_t type,
 			struct kr_cache_p *peek)
 {
 	if (!check_rrtype(type, NULL) || !check_dname_for_lf(name, NULL)) {
@@ -912,13 +915,14 @@ static int peek_exact_real(struct kr_cache *cache, const knot_dname_t *name, uin
 		.raw_data = val.data,
 		.raw_bound = knot_db_val_bound(val),
 	};
-	kr_cache_top_access(&cache->top, key.data, key.len, whole_val_len, "peek_exact_real"); // hits only
+	kr_cache_top_access(req, key.data, key.len, whole_val_len, "peek_exact_real"); // hits only
 	return kr_ok();
 }
-int kr_cache_peek_exact(struct kr_cache *cache, const knot_dname_t *name, uint16_t type,
+int kr_cache_peek_exact(struct kr_cache *cache, struct kr_request *req,
+			const knot_dname_t *name, uint16_t type,
 			struct kr_cache_p *peek)
 {	/* Just wrap with extra verbose logging. */
-	const int ret = peek_exact_real(cache, name, type, peek);
+	const int ret = peek_exact_real(cache, req, name, type, peek);
 	if (false && kr_log_is_debug(CACHE, NULL)) { /* too noisy for usual --verbose */
 		auto_free char *type_str = kr_rrtype_text(type),
 			*name_str = kr_dname_text(name);

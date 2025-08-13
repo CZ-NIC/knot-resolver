@@ -122,7 +122,8 @@ struct kr_cache_p {
 	};
 };
 KR_EXPORT
-int kr_cache_peek_exact(struct kr_cache *cache, const knot_dname_t *name, uint16_t type,
+int kr_cache_peek_exact(struct kr_cache *cache, struct kr_request *req,
+			const knot_dname_t *name, uint16_t type,
 			struct kr_cache_p *peek);
 /* Parameters (qry, name, type) are used for timestamp and stale-serving decisions. */
 KR_EXPORT

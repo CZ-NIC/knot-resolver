@@ -598,11 +598,9 @@ int kr_resolve_produce(struct kr_request *request, struct kr_transport **transpo
 {
 	kr_require(request && transport && packet);
 	struct kr_rplan *rplan = &request->rplan;
-	kr_cache_top_context_switch(&the_resolver->cache.top, &request->cache_top_context, "produce");
 
 	/* No query left for resolution */
 	if (kr_rplan_empty(rplan)) {
-		kr_cache_top_context_switch(&the_resolver->cache.top, NULL, "produce");
 		return KR_STATE_FAIL;
 	}
 
@@ -620,12 +618,8 @@ int kr_resolve_produce(struct kr_request *request, struct kr_transport **transpo
 		}
 
 		switch(state) {
-		case KR_STATE_FAIL:
-			kr_cache_top_context_switch(&the_resolver->cache.top, NULL, "produce");
-			return KR_STATE_FAIL;
-		case KR_STATE_DONE:
-			kr_cache_top_context_switch(&the_resolver->cache.top, NULL, "produce");
-			return KR_STATE_PRODUCE;
+		case KR_STATE_FAIL: return KR_STATE_FAIL;
+		case KR_STATE_DONE: return KR_STATE_PRODUCE;
 		default: break;
 		}
 		VERBOSE_MSG(qry, "=> resuming yielded answer\n");
@@ -643,12 +637,8 @@ int kr_resolve_produce(struct kr_request *request, struct kr_transport **transpo
 		 * this is normally not required, and incurs another cache lookups for cached answer. */
 		if (qry->flags.ALWAYS_CUT) { // LATER: maybe the flag doesn't work well anymore
 			switch(zone_cut_check(request, qry, packet)) {
-			case KR_STATE_FAIL:
-				kr_cache_top_context_switch(&the_resolver->cache.top, NULL, "produce");
-				return KR_STATE_FAIL;
-			case KR_STATE_DONE:
-				kr_cache_top_context_switch(&the_resolver->cache.top, NULL, "produce");
-				return KR_STATE_PRODUCE;
+			case KR_STATE_FAIL: return KR_STATE_FAIL;
+			case KR_STATE_DONE: return KR_STATE_PRODUCE;
 			default: break;
 			}
 		}
@@ -664,9 +654,7 @@ int kr_resolve_produce(struct kr_request *request, struct kr_transport **transpo
 		}
 	}
 	switch(request->state) {
-	case KR_STATE_FAIL:
-		kr_cache_top_context_switch(&the_resolver->cache.top, NULL, "produce");
-		return request->state;
+	case KR_STATE_FAIL: return request->state;
 	case KR_STATE_CONSUME: break;
 	case KR_STATE_DONE:
 	default: /* Current query is done */
@@ -674,7 +662,6 @@ int kr_resolve_produce(struct kr_request *request, struct kr_transport **transpo
 			kr_rplan_pop(rplan, qry);
 		}
 		ITERATE_LAYERS(request, qry, reset);
-		kr_cache_top_context_switch(&the_resolver->cache.top, NULL, "produce");
 		return kr_rplan_empty(rplan) ? KR_STATE_DONE : KR_STATE_PRODUCE;
 	}
 	/* At this point we need to send a query upstream to proceed towards success. */
@@ -683,19 +670,14 @@ int kr_resolve_produce(struct kr_request *request, struct kr_transport **transpo
 	if (qry->stype == KNOT_RRTYPE_ANY ||
 	    !knot_wire_get_rd(request->qsource.packet->wire)) {
 		VERBOSE_MSG(qry, "=> qtype is ANY or RD=0, bail out\n");
-		kr_cache_top_context_switch(&the_resolver->cache.top, NULL, "produce");
 		return KR_STATE_FAIL;
 	}
 
 	/* Update zone cut, spawn new subrequests. */
 	int state = zone_cut_check(request, qry, packet);
 	switch(state) {
-	case KR_STATE_FAIL:
-		kr_cache_top_context_switch(&the_resolver->cache.top, NULL, "produce");
-		return KR_STATE_FAIL;
-	case KR_STATE_DONE:
-		kr_cache_top_context_switch(&the_resolver->cache.top, NULL, "produce");
-		return KR_STATE_PRODUCE;
+	case KR_STATE_FAIL: return KR_STATE_FAIL;
+	case KR_STATE_DONE: return KR_STATE_PRODUCE;
 	default: break;
 	}
 
@@ -727,14 +709,12 @@ int kr_resolve_produce(struct kr_request *request, struct kr_transport **transpo
 			}
 			kr_request_set_extended_error(request, KNOT_EDNS_EDE_NREACH_AUTH, msg);
 
-			kr_cache_top_context_switch(&the_resolver->cache.top, NULL, "produce");
 			return KR_STATE_FAIL;
 		} else {
 			/* FIXME: This is probably quite inefficient:
 			* we go through the whole qr_task_step loop just because of the serve_stale
 			* module which might not even be loaded. */
 			qry->flags.NO_NS_FOUND = true;
-			kr_cache_top_context_switch(&the_resolver->cache.top, NULL, "produce");
 			return KR_STATE_PRODUCE;
 		}
 	}
@@ -743,7 +723,6 @@ int kr_resolve_produce(struct kr_request *request, struct kr_transport **transpo
 		uint16_t type = (*transport)->protocol == KR_TRANSPORT_RESOLVE_A ? KNOT_RRTYPE_A : KNOT_RRTYPE_AAAA;
 		ns_resolve_addr(qry, qry->request, *transport, type);
 		ITERATE_LAYERS(request, qry, reset);
-		kr_cache_top_context_switch(&the_resolver->cache.top, NULL, "produce");
 		return KR_STATE_PRODUCE;
 	}
 
@@ -757,7 +736,6 @@ int kr_resolve_produce(struct kr_request *request, struct kr_transport **transpo
 	 * kr_resolve_checkout().
 	 */
 	qry->timestamp_mono = kr_now();
-	kr_cache_top_context_switch(&the_resolver->cache.top, NULL, "produce");
 	return request->state;
 }
 

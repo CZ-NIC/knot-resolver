@@ -250,7 +250,7 @@ static const char * find_leq_NSEC1(struct kr_cache *cache, const struct kr_query
 
 success:
 
-	kr_cache_top_access(&cache->top, key_nsec.data, key_nsec.len, val.len, "leq_nsec1");  // hits only
+	kr_cache_top_access(qry->request, key_nsec.data, key_nsec.len, val.len, "leq_nsec1");  // hits only
 	return NULL;
 }
 
