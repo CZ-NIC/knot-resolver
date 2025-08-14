@@ -86,6 +86,8 @@ typedef struct {
 #define SERVER_DEFAULT_SCIDLEN 18
 #define ENABLE_QUIC
 
+#define KR_QUIC_HANDLE_RET_CLOSE	2000
+#define KR_QUIC_ERR_EXCESSIVE_LOAD	0x4
 
 // Macros from knot quic impl
 #define SERVER_DEFAULT_SCIDLEN 18
@@ -93,8 +95,8 @@ typedef struct {
 #define QUIC_SEND_VERSION_NEGOTIATION    NGTCP2_ERR_VERSION_NEGOTIATION
 #define QUIC_SEND_RETRY                  NGTCP2_ERR_RETRY
 #define QUIC_SEND_STATELESS_RESET        (-NGTCP2_STATELESS_RESET_TOKENLEN)
-#define QUIC_SEND_CONN_CLOSE             (-KNOT_QUIC_HANDLE_RET_CLOSE)
-#define QUIC_SEND_EXCESSIVE_LOAD         (-KNOT_QUIC_ERR_EXCESSIVE_LOAD)
+#define QUIC_SEND_CONN_CLOSE             (-KR_QUIC_HANDLE_RET_CLOSE)
+#define QUIC_SEND_EXCESSIVE_LOAD         (-KR_QUIC_ERR_EXCESSIVE_LOAD)
 // this limits the number of un-finished streams per conn
 // i.e. if response has been recvd with FIN, it doesn't count
 #define MAX_STREAMS_PER_CONN 10
@@ -115,6 +117,7 @@ struct pl_quic_state {
  * gets stored in quic_unwrap and read in quic_wrap */
 struct quic_target {
 	ngtcp2_cid dcid;
+	ngtcp2_cid scid; // maybe redundant
 	uint64_t stream_id;
 };
 
@@ -253,7 +256,7 @@ typedef struct kr_quic_conn {
 	// FIXME: could this be removed?
 	struct kr_quic_table *quic_table;
 
-	struct wire_buf unwrap_buf
+	struct wire_buf unwrap_buf;
 
 } kr_quic_conn_t;
 
@@ -265,7 +268,8 @@ typedef struct pl_quic_sess_data {
 	uint32_t conn_count;
 	protolayer_iter_ctx_queue_t unwrap_queue;
 	protolayer_iter_ctx_queue_t wrap_queue;
-	protolayer_iter_ctx_queue_t resend_queue;
+	// protolayer_iter_ctx_queue_t resend_queue;
+	struct wire_buf outbuf;
 
 	kr_quic_table_t *conn_table;
 	uint64_t first_stream_id;

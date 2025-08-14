@@ -48,7 +48,7 @@ void kr_quic_stream_ack_data(struct kr_quic_conn *conn, int64_t stream_id,
 
 	struct kr_quic_obuf *first;
 
-	while (EMPTY_LIST(*obs) != 0 && end_acked >= (first = HEAD(*obs))->len + s->first_offset) {
+	while (!EMPTY_LIST(*obs) && end_acked >= (first = HEAD(*obs))->len + s->first_offset) {
 		rem_node(&first->node);
 		assert(HEAD(*obs) != first); // help CLANG analyzer understand
 					     // what rem_node did and that
@@ -64,7 +64,7 @@ void kr_quic_stream_ack_data(struct kr_quic_conn *conn, int64_t stream_id,
 		}
 	}
 
-	if (EMPTY_LIST(*obs) == 0 && !keep_stream) {
+	if (EMPTY_LIST(*obs) && !keep_stream) {
 		stream_outprocess(conn, s);
 		memset(s, 0, sizeof(*s));
 		init_list(&s->outbufs);
@@ -149,9 +149,7 @@ void kr_quic_conn_stream_free(kr_quic_conn_t *conn, int64_t stream_id)
 		// conn->ibufs_size -= buffer_alloc_size(s->inbuf.iov_len);
 		// conn->quic_table->ibufs_size -= buffer_alloc_size(s->inbuf.iov_len);
 
-		// overwrite freed memory?
 		// s->pers_inbuf = NULL;
-		// memset(&s->inbuf, 0, sizeof(s->inbuf));
 	}
 
 	// knotdns iovec inbufs specific
@@ -237,13 +235,6 @@ struct kr_quic_stream *kr_quic_conn_get_stream(kr_quic_conn_t *conn,
 
 	return NULL;
 }
-
-// TODO: free the streams
-// while (stream->inbufs != NULL) {
-// 	knot_tcp_inbufs_upd_res_t *tofree = stream->inbufs;
-// 	stream->inbufs = tofree->next;
-// 	free(tofree);
-// }
 
 /** buffer resolved payload in wire format, this buffer
  * is used to create quic stream data. Data in this buffer
