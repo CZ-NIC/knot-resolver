@@ -5,6 +5,7 @@
 #include "kresconfig.h"
 #include "lib/proto.h"
 #include "mempattern.h"
+#include "quic.h"
 #include "daemon/worker.h"
 
 #include <libknot/wire.h>
@@ -359,7 +360,7 @@ static struct request_ctx *request_create(struct session2 *session,
 		const struct sockaddr *comm_addr = comm->comm_addr;
 		const struct sockaddr *dst_addr = comm->dst_addr;
 		const struct proxy_result *proxy = comm->proxy;
-		struct ngtcp2_cid *dcid = comm->target;
+		struct quic_target *orig_target = comm->target;
 
 		req->qsource.stream_id = -1;
 		session2_init_request(session, req);
@@ -385,7 +386,10 @@ static struct request_ctx *request_create(struct session2 *session,
 		req->qsource.dst_addr = &ctx->source.dst_addr.ip;
 
 		if (req->qsource.flags.quic) {
-			ctx->source.session->comm_storage.target = dcid;
+			kr_require(comm->target);
+			ctx->source.session->comm_storage.target = comm->target;
+			// memcpy(&ctx->source.session->comm_storage.target,
+			// 		orig_target, sizeof(struct quic_target));
 		}
 	}
 
@@ -1828,12 +1832,6 @@ static enum protolayer_iter_cb_result pl_dns_dgram_unwrap(
 			if (!pkt) {
 				ret = KNOT_EMALF;
 				break;
-			}
-			if (ctx->session->proto == KR_PROTO_DOQ) {
-				// memcpy(&ctx->comm->tmp_stream_id,
-				// 	&ctx->payload.iovec.iov->iov_base +
-				// 	((i - 1) * sizeof(uint64_t)),
-				// 	sizeof(uint64_t));
 			}
 
 			ret = worker_submit(session, ctx->comm, pkt);

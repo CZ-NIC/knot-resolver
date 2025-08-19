@@ -80,10 +80,9 @@ void kr_quic_stream_ack_data(struct kr_quic_conn *conn, int64_t stream_id,
 				conn->first_stream_id = 0;
 				break;
 			} else {
-				conn->first_stream_id ++;
+				conn->first_stream_id++;
 				conn->stream_inprocess--;
-				memmove(s, s + 1,
-					sizeof(*s) * conn->streams_count);
+				memmove(s, s + 1, sizeof(*s) * conn->streams_count);
 				// possible realloc to shrink allocated space,
 				// but probably useless
 				for (struct kr_quic_stream *si = s;
@@ -142,7 +141,14 @@ struct kr_quic_stream *kr_quic_stream_get_process(struct kr_quic_conn *conn,
 
 void kr_quic_conn_stream_free(kr_quic_conn_t *conn, int64_t stream_id)
 {
+
 	struct kr_quic_stream *s = kr_quic_conn_get_stream(conn, stream_id, false);
+
+	if (s != NULL && s->pers_inbuf.buf) {
+		/* should not happen */
+		wire_buf_deinit(&s->pers_inbuf);
+	}
+
 	if (s != NULL && /* FIXME this condition */ wire_buf_data_length(&s->pers_inbuf) > 0) {
 		wire_buf_deinit(&s->pers_inbuf);
 		// TODO
@@ -223,7 +229,6 @@ struct kr_quic_stream *kr_quic_conn_get_stream(kr_quic_conn_t *conn,
 		for (struct kr_quic_stream *si = new_streams + conn->streams_count;
 		     si < new_streams + new_streams_count; si++) {
 			memset(si, 0, sizeof(*si));
-			wire_buf_init(&si->pers_inbuf, /* FIXME */QBUFSIZE);
 			init_list(&si->outbufs);
 		}
 
@@ -303,8 +308,7 @@ int update_stream_pers_buffer(const uint8_t *data, size_t len,
 
 	// struct wire_buf wb = stream->pers_inbuf;
 	if (wire_buf_free_space_length(&stream->pers_inbuf) < len) {
-		kr_log_error(DOQ, "wire buf for stream no. %ld ran out of available space"
-				" needed: %zu, available: %zu\n",
+		kr_log_error(DOQ, "wire buf for stream no. %ld ran out of available space needed: %zu, available: %zu\n",
 				stream_id, len,
 				wire_buf_free_space_length(&stream->pers_inbuf));
 		return kr_error(ENOMEM);
@@ -332,13 +336,17 @@ int kr_quic_stream_recv_data(struct kr_quic_conn *qconn, int64_t stream_id,
 	}
 
 	qconn->streams_pending++;
+	if (!stream->pers_inbuf.buf) {
+		wire_buf_init(&stream->pers_inbuf, /* FIXME */QBUFSIZE);
+	}
 
 	// struct iovec in = { (void *)data, len };
 	// ssize_t prev_ibufs_size = qconn->ibufs_size;
 	// size_t save_total = qconn->ibufs_size;
 
-	if (update_stream_pers_buffer(data, len, stream, stream_id) != kr_ok()) {
-		return -1 /* TODO */;
+	int ret;
+	if ((ret = update_stream_pers_buffer(data, len, stream, stream_id)) != kr_ok()) {
+		return ret;
 	}
 
 	// int ret = knot_tcp_inbufs_upd(&stream->inbuf, in, true,

@@ -167,8 +167,6 @@ kr_quic_conn_t *kr_quic_table_add(ngtcp2_conn *ngconn, const ngtcp2_cid *cid,
 		return NULL;
 
 	/* FIXME magic numbers */
-
-
 	conn->conn = ngconn;
 	conn->quic_table = table;
 	conn->stream_inprocess = -1;
@@ -274,6 +272,8 @@ void kr_quic_table_rem(kr_quic_conn_t *conn, kr_quic_table_t *table)
 	ngtcp2_conn_del(conn->conn);
 	conn->conn = NULL;
 
+	// free(conn);
+
 	table->usage--;
 }
 
@@ -359,15 +359,16 @@ static void quic_debug_cb(void *user_data, const char *format, ...)
 
 int recv_crypto_data(ngtcp2_conn *conn,
 		 ngtcp2_encryption_level encryption_level, uint64_t offset,
-		 const uint8_t *data, size_t datalen, void *user_data) {
-	kr_log_debug(DOQ, "Crypto data: %d %s %ld\n", encryption_level, data, datalen);
+		 const uint8_t *data, size_t datalen, void *user_data)
+{
 
 	return ngtcp2_crypto_recv_crypto_data_cb(conn, encryption_level, offset, data,
 		 datalen, user_data);
 }
 
 int do_hp_mask(uint8_t *dest, const ngtcp2_crypto_cipher *hp,
-		const ngtcp2_crypto_cipher_ctx *hp_ctx, const uint8_t *sample) {
+		const ngtcp2_crypto_cipher_ctx *hp_ctx, const uint8_t *sample)
+{
 	if (ngtcp2_crypto_hp_mask(dest, hp, hp_ctx, sample) != 0) {
 		return NGTCP2_ERR_CALLBACK_FAILURE;
 	}
@@ -389,15 +390,9 @@ static int stream_close_cb(ngtcp2_conn *conn, uint32_t flags, int64_t stream_id,
 	struct kr_quic_conn *qconn = (struct kr_quic_conn *)user_data;
 	assert(qconn->conn == conn);
 
-	struct kr_quic_stream *stream = kr_quic_conn_get_stream(qconn, stream_id, true);
-
-	if (stream == NULL) {
-		return KNOT_ENOENT;
-	}
-
 	// NOTE possible error is stored in (flags & NGTCP2_STREAM_CLOSE_FLAG_APP_ERROR_CODE_SET)
 
-	bool keep = !ngtcp2_conn_is_server(conn); // kxdpgun: process incomming reply after recvd&closed
+	bool keep = !ngtcp2_conn_is_server(conn);
 	if (!keep) {
 		kr_quic_conn_stream_free(qconn, stream_id);
 	}
@@ -612,22 +607,14 @@ static int tls_init_conn_session(kr_quic_conn_t *conn, bool server)
 {
 	int ret = kr_tls_session(&conn->tls_session, conn->quic_table->creds,
 	                           conn->quic_table->priority, true, true, server);
-	if (ret != KNOT_EOK) {
-		kr_log_warning(DOQ, "kr_tls_session Failed :%d %s %s\n",
-				ret, ngtcp2_strerror(ret), gnutls_strerror(ret));
+	if (ret != KNOT_EOK)
 		return kr_error(ret);
-	}
 
-	if (server) {
-		ret = ngtcp2_crypto_gnutls_configure_server_session(conn->tls_session);
-		kr_log_info(DOQ, "configuring crypto server: %s (%d)\n", ngtcp2_strerror(ret), ret);
-	} else {
-		ret = ngtcp2_crypto_gnutls_configure_client_session(conn->tls_session);
-	}
-
+	ret = (server)
+		? ngtcp2_crypto_gnutls_configure_server_session(conn->tls_session)
+		: ngtcp2_crypto_gnutls_configure_client_session(conn->tls_session);
 	if (ret != NGTCP2_NO_ERROR) {
-		kr_log_warning(DOQ, "Failed to configure gnutls session (%d) %s\n",
-				ret, ngtcp2_strerror(ret));
+		kr_log_info(DOQ, "Failed to configure crypto session\n");
 		return kr_error(ret);
 	}
 
@@ -739,7 +726,6 @@ static int pl_quic_sess_init(struct session2 *session, void *sess_data, void *pa
 		}
 
 		kr_require(quic->conn_table);
-
 		quic->conn_count = 0;
 	}
 
@@ -775,6 +761,14 @@ static void kr_quic_conn_mark_used(kr_quic_conn_t *conn, kr_quic_table_t *table)
 	kr_conn_heap_reschedule(conn, table);
 }
 
+bool kr_quic_conn_timeout(kr_quic_conn_t *conn, uint64_t *now)
+{
+	if (*now == 0)
+		*now = quic_timestamp();
+
+	return *now > ngtcp2_conn_get_expiry(conn->conn);
+}
+
 // TODO
 // static void send_excessive_load(kr_quic_conn_t *conn, struct kr_quic_reply *reply,
 // 		kr_quic_table_t *table)
@@ -783,14 +777,6 @@ static void kr_quic_conn_mark_used(kr_quic_conn_t *conn, kr_quic_table_t *table)
 // 		reply->handle_ret = KR_QUIC_ERR_EXCESSIVE_LOAD;
 // 		(void)kr_quic_send(table, conn, reply, 0, 0);
 // 	}
-// }
-//
-// bool kr_quic_conn_timeout(kr_quic_conn_t *conn, uint64_t *now)
-// {
-// 	if (*now == 0)
-// 		*now = quic_timestamp();
-//
-// 	return *now > ngtcp2_conn_get_expiry(conn->conn);
 // }
 //
 // void kr_quic_table_sweep(kr_quic_table_t *table, struct kr_quic_reply *sweep_reply,
@@ -845,6 +831,7 @@ void kr_quic_table_free(kr_quic_table_t *table)
 			kr_quic_conn_t *c = *(kr_quic_conn_t **)HHEAD(table->expiry_heap);
 			kr_quic_table_rem(c, table);
 			kr_quic_cleanup(&c, 1);
+			// free(c);
 		}
 		assert(table->usage == 0);
 		assert(table->pointers == 0);
@@ -863,7 +850,6 @@ static int pl_quic_sess_deinit(struct session2 *session, void *data)
 	pl_quic_sess_data_t *quic = data;
 	queue_deinit(quic->unwrap_queue);
 	queue_deinit(quic->wrap_queue);
-	// heap_deinit(quic->conn_table->expiry_heap);
 	kr_quic_table_free(quic->conn_table);
 	wire_buf_deinit(&quic->outbuf);
 
@@ -981,88 +967,82 @@ static int quic_init_server_conn(kr_quic_table_t *table,
 	ngtcp2_path path;
 	kr_quic_set_addrs(ctx, &path);
 
-	if ((*out_conn) == NULL) {
-		ngtcp2_pkt_hd header = { 0 };
-		ret = ngtcp2_accept(&header,
-				payload,
-				payload_len);
-		if (ret != 0) {
-			ret = -QUIC_SEND_STATELESS_RESET;
-			goto finish;
-		}
+	kr_require(*out_conn == NULL);
 
-		// TODO This never happens (kr_quic_require_retry just returns false)
-		// if (header.tokenlen == 0
-		// 		&& kr_quic_require_retry(table) /* TBD */) {
-		// 	ret = -QUIC_SEND_RETRY;
-		// 	goto finish;
-		// }
+	ngtcp2_pkt_hd header = { 0 };
+	ret = ngtcp2_accept(&header,
+			payload,
+			payload_len);
+	if (ret != 0) {
+		ret = -QUIC_SEND_STATELESS_RESET;
+		goto finish;
+	}
 
-		if (header.tokenlen > 0) {
-			if (header.token[0] == NGTCP2_CRYPTO_TOKEN_MAGIC_RETRY) {
-				ret = ngtcp2_crypto_verify_retry_token(
-					&odcid, header.token, header.tokenlen,
-					(const uint8_t *)table->hash_secret,
-					sizeof(table->hash_secret), header.version,
-					// (const struct sockaddr *)reply->ip_rem,
-					path.remote.addr,
-					path.remote.addrlen,
-					dcid, idle_timeout, now // NOTE setting retry token validity to idle_timeout for simplicity
-				);
-			} else {
-				ret = ngtcp2_crypto_verify_regular_token(
-					header.token, header.tokenlen,
-					(const uint8_t *)table->hash_secret,
-					sizeof(table->hash_secret),
-					// (const struct sockaddr *)reply->ip_rem,
-					path.remote.addr,
-					path.remote.addrlen,
-					QUIC_REGULAR_TOKEN_TIMEOUT, now
-				);
-			}
+	// TODO This never happens (kr_quic_require_retry just returns false)
+	// if (header.tokenlen == 0
+	// 		&& kr_quic_require_retry(table) /* TBD */) {
+	// 	ret = -QUIC_SEND_RETRY;
+	// 	goto finish;
+	// }
 
-			if (ret != 0)
-				goto finish;
-
+	if (header.tokenlen > 0) {
+		if (header.token[0] == NGTCP2_CRYPTO_TOKEN_MAGIC_RETRY) {
+			ret = ngtcp2_crypto_verify_retry_token(
+				&odcid, header.token, header.tokenlen,
+				(const uint8_t *)table->hash_secret,
+				sizeof(table->hash_secret), header.version,
+				// (const struct sockaddr *)reply->ip_rem,
+				path.remote.addr,
+				path.remote.addrlen,
+				dcid, idle_timeout, now // NOTE setting retry token validity to idle_timeout for simplicity
+			);
 		} else {
-			// ngtcp2_cid_init(&odcid, dcid->data, dcid->datalen);
-			memcpy(&odcid, dcid, sizeof(odcid));
-			kr_assert(ngtcp2_cid_eq(&odcid, dcid));
+			ret = ngtcp2_crypto_verify_regular_token(
+				header.token, header.tokenlen,
+				(const uint8_t *)table->hash_secret,
+				sizeof(table->hash_secret),
+				// (const struct sockaddr *)reply->ip_rem,
+				path.remote.addr,
+				path.remote.addrlen,
+				QUIC_REGULAR_TOKEN_TIMEOUT, now
+			);
 		}
 
-		// server chooses his CID to his liking
-		if (!init_unique_cid(dcid, 0, table)) {
-			kr_log_error(DOQ, "Failed to initialize unique cid (servers choice)\n");
-			ret = kr_error(-1);
+		if (ret != 0)
 			goto finish;
-		}
 
-		*out_conn= kr_quic_table_add(NULL, dcid, table);
-		if (*out_conn == NULL) {
-			kr_log_error(DOQ, "Failed to create new connection\n");
-			ret = kr_error(ENOMEM);
-			goto finish;
-		}
-
-		ret = conn_new_handler(&(*out_conn)->conn, &path,
-				&header.scid, dcid, &header.dcid,
-				decoded_cids.version, now, idle_timeout,
-				*out_conn, true, header.tokenlen > 0);
-
-		if (ret >= 0) {
-			ret = tls_init_conn_session(*out_conn, true);
-		} else {
-			kr_quic_table_rem(*out_conn, table);
-			// *out_conn = conn; // TODO: Implement a cleanup
-					  // orig:{we need knot_quic_cleanup()
-					  // by the caller afterwards}
-			kr_log_error(DOQ, "Failed to create new server connection\n");
-			goto finish;
-		}
 	} else {
-		// should not happen
-		kr_log_info(DOQ, "Called quic_init_server_conn with NON NULL out_conn");
-		return kr_error(EINVAL);
+		// ngtcp2_cid_init(&odcid, dcid->data, dcid->datalen);
+		memcpy(&odcid, dcid, sizeof(odcid));
+		kr_assert(ngtcp2_cid_eq(&odcid, dcid));
+	}
+
+	// server chooses his CID to his liking
+	if (!init_unique_cid(dcid, 0, table)) {
+		kr_log_error(DOQ, "Failed to initialize unique cid (servers choice)\n");
+		ret = kr_error(-1);
+		goto finish;
+	}
+
+	*out_conn = kr_quic_table_add(NULL, dcid, table);
+	if (*out_conn == NULL) {
+		kr_log_error(DOQ, "Failed to create new connection\n");
+		ret = kr_error(ENOMEM);
+		goto finish;
+	}
+
+	ret = conn_new_handler(&(*out_conn)->conn, &path,
+			&header.scid, dcid, &header.dcid,
+			decoded_cids.version, now, idle_timeout,
+			*out_conn, true, header.tokenlen > 0);
+
+	if (ret >= 0) {
+		ret = tls_init_conn_session(*out_conn, true);
+	} else {
+		kr_quic_table_rem(*out_conn, table);
+		// free(*out_conn);
+		kr_log_error(DOQ, "Failed to create new server connection\n");
+		goto finish;
 	}
 
 	return kr_ok();
@@ -1132,25 +1112,33 @@ static int handle_packet(struct pl_quic_sess_data *quic,
 	const ngtcp2_path *path = ngtcp2_conn_get_path(qconn->conn);
 	ngtcp2_pkt_info pi = { .ecn = NGTCP2_ECN_NOT_ECT, };
 
+	// while (ngtcp2_conn_read_pkt(qconn->conn, path, &pi, pkt, pktlen, now) == 0);
 	ret = ngtcp2_conn_read_pkt(qconn->conn, path, &pi, pkt, pktlen, now);
 
 	*out_conn = qconn;
 	/* FIXME: inacurate error handling */
 	if (ret == NGTCP2_ERR_DRAINING) { // doq received CONNECTION_CLOSE from the counterpart
 		kr_quic_table_rem(qconn, quic->conn_table);
-		ret = KNOT_EOK;
-		return ret;
+		wire_buf_reset(ctx->payload.wire_buf);
+		*action = KR_QUIC_HANDLE_RET_CLOSE;
+		free(*out_conn);
+		return kr_ok();
 
 	} else if (ngtcp2_err_is_fatal(ret)) { // connection doomed
 		kr_log_error(DOQ, "fatal error in ngtcp2_conn_read_pkt: %s (%d)", ngtcp2_strerror(ret), ret);
-		if (ret == NGTCP2_ERR_CALLBACK_FAILURE) {
-			ret = KNOT_EBADCERTKEY;
-		} else {
-			ret = KNOT_ECONN;
-		}
-
+		// if (ret == NGTCP2_ERR_CALLBACK_FAILURE) {
+			// ret = kr_error(KNOT_EBADCERT);
+		// } else {
+		// 	ret = kr_error();
+		// }
 		kr_quic_table_rem(qconn, quic->conn_table);
 		return ret;
+
+	} else if (ret == NGTCP2_ERR_RETRY) {
+		kr_log_info(DOQ, "server will perform address validation via Retry packet\n");
+		*action = QUIC_SEND_RETRY;
+		wire_buf_reset(ctx->payload.wire_buf);
+		return kr_ok();
 
 	} else if (ret != NGTCP2_NO_ERROR) { // non-fatal error, discard packet
 		kr_log_error(DOQ, "discarding recieved pkt: %s (%d)", ngtcp2_strerror(ret), ret);
@@ -1163,6 +1151,42 @@ static int handle_packet(struct pl_quic_sess_data *quic,
 	/* given the 0 return value the pkt has been processed */
 	wire_buf_reset(ctx->payload.wire_buf);
 	return kr_ok();
+}
+
+static int get_query(struct protolayer_iter_ctx *ctx,
+		struct kr_quic_conn *qconn, struct quic_target *target)
+{
+	kr_require(wire_buf_data_length(&qconn->unwrap_buf) == 0);
+
+	int64_t stream_id;
+	struct kr_quic_stream *stream;
+	stream = kr_quic_stream_get_process(qconn, &stream_id);
+
+	/* no stream has finished payload (should not happen) */
+	kr_require(stream);
+
+	size_t to_write = wire_buf_data_length(&stream->pers_inbuf);
+	ctx->payload = protolayer_payload_wire_buf(&stream->pers_inbuf,
+			false);
+
+	target->stream_id = stream_id;
+	ctx->comm->target = target;
+
+	if (to_write > wire_buf_free_space_length(&qconn->unwrap_buf)) {
+		kr_log_error(DOQ, "unwrap buf is not big enough\n");
+		return kr_error(ENOMEM);
+	}
+
+	memcpy(wire_buf_free_space(&qconn->unwrap_buf),
+		wire_buf_data(&stream->pers_inbuf), to_write);
+	wire_buf_consume(&qconn->unwrap_buf, to_write);
+	wire_buf_trim(&stream->pers_inbuf, to_write);
+	if (wire_buf_data_length(&stream->pers_inbuf) == 0) {
+		wire_buf_deinit(&stream->pers_inbuf);
+		memset(&stream->pers_inbuf, 0, sizeof(struct wire_buf));
+	}
+
+	return to_write;
 }
 
 static int collect_queries(struct protolayer_iter_ctx *ctx,
@@ -1195,6 +1219,11 @@ static int collect_queries(struct protolayer_iter_ctx *ctx,
 			wire_buf_data(&stream->pers_inbuf), to_write);
 		wire_buf_consume(&qconn->unwrap_buf, to_write);
 		wire_buf_trim(&stream->pers_inbuf, to_write);
+		if (wire_buf_data_length(&stream->pers_inbuf) == 0) {
+			wire_buf_deinit(&stream->pers_inbuf);
+			memset(&stream->pers_inbuf, 0, sizeof(struct wire_buf));
+		}
+
 		free_space -= to_write;
 		++queries_agregated;
 	}
@@ -1205,7 +1234,7 @@ static int collect_queries(struct protolayer_iter_ctx *ctx,
 static enum protolayer_iter_cb_result pl_quic_unwrap(void *sess_data,
 		void *iter_data, struct protolayer_iter_ctx *ctx)
 {
-	int rv = kr_ok();
+	int ret = kr_ok();
 	kr_quic_conn_t *qconn = NULL;
 	struct pl_quic_sess_data *quic = sess_data;
 
@@ -1220,7 +1249,7 @@ static enum protolayer_iter_cb_result pl_quic_unwrap(void *sess_data,
 		ngtcp2_version_cid dec_cids;
 		int action;
 
-		int ret = handle_packet(quic,
+		ret = handle_packet(quic,
 				ctx,
 				wire_buf_data(ctx->payload.wire_buf),
 				wire_buf_data_length(ctx->payload.wire_buf),
@@ -1228,14 +1257,17 @@ static enum protolayer_iter_cb_result pl_quic_unwrap(void *sess_data,
 		/* not all fails should be quiet, some require a response from
 		 * our side (kr_quic_send with given action) TODO! */
 		if (ret != kr_ok()) {
-			rv = kr_error(ret);
+			goto fail;
+		}
+		if (action == KR_QUIC_HANDLE_RET_CLOSE) {
+			ret = kr_ok();
 			goto fail;
 		}
 
 		if (qconn->stream_inprocess == -1) {
 			kr_quic_send(quic->conn_table, qconn, ctx, action,
 					&dec_cids, QUIC_MAX_SEND_PER_RECV, 0);
-			rv = kr_ok();
+			ret = kr_ok();
 			goto fail;
 		}
 
@@ -1243,20 +1275,47 @@ static enum protolayer_iter_cb_result pl_quic_unwrap(void *sess_data,
 			ret = kr_error(EINVAL);
 			goto fail;
 		}
+
+		/* WARNING: this has been moved */
+		// struct protolayer_iter_ctx *ctx_head = queue_head(quic->unwrap_queue);
+		// if (!kr_fails_assert(ctx == ctx_head)) {
+		// 	protolayer_break(ctx, kr_error(EINVAL));
+		// 	ctx = ctx_head;
+		// }
 	}
 
 	struct protolayer_iter_ctx *ctx_head = queue_head(quic->unwrap_queue);
 	if (!kr_fails_assert(ctx == ctx_head))
 		queue_pop(quic->unwrap_queue);
 
-	if ((rv = collect_queries(ctx, qconn, target)) > 0) {
+	while (qconn->streams_pending) {
+		if ((ret = get_query(ctx, qconn, target)) <= 0)
+			goto fail;
+
 		ctx->payload = protolayer_payload_wire_buf(&qconn->unwrap_buf,
 				false);
-		return protolayer_continue(ctx);
+
+		if (qconn->streams_pending == 0) {
+			return protolayer_continue(ctx);
+		}
+
+		/* FIXME should we ignore the result? */
+		session2_unwrap_after(ctx->session,
+				PROTOLAYER_TYPE_QUIC,
+				ctx->payload,
+				ctx->comm,
+				ctx->finished_cb,
+				ctx->finished_cb_baton);
 	}
 
-	// return protolayer_continue(ctx);
-	return protolayer_break(ctx, rv);
+	// if ((ret = collect_queries(ctx, qconn, target)) > 0) {
+	// 	ctx->payload = protolayer_payload_wire_buf(&qconn->unwrap_buf,
+	// 			false);
+	// 	return protolayer_continue(ctx);
+	// }
+
+	free(target);
+	return protolayer_break(ctx, ret);
 
 fail:
 	ctx_head = queue_head(quic->unwrap_queue);
@@ -1264,7 +1323,7 @@ fail:
 		queue_pop(quic->unwrap_queue);
 
 	free(target);
-	return protolayer_break(ctx, rv);
+	return protolayer_break(ctx, ret);
 }
 
 /* TODO perhaps also move to quic_stream */
@@ -1303,48 +1362,35 @@ static int send_stream(struct protolayer_iter_ctx *ctx,
 
 	ngtcp2_conn_info info = { 0 };
 	ngtcp2_conn_get_conn_info(qconn->conn, &info);
-	int nwrite = 0;
+	int nwrite = ngtcp2_conn_writev_stream(qconn->conn, path, &pi,
+			wire_buf_free_space(ctx->payload.wire_buf),
+			wire_buf_free_space_length(ctx->payload.wire_buf),
+			sent, fl, stream_id, &vec,
+			(stream_id >= 0 ? 1 : 0), quic_timestamp());
 
-	kr_require(ctx->payload.type == PROTOLAYER_PAYLOAD_WIRE_BUF
-			&& ctx->payload.wire_buf
-			// TODO consider a better approach
-			&& wire_buf_free_space_length(ctx->payload.wire_buf) >= 1200);
-	kr_require(ctx->payload.wire_buf->start == 0);
+	/* TODO:
+	 * This packet may contain frames other than STREAM frame. The
+	 * packet might not contain STREAM frame if other frames
+	 * occupy the packet. In that case, *pdatalen would
+	 * be -1 if pdatalen is not NULL. */
+	// TODO: abstract error printing, likely shared across many ngtcp2_ calls
+	if (nwrite < 0) {
+		kr_log_error(DOQ, "writev_stream to %zu failed %s (%d)\n",
+				stream_id, ngtcp2_strerror(nwrite), nwrite);
+		if (len)
+			return nwrite;
 
-	do {
-		nwrite = ngtcp2_conn_writev_stream(qconn->conn, path, &pi,
-				wire_buf_free_space(ctx->payload.wire_buf),
-				wire_buf_free_space_length(ctx->payload.wire_buf),
-				sent, fl, stream_id, &vec,
-				(stream_id >= 0 ? 1 : 0), quic_timestamp());
+		goto exit;
+	} else if (*sent >= 0) {
+		/* TODO this data has to be kept untill acked */
+		vec.len -= *sent;
+	}
 
-		/* TODO:
-		 * This packet may contain frames other than STREAM frame. The
-		 * packet might not contain STREAM frame if other frames
-		 * occupy the packet. In that case, *pdatalen would
-		 * be -1 if pdatalen is not NULL. */
-		// TODO: abstract error printing, likely shared across many ngtcp2_ calls
-		if (nwrite < 0) {
-			kr_log_error(DOQ, "writev_stream failed %s (%d)\n",
-					ngtcp2_strerror(nwrite), nwrite);
-			if (len)
-				return nwrite;
-
-			goto exit;
-
-
-		} else if (*sent >= 0) {
-			/* TODO this data has to be kept untill acked */
-			vec.len -= *sent;
-		}
-
-		if (wire_buf_consume(ctx->payload.wire_buf, nwrite) != kr_ok()) {
-			kr_log_error(DOQ, "Wire_buf failed to consume: %s (%d)\n",
-					ngtcp2_strerror(nwrite), nwrite);
-			goto exit;
-		}
-
-	} while (nwrite && vec.len > 0);
+	if (wire_buf_consume(ctx->payload.wire_buf, nwrite) != kr_ok()) {
+		kr_log_error(DOQ, "Wire_buf failed to consume: %s (%d)\n",
+				ngtcp2_strerror(nwrite), nwrite);
+		goto exit;
+	}
 
 	/* called from wrap, proceed to the next layer */
 	if (len) {
@@ -1378,15 +1424,15 @@ exit:
  * For now only kr_quic_send ever call send_special, though this might proove
  * to cause issues in situation where the connection has NOT been established
  * and we still would like to send data (i.e. we do not have decoded cids)
- * The only time we need to send_special without having atleas the cids
- * is then the decode_v_cid fails with NGTCP2_ERR_VERSION_NEGOT*/
+ * The only time we need to send_special without having at least the cids
+ * is then the decode_v_cid fails with NGTCP2_ERR_VERSION_NEGOTIATION */
 static int send_special(struct protolayer_iter_ctx *ctx,
 		kr_quic_table_t *quic_table, int action,
 		ngtcp2_version_cid *decoded_cids,
 		struct kr_quic_conn *conn)
 		// kr_quic_conn_t *relay /* only for connection close */)
 {
-	if (wire_buf_data_length(ctx->payload.wire_buf) == 0) {
+	if (wire_buf_data_length(ctx->payload.wire_buf) != 0) {
 		kr_log_error(DOQ, "wire_buf in quic/send_special is expected to be empty\n");
 		return kr_error(EINVAL);
 	}
@@ -1508,7 +1554,7 @@ static int send_special(struct protolayer_iter_ctx *ctx,
 		);
 		break;
 	default:
-		ret = KNOT_EINVAL;
+		ret = kr_error(EINVAL);
 		break;
 	}
 
@@ -1546,8 +1592,7 @@ int kr_quic_send(kr_quic_table_t *quic_table /* FIXME maybe unused */,
 		return kr_error(EINVAL);
 	} else if ((conn->flags & KR_QUIC_CONN_BLOCKED) && !(flags & KR_QUIC_SEND_IGNORE_BLOCKED)) {
 		return kr_error(EINVAL);
-	// TODO
-	} else if (action > 0) {
+	} else if (action != 0) {
 		return send_special(ctx, quic_table, action, decoded_cids, conn);
 	} else if (conn == NULL) {
 		return kr_error(EINVAL);
@@ -1574,8 +1619,21 @@ int kr_quic_send(kr_quic_table_t *quic_table /* FIXME maybe unused */,
 		}
 
 		bool fin = (((node_t *)uo->node.next)->next == NULL) && ignore_last == 0;
+
+		kr_log_info(DOQ, "About to SEND_STREAM fin: %d stream_id: %zu fsi: %zu streams_count: %d\n",
+			   fin, stream_id, conn->first_stream_id, conn->streams_count);
+
 		ret = send_stream(ctx, conn, stream_id, uo->buf + uf,
 				  uo->len - uf - ignore_last, fin, &sent);
+
+		/* FIXME: just an attempted hotfix
+		 * ok this actually worked, but it shadows an underlying issue
+		 * and leaks more than a decapitated elephant */
+		if (ret == NGTCP2_ERR_STREAM_SHUT_WR) {
+			// kr_quic_stream_mark_sent(conn, stream_id, sent);
+			si++;
+			continue;
+		}
 
 		if (ret < 0 || ret == PROTOLAYER_ITER_CB_RESULT_MAGIC) {
 			return ret;
@@ -1656,13 +1714,7 @@ static enum protolayer_iter_cb_result pl_quic_wrap(
 			.size = 1200 /* FIXME this makes no sence */
 		};
 
-		/* watch out, we lose pointer to the previous payload,
-		 * but since the data is not needed anymore and
-		 * it was allocked from ctx mempool it should be fine */
 		data->payload = protolayer_payload_wire_buf(wb, false);
-
-		/* Here we will actually have payload to be sent out
-		 * TODO assert that? */
 		ret = kr_quic_send(quic->conn_table,
 				conn,
 				data,
@@ -1670,21 +1722,21 @@ static enum protolayer_iter_cb_result pl_quic_wrap(
 				NULL,
 				QUIC_MAX_SEND_PER_RECV,
 				0 /* no flags */);
-
-		kr_log_info(DOQ, "About to continue from quic_wrap: %s\n",
-				protolayer_payload_name(data->payload.type));
-
 		if (ret <= 0)
 			break;
 
-		// FIXME certainly not here, this leaks as is
-		free(ctx->comm_storage.target);
-		return ret;
-
-		// return protolayer_continue(ctx);
+		// if (ret == PROTOLAYER_ITER_CB_RESULT_MAGIC) {
+		// 	free(ctx->comm_storage.target);
+		// }
 	}
 
-	return protolayer_break(ctx, kr_ok());
+	// FIXME: certainly not here, this leaks as is
+	// free(ctx->comm_storage.target);
+	// free(ctx->comm_storage.target);
+	return ret;
+
+	// return protolayer_continue(ctx);
+	// return protolayer_break(ctx, kr_ok());
 }
 
 static enum protolayer_event_cb_result pl_quic_event_unwrap(
@@ -1704,8 +1756,8 @@ static enum protolayer_event_cb_result pl_quic_event_wrap(
 }
 
 static void pl_quic_request_init(struct session2 *session,
-                                struct kr_request *req,
-                                void *sess_data)
+		struct kr_request *req,
+		void *sess_data)
 {
 	kr_log_warning(DOQ, "IN request init\n");
 	req->qsource.comm_flags.quic = true;
@@ -1723,7 +1775,7 @@ static void quic_protolayers_init(void)
 		// .iter_size = sizeof(struct ),
 		.wire_buf_overhead = MAX_QUIC_FRAME_SIZE,
 		// .iter_init = pl_quic_iter_init,
-		// .iter_deinit = pl_quic_iter_deinit
+		// .iter_deinit = pl_quic_iter_deinit,
 		.sess_init = pl_quic_sess_init,
 		.sess_deinit = pl_quic_sess_deinit,
 		.unwrap = pl_quic_unwrap,
