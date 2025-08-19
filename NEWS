@@ -8,6 +8,7 @@ Improvements
 Bugfixes
 --------
 - /options/query-case-randomization: respect this even on TCP issues (!1732)
+- prometheus metrics: make the latency histogram cumulative (!1731, GH#117)
 
 
 Knot Resolver 6.0.15 (2025-07-17)
