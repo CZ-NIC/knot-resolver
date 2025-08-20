@@ -19,12 +19,12 @@
 /** Information for one NS name + address type. */
 typedef enum {
 	AI_UNINITED = 0,
-	AI_DISABLED,	/**< Can't use this addrset. */
-	AI_CYCLED,	/**< Skipped due to cycle detection; see implementation for details. */
+	AI_DISABLED = 1,	/**< Can't use this addrset. */
+	AI_CYCLED = 2,	/**< Skipped due to cycle detection; see implementation for details. */
 	AI_LAST_BAD = AI_CYCLED, /** bad states: <= AI_LAST_BAD */
-	AI_UNKNOWN,	/**< Don't know status of this RRset; various reasons. */
-	AI_EMPTY,	/**< No usable address (may mean e.g. just NODATA). */
-	AI_OK,		/**< At least one usable address.
+	AI_UNKNOWN = 3,	/**< Don't know status of this RRset; various reasons. */
+	AI_EMPTY = 4,	/**< No usable address (may mean e.g. just NODATA). */
+	AI_OK = 5,		/**< At least one usable address.
 			 * LATER: we might be interested whether it's only glue. */
 } addrset_info_t;
 
