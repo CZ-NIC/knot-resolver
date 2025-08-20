@@ -648,7 +648,7 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 	case KR_SELECTION_TCP_CONNECT_FAILED:
 	case KR_SELECTION_TCP_CONNECT_TIMEOUT:
 		qry->server_selection.local_state->force_udp = true;
-		qry->flags.NO_0X20 = false;
+		qry->flags.NO_0X20 = qry->request->options.NO_0X20;
 		/* Connection and handshake failures have properties similar
 		 * to UDP timeouts, so we handle them (almost) the same way. */
 		/* fall-through */
