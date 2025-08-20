@@ -46,7 +46,7 @@ def p_output_dispatcher_log(self: POutputDispatcher, data: bytearray):
             if loglevel_match:
                 # just strip the loglevel as supervisor cannot handle it;
                 # used only for target=syslog without systemd
-                line = loglevel_match.group(2)  # pylint: disable=redefined-loop-name
+                line = loglevel_match.group(2)  # noqa: PLW2901
             else:
                 # no loglevel found, mark as stdio output to retain previous behaviour
                 if self.channel == "stderr":
