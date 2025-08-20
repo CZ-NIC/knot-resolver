@@ -633,6 +633,7 @@ static inline const  knot_dname_t * knot_dname_next_label(const knot_dname_t *dn
 }
 #endif
 
+#ifndef __cplusplus /* The atomic stuff seems more trouble than worth on C++ includes. */
 /* Determine whether to perform an action (logging) limited once per time period in ms. */
 static inline bool kr_log_period(uint32_t period, _Atomic uint32_t *last_time) {
 	const uint32_t time_now = kr_now(); // 32 bits are sufficient here
@@ -647,6 +648,7 @@ static inline bool kr_log_period(uint32_t period, _Atomic uint32_t *last_time) {
 	}
 	return false;
 }
+#endif
 
 /* Initialize last_time for kr_log_period. */
 static inline uint32_t kr_log_period_init(uint32_t period) {
