@@ -33,6 +33,8 @@ M.layer.produce = function (state, req, pkt)
 	if not M.data_src or state == kres.FAIL or state == kres.DONE then return state end
 
 	local qry = req:current()
+	if qry.flags.FALLBACK_DISABLE then return state end
+
 	-- Don't do anything for priming, prefetching, etc.
 	-- TODO: not all cases detected ATM.
 	if qry.flags.NO_CACHE then return state end

@@ -12,6 +12,9 @@
 {% if not options.dns64 -%}
 "DNS64_DISABLE",
 {%- endif %}
+{% if not options.fallback -%}
+"FALLBACK_DISABLE",
+{%- endif %}
 {%- endmacro %}
 
 {% macro view_answer(answer) -%}

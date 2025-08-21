@@ -92,10 +92,15 @@ Actions
       .. option:: minimize: true|false
 
          Send minimum amount of information in recursive queries to enhance privacy.
+         Enabled by default.
 
       .. option:: dns64: true|false
 
-         Enable/disable DNS64.
+         Disable DNS64 if enabled globally.
+
+      .. option:: fallback: true|false
+
+         Disable fallback on resolution failure, if enabled globally.
 
       .. option:: price-factor: <float>
 
