@@ -33,11 +33,12 @@ M.layer.produce = function (state, req, pkt)
 	if not M.data_src or state == kres.FAIL or state == kres.DONE then return state end
 
 	local qry = req:current()
+	if qry.flags.FALLBACK_DISABLE then return state end
+
 	-- Don't do anything for priming, prefetching, etc.
 	-- TODO: not all cases detected ATM.
 	if qry.flags.NO_CACHE then return state end
 
-	-- FIXME: also check the source of traffic
 	local now = ffi.C.kr_now()
 	local deadline = qry.creation_time_mono + M.timeout
 	if now > deadline or qry.flags.NO_NS_FOUND then
