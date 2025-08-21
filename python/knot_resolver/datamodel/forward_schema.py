@@ -74,3 +74,20 @@ class ForwardSchema(ConfigSchema):
 
         if self.options.authoritative and is_transport_tls(self.servers):
             raise ValueError("Forwarding to authoritative servers using TLS protocol is not supported.")
+
+
+class FallbackSchema(ConfigSchema):
+    """
+    Configuration for fallback after resolution failure.
+
+    ---
+    enable: Enable/disable the fallback.
+    servers: Forward servers configuration for fallback.
+    """
+
+    enable: bool = False
+    servers: Union[List[IPAddressOptionalPort], List[ForwardServerSchema], None] = None
+
+    def _validate(self) -> None:
+        if self.enable and self.servers is None:
+            raise ValueError("Fallback enabled without configuring servers.")

@@ -1,4 +1,4 @@
-{% from 'macros/forward_macros.lua.j2' import policy_rule_forward_add %}
+{% from 'macros/forward_macros.lua.j2' import policy_rule_forward_add, forward_servers %}
 
 {% if cfg.forward %}
 {% for fwd in cfg.forward %}
@@ -6,4 +6,13 @@
 {{ policy_rule_forward_add(subtree,fwd.options,fwd.servers) }}
 {% endfor %}
 {% endfor %}
+{% endif %}
+
+
+{% if cfg.fallback and cfg.fallback.enable %}
+modules.load('fallback')
+fallback.config({
+  targets = {{ forward_servers(cfg.fallback.servers) }},
+  options = {},
+})
 {% endif %}
