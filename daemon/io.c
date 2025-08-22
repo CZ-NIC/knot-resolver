@@ -567,6 +567,11 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 		}
 	}
 
+	/* Avoid Null pointer */
+	if (!out) {
+		return;
+	}
+
 	/** The current single command and the remaining command(s). */
 	char *cmd, *cmd_next = NULL;
 	bool incomplete_cmd = false;
