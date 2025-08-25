@@ -919,8 +919,9 @@ static int clear_bpf_cb(trie_val_t *val, void *ctx)
 			uv_fileno(endpoint->handle, &sockfd);
 		kr_require(sockfd != -1);
 
+		/* appease linter, kernel ignores optval for SO_DETACH_BPF */
 		int no = 0;
-		if (setsockopt(sockfd, SOL_SOCKET, SO_DETACH_BPF, &no, sizeof(no)) != 0) {
+		if (setsockopt(sockfd, SOL_SOCKET, SO_DETACH_BPF, &no, 0) != 0) {
 			kr_log_error(NETWORK, "failed to clear SO_DETACH_BPF socket option\n");
 		}
 		/* Proceed even if setsockopt() failed,
