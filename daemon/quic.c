@@ -1089,6 +1089,17 @@ static int handle_packet(struct pl_quic_sess_data *quic,
 
 	qconn = kr_quic_table_lookup(&target->dcid, quic->conn_table);
 	if (!qconn) {
+		struct protolayer_data_param data_param = {
+			.protocol = PROTOLAYER_TYPE_QUIC,
+			.param = NULL /* TODO! */
+		};
+
+		struct session2 *conn_sess = session2_new(SESSION2_TRANSPORT_PARENT,
+				KR_PROTO_DOQ,
+				&data_param,
+				0,
+				false);
+
 		/* TODO react accordingly to errcodes from accept.
 		 * not all errors are terminal nor are all quiet,
 		 * see which case warrants the payload to be discarded

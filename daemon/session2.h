@@ -228,6 +228,9 @@ static inline size_t wire_buf_free_space_length(const struct wire_buf *wb)
 	XX(TCP)\
 	XX(TLS)\
 	XX(HTTP)\
+	XX(QUIC_DEMUX)\
+	XX(QUIC_CONN)\
+	/* deprecated TODO: remove */\
 	XX(QUIC)\
 	\
 	/* PROXYv2 */\

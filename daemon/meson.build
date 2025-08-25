@@ -23,8 +23,10 @@ kresd_src = files([
   'udp_queue.c',
   'worker.c',
   'zimport.c',
-  'quic.c',
-  'quic_stream.c',
+  'quic_demux.c',
+  'quic_conn.c',
+  # 'quic.c',
+  # 'quic_stream.c',
 ])
 
 if nghttp2.found()
