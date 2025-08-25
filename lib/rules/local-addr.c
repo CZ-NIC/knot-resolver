@@ -228,7 +228,7 @@ int kr_rule_local_hosts(const char *path, bool use_nodata, uint32_t ttl,
 		count += 1;
 	}
 error:
-	if (ret) {
+	if (ret) { // NOLINT(clang-analyzer-unix.Stream)
 		ret = kr_error(ret);
 		kr_log_error(RULES, "%s:%zu: invalid syntax\n", path, line_count);
 	}
