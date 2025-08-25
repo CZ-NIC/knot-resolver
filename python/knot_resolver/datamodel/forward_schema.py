@@ -51,7 +51,7 @@ class ForwardSchema(ConfigSchema):
     """
 
     subtree: ListOrItem[DomainName]
-    servers: Union[List[IPAddressOptionalPort], List[ForwardServerSchema]]
+    servers: List[Union[IPAddressOptionalPort, ForwardServerSchema]]
     options: ForwardOptionsSchema = ForwardOptionsSchema()
 
     def _validate(self) -> None:
@@ -86,7 +86,7 @@ class FallbackSchema(ConfigSchema):
     """
 
     enable: bool = False
-    servers: Union[List[IPAddressOptionalPort], List[ForwardServerSchema], None] = None
+    servers: Optional[List[Union[IPAddressOptionalPort, ForwardServerSchema]]] = None
 
     def _validate(self) -> None:
         if self.enable and self.servers is None:
