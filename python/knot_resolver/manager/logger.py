@@ -2,10 +2,8 @@ import logging
 import logging.handlers
 import os
 import sys
-from typing import Optional
 
 from knot_resolver.datamodel.config_schema import KresConfig
-from knot_resolver.datamodel.logging_schema import LogTargetEnum
 from knot_resolver.manager.config_store import ConfigStore, only_on_real_changes_update
 
 from .constants import LOGGING_LEVEL_STARTUP
@@ -58,12 +56,12 @@ def get_log_format(config: KresConfig) -> str:
 
 
 async def _set_log_level(config: KresConfig) -> None:
+    groups = config.logging.groups
+    target = _config_to_level[config.logging.level]
+
     # when logging group is set to make us log with DEBUG
-    if config.logging.groups and "manager" in config.logging.groups:
+    if groups and "manager" in groups:
         target = logging.DEBUG
-    # otherwise, follow the standard log level
-    else:
-        target = _config_to_level[config.logging.level]
 
     # expect exactly one existing log handler on the root
     logger.warning(f"Changing logging level to '{_level_to_name[target]}'")
@@ -71,10 +69,7 @@ async def _set_log_level(config: KresConfig) -> None:
 
 
 async def _set_logging_handler(config: KresConfig) -> None:
-    target: Optional[LogTargetEnum] = config.logging.target
-
-    if target is None:
-        target = "stdout"
+    target = config.logging.target
 
     handler: logging.Handler
     if target == SYSLOG:
