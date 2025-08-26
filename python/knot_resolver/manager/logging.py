@@ -12,6 +12,27 @@ from .constants import LOGGING_LEVEL_STARTUP
 
 logger = logging.getLogger(__name__)
 
+NOTICE_LEVEL = (logging.WARNING + logging.INFO) // 2
+NOTICE_NAME = "NOTICE"
+
+_config_to_level = {
+    "crit": logging.CRITICAL,
+    "err": logging.ERROR,
+    "warning": logging.WARNING,
+    "notice": NOTICE_LEVEL,
+    "info": logging.INFO,
+    "debug": logging.DEBUG,
+}
+
+_level_to_name = {
+    logging.CRITICAL: "CRITICAL",
+    logging.ERROR: "ERROR",
+    logging.WARNING: "WARNING",
+    NOTICE_LEVEL: NOTICE_NAME,
+    logging.INFO: "INFO",
+    logging.DEBUG: "DEBUG",
+}
+
 
 def get_log_format(config: KresConfig) -> str:
     """
@@ -33,24 +54,15 @@ def get_log_format(config: KresConfig) -> str:
 
 
 async def _set_log_level(config: KresConfig) -> None:
-    levels_map = {
-        "crit": "CRITICAL",
-        "err": "ERROR",
-        "warning": "WARNING",
-        "notice": "WARNING",
-        "info": "INFO",
-        "debug": "DEBUG",
-    }
-
     # when logging group is set to make us log with DEBUG
     if config.logging.groups and "manager" in config.logging.groups:
-        target = "DEBUG"
+        target = logging.DEBUG
     # otherwise, follow the standard log level
     else:
-        target = levels_map[config.logging.level]
+        target = _config_to_level[config.logging.level]
 
     # expect exactly one existing log handler on the root
-    logger.warning(f"Changing logging level to '{target}'")
+    logger.warning(f"Changing logging level to '{_level_to_name[target]}'")
     logging.getLogger().setLevel(target)
 
 
