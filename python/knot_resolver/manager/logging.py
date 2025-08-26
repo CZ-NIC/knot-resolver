@@ -2,15 +2,13 @@ import logging
 import logging.handlers
 import os
 import sys
-from typing import Optional
+from typing import Any, Optional
 
 from knot_resolver.datamodel.config_schema import KresConfig
 from knot_resolver.datamodel.logging_schema import LogTargetEnum
 from knot_resolver.manager.config_store import ConfigStore, only_on_real_changes_update
 
 from .constants import LOGGING_LEVEL_STARTUP
-
-logger = logging.getLogger(__name__)
 
 NOTICE_LEVEL = (logging.WARNING + logging.INFO) // 2
 NOTICE_NAME = "NOTICE"
@@ -32,6 +30,21 @@ _level_to_name = {
     logging.INFO: "INFO",
     logging.DEBUG: "DEBUG",
 }
+
+
+class LoggerWithNotice(logging.Logger):
+    """Custom logger with additional notice log and level."""
+
+    def notice(self: logging.Logger, msg: Any, *args: Any, **kwargs: Any) -> None:
+        if self.isEnabledFor(NOTICE_LEVEL):
+            self._log(NOTICE_LEVEL, msg, args, **kwargs)
+
+
+logging.addLevelName(NOTICE_LEVEL, NOTICE_NAME)
+# set LoggerWithNotice as default logger class
+logging.setLoggerClass(LoggerWithNotice)
+
+logger = logging.getLogger(__name__)
 
 
 def get_log_format(config: KresConfig) -> str:
