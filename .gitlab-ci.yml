@@ -860,7 +860,7 @@ python:examples:
 python:check:
   <<: *python
   script:
-    - poetry install --all-extras --only main,dev,lint
+    - poetry install --all-extras --only main,build,dev,lint
     - poe check
 
 python:format:
