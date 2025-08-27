@@ -40,6 +40,10 @@ watchdog = { version = "*", optional = true }
 prometheus = ["prometheus-client"]
 watchdog = ["watchdog"]
 
+[tool.poetry.group.build.dependencies]
+poetry-core = ">=1.0.0"
+setuptools = ">=67.8.0"
+
 [tool.poetry.group.dev.dependencies]
 poetry = "^1.8.3"
 pyparsing = "^3.1.1"
@@ -129,7 +133,7 @@ no_implicit_optional = true
 
 [build-system]
 requires = [
-    "poetry-core>=1.0.0",
-    "setuptools>=67.8.0"
+    "poetry-core",
+    "setuptools"
 ]
 build-backend = "poetry.core.masonry.api"
