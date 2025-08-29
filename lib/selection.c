@@ -657,15 +657,16 @@ void error(struct kr_query *qry, struct address_state *addr_state,
 		qry->server_selection.local_state->timeouts++;
 		server_timeout(qry, transport, addr_state, &qry->request->ctx->cache);
 		break;
+	case KR_SELECTION_FORMERR_EDNS:
+		/* It's quite possible that the server does not support EDNS,
+		 * but violated this MUST.  It won't hurt to try. */
+		kr_log_notice(DEVEL, "XXX _FORMERR_EDNS: NO_EDNS = %d\n", (int)qry->flags.NO_EDNS);
 	case KR_SELECTION_FORMERR:
 		if (qry->flags.NO_EDNS) {
 			addr_state->broken = true;
 		} else {
 			qry->flags.NO_EDNS = true;
 		}
-		break;
-	case KR_SELECTION_FORMERR_EDNS:
-		addr_state->broken = true;
 		break;
 	case KR_SELECTION_MISMATCHED:
 		if (qry->flags.NO_0X20 && qry->flags.TCP) {
