@@ -5,7 +5,9 @@ import sys
 from typing import Any
 
 from knot_resolver.datamodel.config_schema import KresConfig
+from knot_resolver.datamodel.logging_schema import LogGroupsManagerEnum
 from knot_resolver.manager.config_store import ConfigStore, only_on_real_changes_update
+from knot_resolver.utils.modeling.types import get_generic_type_arguments
 
 from .constants import LOGGING_LEVEL_STARTUP
 
@@ -80,6 +82,19 @@ async def _set_log_level(config: KresConfig) -> None:
     # expect exactly one existing log handler on the root
     logger.warning(f"Changing logging level to '{_level_to_name[target]}'")
     logging.getLogger().setLevel(target)
+
+    # mapping for nonstandard names
+    groups_map = {
+        "files-watchdog": "files",
+    }
+    # set debug groups
+    if groups:
+        package_name = __name__.rsplit(".", 1)[0]
+        for group in groups:
+            if group in get_generic_type_arguments(LogGroupsManagerEnum):
+                logger_name = f"{package_name}.{groups_map.get(group, group)}"
+                logger.warning(f"Changing logging level of '{logger_name}' group to '{_level_to_name[target]}'")
+                logging.getLogger(logger_name).setLevel(logging.DEBUG)
 
 
 async def _set_logging_handler(config: KresConfig) -> None:
