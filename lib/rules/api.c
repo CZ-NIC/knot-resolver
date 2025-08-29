@@ -50,7 +50,7 @@ static const uint8_t KEY_VIEW_SRC6[1] = "6";
 enum ret_codes_ {
 	RET_CONT_CACHE = 0,
 	RET_ANSWERED = 1,
-	RET_CONTINUE,
+	RET_CONTINUE = 2,
 };
 
 static int answer_exact_match(struct kr_query *qry, knot_pkt_t *pkt, uint16_t type,

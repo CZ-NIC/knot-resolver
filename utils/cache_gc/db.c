@@ -130,15 +130,15 @@ static uint8_t entry_labels(knot_db_val_t * key, uint16_t rrtype)
 
 void debug_printbin(const char *str, unsigned int len)
 {
-	putchar('"');
+	(void)putchar('"');
 	for (int idx = 0; idx < len; idx++) {
 		char c = str[idx];
 		if (isprint(c))
-			putchar(c);
+			(void)putchar(c);
 		else
 			printf("`%02hhx`", c);
 	}
-	putchar('"');
+	(void)putchar('"');
 }
 
 /** Return one entry_h reference from a cache DB value.  NULL if not consistent/suitable. */

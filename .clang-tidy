@@ -36,6 +36,7 @@ Checks: |-
   -readability-identifier-length,
   -readability-isolate-declaration,
   -readability-magic-numbers,
+  -readability-math-missing-parentheses,
   -readability-non-const-parameter,
   -readability-redundant-declaration,
   -readability-uppercase-literal-suffix,
