@@ -16,7 +16,10 @@ log_target('{{ cfg.logging.target }}')
 -- logging.groups
 log_groups({
 {% for g in cfg.logging.groups %}
-{% if g not in ["manager", "supervisord", "policy-loader", "kresd", "cache-gc"] %}
+{% if g not in [
+    "manager", "supervisord", "policy-loader", "kresd", "cache-gc",
+    "files", "metrics", "server",
+] %}
     '{{ g }}',
 {% endif %}
 {% endfor %}

@@ -16,6 +16,12 @@ LogGroupsProcessesEnum = Literal[
     "cache-gc",
 ]
 
+LogGroupsManagerEnum = Literal[
+    "files",
+    "metrics",
+    "server",
+]
+
 LogGroupsKresdEnum = Literal[
     ## Now the LOG_GRP_*_TAG defines, exactly from ../../../lib/log.h
     "system",
@@ -68,7 +74,7 @@ LogGroupsKresdEnum = Literal[
     # "reqdbg",... (non-displayed section of the enum)
 ]
 
-LogGroupsEnum = Literal[LogGroupsProcessesEnum, LogGroupsKresdEnum]
+LogGroupsEnum = Literal[LogGroupsProcessesEnum, LogGroupsManagerEnum, LogGroupsKresdEnum]
 
 
 class DnstapSchema(ConfigSchema):
