@@ -39,8 +39,9 @@
 #define HTTP_FRAME_HDLEN 9
 #define HTTP_FRAME_PADLEN 1
 
-/** accept only non-normal URIs,
- * otherwise only /doh and /dns-query are accepted */
+/** accept ~only~ also non-normal URIs,
+ * otherwise only /doh and /dns-query are accepted
+ * FIXME: really figure out details. */
 #define DOH_IS_PRIVATE 1
 
 struct http_stream {
@@ -139,11 +140,12 @@ static bool check_uri(struct pl_http_sess_data *ctx, const char *path)
 		match_found = strlen(endpoints[i]) == endpoint_len
 			&& !strncmp(path + 1, endpoints[i], strlen(endpoints[i]));
 	}
-
+#if 0 // FIXME: figure out details in here
 	if (DOH_IS_PRIVATE && match_found) { // specifically forbid normal DoH URIs
 		set_status(ctx, HTTP_STATUS_FORBIDDEN);
 		return false;
 	}
+#endif
 	if (!DOH_IS_PRIVATE && !match_found) {
 		set_status(ctx, HTTP_STATUS_NOT_FOUND);
 		return false;
