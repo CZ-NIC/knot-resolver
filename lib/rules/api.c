@@ -347,6 +347,104 @@ static size_t key_common_subtree(knot_db_val_t k1, knot_db_val_t k2, size_t lf_s
 	} while (true);
 }
 
+/// FIXME: describe?  For now, just a part of the call site, torn out separately.
+static int subtree_search(const size_t lf_start_i, const knot_db_val_t key,
+				const char * const ruleset_name,
+			 	struct kr_query *qry, knot_pkt_t *pkt)
+{
+	kr_require(lf_start_i < KEY_MAXLEN);
+	knot_db_val_t key_leq = key;
+	knot_db_val_t val;
+	if (qry->stype == KNOT_RRTYPE_DS)
+		goto shorten; // parent-side type, belongs into zone closer to root
+	// LATER: again, use cursor to iterate over multiple rules on the same key.
+	do {
+		int ret = ruledb_op(read_leq, &key_leq, &val);
+		if (ret == -ENOENT) return RET_CONTINUE;
+		if (ret < 0) return kr_error(ret);
+		if (ret > 0) { // found a previous key
+			size_t cs_len = key_common_subtree(key, key_leq, lf_start_i);
+			if (cs_len < lf_start_i) // no suitable key can exist in DB
+				return RET_CONTINUE;
+			if (cs_len < key_leq.len) { // retry at the common subtree
+				key_leq.len = cs_len;
+				continue;
+			}
+			kr_assert(cs_len == key_leq.len);
+		}
+		const knot_db_val_t zla_lf = {
+			.data = key_leq.data + lf_start_i,
+			.len  = key_leq.len  - lf_start_i,
+		};
+		// Found some good key, now check tags.
+		if (!kr_rule_consume_tags(&val, qry->request)) {
+			kr_assert(key_leq.len >= lf_start_i);
+		shorten:
+			// Shorten key_leq by one label and retry.
+			if (key_leq.len <= lf_start_i) // nowhere to shorten
+				return RET_CONTINUE;
+			const char *data = key_leq.data;
+			while (key_leq.len > lf_start_i && data[--key_leq.len] != '\0') ;
+			continue;
+		}
+		// Tags OK; get ZLA type and deal with special _FORWARD case
+		val_zla_type_t ztype;
+		if (deserialize_fails_assert(&val, &ztype))
+			return kr_error(EILSEQ);
+		if (ztype == VAL_ZLAT_FORWARD) {
+			knot_dname_t apex_name[KNOT_DNAME_MAXLEN];
+			ret = knot_dname_lf2wire(apex_name, zla_lf.len, zla_lf.data);
+			if (kr_fails_assert(ret > 0)) return kr_error(ret);
+			if (val.len > 0 // zero len -> default flags
+			    && deserialize_fails_assert(&val, &qry->data_src.flags)) {
+				return kr_error(EILSEQ);
+			}
+
+			qry->data_src.initialized = true;
+			qry->data_src.targets_ptr = val;
+			qry->data_src.rule_depth = knot_dname_labels(apex_name, NULL);
+			return RET_CONT_CACHE;
+		}
+
+		// Process opts.
+		kr_rule_opts_t opts;
+		if (deserialize_fails_assert(&val, &opts))
+			return kr_error(EILSEQ);
+		log_rule(opts, qry);
+		if (opts.score < qry->request->rule_score_apply)
+			goto shorten; // continue looking for rules
+
+		// The non-forward types optionally specify TTL.
+		uint32_t ttl = KR_RULE_TTL_DEFAULT;
+		if (val.len >= sizeof(ttl)) // allow omitting -> can't kr_assert
+			deserialize_fails_assert(&val, &ttl);
+
+		// Finally execute the rule.
+		switch (ztype) {
+		case KR_RULE_SUB_EMPTY:
+		case KR_RULE_SUB_NXDOMAIN:
+		case KR_RULE_SUB_NODATA:
+			ret = answer_zla_empty(ztype, qry, pkt, zla_lf, ttl);
+			break;
+		case KR_RULE_SUB_REDIRECT:
+			ret = answer_zla_redirect(qry, pkt, ruleset_name, zla_lf, ttl);
+			break;
+		case KR_RULE_SUB_DNAME:
+			ret = answer_zla_dname(ztype, qry, pkt, zla_lf, ttl, &val);
+			break;
+		default:
+			return kr_error(EILSEQ);
+		}
+		if (kr_fails_assert(val.len == 0)) {
+			kr_log_error(RULES, "ERROR: unused bytes: %zu\n", val.len);
+			return kr_error(EILSEQ);
+		}
+		if (ret == kr_error(EAGAIN))
+			goto shorten;
+		return ret ? kr_error(ret) : RET_ANSWERED;
+	} while (true);
+}
+
 int rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt)
 {
 	kr_require(the_rules);
@@ -419,105 +517,17 @@ int rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt)
 		}
 
 		/* Find the closest zone-like apex that applies.
-		 * Now the key needs one byte change and a little truncation
-		 * (we may truncate repeatedly). */
+		 * Now the key needs one byte change and a little truncation */
 		static_assert(sizeof(KEY_ZONELIKE_A) == sizeof(KEY_EXACT_MATCH),
 				"bad combination of constants");
 		memcpy(key_data_ruleset_end, &KEY_ZONELIKE_A, sizeof(KEY_ZONELIKE_A));
 		key.len = key_data + KEY_DNAME_END_OFFSET - (uint8_t *)key.data;
 		const size_t lf_start_i = key_data_ruleset_end + sizeof(KEY_ZONELIKE_A)
 					- (const uint8_t *)key.data;
-		kr_require(lf_start_i < KEY_MAXLEN);
-		knot_db_val_t key_leq = key;
-		knot_db_val_t val;
-		if (rrtype == KNOT_RRTYPE_DS)
-			goto shorten; // parent-side type, belongs into zone closer to root
-		// LATER: again, use cursor to iterate over multiple rules on the same key.
-		do {
-			ret = ruledb_op(read_leq, &key_leq, &val);
-			if (ret == -ENOENT) break;
-			if (ret < 0) return kr_error(ret);
-			if (ret > 0) { // found a previous key
-				size_t cs_len = key_common_subtree(key, key_leq, lf_start_i);
-				if (cs_len < lf_start_i) // no suitable key can exist in DB
-					break;
-				if (cs_len < key_leq.len) { // retry at the common subtree
-					key_leq.len = cs_len;
-					continue;
-				}
-				kr_assert(cs_len == key_leq.len);
-			}
-			const knot_db_val_t zla_lf = {
-				.data = key_leq.data + lf_start_i,
-				.len  = key_leq.len  - lf_start_i,
-			};
-			// Found some good key, now check tags.
-			if (!kr_rule_consume_tags(&val, qry->request)) {
-				kr_assert(key_leq.len >= lf_start_i);
-			shorten:
-				// Shorten key_leq by one label and retry.
-				if (key_leq.len <= lf_start_i) // nowhere to shorten
-					break;
-				const char *data = key_leq.data;
-				while (key_leq.len > lf_start_i && data[--key_leq.len] != '\0') ;
-				continue;
-			}
-			// Tags OK; get ZLA type and deal with special _FORWARD case
-			val_zla_type_t ztype;
-			if (deserialize_fails_assert(&val, &ztype))
-				return kr_error(EILSEQ);
-			if (ztype == VAL_ZLAT_FORWARD) {
-				knot_dname_t apex_name[KNOT_DNAME_MAXLEN];
-				ret = knot_dname_lf2wire(apex_name, zla_lf.len, zla_lf.data);
-				if (kr_fails_assert(ret > 0)) return kr_error(ret);
-				if (val.len > 0 // zero len -> default flags
-				    && deserialize_fails_assert(&val, &qry->data_src.flags)) {
-					return kr_error(EILSEQ);
-				}
 
-				qry->data_src.initialized = true;
-				qry->data_src.targets_ptr = val;
-				qry->data_src.rule_depth = knot_dname_labels(apex_name, NULL);
-				return RET_CONT_CACHE;
-			}
-
-			// Process opts.
-			kr_rule_opts_t opts;
-			if (deserialize_fails_assert(&val, &opts))
-				return kr_error(EILSEQ);
-			log_rule(opts, qry);
-			if (opts.score < qry->request->rule_score_apply)
-				goto shorten; // continue looking for rules
-
-			// The non-forward types optionally specify TTL.
-			uint32_t ttl = KR_RULE_TTL_DEFAULT;
-			if (val.len >= sizeof(ttl)) // allow omitting -> can't kr_assert
-				deserialize_fails_assert(&val, &ttl);
-
-			// Finally execute the rule.
-			switch (ztype) {
-			case KR_RULE_SUB_EMPTY:
-			case KR_RULE_SUB_NXDOMAIN:
-			case KR_RULE_SUB_NODATA:
-				ret = answer_zla_empty(ztype, qry, pkt, zla_lf, ttl);
-				break;
-			case KR_RULE_SUB_REDIRECT:
-				ret = answer_zla_redirect(qry, pkt, ruleset_name, zla_lf, ttl);
-				break;
-			case KR_RULE_SUB_DNAME:
-				ret = answer_zla_dname(ztype, qry, pkt, zla_lf, ttl, &val);
-				break;
-			default:
-				return kr_error(EILSEQ);
-			}
-			if (kr_fails_assert(val.len == 0)) {
-				kr_log_error(RULES, "ERROR: unused bytes: %zu\n", val.len);
-				return kr_error(EILSEQ);
-			}
-			if (ret == kr_error(EAGAIN))
-				goto shorten;
-			return ret ? kr_error(ret) : RET_ANSWERED;
-		} while (true);
+		ret = subtree_search(lf_start_i, key, ruleset_name, qry, pkt);
+		if (ret != RET_CONTINUE)
+			return ret;
 	}
 
 	return RET_CONT_CACHE;
