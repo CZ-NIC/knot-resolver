@@ -467,3 +467,14 @@ static inline void kr_query_inform_timeout(struct kr_request *req, const struct 
 
 	kr_log_req(req, qid, ind, WORKER, "internal timeout for resolving the request has expired\n");
 }
+
+/* Let's represent unblocked (allow-listed) requests in this way. */
+static inline void kr_request_unblock(struct kr_request *req)
+{
+	req->rule.action = KREQ_ACTION_PASS;
+}
+static inline bool kr_request_unblocked(const struct kr_request *req)
+{
+	return req->rule.action == KREQ_ACTION_PASS;
+}
+

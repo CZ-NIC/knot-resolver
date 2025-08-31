@@ -193,7 +193,7 @@ int kr_rule_local_data_del(const knot_rrset_t *rrs, kr_rule_tags_t tags);
 
 enum kr_rule_sub_t {
 	/// Empty zone, i.e. with SOA and NS
-	KR_RULE_SUB_EMPTY = 1,
+	KR_RULE_SUB_EMPTY = 16,
 	/// NXDOMAIN for everything; TODO: SOA owner is hard.
 	KR_RULE_SUB_NXDOMAIN,
 	/// NODATA answers but not on exact name (e.g. it's similar to DNAME)

@@ -356,6 +356,7 @@ static int subtree_search(const size_t lf_start_i, const knot_db_val_t key,
 				const char * const ruleset_name,
 			 	struct kr_query *qry, knot_pkt_t *pkt)
 {
+	struct kr_request * const req = qry->request;
 	kr_require(lf_start_i < KEY_MAXLEN);
 	knot_db_val_t key_leq = key;
 	knot_db_val_t val;
@@ -381,7 +382,7 @@ static int subtree_search(const size_t lf_start_i, const knot_db_val_t key,
 			.len  = key_leq.len  - lf_start_i,
 		};
 		// Found some good key, now check tags.
-		if (!kr_rule_consume_tags(&val, qry->request)) {
+		if (!kr_rule_consume_tags(&val, req)) {
 			kr_assert(key_leq.len >= lf_start_i);
 		shorten:
 			// Shorten key_leq by one label and retry.
@@ -410,12 +411,25 @@ static int subtree_search(const size_t lf_start_i, const knot_db_val_t key,
 			return RET_CONT_CACHE;
 		}
 
+		// Only forward rules apply to unblocked requests.
+		// LATER(optim.): we might cache the state of having no forward rules
+		if (kr_request_unblocked(req))
+			goto shorten;
+		// Unblock rules also don't have opts+ttl.
+		if (ztype == VAL_ZLAT_UNBLOCK) {
+			kr_request_unblock(req);
+			VERBOSE_MSG(qry, "=> unblocked\n");
+			if (kr_fails_assert(val.len == 0))
+				kr_log_error(RULES, "ERROR: unused bytes: %zu\n", val.len);
+			goto shorten; // the same situation as kr_request_unblocked()
+		}
+
 		// Process opts.
 		kr_rule_opts_t opts;
 		if (deserialize_fails_assert(&val, &opts))
 			return kr_error(EILSEQ);
 		log_rule(opts, qry);
-		if (opts.score < qry->request->rule_score_apply)
+		if (opts.score < req->rule_score_apply)
 			goto shorten; // continue looking for rules
 
 		// The non-forward types optionally specify TTL.
@@ -503,6 +517,8 @@ int rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt)
 				goto skip_exact;
 			}
 		}
+		if (kr_request_unblocked(qry->request))
+			goto skip_exact;
 
 		// Probe for exact and CNAME rule.
 		memcpy(key_data_ruleset_end, &KEY_EXACT_MATCH, sizeof(KEY_EXACT_MATCH));
