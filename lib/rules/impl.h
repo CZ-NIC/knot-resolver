@@ -46,6 +46,8 @@ int rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt);
 typedef uint8_t val_zla_type_t;
 /** This effectively contains enum kr_rule_sub_t */
 enum {
+	/** Unblock (i.e. allow-list) this subtree. */
+	VAL_ZLAT_UNBLOCK = 8,
 	/** Forward, i.e. override upstream for this subtree (resolver or auth). */
 	VAL_ZLAT_FORWARD = 128,
 };
