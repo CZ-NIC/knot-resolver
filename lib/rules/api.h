@@ -19,6 +19,14 @@ typedef uint64_t kr_rule_tags_t;
 /// Tags "capacity", i.e. numbered from 0 to _CAP - 1.
 #define KR_RULE_TAGS_CAP (sizeof(kr_rule_tags_t) * 8)
 
+/// Combine two sets of tags, i.e. union of the two tag-sets.
+static inline kr_rule_tags_t kr_rule_tags_combine(kr_rule_tags_t t1, kr_rule_tags_t t2)
+{
+	if (t1 == KR_RULE_TAGS_ALL || t2 == KR_RULE_TAGS_ALL)
+		return KR_RULE_TAGS_ALL;
+	return t1 | t2;
+}
+
 /// Extra options for a rule (not for forwarding)
 struct kr_rule_opts {
 	/// Degree of severity for the rule;  FIXME: granularity, defaults, etc.
@@ -212,6 +220,12 @@ enum kr_rule_sub_t {
 KR_EXPORT
 int kr_rule_local_subtree(const knot_dname_t *apex, enum kr_rule_sub_t type,
 			  uint32_t ttl, kr_rule_tags_t tags, kr_rule_opts_t opts);
+
+/** Unblock a subtree, i.e. allow-list those names.
+ *
+ * You can call it multiple times with different tags; they will combine.
+ */
+int kr_rule_local_unblock(const knot_dname_t *apex, kr_rule_tags_t tags);
 
 /** Insert a view action into the default ruleset.
  *

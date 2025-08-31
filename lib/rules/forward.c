@@ -141,7 +141,7 @@ int kr_rule_forward(const knot_dname_t *apex, kr_rule_fwd_flags_t flags,
 	}
 
 	uint8_t key_data[KEY_MAXLEN];
-	knot_db_val_t key = zla_key(apex, key_data);
+	knot_db_val_t key = zla_key(apex, key_data, RULESET_DEFAULT);
 
 	// Prepare the data into a temporary buffer.
 	const int targets_len = count * sizeof(union kr_sockaddr);
