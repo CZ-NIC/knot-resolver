@@ -989,7 +989,7 @@ int kr_rule_local_subtree(const knot_dname_t *apex, enum kr_rule_sub_t type,
 {
 	return rule_local_subtree(apex, type, NULL, ttl, tags, opts);
 }
-knot_db_val_t zla_key(const knot_dname_t *apex, uint8_t key_data[KEY_MAXLEN])
+knot_db_val_t zla_key(const knot_dname_t *apex, uint8_t key_data[KEY_MAXLEN], const char ruleset[])
 {
 	kr_require(the_rules);
 	knot_db_val_t key;
@@ -998,9 +998,9 @@ knot_db_val_t zla_key(const knot_dname_t *apex, uint8_t key_data[KEY_MAXLEN])
 	key.data -= sizeof(KEY_ZONELIKE_A);
 	memcpy(key.data, &KEY_ZONELIKE_A, sizeof(KEY_ZONELIKE_A));
 
-	const size_t rsp_len = strlen(RULESET_DEFAULT);
+	const size_t rsp_len = strlen(ruleset);
 	key.data -= rsp_len;
-	memcpy(key.data, RULESET_DEFAULT, rsp_len);
+	memcpy(key.data, ruleset, rsp_len);
 	key.len = key_data + KEY_DNAME_END_OFFSET - (uint8_t *)key.data;
 	return key;
 }
@@ -1029,7 +1029,7 @@ static int rule_local_subtree(const knot_dname_t *apex, enum kr_rule_sub_t type,
 	ENSURE_the_rules;
 
 	uint8_t key_data[KEY_MAXLEN];
-	knot_db_val_t key = zla_key(apex, key_data);
+	knot_db_val_t key = zla_key(apex, key_data, RULESET_DEFAULT);
 
 	// Prepare the data into a temporary buffer.
 	const int target_len = has_target ? knot_dname_size(target) : 0;
@@ -1055,6 +1055,44 @@ static int rule_local_subtree(const knot_dname_t *apex, enum kr_rule_sub_t type,
 
 	knot_db_val_t val = { .data = buf, .len = val_len };
 	int ret = ruledb_op(write, &key, &val, 1); // TODO: overwriting on ==tags?
+	// ENOSPC seems to be the only expectable error.
+	kr_assert(ret == 0 || ret == kr_error(ENOSPC));
+	return ret;
+}
+
+int kr_rule_local_unblock(const knot_dname_t *apex, kr_rule_tags_t tags)
+{
+	ENSURE_the_rules;
+
+	const val_zla_type_t ztype = VAL_ZLAT_UNBLOCK;
+	enum { val_len = sizeof(tags) + sizeof(ztype) };
+
+	uint8_t key_data[KEY_MAXLEN];
+	knot_db_val_t key = zla_key(apex, key_data, RULESET_START);
+
+	// Maybe the name is there already?  Read it and combine the tags.
+	knot_db_val_t val = { 0 };
+	int ret = ruledb_op(read, &key, &val, 1);
+	kr_assert(ret == 0 || ret == kr_error(ENOENT));
+	if (ret == 0) {
+		if (kr_fails_assert(val.len == val_len))
+			return kr_error(EINVAL);
+		kr_rule_tags_t tags_old;
+		memcpy(&tags_old, val.data, sizeof(tags_old));
+		tags = kr_rule_tags_combine(tags, tags_old);
+	}
+
+	// Construct the data to write
+	uint8_t buf[val_len], *data = buf;
+	memcpy(data, &tags, sizeof(tags));
+	data += sizeof(tags);
+	memcpy(data, &ztype, sizeof(ztype));
+	data += sizeof(ztype);
+	kr_require(data == buf + val_len);
+
+	val.data = buf;
+	val.len = val_len;
+	ret = ruledb_op(write, &key, &val, 1);
 	// ENOSPC seems to be the only expectable error.
 	kr_assert(ret == 0 || ret == kr_error(ENOSPC));
 	return ret;
