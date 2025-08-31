@@ -37,7 +37,11 @@ const kr_rule_opts_t KR_RULE_OPTS_DEFAULT = { .score = KR_RULE_SCORE_DEFAULT, /*
 	-> conditions + action-rule string; see kr_view_insert_action()
  */
 
+/// We put basically everything into this ruleset.
 /*const*/ char RULESET_DEFAULT[] = "d";
+/// _START is only used for VAL_ZLAT_UNBLOCK (in KEY_ZONELIKE_A) and only once per kr_request.
+/*const*/ char RULESET_START[] = "1";
+/*const*/ char RULESETS_ALL[] = "1\0d";
 
 static const uint8_t KEY_EXACT_MATCH[1] = "e";
 static const uint8_t KEY_ZONELIKE_A [1] = "a";
@@ -205,7 +209,7 @@ int kr_rules_init(const char *path, size_t maxsize, bool overwrite)
 	/* Activate one default ruleset. */
 	uint8_t key_rs[] = "\0rulesets";
 	knot_db_val_t key = { .data = key_rs, .len = sizeof(key_rs) };
-	knot_db_val_t rulesets = { .data = &RULESET_DEFAULT, .len = strlen(RULESET_DEFAULT) + 1 };
+	knot_db_val_t rulesets = { .data = &RULESETS_ALL, .len = sizeof(RULESETS_ALL) };
 	ret = ruledb_op(remove, &key, 1);  kr_assert(ret == 0 || ret == 1);
 	ret = ruledb_op(write, &key, &rulesets, 1);
 	if (ret == 0) return kr_ok();
@@ -490,6 +494,16 @@ int rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt)
 			rulesets.len -= rsp_len + 1;
 		}
 
+		// RULESET_START only applies once per kr_request,
+		// and it doesn't do exact matches
+		if (strcmp(ruleset_name, RULESET_START) == 0) {
+			if (qry->parent) {
+				continue;
+			} else {
+				goto skip_exact;
+			}
+		}
+
 		// Probe for exact and CNAME rule.
 		memcpy(key_data_ruleset_end, &KEY_EXACT_MATCH, sizeof(KEY_EXACT_MATCH));
 		key.len = key_data + KEY_DNAME_END_OFFSET + 2 + sizeof(rrtype)
@@ -515,7 +529,7 @@ int rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt)
 			if (kr_fails_assert(ret == 0 || ret == -ENOENT))
 				return kr_error(ret);
 		}
-
+	skip_exact:;
 		/* Find the closest zone-like apex that applies.
 		 * Now the key needs one byte change and a little truncation */
 		static_assert(sizeof(KEY_ZONELIKE_A) == sizeof(KEY_EXACT_MATCH),
