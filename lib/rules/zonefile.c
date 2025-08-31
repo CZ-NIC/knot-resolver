@@ -71,13 +71,6 @@ static void cname_scan2rule(zs_scanner_t *s)
 	s_data_t *s_data = s->process.data;
 	const struct kr_rule_zonefile_config *c = s_data->c;
 
-	const char *last_label = NULL; // last label of the CNAME
-	for (knot_dname_t *dn = s->r_data; *dn != '\0'; dn += 1 + *dn)
-		last_label = (const char *)dn + 1;
-	if (last_label && strncmp(last_label, "rpz-", 4) == 0) {
-		kr_log_warning(RULES, "skipping unsupported CNAME target .%s\n", last_label);
-		return;
-	}
 	int ret = 0;
 	if (s->r_data[0] == 0) { // "CNAME ." i.e. NXDOMAIN
 		const knot_dname_t *apex = s->r_owner;
@@ -102,7 +95,21 @@ static void cname_scan2rule(zs_scanner_t *s)
 					KNOT_CLASS_IN, s->r_ttl);
 			ret = kr_rule_local_data_ins(&rrs, NULL, c->tags, c->opts);
 		}
+	} else if (knot_dname_is_equal(s->r_data, (const knot_dname_t *)"\frpz-passthru")) {
+		const knot_dname_t *apex = s->r_owner;
+		if (knot_dname_is_wildcard(apex))
+			apex += 2;
+		// RPZ_COMPAT: we unblock the whole subtree regardless of being wildcard.
+		ret = kr_rule_local_unblock(apex, c->tags);
 	} else {
+		const char *last_label = NULL; // last label of the CNAME
+		for (knot_dname_t *dn = s->r_data; *dn != '\0'; dn += 1 + *dn)
+			last_label = (const char *)dn + 1;
+		if (last_label && strncmp(last_label, "rpz-", 4) == 0) {
+			kr_log_warning(RULES, "skipping unsupported CNAME target .%s\n", last_label);
+			return;
+		}
+
 		knot_dname_t *target = s->r_owner;
 		knot_rrset_t rrs;
 		knot_rrset_init(&rrs, target, KNOT_RRTYPE_CNAME, KNOT_CLASS_IN, s->r_ttl);
