@@ -3,16 +3,17 @@
 #include "lib/proto.h"
 // #include "quic.h"
 #include "session2.h"
+#include <ctype.h>
 #include <fenv.h>
 #include <ngtcp2/ngtcp2.h>
 #include <string.h>
 
 static int cmp_expiry_heap_nodes(void *c1, void *c2)
 {
-	if (((struct pl_quic_conn_sess_data *)c1)->next_expiry < ((struct pl_quic_conn_sess_data *)c2)->next_expiry)
+	if (((struct pl_quic_conn_sess_data *)c1)->h.next_expiry < ((struct pl_quic_conn_sess_data *)c2)->h.next_expiry)
 		return -1;
 
-	if (((struct pl_quic_conn_sess_data *)c1)->next_expiry > ((struct pl_quic_conn_sess_data *)c2)->next_expiry)
+	if (((struct pl_quic_conn_sess_data *)c1)->h.next_expiry > ((struct pl_quic_conn_sess_data *)c2)->h.next_expiry)
 		return 1;
 
 	return 0;
@@ -39,15 +40,16 @@ kr_quic_cid_t **kr_quic_table_lookup2(const ngtcp2_cid *cid, kr_quic_table_t *ta
 	return res;
 }
 
-struct session2 *kr_quic_table_lookup(const ngtcp2_cid *cid, kr_quic_table_t *table)
+// struct session2 *kr_quic_table_lookup(const ngtcp2_cid *cid, kr_quic_table_t *table)
+struct pl_quic_conn_sess_data *kr_quic_table_lookup(const ngtcp2_cid *cid, kr_quic_table_t *table)
 {
 	kr_quic_cid_t **pcid = kr_quic_table_lookup2(cid, table);
 	assert(pcid != NULL);
 	return *pcid == NULL ? NULL : (*pcid)->conn_sess;
 }
 
-kr_quic_cid_t **kr_quic_table_insert(struct session2 *conn_sess, const ngtcp2_cid *cid,
-                                    kr_quic_table_t *table)
+kr_quic_cid_t **kr_quic_table_insert(struct pl_quic_conn_sess_data *conn_sess,
+		const ngtcp2_cid *cid, kr_quic_table_t *table)
 {
 	uint64_t hash = cid2hash(cid, table);
 
@@ -68,16 +70,22 @@ kr_quic_cid_t **kr_quic_table_insert(struct session2 *conn_sess, const ngtcp2_ci
 	return addto;
 }
 
-
 //TODO
 // struct pl_quic_demux_sess_data *kr_quic_table_add(ngtcp2_conn *ngconn, const ngtcp2_cid *cid,
 //                                  kr_quic_table_t *table)
-struct pl_quic_demux_sess_data *kr_quic_table_add(struct session2 *conn_sess,
+int kr_quic_table_add(struct pl_quic_conn_sess_data *conn_sess,
 		const ngtcp2_cid *cid, kr_quic_table_t *table)
 {
-	struct pl_quic_demux_sess_data *conn = calloc(1, sizeof(*conn));
-	if (conn == NULL)
-		return NULL;
+	if (!conn_sess || !cid || !table) {
+		return kr_error(EINVAL);
+	}
+
+	// struct pl_quic_demux_sess_data *conn = calloc(1, sizeof(*conn));
+	// if (conn == NULL)
+	// 	return NULL;
+
+	// FIXME might be redundant
+	conn_sess->conn_table = table;
 
 	/* FIXME magic numbers */
 	// conn->conn = ngconn;
@@ -86,41 +94,52 @@ struct pl_quic_demux_sess_data *kr_quic_table_add(struct session2 *conn_sess,
 	// conn->qlog_fd = -1;
 	// wire_buf_init(&conn->unwrap_buf, 1200);
 
-	// conn->next_expiry = UINT64_MAX;
-	if (!heap_insert(table->expiry_heap, (heap_val_t *)conn)) {
-		free(conn);
-		return NULL;
+	conn_sess->h.next_expiry = UINT64_MAX;
+	if (!heap_insert(table->expiry_heap, (heap_val_t *)conn_sess)) {
+		return -1;
 	}
 
 	kr_quic_cid_t **addto = kr_quic_table_insert(conn_sess, cid, table);
 	if (addto == NULL) {
-		heap_delete(table->expiry_heap, heap_find(table->expiry_heap, (heap_val_t *)conn));
-		free(conn);
-		return NULL;
+		heap_delete(table->expiry_heap, heap_find(table->expiry_heap, (heap_val_t *)conn_sess));
+		return -2;
 	}
 
-	table->usage++;
+	conn_sess->creds = table->creds;
+	conn_sess->priority = table->priority;
+	conn_sess->hash_secret[0] = table->hash_secret[0];
+	conn_sess->hash_secret[1] = table->hash_secret[1];
+	conn_sess->hash_secret[2] = table->hash_secret[2];
+	conn_sess->hash_secret[3] = table->hash_secret[3];
 
-	return conn;
+	table->usage++;
+	return kr_ok();
 }
 
+static void init_random_cid(ngtcp2_cid *cid, size_t len)
+{
+	if (len == 0)
+		len = SERVER_DEFAULT_SCIDLEN;
 
-/* TODO REMOVE */
-typedef struct my_ngtcp2_version_cid {
-  uint32_t version;
-  uint8_t *dcid;
-  size_t dcidlen;
-  uint8_t *scid;
-  size_t scidlen;
-} my_ngtcp2_version_cid;
-/* TODO REMOVE */
+	cid->datalen = dnssec_random_buffer(cid->data, len) == DNSSEC_EOK ? len : 0;
+}
 
+static bool init_unique_cid(ngtcp2_cid *cid, size_t len, kr_quic_table_t *table)
+{
+	do {
+		if (init_random_cid(cid, len), cid->datalen == 0)
+			return false;
+
+	} while (kr_quic_table_lookup(cid, table) != NULL);
+	return true;
+}
 
 static enum protolayer_iter_cb_result pl_quic_demux_unwrap(void *sess_data,
 		void *iter_data, struct protolayer_iter_ctx *ctx)
 {
 	int ret = kr_ok();
-	struct session2 *qconn = NULL;
+	// struct session2 *qconn = NULL;
+	struct pl_quic_conn_sess_data *qconn = NULL;
 	struct pl_quic_demux_sess_data *quic_demux = sess_data;
 
 	queue_push(quic_demux->unwrap_queue, ctx);
@@ -131,8 +150,11 @@ static enum protolayer_iter_cb_result pl_quic_demux_unwrap(void *sess_data,
 
 	while (protolayer_queue_has_payload(&quic_demux->unwrap_queue)) {
 		struct protolayer_iter_ctx *data = queue_head(quic_demux->unwrap_queue);
-		// ngtcp2_version_cid dec_cids;
-		my_ngtcp2_version_cid dec_cids;
+		kr_require(data->payload.type == PROTOLAYER_PAYLOAD_WIRE_BUF);
+
+		queue_pop(quic_demux->unwrap_queue);
+		ngtcp2_version_cid dec_cids;
+		ngtcp2_cid odcid;
 		ngtcp2_cid dcid;
 		ngtcp2_cid scid;
 
@@ -147,62 +169,163 @@ static enum protolayer_iter_cb_result pl_quic_demux_unwrap(void *sess_data,
 			return kr_ok();
 		}
 
-		/* JUST A TESTING LOOP INIT */
-		struct session2 *qconns[6] = { 0 };
-		for (int i = 0; i < 5; i++) {
-			uint32_t supported_quic_demux[1] = { NGTCP2_PROTO_VER_V1 };
-			ngtcp2_cid_init(&dcid, dec_cids.dcid, dec_cids.dcidlen - i);
-			ngtcp2_cid_init(&scid, dec_cids.scid, dec_cids.scidlen - i);
-			kr_log_info(DOQ, "dcid: %s (%zu)\n", dec_cids.dcid, dec_cids.dcidlen);
-			kr_log_info(DOQ, "scid: %s (%zu)\n", dec_cids.scid, dec_cids.scidlen);
-			// TODO:
-			// if (ret == NGTCP2_ERR_VERSION_NEGOTIATION) {
-			// 	*action = -QUIC_SEND_VERSION_NEGOTIATION;
-			// 	return kr_ok();
-			// 	// goto finish
-			// }
+		uint32_t supported_quic_demux[1] = { NGTCP2_PROTO_VER_V1 };
+		ngtcp2_cid_init(&dcid, dec_cids.dcid, dec_cids.dcidlen);
+		ngtcp2_cid_init(&scid, dec_cids.scid, dec_cids.scidlen);
 
+		kr_log_info(DOQ, "in demux_unwrap queue loop\n");
 
-			qconn = kr_quic_table_lookup(&dcid, quic_demux->conn_table);
-			if (!qconn) {
-				/* FIXME: alloc on the heap if used beyond this scope */
-				struct kr_quic_conn_param *params = malloc(sizeof(*params));
-				kr_require(params);
-				params->dcid = dcid;
-				params->scid = scid;
-				memcpy(&params->dec_cids, &dec_cids, sizeof(ngtcp2_version_cid));
+		// TODO:
+		// if (ret == NGTCP2_ERR_VERSION_NEGOTIATION) {
+		// 	*action = -QUIC_SEND_VERSION_NEGOTIATION;
+		// 	return kr_ok();
+		// 	// goto finish
+		// }
 
-				struct protolayer_data_param data_param = {
-					.protocol = PROTOLAYER_TYPE_QUIC_CONN,
-					.param = params
-				};
+		qconn = kr_quic_table_lookup(&dcid, quic_demux->conn_table);
+		kr_log_info(DOQ, "%s found the conn, usage: %zu (searched for: %s)\n",
+				!qconn ? "Havent" : "Have",
+				quic_demux->conn_table->usage,
+				dcid.data);
+		if (!qconn) {
+			memcpy(&odcid, &dcid, sizeof(odcid));
+			/* we are the server side so choose our dcid */
+			if (!quic_demux->h.session->outgoing) {
+				if (!init_unique_cid(&dcid, 0, quic_demux->conn_table)) {
+					kr_log_error(DOQ, "Failed to initialize unique cid (servers choice)\n");
+					ret = kr_error(-1);
+				}
+			}
 
-				qconns[i] = session2_new_child(quic_demux->h.session,
-						KR_PROTO_DOQ,
+			
+			struct kr_quic_conn_param *params = malloc(sizeof(*params));
+			kr_require(params);
+			params->dcid = dcid;
+			params->scid = scid;
+			params->odcid = odcid;
+			memcpy(&params->dec_cids, &dec_cids, sizeof(ngtcp2_version_cid));
+
+			struct protolayer_data_param data_param = {
+				.protocol = PROTOLAYER_TYPE_QUIC_CONN,
+				.param = params
+			};
+
+			struct session2 *new_conn_sess =
+				session2_new_child(quic_demux->h.session,
+						KR_PROTO_DOQ_CONN,
 						&data_param,
 						1 /* FIXME */,
 						false);
-				// qconn = session2_new_child(quic_demux->h.session,
-				// 		KR_PROTO_DOQ,
-				// 		&data_param,
-				// 		1 /* FIXME */,
-				// 		false);
 
-				void *x = protolayer_sess_data_get_current(ctx);
-				struct pl_quic_conn_sess_data *y0 =
-					protolayer_sess_data_get_proto(qconns[0], PROTOLAYER_TYPE_QUIC_CONN);
-				struct pl_quic_conn_sess_data *yi =
-					protolayer_sess_data_get_proto(qconns[i], PROTOLAYER_TYPE_QUIC_CONN);
+			struct pl_quic_conn_sess_data *conn_sess_data =
+				protolayer_sess_data_get_proto(new_conn_sess,
+						PROTOLAYER_TYPE_QUIC_CONN);
+			kr_quic_table_add(conn_sess_data, &dcid,
+					quic_demux->conn_table);
 
-				kr_quic_table_add(NULL, &dcid,
-						quic_demux->conn_table);
+			qconn = conn_sess_data;
+
+			ngtcp2_pkt_hd header = { 0 };
+			if (ngtcp2_accept(&header,
+				wire_buf_data(data->payload.wire_buf),
+				wire_buf_data_length(data->payload.wire_buf))
+					!= NGTCP2_NO_ERROR) {
+				// TODO stateless reset 
+				return protolayer_break(data, -1/*FIXME*/);
 			}
 
-			dec_cids.dcid[0]++;
-			dec_cids.dcidlen++;
-			dec_cids.scid[0]++;
-			dec_cids.scidlen++;
-		} /* JUST A TESTING LOOP END */
+			// TODO This never happens (kr_quic_require_retry just returns false)
+			// if (header.tokenlen == 0
+			// 		&& kr_quic_require_retry(table) /* TBD */) {
+			// 	ret = -QUIC_SEND_RETRY;
+			// 	goto finish;
+			// }
+
+			// if (header.tokenlen > 0) {
+			// 	if (header.token[0] == NGTCP2_CRYPTO_TOKEN_MAGIC_RETRY) {
+			// 		ret = ngtcp2_crypto_verify_retry_token(
+			// 			&odcid, header.token, header.tokenlen,
+			// 			(const uint8_t *)table->hash_secret,
+			// 			sizeof(table->hash_secret), header.version,
+			// 			// (const struct sockaddr *)reply->ip_rem,
+			// 			path.remote.addr,
+			// 			path.remote.addrlen,
+			// 			dcid, idle_timeout, now // NOTE setting retry token validity to idle_timeout for simplicity
+			// 		);
+			// 	} else {
+			// 		ret = ngtcp2_crypto_verify_regular_token(
+			// 			header.token, header.tokenlen,
+			// 			(const uint8_t *)table->hash_secret,
+			// 			sizeof(table->hash_secret),
+			// 			// (const struct sockaddr *)reply->ip_rem,
+			// 			path.remote.addr,
+			// 			path.remote.addrlen,
+			// 			QUIC_REGULAR_TOKEN_TIMEOUT, now
+			// 		);
+			// 	}
+			//
+			// 	if (ret != 0) {
+			// 		// goto finish;
+			// 	}
+
+			// TODO store tokenlen to know if the pkt is retry
+			// (tokenlen > 0)
+		}
+
+		ret = session2_unwrap(qconn->h.session,
+				data->payload,
+				data->comm,
+				data->finished_cb,
+				data->finished_cb_baton);
+	}
+
+	return protolayer_break(ctx, kr_ok());
+
+		// /* JUST A TESTING LOOP INIT */
+		// struct session2 *qconns[6] = { 0 };
+		// for (int i = 0; i < 5; i++) {
+		// 	uint32_t supported_quic_demux[1] = { NGTCP2_PROTO_VER_V1 };
+		// 	ngtcp2_cid_init(&dcid, dec_cids.dcid, dec_cids.dcidlen);
+		// 	ngtcp2_cid_init(&scid, dec_cids.scid, dec_cids.scidlen);
+		//
+		// 	// TODO:
+		// 	// if (ret == NGTCP2_ERR_VERSION_NEGOTIATION) {
+		// 	// 	*action = -QUIC_SEND_VERSION_NEGOTIATION;
+		// 	// 	return kr_ok();
+		// 	// 	// goto finish
+		// 	// }
+		//
+		//
+		// 	qconn = kr_quic_table_lookup(&dcid, quic_demux->conn_table);
+		// 	if (!qconn) {
+		// 		/* FIXME: alloc on the heap if used beyond this scope */
+		// 		struct kr_quic_conn_param *params = malloc(sizeof(*params));
+		// 		kr_require(params);
+		// 		params->dcid = dcid;
+		// 		params->scid = scid;
+		// 		memcpy(&params->dec_cids, &dec_cids, sizeof(ngtcp2_version_cid));
+		//
+		// 		struct protolayer_data_param data_param = {
+		// 			.protocol = PROTOLAYER_TYPE_QUIC_CONN,
+		// 			.param = params
+		// 		};
+		//
+		// 		qconns[i] = session2_new_child(quic_demux->h.session,
+		// 				KR_PROTO_DOQ_CONN,
+		// 				&data_param,
+		// 				1 /* FIXME */,
+		// 				false);
+		// 		// qconn = session2_new_child(quic_demux->h.session,
+		// 		// 		KR_PROTO_DOQ,
+		// 		// 		&data_param,
+		// 		// 		1 /* FIXME */,
+		// 		// 		false);
+		//
+		// 		kr_quic_table_add(NULL, &dcid,
+		// 				quic_demux->conn_table);
+		// 	}
+		//
+		// } /* JUST A TESTING LOOP END */
 
 		// ngtcp2_cid_init(&dcid, dec_cids.dcid, dec_cids.dcidlen);
 		// ngtcp2_cid_init(&scid, dec_cids.scid, dec_cids.scidlen);
@@ -236,26 +359,29 @@ static enum protolayer_iter_cb_result pl_quic_demux_unwrap(void *sess_data,
 		// }
 
 
-		struct pl_quic_conn_sess_data *y0 =
-			protolayer_sess_data_get_proto(qconns[0], PROTOLAYER_TYPE_QUIC_CONN);
-		// ret = session2_unwrap_after(y0->h.session,
-				// PROTOLAYER_TYPE_QUIC_CONN,
-
-		ret = session2_unwrap((void *)y0,
-				data->payload,
-				data->comm,
-				data->finished_cb,
-				data->finished_cb_baton);
-
-
-		queue_pop(quic_demux->unwrap_queue);
-
-		session2_close(qconn);
-
-		// return protolayer_continue(data);
-		}
-
-	return protolayer_break(ctx, kr_ok());
+	// 	for (int i = 0; i < 5; i++) {
+	// 		kr_log_info(DOQ, "sess_data session pointers od %d.: %p\n",
+	// 				i, qconns[i]);
+	//
+	// 		struct pl_quic_conn_sess_data *y0 =
+	// 			protolayer_sess_data_get_proto(qconns[i], PROTOLAYER_TYPE_QUIC_CONN);
+	// 		// ret = session2_unwrap_after(quic_demux->h.session,
+	// 		// 		PROTOLAYER_TYPE_QUIC_CONN,
+	// 		ret = session2_unwrap(y0->h.session,
+	// 				data->payload,
+	// 				data->comm,
+	// 				data->finished_cb,
+	// 				data->finished_cb_baton);
+	//
+	// 		session2_close(y0->h.session);
+	// 	}
+	//
+	// 	queue_pop(quic_demux->unwrap_queue);
+	//
+	// 	// return protolayer_continue(data);
+	// 	}
+	//
+	// return protolayer_break(ctx, kr_ok());
 
 // 		/* not all fails should be quiet, some require a response from
 // 		 * our side (kr_quic_send with given action) TODO! */
@@ -329,8 +455,15 @@ static enum protolayer_iter_cb_result pl_quic_demux_unwrap(void *sess_data,
 // 	return protolayer_break(ctx, ret);
 }
 
-kr_quic_table_t *kr_quic_table_new(size_t max_conns, size_t max_ibufs, size_t max_obufs,
-                                       size_t udp_payload, struct tls_credentials *creds)
+static enum protolayer_iter_cb_result pl_quic_demux_wrap(void *sess_data,
+		void *iter_data, struct protolayer_iter_ctx *ctx)
+{
+	return protolayer_continue(ctx);
+}
+
+kr_quic_table_t *kr_quic_table_new(size_t max_conns, size_t max_ibufs,
+		size_t max_obufs, size_t udp_payload,
+		struct tls_credentials *creds)
 {
 #define BUCKETS_PER_CONNS 8
 	size_t table_size = max_conns * BUCKETS_PER_CONNS;
@@ -436,15 +569,7 @@ static int pl_quic_demux_sess_init(struct session2 *session, void *sess_data, vo
 	return 0;
 }
 
-void kr_quic_table_rem2(kr_quic_cid_t **pcid, kr_quic_table_t *table)
-{
-	kr_quic_cid_t *cid = *pcid;
-	*pcid = cid->next;
-	free(cid);
-	table->pointers--;
-}
-
-// static void stream_outprocess(struct kr_quic_conn *conn, struct kr_quic_stream *stream)
+// static void stream_outprocess(struct kr_quic_conn *conn, struct kr_quic_stream *stream)quic_stream
 // {
 // 	if (stream != &conn->streams[conn->stream_inprocess]) {
 // 		return;
@@ -692,7 +817,7 @@ void kr_quic_table_rem2(kr_quic_cid_t **pcid, kr_quic_table_t *table)
 //
 // 	table->usage--;
 // }
-//
+
 // void kr_quic_cleanup(kr_quic_conn_t *conns[], size_t n_conns)
 // {
 // 	for (size_t i = 0; i < n_conns; i++) {
@@ -707,12 +832,66 @@ void kr_quic_table_rem2(kr_quic_cid_t **pcid, kr_quic_table_t *table)
 // 	}
 // }
 
+void kr_quic_table_rem2(kr_quic_cid_t **pcid, kr_quic_table_t *table)
+{
+	kr_quic_cid_t *cid = *pcid;
+	*pcid = cid->next;
+	free(cid);
+	table->pointers--;
+}
+
+void kr_quic_table_rem(struct pl_quic_conn_sess_data *conn,
+		kr_quic_table_t *table)
+{
+	if (conn == NULL || table == NULL)
+		return;
+
+	session2_event(conn->h.session, PROTOLAYER_EVENT_CLOSE/*maybe FORCE?*/, NULL);
+	// session2_event(conn->h.session, PROTOLAYER_EVENT_CLOSE/*maybe FORCE?*/, NULL);
+
+	// for (ssize_t i = conn->streams_count - 1; i >= 0; i--)
+	// 	kr_quic_conn_stream_free(conn, (i + conn->first_stream_id) * 4);
+
+	// assert(conn->streams_count <= 0);
+	// assert(conn->obufs_size == 0);
+
+
+	// TODO: in the conn layer
+	// size_t num_scid = ngtcp2_conn_get_scid(conn->conn, NULL);
+	// ngtcp2_cid *scids = calloc(num_scid, sizeof(*scids));
+	// ngtcp2_conn_get_scid(conn->conn, scids);
+	//
+	// for (size_t i = 0; i < num_scid && scids; i++) {
+	// 	kr_quic_cid_t **pcid = kr_quic_table_lookup2(&scids[i], table);
+	// 	assert(pcid != NULL);
+	// 	if (*pcid == NULL)
+	// 		continue;
+	//
+	// 	assert((*pcid)->conn == conn);
+	// 	kr_quic_table_rem2(pcid, table);
+
+
+	int pos = heap_find(table->expiry_heap, (heap_val_t *)conn);
+	heap_delete(table->expiry_heap, pos);
+
+	// wire_buf_deinit(&conn->unwrap_buf);
+	// gnutls_deinit(conn->tls_session);
+	// ngtcp2_conn_del(conn->conn);
+	// conn->conn = NULL;
+
+	// free(conn);
+
+	table->usage--;
+}
+
 void kr_quic_table_free(kr_quic_table_t *table)
 {
 	if (table != NULL) {
 		while (!EMPTY_HEAP(table->expiry_heap)) {
-			// kr_quic_conn_t *c = *(kr_quic_conn_t **)HHEAD(table->expiry_heap);
-			// kr_quic_table_rem(c, table);
+			struct pl_quic_conn_sess_data *c =
+				*(struct pl_quic_conn_sess_data **)HHEAD(table->expiry_heap);
+
+			kr_quic_table_rem(c, table);
 			// kr_quic_cleanup(&c, 1);
 			// free(c);
 		}
@@ -730,30 +909,43 @@ void kr_quic_table_free(kr_quic_table_t *table)
 
 static int pl_quic_demux_sess_deinit(struct session2 *session, void *data)
 {
+	kr_log_info(DOQ, "IN DEMUX DEINIT\n");
 	struct pl_quic_demux_sess_data *quic = data;
 	queue_deinit(quic->unwrap_queue);
 	queue_deinit(quic->wrap_queue);
+	// currently just loops forever
 	kr_quic_table_free(quic->conn_table);
 	wire_buf_deinit(&quic->outbuf);
 
 	return kr_ok();
 }
 
+static enum protolayer_event_cb_result pl_quic_demux_event_unwrap(
+		enum protolayer_event_type event, void **baton,
+		struct session2 *session, void *sess_data)
+{
+	kr_log_info(DOQ, "IN PL_QUIC_CONN_EVENT_UNWRAP\n");
+	if (event == PROTOLAYER_EVENT_CONNECT_UPDATE) {
+	}
+
+	return PROTOLAYER_EVENT_CONSUME;
+}
+
 __attribute__((constructor))
-static void quic_demux_protolayers_init(void)
+static enum protolayer_event_cb_result quic_demux_protolayers_init(void)
 {
 	protolayer_globals[PROTOLAYER_TYPE_QUIC_DEMUX] = (struct protolayer_globals) {
 		.sess_size = sizeof(struct pl_quic_demux_sess_data),
 		// .iter_size = sizeof(struct ),
-		// .wire_buf_overhead = MAX_QUIC_FRAME_SIZE,
+		.wire_buf_overhead = MAX_QUIC_FRAME_SIZE,
 		// .iter_init = pl_quic_iter_init,
 		// .iter_deinit = pl_quic_iter_deinit,
 		.sess_init = pl_quic_demux_sess_init,
 		.sess_deinit = pl_quic_demux_sess_deinit,
 		.unwrap = pl_quic_demux_unwrap,
-		// .wrap = pl_quic_wrap,
-		// .event_unwrap = pl_quic_event_unwrap,
-		// .event_wrap = pl_quic_event_wrap,
-		// .request_init = pl_quic_request_init,
+		.wrap = pl_quic_demux_wrap,
+		.event_unwrap = pl_quic_demux_event_unwrap,
+		// .event_wrap = pl_quic_demux_event_wrap,
+		// .request_init = pl_quic_demux_request_init,
 	};
 }

@@ -27,6 +27,7 @@
     XX(DOT, dot, "DNS-over-TLS") \
     XX(DOH, doh, "DNS-over-HTTPS") \
     XX(DOQ, doq, "DNS-over-QUIC") \
+    XX(DOQ_CONN, doq_conn, "DNS-over-QUIC-conn") \
 
 /** DNS protocol set - mutually exclusive options, contrary to
  * kr_request_qsource_flags

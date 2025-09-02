@@ -346,6 +346,8 @@ typedef void (*protolayer_finished_cb)(int status, struct session2 *session,
 	XX(STATS_QRY_OUT) \
 	/** OS buffers are full, so not sending any more data. */\
 	XX(OS_BUFFER_FULL) \
+	/** Request update of connection data, only used by DoQ */\
+	XX(CONNECT_UPDATE) \
 	//
 
 /** Event type, to be interpreted by a layer. */
@@ -567,6 +569,10 @@ size_t protolayer_iter_size_est(struct protolayer_iter_ctx *ctx, bool incl_paylo
 /** Layer-specific data - the generic struct. To be added as the first member of
  * each specific struct. */
 struct protolayer_data {
+	/* FIXME: Only used by quic_demux, I do not like changing this struct
+	 * so seriously consider if it is neccesarry here */
+	int heap_node_placeholder; // MUST be first field of the struct
+	uint64_t next_expiry;
 	struct session2 *session; /**< Pointer to the owner session. */\
 };
 

@@ -10,7 +10,6 @@
 #include <ngtcp2/ngtcp2_crypto.h>
 #include <ngtcp2/ngtcp2_crypto_gnutls.h>
 // #include "daemon/tls.h"
-#include "quic_conn.h"
 
 #include <gnutls/x509.h>
 #include <gnutls/gnutls.h>
@@ -70,7 +69,7 @@ typedef struct kr_quic_table {
 	struct tls_credentials *creds;
 	struct gnutls_priority_st *priority;
 	struct heap *expiry_heap;
-	kr_quic_cid_t *conns[];
+	struct kr_quic_cid *conns[];
 } kr_quic_table_t;
 
 

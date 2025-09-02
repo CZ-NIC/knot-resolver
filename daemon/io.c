@@ -6,6 +6,7 @@
 
 #include <contrib/ucw/lib.h>
 #include <contrib/ucw/mempool.h>
+#include <errno.h>
 #include <libknot/errcode.h>
 #include <string.h>
 #include <sys/resource.h>
