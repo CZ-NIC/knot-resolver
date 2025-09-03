@@ -221,6 +221,8 @@ enum kr_request_rule_action {
 	KREQ_ACTION_NODATA = 2,
 	KREQ_ACTION_PASS = 3,
 	KREQ_ACTION_LOCAL_DATA = 6,
+	/// This is missing from the dnstap definition.
+	KREQ_ACTION_AUDIT = 120,
 };
 
 /**

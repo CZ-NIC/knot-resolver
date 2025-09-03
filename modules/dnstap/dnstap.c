@@ -253,8 +253,20 @@ static int dnstap_log(kr_layer_t *ctx, enum dnstap_log_phase phase) {
 		m.type = DNSTAP__MESSAGE__TYPE__CLIENT_RESPONSE;
 
 		if (req->rule.action) {
-			policy.action = req->rule.action;
-			policy.has_action = true;
+			/* FIXME: fill in the tags;
+			 * ideally the rule only had a single tag */
+			policy.rule.data = (uint8_t *)"";
+			policy.rule.len = 0;
+			policy.has_rule = true;
+
+			/* dnstap's action can't represent _AUDIT,
+			 * so in that case we define .rule but no .action
+			 * (which fits, as rule matched but no action happened) */
+			if (req->rule.action != KREQ_ACTION_AUDIT) {
+				policy.action = (unsigned)req->rule.action;
+				policy.has_action = true;
+			}
+
 			m.policy = &policy;
 		}
 
