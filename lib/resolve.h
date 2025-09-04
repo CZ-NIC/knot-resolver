@@ -211,9 +211,11 @@ typedef array_t(union kr_sockaddr) kr_sockaddr_array_t;
 /** Information about rules/policies applied to a kr_request.
  *
  * Let's keep this compatible with dnstap, including the number values.
- * Though the meaning can't "match exactly". */
+ * Though the meaning can't "match exactly".
+ * TODO: when multiple actions happen during one kr_request... */
 struct kr_request_rule {
 	int8_t action;
+	kr_rule_tags_t tags; /// TagSet that caused the action
 };
 enum kr_request_rule_action {
 	// zero == unset
@@ -318,7 +320,8 @@ struct kr_request {
 	unsigned int count_no_nsaddr;
 	unsigned int count_fail_row;
 	alloc_wire_f alloc_wire_cb; /**< CB to allocate answer wire (can be NULL). */
-	kr_rule_tags_t rule_tags; /**< TagSet applying to this request. */
+	kr_rule_tags_t rule_tags_apply; /**< TagSet applying to this request. */
+	kr_rule_tags_t rule_tags_audit; /**< TagSet audited by this request. */
 	struct kr_extended_error extended_error;  /**< EDE info; don't modify directly, use kr_request_set_extended_error() */
 };
 
