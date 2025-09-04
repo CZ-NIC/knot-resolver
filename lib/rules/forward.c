@@ -131,7 +131,6 @@ int kr_rule_forward(const knot_dname_t *apex, kr_rule_fwd_flags_t flags,
 			const struct sockaddr * targets[])
 {
 	ENSURE_the_rules;
-	const kr_rule_tags_t tags = KR_RULE_TAGS_ALL;
 	const val_zla_type_t ztype = VAL_ZLAT_FORWARD;
 
 	int count = 0;
@@ -145,10 +144,8 @@ int kr_rule_forward(const knot_dname_t *apex, kr_rule_fwd_flags_t flags,
 
 	// Prepare the data into a temporary buffer.
 	const int targets_len = count * sizeof(union kr_sockaddr);
-	const int val_len = sizeof(tags) + sizeof(ztype) + sizeof(flags) + targets_len;
+	const int val_len = sizeof(ztype) + sizeof(flags) + targets_len;
 	uint8_t buf[val_len], *data = buf;
-	memcpy(data, &tags, sizeof(tags));
-	data += sizeof(tags);
 	memcpy(data, &ztype, sizeof(ztype));
 	data += sizeof(ztype);
 	memcpy(data, &flags, sizeof(flags));

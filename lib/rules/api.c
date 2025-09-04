@@ -381,18 +381,9 @@ static int subtree_search(const size_t lf_start_i, const knot_db_val_t key,
 			.data = key_leq.data + lf_start_i,
 			.len  = key_leq.len  - lf_start_i,
 		};
-		// Found some good key, now check tags.
-		if (!kr_rule_consume_tags(&val, req)) {
-			kr_assert(key_leq.len >= lf_start_i);
-		shorten:
-			// Shorten key_leq by one label and retry.
-			if (key_leq.len <= lf_start_i) // nowhere to shorten
-				return RET_CONTINUE;
-			const char *data = key_leq.data;
-			while (key_leq.len > lf_start_i && data[--key_leq.len] != '\0') ;
-			continue;
-		}
-		// Tags OK; get ZLA type and deal with special _FORWARD case
+
+		// Found some good key, now get the ZLA type,
+		// and deal with the special _FORWARD case.
 		val_zla_type_t ztype;
 		if (deserialize_fails_assert(&val, &ztype))
 			return kr_error(EILSEQ);
@@ -415,6 +406,19 @@ static int subtree_search(const size_t lf_start_i, const knot_db_val_t key,
 		// LATER(optim.): we might cache the state of having no forward rules
 		if (kr_request_unblocked(req))
 			goto shorten;
+
+		// The other ztype possibilities are similar; check the tags now.
+		if (!kr_rule_consume_tags(&val, req)) {
+			kr_assert(key_leq.len >= lf_start_i);
+		shorten:
+			// Shorten key_leq by one label and retry.
+			if (key_leq.len <= lf_start_i) // nowhere to shorten
+				return RET_CONTINUE;
+			const char *data = key_leq.data;
+			while (key_leq.len > lf_start_i && data[--key_leq.len] != '\0') ;
+			continue;
+		}
+
 		// Unblock rules also don't have opts+ttl.
 		if (ztype == VAL_ZLAT_UNBLOCK) {
 			kr_request_unblock(req);
@@ -1034,13 +1038,13 @@ static int rule_local_subtree(const knot_dname_t *apex, enum kr_rule_sub_t type,
 	// Prepare the data into a temporary buffer.
 	const int target_len = has_target ? knot_dname_size(target) : 0;
 	const bool has_ttl = ttl != KR_RULE_TTL_DEFAULT || has_target;
-	const int val_len = sizeof(tags) + sizeof(ztype) + sizeof(opts)
+	const int val_len = sizeof(ztype) + sizeof(tags) + sizeof(opts)
 			  + (has_ttl ? sizeof(ttl) : 0) + target_len;
 	uint8_t buf[val_len], *data = buf;
-	memcpy(data, &tags, sizeof(tags));
-	data += sizeof(tags);
 	memcpy(data, &ztype, sizeof(ztype));
 	data += sizeof(ztype);
+	memcpy(data, &tags, sizeof(tags));
+	data += sizeof(tags);
 	memcpy(data, &opts, sizeof(opts));
 	data += sizeof(opts);
 	if (has_ttl) {
@@ -1065,7 +1069,7 @@ int kr_rule_local_unblock(const knot_dname_t *apex, kr_rule_tags_t tags)
 	ENSURE_the_rules;
 
 	const val_zla_type_t ztype = VAL_ZLAT_UNBLOCK;
-	enum { val_len = sizeof(tags) + sizeof(ztype) };
+	enum { val_len = sizeof(ztype) + sizeof(tags) };
 
 	uint8_t key_data[KEY_MAXLEN];
 	knot_db_val_t key = zla_key(apex, key_data, RULESET_START);
@@ -1084,10 +1088,10 @@ int kr_rule_local_unblock(const knot_dname_t *apex, kr_rule_tags_t tags)
 
 	// Construct the data to write
 	uint8_t buf[val_len], *data = buf;
-	memcpy(data, &tags, sizeof(tags));
-	data += sizeof(tags);
 	memcpy(data, &ztype, sizeof(ztype));
 	data += sizeof(ztype);
+	memcpy(data, &tags, sizeof(tags));
+	data += sizeof(tags);
 	kr_require(data == buf + val_len);
 
 	val.data = buf;
