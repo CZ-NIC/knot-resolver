@@ -241,7 +241,12 @@ int kr_rules_reset(void)
 	return ruledb_op(commit, false, true);
 }
 
-static bool kr_rule_consume_tags(knot_db_val_t *val, const struct kr_request *req)
+/** Eat and process tags from *val.
+ *
+ * Returning true means that the rule should apply,
+ * and it requires the caller to fill req->rule.action later.
+ */
+static bool kr_rule_consume_tags(knot_db_val_t *val, struct kr_request *req, bool allow_audit)
 {
 	kr_rule_tags_t tags;
 	if (deserialize_fails_assert(val, &tags)) {
@@ -250,7 +255,19 @@ static bool kr_rule_consume_tags(knot_db_val_t *val, const struct kr_request *re
 		 * will fail anyway due to zero remaining length. */
 		return false;
 	}
-	return tags == KR_RULE_TAGS_ALL || (tags & req->rule_tags);
+	// _apply tags take precendence, and we store the last one
+	kr_rule_tags_t const tags_apply = tags & req->rule_tags_apply;
+	if (tags == KR_RULE_TAGS_ALL || tags_apply) {
+		req->rule.tags = tags_apply;
+		return true;
+	}
+	// _audit: we fill everything iff we're the very first action
+	kr_rule_tags_t const tags_audit = tags & req->rule_tags_audit;
+	if (allow_audit && tags_audit && !req->rule.action) {
+		req->rule.tags = tags_audit;
+		req->rule.action = KREQ_ACTION_AUDIT;
+	}
+	return false;
 }
 
 
@@ -407,8 +424,10 @@ static int subtree_search(const size_t lf_start_i, const knot_db_val_t key,
 		if (kr_request_unblocked(req))
 			goto shorten;
 
+		// Let's never audit _UNBLOCK actions.
+		const bool allow_audit = ztype != VAL_ZLAT_UNBLOCK;
 		// The other ztype possibilities are similar; check the tags now.
-		if (!kr_rule_consume_tags(&val, req)) {
+		if (!kr_rule_consume_tags(&val, req, allow_audit)) {
 			kr_assert(key_leq.len >= lf_start_i);
 		shorten:
 			// Shorten key_leq by one label and retry.
@@ -538,7 +557,7 @@ int rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt)
 			for (ret = ruledb_op(it_first, &key, &val);
 					ret == 0;
 					ret = ruledb_op(it_next, &val)) {
-				if (!kr_rule_consume_tags(&val, qry->request))
+				if (!kr_rule_consume_tags(&val, qry->request, true))
 					continue;
 
 				// We found a rule that applies to the dname+rrtype+req.
@@ -938,7 +957,8 @@ static int answer_zla_redirect(struct kr_query *qry, knot_pkt_t *pkt, const char
 	knot_db_val_t val;
 	// Multiple variants are possible, with different tags.
 	for (ret = ruledb_op(it_first, &key, &val); ret == 0; ret = ruledb_op(it_next, &val)) {
-		if (kr_rule_consume_tags(&val, qry->request)) {
+		const bool allow_audit = false; // we just audited at _REDIRECT root
+		if (kr_rule_consume_tags(&val, qry->request, allow_audit)) {
 			int ret2 = answer_exact_match(qry, pkt, qry->stype, &val);
 			if (ret2 != RET_CONTINUE)
 				return ret2;

@@ -855,7 +855,7 @@ function policy.get_tagset(names)
 end
 function policy.tags_assign_bitmap(bitmap)
 	return function (_, req)
-		req.rule_tags = bitmap
+		req.rule_tags_apply = bitmap
 	end
 end
 function policy.TAGS_ASSIGN(names)
