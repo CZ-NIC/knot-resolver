@@ -18,12 +18,13 @@ def test_policy_add():
 
 def test_policy_tags_assign():
     tags: List[str] = ["t01", "t02", "t03"]
+    # TODO: tags_audit isn't tested yet, but it's the same
     tmpl_str = """{% from 'macros/policy_macros.lua.j2' import policy_tags_assign %}
-{{ policy_tags_assign(tags) }}"""
+{{ policy_tags_assign(tags, none) }}"""
 
     tmpl = template_from_str(tmpl_str)
-    assert tmpl.render(tags=tags[1]) == f"policy.TAGS_ASSIGN('{tags[1]}')"
-    assert tmpl.render(tags=tags) == "policy.TAGS_ASSIGN({" + ",".join([f"'{x}'" for x in tags]) + ",})"
+    assert tmpl.render(tags=tags[1]) == f"policy.TAGS_ASSIGN('{tags[1]}'," + " {})"
+    assert tmpl.render(tags=tags) == "policy.TAGS_ASSIGN({" + ",".join([f"'{x}'" for x in tags]) + ",}, {})"
 
 
 def test_policy_get_tagset():

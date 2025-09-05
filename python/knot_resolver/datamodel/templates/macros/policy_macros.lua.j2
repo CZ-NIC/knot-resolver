@@ -51,8 +51,8 @@ policy.PRICE_FACTOR16({{ (factor|float * 2**16)|round|int }})
 
 {# Tags assign #}
 
-{% macro policy_tags_assign(tags) -%}
-policy.TAGS_ASSIGN({{ string_table(tags) }})
+{% macro policy_tags_assign(tags, tags_audit) -%}
+policy.TAGS_ASSIGN({{ string_table(tags) }}, {{ string_table(tags_audit) }})
 {%- endmacro %}
 
 {% macro policy_get_tagset(tags) -%}
