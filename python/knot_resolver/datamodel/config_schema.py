@@ -55,6 +55,8 @@ def _get_views_tags(views: List[ViewSchema]) -> List[str]:
     for view in views:
         if view.tags:
             tags += [str(tag) for tag in view.tags if str(tag) not in tags]
+        if view.tags_audit:
+            tags += [str(tag) for tag in view.tags_audit if str(tag) not in tags]
     return tags
 
 

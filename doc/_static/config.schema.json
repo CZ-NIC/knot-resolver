@@ -618,6 +618,18 @@
                         "description": "Tags to link with other policy rules.",
                         "default": null
                     },
+                    "tags-audit": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "type": "string",
+                            "pattern": "^(?!-)[a-z0-9-]*[a-z0-9]+$"
+                        },
+                        "description": "Internal/tentative.  Additional tags for auditing of policy rules in dnstap output.",
+                        "default": null
+                    },
                     "answer": {
                         "type": [
                             "string",

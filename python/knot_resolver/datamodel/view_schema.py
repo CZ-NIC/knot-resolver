@@ -28,6 +28,7 @@ class ViewSchema(ConfigSchema):
     dst_subnet: Destination subnet, as an additional condition.
     protocols: Transport protocol, as an additional condition.
     tags: Tags to link with other policy rules.
+    tags_audit: Internal/tentative.  Additional tags for auditing of policy rules in dnstap output.
     answer: Direct approach how to handle request from clients identified by the view.
     options: Configuration options for clients identified by the view.
     """
@@ -37,6 +38,7 @@ class ViewSchema(ConfigSchema):
     protocols: Optional[List[Literal["udp53", "tcp53", "dot", "doh", "doq"]]] = None
 
     tags: Optional[List[IDPattern]] = None
+    tags_audit: Optional[List[IDPattern]] = None
     answer: Optional[Literal["allow", "refused", "noanswer"]] = None
     options: ViewOptionsSchema = ViewOptionsSchema()
 

@@ -853,14 +853,16 @@ function policy.get_tagset(names)
 	end
 	return result[0] -- it's atomic value fortunately
 end
-function policy.tags_assign_bitmap(bitmap)
+function policy.tags_assign_bitmaps(bitmap, bitmap_audit)
 	return function (_, req)
 		req.rule_tags_apply = bitmap
+		req.rule_tags_audit = bitmap_audit
 	end
 end
-function policy.TAGS_ASSIGN(names)
-	local bitmap = policy.get_tagset(names)
-	return 'policy.tags_assign_bitmap(' .. tostring(bitmap) .. ')'
+function policy.TAGS_ASSIGN(names, names_audit)
+	local bitmap = policy.get_tagset(names or {})
+	local bitmap_audit = policy.get_tagset(names_audit or {})
+	return 'policy.tags_assign_bitmaps(' .. tostring(bitmap) .. ',' .. tostring(bitmap_audit) .. ')'
 end
 
 -- Perform a list of actions sequentially; meant for kr_view_insert_action().

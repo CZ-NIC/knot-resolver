@@ -15,8 +15,8 @@ assert(C.kr_view_insert_action('{{ subnet }}', '{{ view.dst_subnet or '' }}',
 {% if view.options.price_factor|float != 1.0 %}
 	{{ quotes(policy_price_factor(view.options.price_factor)) }},
 {%- endif %}
-{% if view.tags %}
-	{{ policy_tags_assign(view.tags) }},
+{% if view.tags or view.tags_audit %}
+	{{ policy_tags_assign(view.tags, view.tags_audit) }},
 {% elif view.answer %}
 	{{ view_answer(view.answer) }},
 {%- endif %}
