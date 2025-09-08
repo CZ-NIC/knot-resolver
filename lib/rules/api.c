@@ -26,6 +26,7 @@ const kr_rule_opts_t KR_RULE_OPTS_DEFAULT = { .score = KR_RULE_SCORE_DEFAULT, /*
  - "\0" starts special keys like "\0rulesets" or "\0stamp"
   - "\0tagBits" -> kr_rule_tags_t denoting the set of tags that have a name in DB
   - "\0tag_" + tag name -> one byte with the tag's number
+  - "\0tagI_" + one byte with the tag's number -> tag name (incl. final zero)
  - some future additions?
  - otherwise it's rulesets - each has a prefix, e.g. RULESET_DEFAULT,
    its length is bounded by KEY_RULESET_MAXLEN - 1; after that prefix:
@@ -143,7 +144,7 @@ int kr_rule_tag_add(const char *tag, kr_rule_tags_t *tagset)
 	memcpy(&bmp, val.data, sizeof(bmp));
 	// Find a free index.
 	static_assert(sizeof(long long) >= sizeof(bmp), "bad combination of constants");
-	int ix = ffsll(~bmp) - 1;
+	const int ix = ffsll(~bmp) - 1;
 	if (ix < 0 || ix >= 8 * sizeof(bmp))
 		return kr_error(E2BIG);
 	const kr_rule_tags_t tag_new = (kr_rule_tags_t)1 << ix;
@@ -164,10 +165,51 @@ int kr_rule_tag_add(const char *tag, kr_rule_tags_t *tagset)
 	ret = ruledb_op(write, &key, &val, 1); // key remained correct since ENOENT
 	if (ret != 0)
 		return kr_error(ret);
+	// Record this tag's reverse mapping (bit-index -> name).
+	uint8_t key2_buf[] = "\0tagI_";
+	key2_buf[sizeof(key2_buf) -1] = ix_8t; // rewrite the terminating '\0'
+	knot_db_val_t key2 = { .data = key2_buf, .len = sizeof(key2_buf) };
+	knot_db_val_t val2 = {
+		.data = (char *)/*const-cast*/tag,
+		.len = tag_len + 1, // include the final '\0'
+	};
+	ret = ruledb_op(write, &key2, &val2, 1);
+	if (ret != 0)
+		return kr_error(ret);
+	// Success!
 	*tagset |= tag_new;
 	return kr_ok();
 }
 
+/// Get a tag's name by its index (bitmap with value 1 means index 0).
+static const char * kr_rule_tag_ix2name(uint8_t tag_ix)
+{
+	uint8_t key2_buf[] = "\0tagI_";
+	key2_buf[sizeof(key2_buf) -1] = tag_ix; // rewrite the terminating '\0'
+	knot_db_val_t key2 = { .data = key2_buf, .len = sizeof(key2_buf) };
+	knot_db_val_t val2;
+	int ret = ruledb_op(read, &key2, &val2, 1);
+	const char *name = val2.data;
+	bool ok = ret == 0
+		&& !kr_fails_assert(val2.len > 0 && strnlen(name, val2.len) == val2.len - 1);
+	if (!ok) {
+		errno = abs(ret);
+		return NULL;
+	}
+	return name;
+}
+char * kr_rule_tags2str(kr_rule_tags_t tagset)
+{
+	if (tagset == KR_RULE_TAGS_ALL)
+		return calloc(1, 1); // new empty string
+	int ix = ffsll(tagset) - 1;
+	if (kr_fails_assert(ix >= 0))
+		return NULL;
+	const char *name = kr_rule_tag_ix2name(ix);
+	if (!name)
+		return NULL;
+	return strdup(name);
+}
 
 int kr_rules_init_ensure(void)
 {

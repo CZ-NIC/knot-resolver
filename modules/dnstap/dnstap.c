@@ -201,6 +201,7 @@ static int dnstap_log(kr_layer_t *ctx, enum dnstap_log_phase phase) {
 
 	auto_free char *user_key_buf = NULL;
 	char dnstap_extra_buf[24];
+	auto_free const char *tags_str = NULL;
 	if (phase == CLIENT_QUERY_PHASE) {
 		m.type = DNSTAP__MESSAGE__TYPE__CLIENT_QUERY;
 
@@ -253,10 +254,9 @@ static int dnstap_log(kr_layer_t *ctx, enum dnstap_log_phase phase) {
 		m.type = DNSTAP__MESSAGE__TYPE__CLIENT_RESPONSE;
 
 		if (req->rule.action) {
-			/* FIXME: fill in the tags;
-			 * ideally the rule only had a single tag */
-			policy.rule.data = (uint8_t *)"";
-			policy.rule.len = 0;
+			tags_str = kr_rule_tags2str(req->rule.tags); // to get auto_free'd
+			policy.rule.data = (uint8_t *)tags_str;
+			policy.rule.len = strlen(tags_str);
 			policy.has_rule = true;
 
 			/* dnstap's action can't represent _AUDIT,

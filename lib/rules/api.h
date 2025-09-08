@@ -256,6 +256,13 @@ int kr_view_insert_action(const char *subnet, const char *dst_subnet,
 KR_EXPORT
 int kr_rule_tag_add(const char *tag, kr_rule_tags_t *tagset);
 
+/** Return a description for a TagSet.  You need to free() the string.
+ *
+ * On error you get NULL + errno.
+ * For now it's just the name of the first tag.
+ */
+KR_EXPORT
+char * kr_rule_tags2str(kr_rule_tags_t tagset);
 
 struct kr_rule_zonefile_config {
 	const char *filename; /// NULL if specifying input_str instead
