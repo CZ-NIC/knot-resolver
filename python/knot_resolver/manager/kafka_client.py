@@ -217,25 +217,55 @@ if KAFKA_LIB:
 
     logger.info("Successfully processed message")
 
+    def process_messages(messages: Dict[TopicPartition, List[ConsumerRecord]], config: KresConfig) -> None:
+        error_msg_prefix = "Processing message failed with"
+
+        for _partition, records in messages.items():
+            for record in records:
+                try:
+                    process_record(config, record)
+                except KresKafkaClientError as e:
+                    logger.error(f"{error_msg_prefix} Kafka client error:\n{e}")
+                except DataParsingError as e:
+                    logger.error(f"{error_msg_prefix} data parsing error:\n{e}")
+                except DataValidationError as e:
+                    logger.error(f"{error_msg_prefix} data validation error:\n{e}")
+                except Exception as e:
+                    logger.error(f"{error_msg_prefix} unknown error:\n{e}")
+
     class KresKafkaClient:
         def __init__(self, config: KresConfig) -> None:
             self._config = config
+            self._consumer_timer: Optional[Timer] = None
+            self._consumer: Optional[KafkaConsumer] = None
 
             # reduce the verbosity of kafka module logger
             kafka_logger = logging.getLogger("kafka")
-            kafka_logger.setLevel(logging.ERROR)
+            # kafka_logger.setLevel(logging.ERROR)
+            kafka_logger.propagate = False
 
             brokers = []
             kafka_conf = config.kafka
             for server in kafka_conf.server.to_std():
                 broker = str(server)
                 brokers.append(broker.replace("@", ":") if server.port else f"{broker}:9092")
+            self._brokers: List[str] = brokers
+            self._consumer_run()
+
+        def _consumer_connect(self) -> None:
+            error_msg_prefix = f"Connecting to Kafka broker(s) '{self._brokers}' has failed with"
+            kafka_conf = self._config.kafka
+
+            # close old consumer connection
+            if self._consumer:
+                self._consumer.close()
+                self._consumer = None
 
             logger.info("Connecting to Kafka broker(s)...")
             try:
                 consumer = KafkaConsumer(
                     str(kafka_conf.topic),
-                    bootstrap_servers=brokers,
+                    bootstrap_servers=self._brokers,
                     client_id=str(self._config.hostname),
                     security_protocol=str(kafka_conf.security_protocol).upper(),
                     ssl_cafile=str(kafka_conf.ca_file) if kafka_conf.ca_file else None,
@@ -243,45 +273,48 @@ if KAFKA_LIB:
                     ssl_keyfile=str(kafka_conf.key_file) if kafka_conf.key_file else None,
                 )
                 self._consumer = consumer
-
-                self._consumer_timer = Timer(5, self._consume_messages)
-                self._consumer_timer.start()
                 logger.info("Successfully connected to Kafka broker")
             except KafkaError as e:
-                raise KresKafkaClientError(f"Connecting to Kafka broker(s) '{brokers}' has failed") from e
+                logger.error(f"{error_msg_prefix} {e}")
+            except Exception as e:
+                logger.error(f"{error_msg_prefix} unknown error:\n{e}")
 
         def deinit(self) -> None:
-            self._consumer_timer.cancel()
-            self._consumer.close()
-            self._consumer = None
+            if self._consumer_timer:
+                self._consumer_timer.cancel()
+            if self._consumer:
+                self._consumer.close()
+                self._consumer = None
 
-        def _consume_messages(self) -> None:
+        def _consumer_run(self) -> None:
+            keep_consuming = False
+
             if not self._consumer:
-                return
+                # connect to brokers
+                self._consumer_connect()
+            else:
+                # ready to consume messages
+                error_msg_prefix = "Consuming messages failed with"
+                try:
+                    logger.info("Started consuming messages...")
+                    messages: Dict[TopicPartition, List[ConsumerRecord]] = self._consumer.poll(timeout_ms=100)
+                except KafkaError as e:
+                    logger.error(f"{error_msg_prefix} Kafka error:\n{e}")
+                except Exception as e:
+                    logger.error(f"{error_msg_prefix} unknown error:\n{e}")
+                    self._consumer_connect()
+                else:
+                    # ready to process messages
+                    process_messages(messages, self._config)
+                    if messages:
+                        keep_consuming = True
 
-            logger.info("Started consuming messages...")
-            messages: Dict[TopicPartition, List[ConsumerRecord]] = self._consumer.poll(timeout_ms=100)
-
-            for _partition, records in messages.items():
-                for record in records:
-                    error_msg_prefix = "Processing message failed with"
-                    try:
-                        process_record(self._config, record)
-                    except KresKafkaClientError as e:
-                        logger.error(f"{error_msg_prefix} Kafka client error:\n{e}")
-                    except DataParsingError as e:
-                        logger.error(f"{error_msg_prefix} data parsing error:\n{e}")
-                    except DataValidationError as e:
-                        logger.error(f"{error_msg_prefix} data validation error:\n{e}")
-                    except Exception as e:
-                        logger.error(f"{error_msg_prefix} unknown error:\n{e}")
-
-            # keep consuming if received messages
-            if len(messages) > 0:
-                self._consume_messages()
+            if keep_consuming:
+                # keep consuming if received messages
+                self._consumer_run()
             else:
                 # else start new timer
-                self._consumer_timer = Timer(5, self._consume_messages)
+                self._consumer_timer = Timer(5, self._consumer_run)
                 self._consumer_timer.start()
 
 
