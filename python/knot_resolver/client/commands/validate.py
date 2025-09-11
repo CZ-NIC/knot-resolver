@@ -1,13 +1,15 @@
 import argparse
 import sys
 from pathlib import Path
-from typing import List, Tuple, Type
+from typing import Any, Dict, List, Tuple, Type
 
 from knot_resolver.client.command import Command, CommandArgs, CompWords, comp_get_words, register_command
+from knot_resolver.constants import CONFIG_FILE
 from knot_resolver.datamodel import KresConfig
 from knot_resolver.datamodel.globals import Context, reset_global_validation_context, set_global_validation_context
 from knot_resolver.utils.modeling import try_to_parse
 from knot_resolver.utils.modeling.exceptions import DataParsingError, DataValidationError
+from knot_resolver.utils.modeling.parsing import data_combine
 
 
 @register_command
@@ -32,9 +34,9 @@ class ValidateCommand(Command):
         validate.add_argument(
             "input_file",
             type=str,
-            nargs="?",
-            help="File with configuration in YAML or JSON format.",
-            default=None,
+            nargs="*",
+            help="File or combination of files with the declarative configuration in YAML or JSON format.",
+            default=[CONFIG_FILE],
         )
 
         return validate, ValidateCommand
@@ -44,15 +46,16 @@ class ValidateCommand(Command):
         return comp_get_words(args, parser)
 
     def run(self, args: CommandArgs) -> None:
-        if self.input_file:
-            with open(self.input_file, "r") as f:
-                data = f.read()
-        else:
-            data = input("Type configuration to validate: ")
-
+        data: Dict[str, Any] = {}
         try:
-            set_global_validation_context(Context(Path(self.input_file).parent, self.strict))
-            KresConfig(try_to_parse(data))
+            for file in self.input_file:
+                with open(file, "r") as f:
+                    raw = f.read()
+                parsed = try_to_parse(raw)
+                data = data_combine(data, parsed)
+
+            set_global_validation_context(Context(Path(self.input_file[0]).parent, self.strict))
+            KresConfig(data)
             reset_global_validation_context()
         except (DataParsingError, DataValidationError) as e:
             print(e, file=sys.stderr)

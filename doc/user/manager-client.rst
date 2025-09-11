@@ -251,13 +251,15 @@ single ``kresctl`` command.
         This is because the validation runs under a different user/group than the resolver
         itself and attempts to access the configured paths directly.
 
-    .. option:: <input_file>
+    .. option:: [<input_file> ...]
 
-        File with the declarative configuration in YAML or JSON format.
+        :default: /etc/knot-resolver/config.yaml
+
+        Optional, file or combination of files with the declarative configuration in YAML or JSON format.
 
     .. code-block:: bash
 
-        $ kresctl validate input-config.json
+        $ kresctl validate config.yaml config.additional.json
 
 
 .. option:: convert
