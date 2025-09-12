@@ -160,17 +160,30 @@ static bool check_user_key(const char *path, char **user_key)
 		*user_key = NULL;
 		return true;
 	}
-	if (path[0] != '/')
-		return false;
-	++path;
-	const char *query_mark = strstr(path, "?");
-	if (query_mark) {
-		size_t len = query_mark - path;
+	// strip final '?params'
+	const char *path_end = strchr(path, '?');
+	if (!path_end)
+		path_end = path + strlen(path);
+	// strip optional appendix
+	const char appendix[] = "/dns-query";
+	const size_t appendix_len = sizeof(appendix) - 1;
+	if (path_end - path >= appendix_len
+			&& strncmp(path_end - appendix_len, appendix, appendix_len) == 0) {
+		path_end -= appendix_len;
+	}
+	// trim slashes at both ends if any
+	if (path_end > path && path[0] == '/')
+		++path;
+	if (path_end > path && path_end[-1] == '/')
+		--path_end;
+	// copy out the selected user key, if any
+	size_t len = path_end - path;
+	if (len > 0 &&/*linters*/ len + 1 > 0) {
 		*user_key = malloc(len + 1);
 		memcpy(*user_key, path, len);
 		(*user_key)[len] = '\0';
 	} else {
-		*user_key = strdup(path);
+		*user_key = NULL;
 	}
 	return true;
 }
