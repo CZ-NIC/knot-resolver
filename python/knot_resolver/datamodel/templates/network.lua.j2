@@ -66,12 +66,12 @@ false
 
 {% if cfg.network.address_renumbering %}
 -- network.address-renumbering
-modules.load('renumber')
-renumber.config = {
+modules.load('renumber < cache')
+renumber.config({
 {% for item in cfg.network.address_renumbering %}
     {'{{ item.source }}', '{{ item.destination }}'},
 {% endfor %}
-}
+})
 {% endif %}
 
 {%- set vars = {'doh_legacy': False} -%}
