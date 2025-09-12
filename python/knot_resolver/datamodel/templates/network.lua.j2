@@ -66,7 +66,7 @@ false
 
 {% if cfg.network.address_renumbering %}
 -- network.address-renumbering
-modules.load('renumber < cache')
+modules.load('renumber')
 renumber.config({
 {% for item in cfg.network.address_renumbering %}
     {'{{ item.source }}', '{{ item.destination }}'},
