@@ -168,10 +168,15 @@ def _check_permission(dest_path: Path, perm_mode: _PermissionMode) -> bool:
         _PermissionMode.EXECUTE: [stat.S_IXUSR, stat.S_IXGRP, stat.S_IXOTH],
     }
 
+    # running outside the manager (client, ...)
     if get_permissions_default():
         user_uid = getpwnam(USER).pw_uid
         user_gid = getgrnam(GROUP).gr_gid
         username = USER
+    # running under root privileges
+    elif os.geteuid() == 0:
+        return True
+    # running normally under an unprivileged user
     else:
         user_uid = os.getuid()
         user_gid = os.getgid()
