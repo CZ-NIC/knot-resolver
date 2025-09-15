@@ -559,6 +559,8 @@ async def start_server(config: List[str]) -> int:  # noqa: PLR0915
             f"Knot Resolver does not run as the default '{USER}' user, but as '{pw_username}' instead."
             " This may or may not affect the configuration validation and the proper functioning of the resolver."
         )
+    if os.geteuid() == 0:
+        logger.warning(" It is not recommended to run under root privileges unless there is no other option.")
 
     # before starting server, initialize the subprocess controller, config store, etc. Any errors during inicialization
     # are fatal
