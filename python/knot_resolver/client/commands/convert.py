@@ -61,9 +61,9 @@ class ConvertCommand(Command):
             set_global_validation_context(Context(Path(Path(self.input_file).parent), self.strict))
 
             if self.type == "worker":
-                lua = KresConfig(parsed).render_lua()
+                lua = KresConfig(parsed).render_kresd_lua()
             elif self.type == "policy-loader":
-                lua = KresConfig(parsed).render_lua_policy()
+                lua = KresConfig(parsed).render_policy_loader_lua()
             else:
                 raise ValueError(f"Invalid self.type={self.type}")
 
