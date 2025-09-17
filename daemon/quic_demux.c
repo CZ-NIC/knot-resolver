@@ -71,7 +71,7 @@ kr_quic_cid_t **kr_quic_table_insert(struct pl_quic_conn_sess_data *conn_sess,
 }
 
 //TODO
-// struct pl_quic_demux_sess_data *kr_quic_table_add(ngtcp2_conn *ngconn, const ngtcp2_cid *cid,
+// struct pl_quic_demux_sess_data *kr_quic_table_add(ngtcp1_conn *ngconn, const ngtcp2_cid *cid,
 //                                  kr_quic_table_t *table)
 int kr_quic_table_add(struct pl_quic_conn_sess_data *conn_sess,
 		const ngtcp2_cid *cid, kr_quic_table_t *table)
@@ -188,7 +188,51 @@ static enum protolayer_iter_cb_result pl_quic_demux_unwrap(void *sess_data,
 				quic_demux->conn_table->usage,
 				dcid.data);
 		if (!qconn) {
-			memcpy(&odcid, &dcid, sizeof(odcid));
+			ngtcp2_pkt_hd header = { 0 };
+			if (ngtcp2_accept(&header,
+				wire_buf_data(data->payload.wire_buf),
+				wire_buf_data_length(data->payload.wire_buf))
+					!= NGTCP2_NO_ERROR) {
+				// TODO stateless reset 
+				return protolayer_break(data, -1/*FIXME*/);
+			}
+			kr_require(header.type == NGTCP2_PKT_INITIAL);
+			if (header.tokenlen == 0 /*&& quic_require_retry(table)*/) {
+				kr_log_error(DOQ, "received empty header.token\n");
+				// ret = -QUIC_SEND_RETRY;
+				// goto finish;
+			}
+
+			/* if (header.tokenlen > 0) {
+				if (header.token[0] == NGTCP2_CRYPTO_TOKEN_MAGIC_RETRY) {
+					ret = ngtcp2_crypto_verify_retry_token(
+						&odcid, header.token, header.tokenlen,
+						(const uint8_t *)table->hash_secret,
+						sizeof(table->hash_secret), header.version,
+						(const struct sockaddr *)reply->ip_rem,
+						addr_len((struct sockaddr_in6 *)reply->ip_rem),
+						&dcid, idle_timeout, now // NOTE setting retry token validity to idle_timeout for simplicity
+					);
+				} else {
+					ret = ngtcp2_crypto_verify_regular_token(
+						header.token, header.tokenlen,
+						(const uint8_t *)table->hash_secret,
+						sizeof(table->hash_secret),
+						(const struct sockaddr *)reply->ip_rem,
+						addr_len((struct sockaddr_in6 *)reply->ip_rem),
+						QUIC_REGULAR_TOKEN_TIMEOUT, now
+					);
+				}
+				if (ret != 0) {
+					ret = KNOT_EOK;
+					goto finish;
+				}
+			} else*/ {
+				memcpy(&odcid, &dcid, sizeof(odcid));
+			}
+
+
+
 			/* we are the server side so choose our dcid */
 			if (!quic_demux->h.session->outgoing) {
 				if (!init_unique_cid(&dcid, 0, quic_demux->conn_table)) {
@@ -197,13 +241,13 @@ static enum protolayer_iter_cb_result pl_quic_demux_unwrap(void *sess_data,
 				}
 			}
 
-			
 			struct kr_quic_conn_param *params = malloc(sizeof(*params));
 			kr_require(params);
 			params->dcid = dcid;
 			params->scid = scid;
 			params->odcid = odcid;
 			memcpy(&params->dec_cids, &dec_cids, sizeof(ngtcp2_version_cid));
+			memcpy(&params->comm_storage, ctx->comm, sizeof(struct comm_info));
 
 			struct protolayer_data_param data_param = {
 				.protocol = PROTOLAYER_TYPE_QUIC_CONN,
@@ -224,15 +268,6 @@ static enum protolayer_iter_cb_result pl_quic_demux_unwrap(void *sess_data,
 					quic_demux->conn_table);
 
 			qconn = conn_sess_data;
-
-			ngtcp2_pkt_hd header = { 0 };
-			if (ngtcp2_accept(&header,
-				wire_buf_data(data->payload.wire_buf),
-				wire_buf_data_length(data->payload.wire_buf))
-					!= NGTCP2_NO_ERROR) {
-				// TODO stateless reset 
-				return protolayer_break(data, -1/*FIXME*/);
-			}
 
 			// TODO This never happens (kr_quic_require_retry just returns false)
 			// if (header.tokenlen == 0

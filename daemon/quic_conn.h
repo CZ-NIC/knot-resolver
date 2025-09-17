@@ -14,9 +14,10 @@
 #include <gnutls/x509.h>
 #include <gnutls/gnutls.h>
 #include <gnutls/crypto.h>
-#include "lib/generic/queue.h"
+// #include "lib/generic/queue.h"
 #include "lib/log.h"
 #include "quic_demux.h"
+#include "quic_stream.h"
 #include "session2.h"
 #include "network.h"
 #include "lib/resolve.h"
@@ -93,18 +94,6 @@ typedef enum {
 } kr_quic_send_flag_t;
 
 struct pl_quic_conn_sess_data;
-struct kr_quic_stream *kr_quic_conn_get_stream(
-		struct pl_quic_conn_sess_data *conn,
-		int64_t stream_id, bool create);
-
-int kr_quic_stream_add_data(struct pl_quic_conn_sess_data *conn,
-		int64_t stream_id, struct protolayer_payload *pl);
-
-int kr_quic_stream_recv_data(struct pl_quic_conn_sess_data *conn,
-		int64_t stream_id, const uint8_t *data, size_t len, bool fin);
-
-struct kr_quic_stream *kr_quic_stream_get_process(
-		struct pl_quic_conn_sess_data *conn, int64_t *stream_id);
 
 int kr_quic_send(struct pl_quic_conn_sess_data *conn,
 		// void *sess_data,
@@ -129,38 +118,6 @@ typedef struct kr_quic_cid {
 	struct kr_quic_cid *next;
 } kr_quic_cid_t;
 
-struct kr_quic_stream {
-	// struct iovec inbuf;
-	struct wire_buf pers_inbuf;
-	// struct kr_tcp_inbufs_upd_res *inbufs;
-
-	size_t firstib_consumed;
-	/* stores data that has been sent out and awaits acknowledgement and
-	 * data that has just been created and is waiting to be sent out */
-	/* ucw */struct list outbufs;
-
-	// /* ucw */struct kr_quic_ucw_list outbufs;
-	// /*ucw_*/queue_t(struct kr_quic_obuf) outbufs;
-	// /*ucw_*/list_t outbufs;
-
-	/* FIXME Properly implement everywhere
-	 * kr_quic_stream_ack_data uses this to check the
-	 * stream is really finished, without proper handling
-	 * no stream will ever be deleted */
-	/* size of all outbufs */
-	size_t obufs_size;
-
-	/* pointer to somewhere in outbufs */
-	struct kr_quic_obuf *unsent_obuf;
-	/* offset of the first unacked data in the entire stream
-	 * (not just current unsent_obuf) */
-	size_t first_offset;
-	/* number of sent out bytes in the current unsent_obuf
-	 * if we send >= to the unsent_obuf size the list attemps
-	 * to advance to the next unsent_obuf and this value is reset to 0 */
-	size_t unsent_offset;
-};
-
 typedef enum {
 	KR_QUIC_CONN_HANDSHAKE_DONE = (1 << 0),
 	KR_QUIC_CONN_SESSION_TAKEN  = (1 << 1),
@@ -174,6 +131,7 @@ struct kr_quic_conn_param {
 	ngtcp2_cid scid;
 	ngtcp2_cid odcid;
 	ngtcp2_version_cid dec_cids;
+	struct comm_info comm_storage;
 };
 
 typedef struct {
@@ -210,6 +168,9 @@ struct pl_quic_conn_sess_data {
 	ngtcp2_cid odcid;
 	ngtcp2_version_cid dec_cids;
 
+	struct comm_info comm_storage;
+	struct comm_addr_storage comm_addr_storage;
+
 	gnutls_session_t tls_session;
 
 	// crypto callbacks
@@ -217,7 +178,8 @@ struct pl_quic_conn_sess_data {
 
 	// QUIC stream abstraction
 	// TODO sentinel for streams?
-	struct kr_quic_stream *streams;
+	struct pl_quic_stream_sess_data *streams;
+	// struct kr_quic_stream *streams;
 	// number of allocated streams structures
 	int16_t streams_count;
 	// index of first stream that has complete incomming data to be processed (aka inbuf_fin)
@@ -244,3 +206,11 @@ struct pl_quic_conn_sess_data {
 	struct kr_request *req;
 	// quic_state_t state;
 };
+
+uint64_t quic_timestamp(void);
+
+struct pl_quic_stream_sess_data *kr_quic_stream_get_process(
+		struct pl_quic_conn_sess_data *conn, int64_t *stream_id);
+
+int kr_quic_stream_recv_data(struct pl_quic_conn_sess_data *conn,
+		int64_t stream_id, const uint8_t *data, size_t len, bool fin);

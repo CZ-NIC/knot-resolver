@@ -69,6 +69,14 @@ static const enum protolayer_type protolayer_grp_doh[] = {
 	PROTOLAYER_TYPE_DNS_UNSIZED_STREAM,
 };
 
+static const enum protolayer_type protolayer_grp_doq_stream[] = {
+	PROTOLAYER_TYPE_QUIC_STREAM,
+	// PROTOLAYER_TYPE_DNS_UNSIZED_STREAM,
+	PROTOLAYER_TYPE_DNS_SINGLE_STREAM,
+	// PROTOLAYER_TYPE_DNS_MULTI_STREAM,
+	// PROTOLAYER_TYPE_DNS_DGRAM,
+};
+
 static const enum protolayer_type protolayer_grp_doq_conn[] = {
 	// PROTOLAYER_TYPE_UDP,
 	// PROTOLAYER_TYPE_PROXYV2_DGRAM,
@@ -77,13 +85,12 @@ static const enum protolayer_type protolayer_grp_doq_conn[] = {
 	PROTOLAYER_TYPE_QUIC_CONN,
 	// PROTOLAYER_TYPE_DNS_DGRAM,
 	// PROTOLAYER_TYPE_DNS_UNSIZED_STREAM,
-	PROTOLAYER_TYPE_DNS_MULTI_STREAM,
+	// PROTOLAYER_TYPE_DNS_MULTI_STREAM,
 	// PROTOLAYER_TYPE_DNS_SINGLE_STREAM,
-
+	PROTOLAYER_TYPE_NULL,
 };
 
-
-static const enum protolayer_type protolayer_grp_doq[] = {
+static const enum protolayer_type protolayer_grp_doq_demux[] = {
 	PROTOLAYER_TYPE_UDP,
 	// PROTOLAYER_TYPE_PROXYV2_DGRAM,
 	// PROTOLAYER_TYPE_DEFER,
@@ -653,7 +660,7 @@ static int session2_submit(
 	if ((direction == PROTOLAYER_UNWRAP) && (layer_ix == 0))
 		defer_sample_start(NULL);
 
-	struct protolayer_iter_ctx *ctx = malloc(session->iter_ctx_size);
+		struct protolayer_iter_ctx *ctx = malloc(session->iter_ctx_size);
 	kr_require(ctx);
 
 	VERBOSE_LOG(session,

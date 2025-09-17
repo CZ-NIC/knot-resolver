@@ -230,8 +230,9 @@ static inline size_t wire_buf_free_space_length(const struct wire_buf *wb)
 	XX(HTTP)\
 	XX(QUIC_DEMUX)\
 	XX(QUIC_CONN)\
+	XX(QUIC_STREAM)\
 	/* deprecated TODO: remove */\
-	XX(QUIC)\
+	XX(QUIC_DEPRECATED)\
 	\
 	/* PROXYv2 */\
 	XX(PROXYV2_DGRAM)\
@@ -992,6 +993,7 @@ static inline struct session2 *session2_new_child(struct session2 *parent,
 	struct session2 *s = session2_new(SESSION2_TRANSPORT_PARENT, layer_grp,
 			layer_param, layer_param_count, outgoing);
 	s->transport.parent = parent;
+	s->comm_storage = parent->comm_storage;
 	return s;
 }
 

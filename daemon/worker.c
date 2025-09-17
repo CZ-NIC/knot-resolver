@@ -360,7 +360,6 @@ static struct request_ctx *request_create(struct session2 *session,
 		const struct sockaddr *comm_addr = comm->comm_addr;
 		const struct sockaddr *dst_addr = comm->dst_addr;
 		const struct proxy_result *proxy = comm->proxy;
-		struct quic_target *orig_target = comm->target;
 
 		req->qsource.stream_id = -1;
 		session2_init_request(session, req);
@@ -384,13 +383,6 @@ static struct request_ctx *request_create(struct session2 *session,
 			dst_addr = session2_get_sockname(session);
 		memcpy(&ctx->source.dst_addr.ip, dst_addr, kr_sockaddr_len(dst_addr));
 		req->qsource.dst_addr = &ctx->source.dst_addr.ip;
-
-		if (req->qsource.flags.quic) {
-			kr_require(comm->target);
-			ctx->source.session->comm_storage.target = comm->target;
-			// memcpy(&ctx->source.session->comm_storage.target,
-			// 		orig_target, sizeof(struct quic_target));
-		}
 	}
 
 	req->selection_context.is_tls_capable = is_tls_capable;
