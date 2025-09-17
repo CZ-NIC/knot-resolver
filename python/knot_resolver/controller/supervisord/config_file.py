@@ -104,7 +104,7 @@ class ProcessTypeConfig:
             logfile=supervisord_subprocess_log_dir(config) / "policy-loader.log",
             workdir=cwd,
             command=f"{KRESD_EXECUTABLE} -c {(policy_loader_config_file(config))} -c - -n",
-            environment="X-SUPERVISORD-TYPE=notify",
+            environment="",
         )
 
     @staticmethod
