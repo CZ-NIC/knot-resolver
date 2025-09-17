@@ -18,7 +18,7 @@ from knot_resolver.datamodel.monitoring_schema import MonitoringSchema
 from knot_resolver.datamodel.network_schema import NetworkSchema
 from knot_resolver.datamodel.options_schema import OptionsSchema
 from knot_resolver.datamodel.rate_limiting_schema import RateLimitingSchema
-from knot_resolver.datamodel.templates import POLICY_CONFIG_TEMPLATE, WORKER_CONFIG_TEMPLATE
+from knot_resolver.datamodel.templates import KRESD_CONFIG_TEMPLATE, POLICY_LOADER_CONFIG_TEMPLATE
 from knot_resolver.datamodel.types import EscapedStr, IntPositive, WritableDir
 from knot_resolver.datamodel.view_schema import ViewSchema
 from knot_resolver.datamodel.webmgmt_schema import WebmgmtSchema
@@ -240,14 +240,14 @@ class KresConfig(ConfigSchema):
         if len(errs) > 1:
             raise AggregateDataValidationError("/", errs)
 
-    def render_lua(self) -> str:
+    def render_kresd_lua(self) -> str:
         # FIXME the `cwd` argument is used only for configuring control socket path
         # it should be removed and relative path used instead as soon as issue
         # https://gitlab.nic.cz/knot/knot-resolver/-/issues/720 is fixed
-        return WORKER_CONFIG_TEMPLATE.render(cfg=self, cwd=os.getcwd())
+        return KRESD_CONFIG_TEMPLATE.render(cfg=self, cwd=os.getcwd())
 
-    def render_lua_policy(self) -> str:
-        return POLICY_CONFIG_TEMPLATE.render(cfg=self, cwd=os.getcwd())
+    def render_policy_loader_lua(self) -> str:
+        return POLICY_LOADER_CONFIG_TEMPLATE.render(cfg=self, cwd=os.getcwd())
 
 
 def get_rundir_without_validation(data: Dict[str, Any]) -> WritableDir:

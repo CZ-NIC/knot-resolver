@@ -119,9 +119,9 @@ class Subprocess(ABC):
 
     def _render_lua(self) -> Optional[str]:
         if self.type is SubprocessType.KRESD:
-            return self._config.render_lua()
+            return self._config.render_kresd_lua()
         if self.type is SubprocessType.POLICY_LOADER:
-            return self._config.render_lua_policy()
+            return self._config.render_policy_loader_lua()
         return None
 
     def _write_config(self) -> None:
