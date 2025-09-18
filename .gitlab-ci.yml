@@ -21,7 +21,7 @@ variables:
   # IMAGE_TAG is a Git branch/tag name from https://gitlab.nic.cz/knot/knot-resolver-ci
   # In general, keep it pointing to a tag - use a branch only for development.
   # More info in the knot-resolver-ci repository.
-  IMAGE_TAG: 'v20250429'
+  IMAGE_TAG: 'tunnel'
   IMAGE_PREFIX: '$CI_REGISTRY/knot/knot-resolver-ci'
 
 image: $IMAGE_PREFIX/debian12-knot_3_3:$IMAGE_TAG
@@ -687,7 +687,7 @@ pkg:make-archive:
   # archive is created once and reused in other pkg jobs
   <<: *pkg_deb_extras
   stage: pkg
-  image: $CI_REGISTRY/packaging/apkg/full/ubuntu-24.04
+  image: $CI_REGISTRY/packaging/apkg/full/debian-13  # OMG, dependency checks during make-archive are insane
   tags:
     - lxc
     - amd64
