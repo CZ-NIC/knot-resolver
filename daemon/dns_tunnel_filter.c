@@ -5,7 +5,6 @@
 #include <stdatomic.h>
 #include "daemon/dns_tunnel_filter.h"
 #include "daemon/libblcnn.h"
-#include "daemon/session2.h"
 #include "lib/mmapped.h"
 #include "lib/utils.h"
 #include "lib/resolve.h"
@@ -142,9 +141,7 @@ bool dns_tunnel_filter_request_begin(struct kr_request *req)
 		return false;  // whitelisted
 	if (!req->current_query)
 		return false;
-	if (!req->current_query->flags)
-		return false;
-	if (req->current_query->flags.CACHED == true) {
+	if (req->current_query->flags.CACHED) {
 		return false; // don't consider cached results
 	}
 	if (!req->current_query->sname)
