@@ -1,6 +1,19 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # daemon
 
+if libtorch.found()
+  libtorch_dep = declare_dependency(
+    link_args: ['-ltorch', '-ltorch_cpu'],
+    dependencies: [libtorch]
+  )
+
+  blcnn_lib = static_library('blcnn',
+    sources: ['libblcnn.cpp'],
+    dependencies: [libtorch_dep]
+  )
+endif
+
+
 kresd_src = files([
   'bindings/cache.c',
   'bindings/event.c',
@@ -16,6 +29,7 @@ kresd_src = files([
   'network.c',
   'proxyv2.c',
   'ratelimiting.c',
+  'dns_tunnel_filter.c',
   'session2.c',
   'tls.c',
   'tls_ephemeral_credentials.c',
@@ -35,7 +49,9 @@ unit_tests += [
   ['ratelimiting', files('ratelimiting.test/tests.c') + libkres_src ],
 
   # parallel tests timeouts under valgrind; they checks mainly for race conditions, which is not needed there
-  ['ratelimiting-parallel', files('ratelimiting.test/tests-parallel.c') + libkres_src, ['skip_valgrind']]
+  ['ratelimiting-parallel', files('ratelimiting.test/tests-parallel.c') + libkres_src, ['skip_valgrind']],
+
+  ['dns_tunnel_filter', files('dns_tunnel_filter.test/tests.c') + libkres_src]
 ]
 
 config_tests += [
@@ -62,7 +78,8 @@ kresd_deps = [
   capng,
   nghttp2,
   malloc,
-  libm
+  libm,
+  libtorch_dep
 ]
 
 
@@ -72,9 +89,11 @@ subdir('lua')
 kresd = executable(
   'kresd',
   kresd_src,
+  link_with: [blcnn_lib],
+  link_args: ['-lstdc++', '-lc10'],
   dependencies: kresd_deps,
   export_dynamic: true,
   install: true,
   install_dir: get_option('sbindir'),
-  install_rpath: rpath,
+  install_rpath: rpath
 )
