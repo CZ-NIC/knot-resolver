@@ -960,6 +960,9 @@ policy.layer = {
 		return policy.evaluate(policy.rules, req, qry, state)
 			or state
 	end,
+	produce = function(state, req)
+		ffi.C.dns_tunnel_filter_request_begin(req)
+	end,
 	finish = function(state, req)
 		-- Optimization for the typical case
 		if #policy.postrules == 0 then return state end

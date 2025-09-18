@@ -164,6 +164,9 @@ malloc = meson.get_compiler('c').find_library(
   # Fortunately it seems unlikely that dynamic wouldn't be found and static would be.
 )
 
+### C++ PyTorch
+libtorch = dependency('Torch', version: '>=2.4.1', required: false)
+
 message('---------------------------')
 
 ## Compiler args
