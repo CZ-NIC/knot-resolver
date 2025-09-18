@@ -165,7 +165,7 @@ malloc = meson.get_compiler('c').find_library(
 )
 
 ### C++ PyTorch
-libtorch = dependency('Torch', version: '>=2.4.1', required: false)
+libtorch = dependency('Torch', required: false)
 
 message('---------------------------')
 
