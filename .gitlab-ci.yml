@@ -841,11 +841,11 @@ docs:website:
 
 .python: &python
   <<: *nodep
-  image: $IMAGE_PREFIX/manager:$IMAGE_TAG
   stage: sanity
   before_script:
     - poetry --version
     - poetry env use python${PYTHON_VERSION}
+    - poetry env info
 
 python:examples:
   <<: *python
