@@ -3,8 +3,8 @@
 */
 
 #include <stdatomic.h>
-#include "daemon/dns_tunnel_filter.h"
-#include "daemon/libblcnn.h"
+#include "dns_tunnel_filter.h"
+#include "libblcnn.h"
 #include "lib/mmapped.h"
 #include "lib/utils.h"
 #include "lib/resolve.h"
