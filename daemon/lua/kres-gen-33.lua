@@ -644,8 +644,6 @@ _Bool ratelimiting_request_begin(struct kr_request *);
 int ratelimiting_init(const char *, size_t, uint32_t, uint32_t, uint16_t, uint32_t, _Bool);
 int defer_init(const char *, uint32_t, int);
 void defer_set_price_factor16(struct kr_request *, uint32_t);
-int dns_tunnel_filter_init(const char *, size_t, uint32_t, uint32_t, uint16_t, uint32_t, _Bool);
-_Bool dns_tunnel_filter_request_begin(struct kr_request *);
 struct engine {
 	char _stub[];
 };
