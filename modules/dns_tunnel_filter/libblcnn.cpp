@@ -13,22 +13,17 @@ struct TorchModuleWrapper {
 	torch::jit::script::Module model;
 };
 
-TorchModule load_model(void) {
+TorchModule load_model(const char *nn_file) {
+	auto *wrapper = new TorchModuleWrapper();
 	try {
-		namespace fs = std::filesystem;
-		auto *wrapper = new TorchModuleWrapper();
-
-		// FIXME: the path to this file
-		fs::path file_path = fs::relative(__FILE__, "../");
-		fs::path absolute_path = fs::absolute(file_path.parent_path()) / "blcnn.pt";
-		wrapper->model = torch::jit::load(absolute_path);
+		wrapper->model = torch::jit::load(nn_file);
 		wrapper->model.to(torch::kCPU);
 		wrapper->model.eval();
 
 		return static_cast<TorchModule>(wrapper);
 	} catch (const c10::Error &e) {
 		std::cerr << "Error loading model: " << e.what() << std::endl;
-
+		delete wrapper;
 		return nullptr;
 	}
 }
