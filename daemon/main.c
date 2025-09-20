@@ -13,7 +13,6 @@
 #include "daemon/worker.h"
 #include "daemon/ratelimiting.h"
 #include "daemon/defer.h"
-#include "daemon/dns_tunnel_filter.h"
 
 #include "lib/defines.h"
 #include "lib/dnssec.h"
@@ -631,6 +630,7 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
+	#if 0
 	if (!dns_tunnel_filter_initialized) {
 		kr_log_warning(TUNNEL, "Tunneling filter not initialized from Lua, using hardcoded default.\n");
 		ret = dns_tunnel_filter_init("dns_tunnel_filter", (1 << 20), (1 << 8), (1 << 17), 0, 0, false);
@@ -639,6 +639,7 @@ int main(int argc, char **argv)
 			goto cleanup;
 		}
 	}
+	#endif
 
 	ret = kr_rules_init_ensure();
 	if (ret) {
@@ -669,7 +670,7 @@ int main(int argc, char **argv)
 cleanup:/* Cleanup. */
 	network_unregister();
 
-	dns_tunnel_filter_deinit();
+	//dns_tunnel_filter_deinit();
 	ratelimiting_deinit();	
 	kr_resolver_deinit();
 	worker_deinit();
