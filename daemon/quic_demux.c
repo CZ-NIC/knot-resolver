@@ -142,17 +142,19 @@ static enum protolayer_iter_cb_result pl_quic_demux_unwrap(void *sess_data,
 	struct pl_quic_conn_sess_data *qconn = NULL;
 	struct pl_quic_demux_sess_data *quic_demux = sess_data;
 
-	queue_push(quic_demux->unwrap_queue, ctx);
+	// queue_push(quic_demux->unwrap_queue, ctx);
 
 	/* TODO Verify this doesn't leak */
 	// struct quic_target *target = malloc(sizeof(struct quic_target));
 	// kr_require(target);
 
-	while (protolayer_queue_has_payload(&quic_demux->unwrap_queue)) {
-		struct protolayer_iter_ctx *data = queue_head(quic_demux->unwrap_queue);
+	// while (protolayer_queue_has_payload(&quic_demux->unwrap_queue)) {
+		// struct protolayer_iter_ctx *data = queue_head(quic_demux->unwrap_queue);
+		// queue_pop(quic_demux->unwrap_queue);
+		struct protolayer_iter_ctx *data = ctx;
+
 		kr_require(data->payload.type == PROTOLAYER_PAYLOAD_WIRE_BUF);
 
-		queue_pop(quic_demux->unwrap_queue);
 		ngtcp2_version_cid dec_cids;
 		ngtcp2_cid odcid;
 		ngtcp2_cid dcid;
@@ -241,17 +243,43 @@ static enum protolayer_iter_cb_result pl_quic_demux_unwrap(void *sess_data,
 				}
 			}
 
-			struct kr_quic_conn_param *params = malloc(sizeof(*params));
-			kr_require(params);
-			params->dcid = dcid;
-			params->scid = scid;
-			params->odcid = odcid;
-			memcpy(&params->dec_cids, &dec_cids, sizeof(ngtcp2_version_cid));
-			memcpy(&params->comm_storage, ctx->comm, sizeof(struct comm_info));
+			// struct kr_quic_conn_param *params = malloc(sizeof(*params));
+			// kr_require(params);
+			// params->dcid = dcid;
+			// params->scid = scid;
+			// params->odcid = odcid;
+			// memcpy(&params->dec_cids, &dec_cids, sizeof(ngtcp2_version_cid));
+			// memcpy(&params->comm_storage, ctx->comm, sizeof(struct comm_info));
+			//
+			// struct protolayer_data_param data_param = {
+			// 	.protocol = PROTOLAYER_TYPE_QUIC_CONN,
+			// 	.param = params
+			// };
+			//
+			// struct session2 *new_conn_sess =
+			// 	session2_new_child(quic_demux->h.session,
+			// 			KR_PROTO_DOQ_CONN,
+			// 			&data_param,
+			// 			1 /* FIXME */,
+			// 			false);
+			// free(params);
+
+			struct kr_quic_conn_param params = { 
+				.dcid = dcid,
+				.scid = scid,
+				.odcid = odcid,
+				.dec_cids = &dec_cids,
+				.comm_storage = ctx->comm,
+			};
+			// params->dcid = dcid;
+			// params->scid = scid;
+			// params->odcid = odcid;
+			// memcpy(&params.dec_cids, &dec_cids, sizeof(ngtcp2_version_cid));
+			// memcpy(&params.comm_storage, ctx->comm, sizeof(struct comm_info));
 
 			struct protolayer_data_param data_param = {
 				.protocol = PROTOLAYER_TYPE_QUIC_CONN,
-				.param = params
+				.param = &params
 			};
 
 			struct session2 *new_conn_sess =
@@ -312,7 +340,7 @@ static enum protolayer_iter_cb_result pl_quic_demux_unwrap(void *sess_data,
 				data->comm,
 				data->finished_cb,
 				data->finished_cb_baton);
-	}
+	// }
 
 	return protolayer_break(ctx, kr_ok());
 

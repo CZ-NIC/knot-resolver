@@ -97,8 +97,12 @@ static int handle_packet(struct pl_quic_conn_sess_data *conn,
 	// *out_conn = qconn;
 	/* FIXME: inacurate error handling */
 	if (ret == NGTCP2_ERR_DRAINING) { // doq received CONNECTION_CLOSE from the counterpart
-		kr_log_info(DOQ, "CLOSING CONNECTION\n");
+		if (conn->streams_count > 0) {
+			kr_log_warning(DOQ, "received connection_close, unsent stream data will be lost\n");
+		}
+
 		session2_close(conn->h.session);
+		return -1;
 		// session2_event(struct session2 *s, enum protolayer_event_type event, void *baton)
 
 		// kr_quic_table_rem(qconn, quic->conn_table);
@@ -261,6 +265,15 @@ static int kr_recv_stream_data_cb(ngtcp2_conn *conn, uint32_t flags,
 				stream_id);
 		return kr_error(ENOMEM);
 	}
+
+	/* FIXME Writing into pl_quic_stream_sess_data is a disgusting
+	 * breach of protocol separation. Possible fix would be to either
+	 * have one large buffer for all streams belonging to this connection
+	 * or n per-stream buffers. Since the latter would just add
+	 * additional allocations and memcpys (the buffer would only be
+	 * used untill pl_quic_conn_unwrap continues to unwrap of
+	 * quic_stream layer, i.e. during ngtcp2_conn_read_pkt) this
+	 * is for now a "good enough" workaround. */
 	memcpy(wire_buf_free_space(&stream->pers_inbuf), data, datalen);
 	kr_require(wire_buf_consume(&stream->pers_inbuf, datalen) == kr_ok());
 
@@ -275,14 +288,17 @@ static int kr_recv_stream_data_cb(ngtcp2_conn *conn, uint32_t flags,
 	// 	session2_close(stream->h.session);
 	// }
 
-	int ret = session2_unwrap(stream->h.session,
-			protolayer_payload_wire_buf(&stream->pers_inbuf, false),
-			&qconn->comm_storage,
-			NULL,
-			NULL);
+	if (flags & NGTCP2_STREAM_DATA_FLAG_FIN) {
+		queue_push(qconn->pending_unwrap, stream);
+	}
+
+	// int ret = session2_unwrap(stream->h.session,
+	// 		protolayer_payload_wire_buf(&stream->pers_inbuf, false),
+	// 		&qconn->comm_storage,
+	// 		NULL,
+	// 		NULL);
 
 	return kr_ok();
-
 	// int ret = kr_quic_stream_recv_data(qconn, stream_id, data, datalen,
 	// 		(flags & NGTCP2_STREAM_DATA_FLAG_FIN));
 
@@ -292,7 +308,6 @@ static int kr_recv_stream_data_cb(ngtcp2_conn *conn, uint32_t flags,
 static int stream_open_cb(ngtcp2_conn *connection, int64_t stream_id, void *user_data)
 {
 	int ret = NGTCP2_ERR_NOMEM;
-
 	struct pl_quic_conn_sess_data *conn = user_data;
 	/* FIXME: send on stack */
 	struct kr_quic_stream_param *params = malloc(sizeof(*params));
@@ -332,12 +347,12 @@ static int stream_open_cb(ngtcp2_conn *connection, int64_t stream_id, void *user
 	// should we attempt to purge unused streams here?
 	// maybe only when we approach the limit
 	if (conn->streams_count == 0) {
-		new_streams = malloc(sizeof(new_streams[0]));
-		if (new_streams == NULL) {
-			goto fail;
-		}
-		new_streams_count = 1;
-		conn->first_stream_id = stream_id;
+		// new_streams = malloc(sizeof(new_streams[0]));
+		// if (new_streams == NULL) {
+		// 	goto fail;
+		// }
+		// new_streams_count = 1;
+		// conn->first_stream_id = stream_id;
 	} else {
 		new_streams_count = stream_id + 1 - conn->first_stream_id;
 		if (new_streams_count > MAX_STREAMS_PER_CONN) {
@@ -359,11 +374,11 @@ static int stream_open_cb(ngtcp2_conn *connection, int64_t stream_id, void *user
 		}
 	}
 
-	for (struct pl_quic_stream_sess_data *si = new_streams + conn->streams_count;
-			si < new_streams + new_streams_count; si++) {
-		memset(si, 0, sizeof(*si));
-		init_list(&si->outbufs);
-	}
+	// for (struct pl_quic_stream_sess_data *si = new_streams + conn->streams_count;
+	// 		si < new_streams + new_streams_count; si++) {
+	// 	memset(si, 0, sizeof(*si));
+	// 	init_list(&si->outbufs);
+	// }
 
 	kr_require(ngtcp2_conn_set_stream_user_data(connection, stream_id, stream_sess_data)
 			== NGTCP2_NO_ERROR);
@@ -383,11 +398,12 @@ static int stream_open_cb(ngtcp2_conn *connection, int64_t stream_id, void *user
 
 	kr_log_info(DOQ, "new stream succesfully inited: %ld\n", stream_id);
 	ret = NGTCP2_NO_ERROR;
+	return ret;
 
 fail:
-	if (new_stream_sess) {
-		session2_close(new_stream_sess);
-	}
+	// if (new_stream_sess) {
+	// 	session2_close(new_stream_sess);
+	// }
 
 	return ret;
 }
@@ -843,49 +859,6 @@ finish:
 	return ret;
 }
 
-// static int get_query(struct protolayer_iter_ctx *ctx,
-// 		struct pl_quic_conn_sess_data *conn)
-// {
-// 	kr_require(wire_buf_data_length(ctx->payload.wire_buf) == 0);
-//
-// 	int64_t stream_id;
-// 	struct kr_quic_stream *stream;
-// 	stream = kr_quic_stream_get_process(conn, &stream_id);
-//
-// 	/* no stream has finished payload (should not happen) */
-// 	kr_require(stream);
-//
-// 	size_t to_write = wire_buf_data_length(&stream->pers_inbuf);
-// 	ctx->payload = protolayer_payload_wire_buf(&stream->pers_inbuf,
-// 			false);
-//
-// 	// target->stream_id = stream_id;
-// 	// ctx->comm->target = mm_alloc(&ctx->pool, sizeof(int64_t));
-// 	// kr_require(ctx->comm->target);
-// 	memcpy(ctx->comm->target, &stream_id, sizeof(int64_t));
-//
-// 	kr_log_info(DOQ, "retrieving query for stream no. %ld\n", stream_id);
-// 	wire_buf_reset(ctx->payload.wire_buf);
-//
-// 	if (to_write > wire_buf_free_space_length(ctx->payload.wire_buf)) {
-// 		kr_log_error(DOQ, "unwrap buf is not big enough, %zu > %zu\n",
-// 				to_write, wire_buf_free_space_length(ctx->payload.wire_buf));
-// 		return kr_error(ENOMEM);
-// 	}
-//
-// 	memcpy(wire_buf_free_space(ctx->payload.wire_buf),
-// 		wire_buf_data(&stream->pers_inbuf), to_write);
-// 	kr_require(wire_buf_consume(ctx->payload.wire_buf, to_write) == kr_ok());
-//
-// 	// wire_buf_consume(&conn->unwrap_buf, to_write);
-// 	// wire_buf_trim(&stream->pers_inbuf, to_write);
-// 	// if (wire_buf_data_length(&stream->pers_inbuf) == 0) {
-// 	// 	wire_buf_deinit(&stream->pers_inbuf);
-// 	// 	memset(&stream->pers_inbuf, 0, sizeof(struct wire_buf));
-// 	// }
-//
-// 	return to_write;
-// }
 static void copy_comm_storage(
 		struct pl_quic_conn_sess_data *conn,
 		struct comm_info *comm)
@@ -918,10 +891,13 @@ static enum protolayer_iter_cb_result pl_quic_conn_unwrap(void *sess_data,
 	int ret = kr_ok();
 	struct pl_quic_conn_sess_data *conn = sess_data;
 
-	queue_push(conn->unwrap_queue, ctx);
+	// queue_push(conn->unwrap_queue, ctx);
 
-	while (protolayer_queue_has_payload(&conn->unwrap_queue)) {
-		struct protolayer_iter_ctx *data = queue_head(conn->unwrap_queue);
+	queue_len(conn->unwrap_queue);
+	// while (protolayer_queue_has_payload(&conn->unwrap_queue)) {
+		// struct protolayer_iter_ctx *data = queue_head(conn->unwrap_queue);
+
+		struct protolayer_iter_ctx *data = ctx;
 		if (!conn->conn) {
 			/* here branching for client and server based on outgoing?
 			 * It doesn't really make sence for client to ever
@@ -949,7 +925,18 @@ static enum protolayer_iter_cb_result pl_quic_conn_unwrap(void *sess_data,
 		ret = handle_packet(conn, data);
 		kr_log_info(DOQ, "handle_packet_result: %d we have %d streams pending\n",
 				ret,conn->streams_pending);
-		if (conn->streams_pending <= 0) {
+		if (ret != kr_ok()) {
+			return protolayer_break(ctx, kr_ok());
+		}
+
+		if (queue_len(conn->pending_unwrap) != 0) {
+			session2_unwrap(queue_head(conn->pending_unwrap)->h.session,
+					data->payload,
+					&conn->comm_storage,
+					data->finished_cb,
+					data->finished_cb_baton);
+			queue_pop(conn->pending_unwrap);
+		} else {
 			// const ngtcp2_path *path = ngtcp2_conn_get_path(conn->conn);
 			// ngtcp2_pkt_info pi = { 0 };
 			// ngtcp2_ssize sent = 0;
@@ -1016,7 +1003,7 @@ static enum protolayer_iter_cb_result pl_quic_conn_unwrap(void *sess_data,
 	// 		// kr_log_info(DOQ, "session2_unwrap_after = %d == NORMAL: %s\n",
 	// 		// 	ret, ret == PROTOLAYER_RET_NORMAL ? "true" : "false");
 	// 	}
-	}
+	// }
 
 	// return protolayer_async();
 	return protolayer_break(ctx, kr_ok());
@@ -1042,7 +1029,10 @@ static enum protolayer_iter_cb_result pl_quic_conn_wrap(void *sess_data,
 			conn->flags, KR_QUIC_CONN_HANDSHAKE_DONE,
 			conn->flags == KR_QUIC_CONN_HANDSHAKE_DONE);
 
-	if (conn->flags < KR_QUIC_CONN_HANDSHAKE_DONE) {
+	/* HACK: we receive iovec payload only when receiving a finished
+	 * query payload. */
+	if (ctx->payload.type != PROTOLAYER_PAYLOAD_IOVEC) {
+	// if (conn->flags < KR_QUIC_CONN_HANDSHAKE_DONE) {
 		ngtcp2_conn_info info = { 0 };
 		ngtcp2_conn_get_conn_info(conn->conn, &info);
 		const ngtcp2_path *path = ngtcp2_conn_get_path(conn->conn);
@@ -1708,18 +1698,18 @@ static void stream_outprocess(struct pl_quic_conn_sess_data *conn,
 	--conn->streams_pending;
 }
 
-struct pl_quic_stream_sess_data *kr_quic_stream_get_process(
-		struct pl_quic_conn_sess_data *conn, int64_t *stream_id)
-{
-	if (conn == NULL || conn->stream_inprocess < 0) {
-		return NULL;
-	}
-
-	struct kr_quic_stream *stream = &conn->streams[conn->stream_inprocess];
-	*stream_id = (conn->first_stream_id + conn->stream_inprocess) * 4;
-	stream_outprocess(conn, stream);
-	return stream;
-}
+// struct pl_quic_stream_sess_data *kr_quic_stream_get_process(
+// 		struct pl_quic_conn_sess_data *conn, int64_t *stream_id)
+// {
+// 	if (conn == NULL || conn->stream_inprocess < 0) {
+// 		return NULL;
+// 	}
+//
+// 	struct kr_quic_stream *stream = &conn->streams[conn->stream_inprocess];
+// 	*stream_id = (conn->first_stream_id + conn->stream_inprocess) * 4;
+// 	stream_outprocess(conn, stream);
+// 	return stream;
+// }
 
 // void kr_quic_stream_ack_data(struct pl_quic_conn_sess_data *conn, int64_t stream_id,
 //                                size_t end_acked, bool keep_stream)
@@ -1925,33 +1915,26 @@ static int pl_quic_conn_sess_init(struct session2 *session, void *sess_data, voi
 	conn->dcid = p->dcid;
 	conn->scid = p->scid;
 	conn->odcid = p->odcid;
-	conn->dec_cids = p->dec_cids;
+	memcpy(&conn->dec_cids, p->dec_cids, sizeof(ngtcp2_version_cid));
 
-	memcpy(&conn->comm_storage, &p->comm_storage, sizeof(struct comm_info));
-
-	struct comm_info comm = p->comm_storage;
-	if (comm.src_addr) {
-			int len = kr_sockaddr_len(comm.src_addr);
+	struct comm_info *comm = p->comm_storage;
+	if (comm->src_addr) {
+			int len = kr_sockaddr_len(comm->src_addr);
 		kr_require(len > 0 && len <= sizeof(union kr_sockaddr));
-		memcpy(&conn->comm_storage.src_addr, comm.src_addr, len);
-		// session->comm_storage.src_addr = &stream->comm_storage.src_addr.ip;
+		memcpy(&conn->comm_storage.src_addr, comm->src_addr, len);
 	}
-	if (comm.comm_addr) {
-		int len = kr_sockaddr_len(comm.comm_addr);
+	if (comm->comm_addr) {
+		int len = kr_sockaddr_len(comm->comm_addr);
 		kr_require(len > 0 && len <= sizeof(union kr_sockaddr));
-		memcpy(&conn->comm_storage.comm_addr, comm.comm_addr, len);
-		// session->comm_storage.comm_addr = &stream->comm_storage.comm_addr;
+		memcpy(&conn->comm_storage.comm_addr, comm->comm_addr, len);
 	}
-	if (comm.dst_addr) {
-		int len = kr_sockaddr_len(comm.dst_addr);
+	if (comm->dst_addr) {
+		int len = kr_sockaddr_len(comm->dst_addr);
 		kr_require(len > 0 && len <= sizeof(union kr_sockaddr));
-		memcpy(&conn->comm_storage.dst_addr, comm.dst_addr, len);
-		// session->comm_storage.dst_addr = &stream->comm_storage.dst_addr.ip;
+		memcpy(&conn->comm_storage.dst_addr, comm->dst_addr, len);
 	}
 
-
-	/* FIXME THIS will not work */
-	// session->comm_storage.target = &conn->dcid;
+	queue_init(conn->pending_unwrap);
 
 	// if (!the_network->tls_credentials) {
 	// 	kr_log_info(DOQ, "tls credentials were not present at the start of DoQ iteration\n");
@@ -2004,7 +1987,7 @@ static enum protolayer_event_cb_result pl_quic_conn_event_unwrap(
 		struct session2 *session, void *sess_data)
 {
 	if (event == PROTOLAYER_EVENT_CLOSE) {
-		kr_log_info(DOQ, "IM SUPPOSTED TO CLOSE FROM EVENT UNWRAP\n");
+		kr_log_info(DOQ, "CONN TO CLOSE FROM EVENT UNWRAP\n");
 	}
 
 	return PROTOLAYER_EVENT_PROPAGATE;
@@ -2017,7 +2000,8 @@ static enum protolayer_event_cb_result pl_quic_conn_event_wrap(
 	// session2_tasklist_finalize(session, 0/* FIXME */);
 	// session2_waitinglist_finalize(session, 0/* FIXME */);
 	if (event == PROTOLAYER_EVENT_CLOSE) {
-		kr_log_info(DOQ, "IM SUPPOSTED TO CLOSE FROM EVENT WRAP\n");
+		kr_log_info(DOQ, "CONN TO CLOSE FROM EVENT WRAP\n");
+		pl_quic_conn_sess_deinit(session, sess_data);
 	}
 
 	// return PROTOLAYER_EVENT_PROPAGATE;
