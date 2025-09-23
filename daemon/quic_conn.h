@@ -103,14 +103,6 @@ int kr_quic_send(struct pl_quic_conn_sess_data *conn,
 		unsigned max_msgs,
 		kr_quic_send_flag_t flags);
 
-typedef struct kr_quic_obuf {
-	// struct kr_quic_ucw_list *node;
-	struct node node;
-	size_t len;
-	// struct wire_buf buf;?
-	uint8_t buf[];
-} kr_quic_obuf_t;
-
 typedef struct kr_quic_cid {
 	uint8_t cid_placeholder[32];
 	struct pl_quic_conn_sess_data *conn_sess;
@@ -125,13 +117,24 @@ typedef enum {
 	KR_QUIC_CONN_AUTHORIZED     = (1 << 3),
 } kr_quic_conn_flag_t;
 
+typedef enum {
+	HANDSHAKE_DONE = (1 << 0),
+	/* TODO: verify that these are relevant vvv */
+	SESSION_TAKEN  = (1 << 1),
+	BLOCKED        = (1 << 2),
+	AUTHORIZED     = (1 << 3),
+	/* TODO: verify that these are relevant ^^^*/
+	DRAINING       = (1 << 4),
+	CLOSING        = (1 << 5),
+} quic_conn_state_t;
+
 /* parameters that will be passed to pl_quic_conn_sess_init */
 struct kr_quic_conn_param {
 	ngtcp2_cid dcid;
 	ngtcp2_cid scid;
 	ngtcp2_cid odcid;
-	ngtcp2_version_cid dec_cids;
-	struct comm_info comm_storage;
+	ngtcp2_version_cid *dec_cids;
+	struct comm_info *comm_storage;
 };
 
 typedef struct {
@@ -145,6 +148,9 @@ struct pl_quic_conn_sess_data {
 	/* I do not like this */
 	// uint64_t next_expiry;
 	// nc_conn_ref_placeholder_t conn_ref;
+
+	/* holds data of all active streams per one packet. */
+	struct wire_buf *inbuf;
 
 	nc_conn_ref_placeholder_t conn_ref;
 
@@ -162,11 +168,16 @@ struct pl_quic_conn_sess_data {
 	protolayer_iter_ctx_queue_t wrap_queue;
 	// protolayer_iter_ctx_queue_t resend_queue;
 	// struct wire_buf outbuf;
+	
+	/* queue for streams that received full queries and are ready
+	 * to proceed in the unwrap direction */
+	queue_t(struct pl_quic_stream_sess_data *) pending_unwrap;
 
 	ngtcp2_cid dcid;
 	ngtcp2_cid scid;
 	ngtcp2_cid odcid;
 	ngtcp2_version_cid dec_cids;
+	struct queue_t *fin_stream_q;
 
 	struct comm_info comm_storage;
 	struct comm_addr_storage comm_addr_storage;
@@ -178,16 +189,21 @@ struct pl_quic_conn_sess_data {
 
 	// QUIC stream abstraction
 	// TODO sentinel for streams?
-	struct pl_quic_stream_sess_data *streams;
+	struct pl_quic_stream_sess_data **streams;
 	// struct kr_quic_stream *streams;
 	// number of allocated streams structures
 	int16_t streams_count;
 	// index of first stream that has complete incomming data to be processed (aka inbuf_fin)
 	int16_t stream_inprocess;
-	// stream_id/4 of first allocated stream
-	int64_t first_stream_id;
 	// count of streams with finished queries pending a resolution
 	uint16_t streams_pending;
+
+	uint16_t first_stream_offset;
+
+	// TODO: remove
+	// // stream_id/4 of first allocated stream
+	// int64_t first_stream_id;
+
 
 	ngtcp2_ccerr last_error;
 	kr_quic_conn_flag_t flags;
@@ -204,7 +220,7 @@ struct pl_quic_conn_sess_data {
 	struct wire_buf unwrap_buf;
 
 	struct kr_request *req;
-	// quic_state_t state;
+	quic_conn_state_t state;
 };
 
 uint64_t quic_timestamp(void);

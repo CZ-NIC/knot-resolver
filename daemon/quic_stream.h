@@ -31,14 +31,33 @@ struct kr_quic_stream_param {
 	struct comm_info comm_storage;
 };
 
+
+// knot_stream
+	// struct iovec inbuf;
+	// struct knot_tcp_inbufs_upd_res *inbufs;
+	// size_t firstib_consumed;
+	// knot_quic_ucw_list_t outbufs;
+	// size_t obufs_size;
+	//
+	// knot_quic_obuf_t *unsent_obuf;
+	// size_t first_offset;
+	// size_t unsent_offset;
+
+struct kr_quic_obuf {
+	struct node node;
+	size_t len;
+	uint8_t buf[];
+};
+
+
 struct pl_quic_stream_sess_data {
 	struct protolayer_data h;
 
 	int64_t stream_id;
 	struct ngtcp2_conn *conn;
 	// struct iovec inbuf;
+
 	struct wire_buf pers_inbuf;
-	// struct kr_tcp_inbufs_upd_res *inbufs;
 
 	struct comm_info comm_storage;
 
@@ -46,34 +65,19 @@ struct pl_quic_stream_sess_data {
 	/* stores data that has been sent out and awaits acknowledgement and
 	 * data that has just been created and is waiting to be sent out */
 	/* ucw */struct list outbufs;
+	size_t obufs_size;
 
-	// /* ucw */struct kr_quic_ucw_list outbufs;
-	// /*ucw_*/queue_t(struct kr_quic_obuf) outbufs;
-	// /*ucw_*/list_t outbufs;
+	struct kr_quic_obuf *unsent_obuf;
+	size_t first_offset;
+	size_t unsent_offset;
 
 	protolayer_iter_ctx_queue_t unwrap_queue;
 	protolayer_iter_ctx_queue_t wrap_queue;
 
 	uint32_t incflags;
 	uint64_t sdata_offset;
-
-	/* FIXME Properly implement everywhere
-	 * kr_quic_stream_ack_data uses this to check the
-	 * stream is really finished, without proper handling
-	 * no stream will ever be deleted */
-	/* size of all outbufs */
-	size_t obufs_size;
-
-	/* pointer to somewhere in outbufs */
-	struct kr_quic_obuf *unsent_obuf;
-	/* offset of the first unacked data in the entire stream
-	 * (not just current unsent_obuf) */
-	size_t first_offset;
-	/* number of sent out bytes in the current unsent_obuf
-	 * if we send >= to the unsent_obuf size the list attemps
-	 * to advance to the next unsent_obuf and this value is reset to 0 */
-	size_t unsent_offset;
 };
+
 
 static int send_stream(struct pl_quic_stream_sess_data *stream,
 		struct protolayer_iter_ctx *ctx,
