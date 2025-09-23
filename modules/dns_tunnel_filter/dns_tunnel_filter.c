@@ -5,19 +5,10 @@
 #include <stdatomic.h>
 #include "dns_tunnel_filter.h"
 #include "libblcnn.h"
+#include "lib/kru-utils.h"
 #include "lib/mmapped.h"
 #include "lib/utils.h"
 #include "lib/resolve.h"
-
-#define V4_PREFIXES  (uint8_t[])       {  18,  20, 24, 32 }
-#define V4_RATE_MULT (kru_price_t[])   { 768, 256, 32,  1 }
-
-#define V6_PREFIXES  (uint8_t[])       { 32, 48, 56, 64, 128 }
-#define V6_RATE_MULT (kru_price_t[])   { 64,  4,  3,  2,   1 }
-
-#define V4_PREFIXES_CNT (sizeof(V4_PREFIXES) / sizeof(*V4_PREFIXES))
-#define V6_PREFIXES_CNT (sizeof(V6_PREFIXES) / sizeof(*V6_PREFIXES))
-#define MAX_PREFIXES_CNT ((V4_PREFIXES_CNT > V6_PREFIXES_CNT) ? V4_PREFIXES_CNT : V6_PREFIXES_CNT)
 
 #define DNAME_SCALE_FACTOR 25
 
@@ -40,13 +31,6 @@ struct dns_tunnel_filter {
 struct dns_tunnel_filter *dns_tunnel_filter = NULL;
 struct mmapped dns_tunnel_filter_mmapped = {0};
 bool dns_tunnel_filter_initialized = false;
-/// return whether we're using optimized variant right now
-static bool using_avx2(void)
-{
-	bool result = (KRU.initialize == KRU_AVX2.initialize);
-	kr_require(result || KRU.initialize == KRU_GENERIC.initialize);
-	return result;
-}
 
 int dns_tunnel_filter_init(const char *mmap_file, size_t capacity, uint32_t instant_limit,
 		uint32_t rate_limit, uint16_t slip, uint32_t log_period, bool dry_run)
