@@ -10,7 +10,7 @@
 #include "lib/utils.h"
 #include "lib/resolve.h"
 
-#define DNAME_SCALE_FACTOR 25
+enum { DNAME_SCALE_MULT = 2622 };
 
 #define VERBOSE_LOG(...) kr_log_debug(TUNNEL, " | " __VA_ARGS__)
 
@@ -137,7 +137,7 @@ static int produce(kr_layer_t *ctx, knot_pkt_t *pkt)
 		return ctx->state;
 
 	const uint32_t time_now = kr_now();
-	uint32_t price_scale_factor = (knot_dname_size(req->current_query->sname) << 16)/ DNAME_SCALE_FACTOR;
+	uint32_t price_scale_factor = knot_dname_size(req->current_query->sname) * DNAME_SCALE_MULT;
 
 	// classify
 	_Alignas(16) uint8_t key[16] = {0, };
