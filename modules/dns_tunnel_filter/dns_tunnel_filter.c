@@ -28,15 +28,23 @@ struct dns_tunnel_filter *dns_tunnel_filter = NULL;
 struct mmapped dns_tunnel_filter_mmapped = {0};
 
 bool load_attempted = false;
-TorchModule net = NULL;
+
+/// Config/state that's not suitable for mmapping.  TODO: name, etc?
+struct {
+	TorchModule net;
+	kr_rule_tags_t tags;
+} config = {0};
 
 
-int dns_tunnel_filter_setup(const char *nn_file, const char *mmap_file,
+KR_EXPORT
+int dns_tunnel_filter_setup(const char *nn_file, const char *mmap_file, kr_rule_tags_t tags,
 		size_t capacity, uint32_t instant_limit, uint32_t rate_limit)
 {
+	config.tags = tags;
+
 	int ret;
-	net = load_model(nn_file);
-	if (!net) {
+	config.net = load_model(nn_file);
+	if (!config.net) {
 		ret = kr_error(EINVAL); // we don't know what's wrong
 		goto fail;
 	}
@@ -113,9 +121,12 @@ static bool ensure_loaded(void)
 		return false;
 
 	kr_log_warning(TUNNEL, "Tunneling filter not initialized from Lua, using hardcoded default.\n");
-	int ret = dns_tunnel_filter_setup("/home/vcunat/dev/nic-notes/vysocina/blcnn.pt", // FIXME TMP
-						"dns_tunnel_filter",
-						(1 << 20), (1 << 8), (1 << 17));
+	kr_rule_tags_t tags = 0;
+	int ret = kr_rule_tag_add("tunnel", &tags);
+	if (ret) return ret;
+	ret = dns_tunnel_filter_setup("/home/vcunat/dev/nic-notes/vysocina/blcnn.pt", // FIXME TMP
+					"dns_tunnel_filter", tags,
+					(1 << 20), (1 << 8), (1 << 17));
 	return ret == kr_ok();
 }
 
@@ -135,6 +146,16 @@ static int produce(kr_layer_t *ctx, knot_pkt_t *pkt)
 	}
 	if (!req->current_query->sname)
 		return ctx->state;
+
+// this logic comes from kr_rule_consume_tags()
+	// _apply tags take precendence, and we store the last one
+	kr_rule_tags_t const tags_apply = config.tags & req->rule_tags_apply;
+	const bool do_apply = config.tags == KR_RULE_TAGS_ALL || tags_apply;
+	// _audit: we fill everything iff we're the very first action
+	kr_rule_tags_t const tags_audit = config.tags & req->rule_tags_audit;
+	const bool do_audit = tags_audit && !req->rule.action;
+	if (!do_apply && !do_audit)
+		return ctx->state; // we save the expensive computations
 
 	const uint32_t time_now = kr_now();
 	uint32_t price_scale_factor = knot_dname_size(req->current_query->sname) * DNAME_SCALE_MULT;
@@ -172,22 +193,31 @@ static int produce(kr_layer_t *ctx, knot_pkt_t *pkt)
 	uint8_t *packet = req->qsource.packet->wire;
 	size_t packet_size = req->qsource.size;
 
-	float tunnel_prob = predict_packet(net, packet, packet_size);
+	float tunnel_prob = predict_packet(config.net, packet, packet_size);
 	
-	if (tunnel_prob > 0.95) {
-		kr_log_info(TUNNEL, "Malicious packet detected! (%f %%)\n", (tunnel_prob - 0.95) * 100 * 20);
-		req->options.NO_ANSWER = true; // FIXME: this isn't a good reaction
-		return ctx->state = req->state = KR_STATE_FAIL;
-	} else {
+	if (tunnel_prob <= 0.95)
+		return ctx->state;
+	kr_log_debug(TUNNEL, "Malicious packet detected! (%f %%) %s\n",
+			(tunnel_prob - 0.95) * 100 * 20,
+	      		(do_apply ? "Blocking." : "Auditing.")
+	);
+
+	if (!do_apply) {
+		kr_assert(do_audit);
+		req->rule.tags = tags_audit;
+		req->rule.action = KREQ_ACTION_AUDIT;
 		return ctx->state;
 	}
+
+	kr_rule_do_answer(KR_RULE_SUB_NXDOMAIN, qry, pkt, qry->sname);
+	return ctx->state;
 }
 
 /// Remove mmapped file data if not used by other processes.
 KR_EXPORT
 int dns_tunnel_filter_deinit(struct kr_module *self)
 {
-	free_model(net);
+	free_model(config.net);
 	mmapped_deinit(&dns_tunnel_filter_mmapped);
 	dns_tunnel_filter = NULL;
 	return kr_ok();
