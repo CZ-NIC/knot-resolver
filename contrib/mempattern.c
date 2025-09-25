@@ -113,10 +113,16 @@ void mm_ctx_init(knot_mm_t *mm)
 	mm->free = free;
 }
 
+// UBSAN type punning workaround
+static void *mp_alloc_wrap(void *ctx, size_t size)
+{
+	return mp_alloc(ctx, size);
+}
+
 void mm_ctx_mempool(knot_mm_t *mm, size_t chunk_size)
 {
 	mm->ctx = mp_new(chunk_size);
-	mm->alloc = (knot_mm_alloc_t)mp_alloc;
+	mm->alloc = mp_alloc_wrap;
 	mm->free = mm_nofree;
 }
 
