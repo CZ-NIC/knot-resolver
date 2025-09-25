@@ -130,22 +130,19 @@ static bool ensure_loaded(void)
 	return ret == kr_ok();
 }
 
-static int produce(kr_layer_t *ctx, knot_pkt_t *pkt)
+static void do_filter(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
 	struct kr_request *req = ctx->req;
+	struct kr_query *qry = req->current_query;
 	if (!ensure_loaded())
-		return ctx->state;
+		return;
 	if (!req->qsource.addr)
-		return ctx->state;  // don't consider internal requests
+		return;  // don't consider internal requests
 	if (req->qsource.price_factor16 == 0)
-		return ctx->state;  // whitelisted
-	if (!req->current_query)
-		return ctx->state;
-	if (req->current_query->flags.CACHED) {
-		return ctx->state; // don't consider cached results
+		return;  // whitelisted
+	if (qry->flags.CACHED) {
+		return; // don't consider cached results
 	}
-	if (!req->current_query->sname)
-		return ctx->state;
 
 // this logic comes from kr_rule_consume_tags()
 	// _apply tags take precendence, and we store the last one
@@ -155,10 +152,10 @@ static int produce(kr_layer_t *ctx, knot_pkt_t *pkt)
 	kr_rule_tags_t const tags_audit = config.tags & req->rule_tags_audit;
 	const bool do_audit = tags_audit && !req->rule.action;
 	if (!do_apply && !do_audit)
-		return ctx->state; // we save the expensive computations
+		return; // we save the expensive computations
 
 	const uint32_t time_now = kr_now();
-	uint32_t price_scale_factor = knot_dname_size(req->current_query->sname) * DNAME_SCALE_MULT;
+	uint32_t price_scale_factor = knot_dname_size(qry->sname) * DNAME_SCALE_MULT;
 
 	// classify
 	_Alignas(16) uint8_t key[16] = {0, };
@@ -188,7 +185,7 @@ static int produce(kr_layer_t *ctx, knot_pkt_t *pkt)
 		limited_prefix = KRU.limited_multi_prefix_or((struct kru *)dns_tunnel_filter->kru, time_now,
 				0, key, V4_PREFIXES, prices, V4_PREFIXES_CNT, NULL);
 	}
-	if (!limited_prefix) return ctx->state;  // not limited
+	if (!limited_prefix) return;  // not limited
 
 	uint8_t *packet = req->qsource.packet->wire;
 	size_t packet_size = req->qsource.size;
@@ -196,20 +193,23 @@ static int produce(kr_layer_t *ctx, knot_pkt_t *pkt)
 	float tunnel_prob = predict_packet(config.net, packet, packet_size);
 	
 	if (tunnel_prob <= 0.95)
-		return ctx->state;
+		return;
 	kr_log_debug(TUNNEL, "Malicious packet detected! (%f %%) %s\n",
 			(tunnel_prob - 0.95) * 100 * 20,
 	      		(do_apply ? "Blocking." : "Auditing.")
 	);
 
-	if (!do_apply) {
+	if (do_apply) {
+		kr_rule_do_answer(KR_RULE_SUB_NXDOMAIN, qry, pkt, qry->sname);
+	} else {
 		kr_assert(do_audit);
 		req->rule.tags = tags_audit;
 		req->rule.action = KREQ_ACTION_AUDIT;
-		return ctx->state;
 	}
-
-	kr_rule_do_answer(KR_RULE_SUB_NXDOMAIN, qry, pkt, qry->sname);
+}
+static int produce(kr_layer_t *ctx, knot_pkt_t *pkt)
+{
+	do_filter(ctx, pkt);
 	return ctx->state;
 }
 
