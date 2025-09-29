@@ -40,6 +40,9 @@ KR_EXPORT
 int dns_tunnel_filter_setup(const char *nn_file, const char *mmap_file, kr_rule_tags_t tags,
 		size_t capacity, uint32_t instant_limit, uint32_t rate_limit)
 {
+	if (dns_tunnel_filter)
+		return kr_error(EALREADY); // we don't support reconfiguration for now
+
 	config.tags = tags;
 
 	int ret;
@@ -106,7 +109,10 @@ int dns_tunnel_filter_setup(const char *nn_file, const char *mmap_file, kr_rule_
 	} // else fail
 
 fail:
-
+	if (config.net) {
+		free_model(config.net);
+		config.net = NULL;
+	}
 	kr_log_crit(TUNNEL, "Initialization of shared DNS tunnel filter data failed.\n");
 	load_attempted = true;
 	return ret;
