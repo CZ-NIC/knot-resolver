@@ -20,6 +20,7 @@ from knot_resolver.datamodel.network_schema import NetworkSchema
 from knot_resolver.datamodel.options_schema import OptionsSchema
 from knot_resolver.datamodel.rate_limiting_schema import RateLimitingSchema
 from knot_resolver.datamodel.templates import POLICY_CONFIG_TEMPLATE, WORKER_CONFIG_TEMPLATE
+from knot_resolver.datamodel.tunnel_filter_schema import TunnelFilterSchema
 from knot_resolver.datamodel.types import EscapedStr, IntPositive, WritableDir
 from knot_resolver.datamodel.view_schema import ViewSchema
 from knot_resolver.datamodel.webmgmt_schema import WebmgmtSchema
@@ -61,7 +62,7 @@ def _get_views_tags(views: List[ViewSchema]) -> List[str]:
 
 
 def _check_local_data_tags(
-    views_tags: List[str], rules_or_rpz: Union[List[RuleSchema], List[RPZSchema]]
+    views_tags: List[str], rules_or_rpz: Union[List[RuleSchema], List[RPZSchema], List[TunnelFilterSchema]]
 ) -> Tuple[List[str], List[DataValidationError]]:
     tags = []
     errs = []
@@ -105,6 +106,7 @@ class KresConfig(ConfigSchema):
         views: List of views and its configuration.
         local_data: Local data for forward records (A/AAAA) and reverse records (PTR).
         forward: List of Forward Zones and its configuration.
+        tunnel_filter: Block suspected attempts of data exfiltration via DNS tunneling.
         cache: DNS resolver cache configuration.
         dnssec: Disable DNSSEC, enable with defaults or set new configuration.
         dns64: Disable DNS64 (RFC 6147), enable with defaults or set new configuration.
@@ -129,6 +131,7 @@ class KresConfig(ConfigSchema):
         views: Optional[List[ViewSchema]] = None
         local_data: LocalDataSchema = LocalDataSchema()
         forward: Optional[List[ForwardSchema]] = None
+        tunnel_filter: TunnelFilterSchema = TunnelFilterSchema()
         cache: CacheSchema = lazy_default(CacheSchema, {})
         dnssec: Union[bool, DnssecSchema] = True
         dns64: Union[bool, Dns64Schema] = False
@@ -153,6 +156,7 @@ class KresConfig(ConfigSchema):
     views: Optional[List[ViewSchema]]
     local_data: LocalDataSchema
     forward: Optional[List[ForwardSchema]]
+    tunnel_filter: TunnelFilterSchema 
     cache: CacheSchema
     dnssec: Union[Literal[False], DnssecSchema]
     dns64: Union[Literal[False], Dns64Schema]
@@ -217,7 +221,7 @@ class KresConfig(ConfigSchema):
         if self.views:
             views_tags = _get_views_tags(self.views)
 
-        # get local-data tags and check its existence in views
+        # get local-data + tunnel_filter tags and check their existence in views
         errs = []
         local_data_tags = []
         if self.local_data.rules:
@@ -228,6 +232,10 @@ class KresConfig(ConfigSchema):
             rpz_tags, rpz_errs = _check_local_data_tags(views_tags, self.local_data.rpz)
             errs += rpz_errs
             local_data_tags += rpz_tags
+        if self.tunnel_filter: # do we want this conditioning?
+            tunnel_tags, tunnel_errs = _check_local_data_tags(views_tags, [self.tunnel_filter])
+            errs += tunnel_errs
+            local_data_tags += tunnel_tags
 
         # look for unused tags in /views
         unused_tags = views_tags.copy()
