@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # vim:foldmethod=marker
 variables:
-  PYTHON_VERSION: '3.12'
+  PYTHON_VERSION: '3.13'
   DEBIAN_FRONTEND: noninteractive
   LC_ALL: C.UTF-8
   GIT_SUBMODULE_STRATEGY: recursive
@@ -21,7 +21,7 @@ variables:
   # IMAGE_TAG is a Git branch/tag name from https://gitlab.nic.cz/knot/knot-resolver-ci
   # In general, keep it pointing to a tag - use a branch only for development.
   # More info in the knot-resolver-ci repository.
-  IMAGE_TAG: 'v20250429'
+  IMAGE_TAG: 'v20250930'
   IMAGE_PREFIX: '$CI_REGISTRY/knot/knot-resolver-ci'
 
 image: $IMAGE_PREFIX/debian12-knot_3_3:$IMAGE_TAG
@@ -841,11 +841,11 @@ docs:website:
 
 .python: &python
   <<: *nodep
-  image: $IMAGE_PREFIX/manager:$IMAGE_TAG
   stage: sanity
   before_script:
     - poetry --version
     - poetry env use python${PYTHON_VERSION}
+    - poetry env info
 
 python:examples:
   <<: *python
