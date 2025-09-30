@@ -251,13 +251,15 @@ single ``kresctl`` command.
         This is because the validation runs under a different user/group than the resolver
         itself and attempts to access the configured paths directly.
 
-    .. option:: <input_file>
+    .. option:: [<input_file> ...]
 
-        File with the declarative configuration in YAML or JSON format.
+        :default: /etc/knot-resolver/config.yaml
+
+        Optional, file or combination of files with the declarative configuration in YAML or JSON format.
 
     .. code-block:: bash
 
-        $ kresctl validate input-config.json
+        $ kresctl validate config.yaml config.additional.json
 
 
 .. option:: convert
@@ -283,20 +285,22 @@ single ``kresctl`` command.
           which generates a rule database based on ``views``, ``local-data``,
           and ``forward`` configuration
 
-    .. option:: <input_file>
-
-        File with the declarative configuration in YAML or JSON format.
-
-    .. option:: [output_file]
+    .. option:: [-o, --output <output_file>]
 
         Optional. The output file for converted Lua configuration.
 
         If not specified, the converted configuration is printed into
         ``stdout``.
 
+    .. option:: [<input_file> ...]
+
+        :default: /etc/knot-resolver/config.yaml
+
+        Optional, file or combination of files with configuration in YAML or JSON format.
+
     .. code-block:: bash
 
-        $ kresctl convert input-config.yaml output-script.lua
+        $ kresctl convert -o output-script.lua input-config.yaml
 
 
 .. option:: reload
