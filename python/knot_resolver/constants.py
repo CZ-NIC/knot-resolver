@@ -1,4 +1,5 @@
 import importlib.util
+import sys
 from pathlib import Path
 
 VERSION = "6.0.16"
@@ -18,6 +19,14 @@ API_SOCK_FILE = RUN_DIR / "kres-api.sock"
 # executables paths
 KRESD_EXECUTABLE = SBIN_DIR / "kresd"
 KRES_CACHE_GC_EXECUTABLE = SBIN_DIR / "kres-cache-gc"
+
+LINUX_SYS = False
+if sys.platform.startswith("linux"):
+    LINUX_SYS = True
+
+APPLE_SYS = False
+if sys.platform == "darwin":
+    APPLE_SYS = True
 
 WATCHDOG_LIB = False
 if importlib.util.find_spec("watchdog"):
