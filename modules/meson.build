@@ -48,6 +48,7 @@ subdir('bogus_log')
 # cookies module is not currently used
 subdir('daf')
 subdir('dnstap')
+subdir('dns_tunnel_filter')
 subdir('edns_keepalive')
 subdir('experimental_dot_auth')
 subdir('extended_error')

@@ -300,3 +300,13 @@ KR_EXPORT
 int kr_rule_forward(const knot_dname_t *apex, kr_rule_fwd_flags_t flags,
 			const struct sockaddr * targets[]);
 
+
+/** FIXME: describe
+ *
+ *
+	if (kr_fails_assert(type == KR_RULE_SUB_EMPTY || type == KR_RULE_SUB_NXDOMAIN
+				|| type == KR_RULE_SUB_NODATA))
+ */
+KR_EXPORT
+int kr_rule_do_answer(enum kr_rule_sub_t type, struct kr_query *qry, knot_pkt_t *pkt,
+				const knot_dname_t apex_name[]);

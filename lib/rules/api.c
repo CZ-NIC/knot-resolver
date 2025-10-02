@@ -61,11 +61,11 @@ enum ret_codes_ {
 static int answer_exact_match(struct kr_query *qry, knot_pkt_t *pkt, uint16_t type,
 		knot_db_val_t *val);
 static int answer_zla_empty(val_zla_type_t type, struct kr_query *qry, knot_pkt_t *pkt,
-		knot_db_val_t zla_lf, uint32_t ttl);
+				const knot_dname_t apex_name[], uint32_t ttl);
 static int answer_zla_dname(val_zla_type_t type, struct kr_query *qry, knot_pkt_t *pkt,
-				knot_db_val_t zla_lf, uint32_t ttl, knot_db_val_t *val);
+				const knot_dname_t apex_name[], uint32_t ttl, knot_db_val_t *val);
 static int answer_zla_redirect(struct kr_query *qry, knot_pkt_t *pkt, const char *ruleset_name,
-				knot_db_val_t zla_lf, uint32_t ttl);
+				/*const*/ knot_dname_t apex_name[], uint32_t ttl);
 static int rule_local_subtree(const knot_dname_t *apex, enum kr_rule_sub_t type,
 				const knot_dname_t *target, uint32_t ttl,
 				kr_rule_tags_t tags, kr_rule_opts_t opts);
@@ -502,18 +502,23 @@ static int subtree_search(const size_t lf_start_i, const knot_db_val_t key,
 		if (val.len >= sizeof(ttl)) // allow omitting -> can't kr_assert
 			deserialize_fails_assert(&val, &ttl);
 
+		knot_dname_t apex_name[KNOT_DNAME_MAXLEN];
+		ret = knot_dname_lf2wire(apex_name, zla_lf.len, zla_lf.data);
+		// kr_require(zla_lf.len + 2 == knot_dname_size(apex_name));
+		if (ret < 0) return kr_error(ret);
+
 		// Finally execute the rule.
 		switch (ztype) {
 		case KR_RULE_SUB_EMPTY:
 		case KR_RULE_SUB_NXDOMAIN:
 		case KR_RULE_SUB_NODATA:
-			ret = answer_zla_empty(ztype, qry, pkt, zla_lf, ttl);
+			ret = answer_zla_empty(ztype, qry, pkt, apex_name, ttl);
 			break;
 		case KR_RULE_SUB_REDIRECT:
-			ret = answer_zla_redirect(qry, pkt, ruleset_name, zla_lf, ttl);
+			ret = answer_zla_redirect(qry, pkt, ruleset_name, apex_name, ttl);
 			break;
 		case KR_RULE_SUB_DNAME:
-			ret = answer_zla_dname(ztype, qry, pkt, zla_lf, ttl, &val);
+			ret = answer_zla_dname(ztype, qry, pkt, apex_name, ttl, &val);
 			break;
 		default:
 			return kr_error(EILSEQ);
@@ -830,22 +835,18 @@ fallback:
 
 /** Empty or NXDOMAIN or NODATA.  Returning kr_error(EAGAIN) means the rule didn't match. */
 static int answer_zla_empty(val_zla_type_t type, struct kr_query *qry, knot_pkt_t *pkt,
-				const knot_db_val_t zla_lf, uint32_t ttl)
+				const knot_dname_t apex_name[], uint32_t ttl)
 {
 	if (kr_fails_assert(type == KR_RULE_SUB_EMPTY || type == KR_RULE_SUB_NXDOMAIN
 				|| type == KR_RULE_SUB_NODATA))
 		return kr_error(EINVAL);
-
-	knot_dname_t apex_name[KNOT_DNAME_MAXLEN];
-	int ret = knot_dname_lf2wire(apex_name, zla_lf.len, zla_lf.data);
-	CHECK_RET(ret);
 
 	const bool hit_apex = knot_dname_is_equal(qry->sname, apex_name);
 	if (hit_apex && type == KR_RULE_SUB_NODATA)
 		return kr_error(EAGAIN);
 
 	/* Start constructing the (pseudo-)packet. */
-	ret = pkt_renew(pkt, qry->sname, qry->stype);
+	int ret = pkt_renew(pkt, qry->sname, qry->stype);
 	CHECK_RET(ret);
 	struct answer_rrset arrset;
 	memset(&arrset, 0, sizeof(arrset));
@@ -858,9 +859,9 @@ static int answer_zla_empty(val_zla_type_t type, struct kr_query *qry, knot_pkt_
 	if (kr_fails_assert(arrset.set.rr))
 		return kr_error(ENOMEM);
 	if (want_NS) {
-		kr_require(zla_lf.len + 2 == knot_dname_size(apex_name));
 		// TODO: maybe it's weird to use this NS name, but what else?
-		ret = knot_rrset_add_rdata(arrset.set.rr, apex_name, zla_lf.len + 2, &pkt->mm);
+		ret = knot_rrset_add_rdata(arrset.set.rr,
+					   apex_name, knot_dname_size(apex_name), &pkt->mm);
 	} else {
 		ret = knot_rrset_add_rdata(arrset.set.rr, soa_rdata,
 						sizeof(soa_rdata) - 1, &pkt->mm);
@@ -904,9 +905,14 @@ static int answer_zla_empty(val_zla_type_t type, struct kr_query *qry, knot_pkt_
 		     type == KR_RULE_SUB_EMPTY ? "empty" : "nxdomain");
 	return kr_ok();
 }
+int kr_rule_do_answer(enum kr_rule_sub_t type, struct kr_query *qry, knot_pkt_t *pkt,
+				const knot_dname_t apex_name[])
+{
+	return answer_zla_empty(type, qry, pkt, apex_name, KR_RULE_TTL_DEFAULT);
+}
 
 static int answer_zla_dname(val_zla_type_t type, struct kr_query *qry, knot_pkt_t *pkt,
-				const knot_db_val_t zla_lf, uint32_t ttl, knot_db_val_t *val)
+				const knot_dname_t apex_name[], uint32_t ttl, knot_db_val_t *val)
 {
 	if (kr_fails_assert(type == KR_RULE_SUB_DNAME))
 		return kr_error(EINVAL);
@@ -925,16 +931,12 @@ static int answer_zla_dname(val_zla_type_t type, struct kr_query *qry, knot_pkt_
 		val->len = 0;
 	}
 
-	knot_dname_t apex_name[KNOT_DNAME_MAXLEN];
-	int ret = knot_dname_lf2wire(apex_name, zla_lf.len, zla_lf.data);
-	CHECK_RET(ret);
-
 	const bool hit_apex = knot_dname_is_equal(qry->sname, apex_name);
 	if (hit_apex && type == KR_RULE_SUB_DNAME)
 		return kr_error(EAGAIN); // LATER: maybe a type that matches apex
 
 	// Start constructing the (pseudo-)packet.
-	ret = pkt_renew(pkt, qry->sname, qry->stype);
+	int ret = pkt_renew(pkt, qry->sname, qry->stype);
 	CHECK_RET(ret);
 	struct answer_rrset arrset;
 	memset(&arrset, 0, sizeof(arrset));
@@ -979,13 +981,10 @@ static int answer_zla_dname(val_zla_type_t type, struct kr_query *qry, knot_pkt_
 }
 
 static int answer_zla_redirect(struct kr_query *qry, knot_pkt_t *pkt, const char *ruleset_name,
-				const knot_db_val_t zla_lf, uint32_t ttl)
+				knot_dname_t apex_name[], uint32_t ttl)
 {
 	VERBOSE_MSG(qry, "=> redirecting by local data\n"); // lazy to get the zone name
 
-	knot_dname_t apex_name[KNOT_DNAME_MAXLEN];
-	int ret = knot_dname_lf2wire(apex_name, zla_lf.len, zla_lf.data);
-	CHECK_RET(ret);
 	const bool name_matches = knot_dname_is_equal(qry->sname, apex_name);
 	if (name_matches || qry->stype == KNOT_RRTYPE_NS || qry->stype == KNOT_RRTYPE_SOA)
 		goto nodata;
@@ -997,6 +996,7 @@ static int answer_zla_redirect(struct kr_query *qry, knot_pkt_t *pkt, const char
 	knot_db_val_t key = local_data_key(&rrs, key_data, ruleset_name);
 
 	knot_db_val_t val;
+	int ret;
 	// Multiple variants are possible, with different tags.
 	for (ret = ruledb_op(it_first, &key, &val); ret == 0; ret = ruledb_op(it_next, &val)) {
 		const bool allow_audit = false; // we just audited at _REDIRECT root

@@ -8,22 +8,15 @@
 #include "daemon/session2.h"
 #include "daemon/udp_queue.h"
 #include "lib/kru.h"
+#include "lib/kru-utils.h"
 #include "lib/mmapped.h"
 #include "lib/resolve.h"
 #include "lib/utils.h"
 
-#define V4_PREFIXES  (uint8_t[])       {  18,  20, 24, 32 }
-#define V4_RATE_MULT (kru_price_t[])   { 768, 256, 32,  1 }
+// see ../lib/kru-utils.h for the closely related V4_* and V6_* defines.
 #define V4_SUBPRIO   (uint8_t[])       {   0,   1,  3,  7 }
-
-#define V6_PREFIXES  (uint8_t[])       { 32, 48, 56, 64, 128 }
-#define V6_RATE_MULT (kru_price_t[])   { 64,  4,  3,  2,   1 }
 #define V6_SUBPRIO   (uint8_t[])       {  2,  4,  5,  6,   7 }
-
 #define SUBPRIO_CNT 8
-#define V4_PREFIXES_CNT (sizeof(V4_PREFIXES) / sizeof(*V4_PREFIXES))
-#define V6_PREFIXES_CNT (sizeof(V6_PREFIXES) / sizeof(*V6_PREFIXES))
-#define MAX_PREFIXES_CNT ((V4_PREFIXES_CNT > V6_PREFIXES_CNT) ? V4_PREFIXES_CNT : V6_PREFIXES_CNT)
 
 struct kru_conf {
 	uint8_t namespace;
@@ -139,14 +132,6 @@ struct pl_defer_iter_data {
 	uint64_t req_stamp;   // time when request was received, uses get_stamp()
 	size_t size;
 };
-
-/// Return whether we're using optimized variant right now.
-static bool using_avx2(void)
-{
-	bool result = (KRU.initialize == KRU_AVX2.initialize);
-	kr_require(result || KRU.initialize == KRU_GENERIC.initialize);
-	return result;
-}
 
 /// Print configuration into desc array.
 void defer_str_conf(char *desc, int desc_len)
