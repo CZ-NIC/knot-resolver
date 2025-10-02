@@ -1,5 +1,6 @@
 import logging
 import os
+import platform
 import socket
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
@@ -163,14 +164,26 @@ class KresConfig(ConfigSchema):
         return obj.hostname
 
     def _workers(self, obj: Raw) -> Any:
+        is_macos = bool(platform.system() == "Darwin")
+        macos_msg = (
+            "On macOS, you cannot run more than one worker because SO_REUSEPORT socket option support is absent."
+        )
+
         if obj.workers == "auto":
             count = _cpu_count()
+            if is_macos:
+                logger.info(f"Running on macOS, 'workers' configuration automatically set to 1. {macos_msg}")
+                count = 1
+
             if count:
                 return IntPositive(count)
             raise ValueError(
                 "The number of available CPUs to automatically set the number of running 'kresd' workers could not be determined."
                 "The number of workers can be configured manually in 'workers' option."
             )
+        if is_macos and (int(obj.workers) > 1):
+            raise ValueError(macos_msg)
+
         return obj.workers
 
     def _dnssec(self, obj: Raw) -> Any:
