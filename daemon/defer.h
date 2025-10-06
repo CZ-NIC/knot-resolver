@@ -91,7 +91,7 @@ static inline void defer_sample_addr(const union kr_sockaddr *addr, bool stream)
 static inline void defer_sample_start_stamp(uint64_t stamp)
 {
 	if (!defer) return;
-	// kr_assert(!defer_sample_state.is_accounting);
+	if (defer_sample_state.is_accounting) return;
 	defer_sample_state.is_accounting = true;
 	defer_sample_state.stamp = stamp;
 	defer_sample_state.addr.ip.sa_family = AF_UNSPEC;
