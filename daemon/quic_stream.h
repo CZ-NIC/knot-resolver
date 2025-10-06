@@ -4,44 +4,12 @@
 
 #pragma once
 
-#include "quic_conn.h"
-#include "quic_demux.h"
-#include "session2.h"
 #include <ngtcp2/ngtcp2.h>
+#include "contrib/ucw/lists.h"
+#include "quic_conn.h"
+#include "session2.h"
 
 #define QUIC_MAX_SEND_PER_RECV	4
-
-// struct pl_quic_stream_sess_data *kr_quic_conn_get_stream(
-// 		struct pl_quic_conn_sess_data *conn,
-// 		int64_t stream_id, bool create);
-
-// int kr_quic_stream_add_data(struct pl_quic_conn_sess_data *conn,
-// 		int64_t stream_id, struct protolayer_payload *pl);
-
-// int kr_quic_stream_recv_data(struct pl_quic_conn_sess_data *conn,
-// 		int64_t stream_id, const uint8_t *data, size_t len, bool fin);
-
-// struct pl_quic_stream_sess_data *kr_quic_stream_get_process(
-// 		struct pl_quic_conn_sess_data *conn, int64_t *stream_id);
-
-/* parameters that will be passed to pl_quic_conn_sess_init */
-struct kr_quic_stream_param {
-	int64_t stream_id;
-	ngtcp2_conn *conn;
-	struct comm_info comm_storage;
-};
-
-
-// knot_stream
-	// struct iovec inbuf;
-	// struct knot_tcp_inbufs_upd_res *inbufs;
-	// size_t firstib_consumed;
-	// knot_quic_ucw_list_t outbufs;
-	// size_t obufs_size;
-	//
-	// knot_quic_obuf_t *unsent_obuf;
-	// size_t first_offset;
-	// size_t unsent_offset;
 
 struct kr_quic_obuf {
 	struct node node;
@@ -49,37 +17,29 @@ struct kr_quic_obuf {
 	uint8_t buf[];
 };
 
-
 struct pl_quic_stream_sess_data {
 	struct protolayer_data h;
 
+	node_t list_node;
 	int64_t stream_id;
 	struct ngtcp2_conn *conn;
-	// struct iovec inbuf;
-
 	struct wire_buf pers_inbuf;
-
+	struct wire_buf outbuf;
 	struct comm_info comm_storage;
-
-	size_t firstib_consumed;
-	/* stores data that has been sent out and awaits acknowledgement and
+	/* stores both data that has been sent out but hasn't been acked and
 	 * data that has just been created and is waiting to be sent out */
-	/* ucw */struct list outbufs;
+	struct list outbufs;
 	size_t obufs_size;
 
 	struct kr_quic_obuf *unsent_obuf;
 	size_t first_offset;
 	size_t unsent_offset;
 
-	protolayer_iter_ctx_queue_t unwrap_queue;
-	protolayer_iter_ctx_queue_t wrap_queue;
-
 	uint32_t incflags;
 	uint64_t sdata_offset;
+
+	struct pl_quic_conn_sess_data *conn_ref;
 };
 
-
-static int send_stream(struct pl_quic_stream_sess_data *stream,
-		struct protolayer_iter_ctx *ctx,
-		// struct protolayer_payload *outwb,
-		uint8_t *data, size_t len, bool fin, ngtcp2_ssize *sent);
+void kr_quic_stream_ack_data(struct pl_quic_stream_sess_data *stream,
+		int64_t stream_id, size_t end_acked, bool keep_stream);
