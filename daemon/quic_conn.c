@@ -564,9 +564,6 @@ static int send_special(struct pl_quic_conn_sess_data *conn,
 
 	uint64_t now = quic_timestamp();
 
-	uint8_t rnd = 0;
-	dnssec_random_buffer(&rnd, sizeof(rnd));
-	uint32_t supported_quic[1] = { NGTCP2_PROTO_VER_V1 };
 	ngtcp2_cid new_dcid;
 	uint8_t retry_token[NGTCP2_CRYPTO_MAX_RETRY_TOKENLEN];
 	uint8_t stateless_reset_token[NGTCP2_STATELESS_RESET_TOKENLEN];
@@ -579,13 +576,10 @@ static int send_special(struct pl_quic_conn_sess_data *conn,
 	int ret = 0;
 	switch (action) {
 	case QUIC_SEND_VERSION_NEGOTIATION:
-		ret = ngtcp2_pkt_write_version_negotiation(
-			wire_buf_free_space(ctx->payload.wire_buf),
-			wire_buf_free_space_length(ctx->payload.wire_buf),
-			rnd, conn->dec_cids.scid, conn->dec_cids.scidlen,
-			conn->dec_cids.dcid, conn->dec_cids.dcidlen, supported_quic,
-			sizeof(supported_quic) / sizeof(*supported_quic)
-		);
+		ret = send_version_negotiation(ctx->payload.wire_buf,
+				conn->dec_cids,
+				conn->dcid,
+				conn->scid);
 		break;
 
 	case QUIC_SEND_RETRY:

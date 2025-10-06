@@ -82,3 +82,5 @@ bool kr_quic_conn_timeout(struct pl_quic_conn_sess_data *conn, uint64_t *now);
 void init_random_cid(ngtcp2_cid *cid, size_t len);
 void quic_event_close_connection(struct pl_quic_conn_sess_data *conn,
 		struct session2 *session);
+ssize_t send_version_negotiation(struct wire_buf *dest, ngtcp2_version_cid dec_cids,
+		ngtcp2_cid dcid, ngtcp2_cid scid);

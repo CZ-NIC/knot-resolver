@@ -202,7 +202,16 @@ static enum protolayer_iter_cb_result pl_quic_demux_unwrap(void *sess_data,
 	ngtcp2_cid_init(&scid, dec_cids.scid, dec_cids.scidlen);
 
 	if (ret == NGTCP2_ERR_VERSION_NEGOTIATION) {
-		/* version negotiation packet should be sent */
+		wire_buf_reset(ctx->payload.wire_buf);
+		send_version_negotiation(ctx->payload.wire_buf,
+				dec_cids, dcid, scid);
+		if (ret >= 0) {
+			session2_wrap(demux->h.session, ctx->payload, ctx->comm,
+					ctx->req, ctx->finished_cb,
+					ctx->finished_cb_baton);
+		}
+
+		return protolayer_break(ctx, kr_ok());
 	}
 
 	qconn = kr_quic_table_lookup(&dcid, demux->conn_table);
