@@ -641,7 +641,9 @@ static int session2_submit(
 	// but we may not know the client's IP yet.
 	// Note two cases: incoming session (new request)
 	// vs. outgoing session (resuming work on some request)
-	if ((direction == PROTOLAYER_UNWRAP) && (layer_ix == 0))
+	if ((direction == PROTOLAYER_UNWRAP) && (layer_ix == 0) &&
+			session->proto != KR_PROTO_DOQ_STREAM &&
+			session->proto != KR_PROTO_DOQ)
 		defer_sample_start(NULL);
 
 	struct protolayer_iter_ctx *ctx = malloc(session->iter_ctx_size);
@@ -704,7 +706,9 @@ static int session2_submit(
 	}
 
 	int ret = protolayer_step(ctx);
-	if ((direction == PROTOLAYER_UNWRAP) && (layer_ix == 0))
+	if ((direction == PROTOLAYER_UNWRAP) && (layer_ix == 0) &&
+			session->proto != KR_PROTO_DOQ_STREAM &&
+			session->proto != KR_PROTO_DOQ)
 		defer_sample_stop(NULL, false);
 	return ret;
 }
