@@ -349,6 +349,8 @@ typedef void (*protolayer_finished_cb)(int status, struct session2 *session,
 	XX(OS_BUFFER_FULL) \
 	/** Request update of connection data, only used by DoQ */\
 	XX(CONNECT_UPDATE) \
+	/** Request removal of cid, only used by DoQ */\
+	XX(CONNECT_RETIRE) \
 	//
 
 /** Event type, to be interpreted by a layer. */
@@ -570,10 +572,8 @@ size_t protolayer_iter_size_est(struct protolayer_iter_ctx *ctx, bool incl_paylo
 /** Layer-specific data - the generic struct. To be added as the first member of
  * each specific struct. */
 struct protolayer_data {
-	/* FIXME: Only used by quic_demux, I do not like changing this struct
-	 * so seriously consider if it is neccesarry here */
 	int heap_node_placeholder; // MUST be first field of the struct
-	uint64_t next_expiry;
+	uint64_t heap_value;
 	struct session2 *session; /**< Pointer to the owner session. */\
 };
 
@@ -993,7 +993,6 @@ static inline struct session2 *session2_new_child(struct session2 *parent,
 	struct session2 *s = session2_new(SESSION2_TRANSPORT_PARENT, layer_grp,
 			layer_param, layer_param_count, outgoing);
 	s->transport.parent = parent;
-	s->comm_storage = parent->comm_storage;
 	return s;
 }
 
