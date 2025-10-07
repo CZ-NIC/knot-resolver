@@ -103,10 +103,12 @@ class Server:
         self._shutdown_event = asyncio.Event()
         self._manager = manager
 
-    async def _reconfigure(self, config: KresConfig) -> None:
+    async def _reconfigure(self, config: KresConfig, force: bool = False) -> None:
         await self._reconfigure_listen_address(config)
 
-    async def _deny_management_changes(self, config_old: KresConfig, config_new: KresConfig) -> Result[None, str]:
+    async def _deny_management_changes(
+        self, config_old: KresConfig, config_new: KresConfig, force: bool = False
+    ) -> Result[None, str]:
         if config_old.management != config_new.management:
             return Result.err(
                 "/server/management: Changing management API address/uTruenix-socket dynamically is not allowed as it's really dangerous."
@@ -116,7 +118,7 @@ class Server:
             )
         return Result.ok(None)
 
-    async def _reload_config(self) -> None:
+    async def _reload_config(self, force: bool = False) -> None:
         if self._config_path is None:
             logger.warning("The manager was started with inlined configuration - can't reload")
         else:
@@ -127,7 +129,7 @@ class Server:
                     data = data_combine(data, file_data)
 
                 config = KresConfig(data)
-                await self.config_store.update(config)
+                await self.config_store.update(config, force)
                 logger.info("Configuration file successfully reloaded")
             except FileNotFoundError:
                 logger.error(
@@ -142,9 +144,9 @@ class Server:
                 logger.error(f"Reloading of the configuration file failed: {e}")
                 logger.error("Configuration has NOT been changed.")
 
-    async def _renew_config(self) -> None:
+    async def _renew_config(self, force: bool = False) -> None:
         try:
-            await self.config_store.renew()
+            await self.config_store.renew(force)
             logger.info("Configuration successfully renewed")
         except KresManagerException as e:
             logger.error(f"Renewing the configuration failed: {e}")
@@ -328,22 +330,22 @@ class Server:
         logger.info("Shutdown event triggered...")
         return web.Response(text="Shutting down...")
 
-    async def _handler_reload(self, _request: web.Request) -> web.Response:
+    async def _handler_reload(self, request: web.Request) -> web.Response:
         """
-        Route handler for reloading the server
+        Route handler for reloading the configuration
         """
 
         logger.info("Reloading event triggered...")
-        await self._reload_config()
+        await self._reload_config(force=bool(request.path.endswith("/force")))
         return web.Response(text="Reloading...")
 
-    async def _handler_renew(self, _request: web.Request) -> web.Response:
+    async def _handler_renew(self, request: web.Request) -> web.Response:
         """
         Route handler for renewing the configuration
         """
 
         logger.info("Renewing configuration event triggered...")
-        await self._renew_config()
+        await self._renew_config(force=bool(request.path.endswith("/force")))
         return web.Response(text="Renewing configuration...")
 
     async def _handler_processes(self, request: web.Request) -> web.Response:
@@ -380,7 +382,9 @@ class Server:
                 web.patch(r"/v1/config{path:.*}", self._handler_config_query),
                 web.post("/stop", self._handler_stop),
                 web.post("/reload", self._handler_reload),
+                web.post("/reload/force", self._handler_reload),
                 web.post("/renew", self._handler_renew),
+                web.post("/renew/force", self._handler_renew),
                 web.get("/schema", self._handler_schema),
                 web.get("/schema/ui", self._handle_view_schema),
                 web.get("/metrics", self._handler_metrics),
@@ -475,7 +479,9 @@ async def _init_manager(config_store: ConfigStore) -> KresManager:
     return manager
 
 
-async def _deny_working_directory_changes(config_old: KresConfig, config_new: KresConfig) -> Result[None, str]:
+async def _deny_working_directory_changes(
+    config_old: KresConfig, config_new: KresConfig, force: bool = False
+) -> Result[None, str]:
     if config_old.rundir != config_new.rundir:
         return Result.err("Changing manager's `rundir` during runtime is not allowed.")
 

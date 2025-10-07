@@ -401,7 +401,7 @@ if PROMETHEUS_LIB:
                 compat.asyncio.run(self.collect_kresd_stats(_triggered_from_prometheus_library=True))
 
     @only_on_real_changes_update(lambda c: c.monitoring.graphite)
-    async def _init_graphite_bridge(config: KresConfig) -> None:
+    async def _init_graphite_bridge(config: KresConfig, force: bool = False) -> None:
         """
         Starts graphite bridge if required
         """
@@ -419,7 +419,9 @@ if PROMETHEUS_LIB:
                 interval=config.monitoring.graphite.interval.seconds(), prefix=str(config.monitoring.graphite.prefix)
             )
 
-    async def _deny_turning_off_graphite_bridge(old_config: KresConfig, new_config: KresConfig) -> Result[None, str]:
+    async def _deny_turning_off_graphite_bridge(
+        old_config: KresConfig, new_config: KresConfig, force: bool = False
+    ) -> Result[None, str]:
         if old_config.monitoring.graphite and not new_config.monitoring.graphite:
             return Result.err(
                 "You can't turn off graphite monitoring dynamically. If you really want this feature, please let the developers know."

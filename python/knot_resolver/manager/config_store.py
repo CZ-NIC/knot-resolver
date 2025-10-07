@@ -9,8 +9,8 @@ from knot_resolver.utils.modeling.types import NoneType
 
 from .exceptions import KresManagerException
 
-VerifyCallback = Callable[[KresConfig, KresConfig], Awaitable[Result[None, str]]]
-UpdateCallback = Callable[[KresConfig], Awaitable[None]]
+VerifyCallback = Callable[[KresConfig, KresConfig, bool], Awaitable[Result[None, str]]]
+UpdateCallback = Callable[[KresConfig, bool], Awaitable[None]]
 
 
 class ConfigStore:
@@ -20,10 +20,10 @@ class ConfigStore:
         self._callbacks: List[UpdateCallback] = []
         self._update_lock: Lock = Lock()
 
-    async def update(self, config: KresConfig) -> None:
+    async def update(self, config: KresConfig, force: bool = False) -> None:
         # invoke pre-change verifiers
         results: Tuple[Result[None, str], ...] = tuple(
-            await asyncio.gather(*[ver(self._config, config) for ver in self._verifiers])
+            await asyncio.gather(*[ver(self._config, config, force) for ver in self._verifiers])
         )
         err_res = filter(lambda r: r.is_err(), results)
         errs = list(map(lambda r: r.unwrap_err(), err_res))
@@ -36,14 +36,14 @@ class ConfigStore:
 
             # invoke change callbacks
             for call in self._callbacks:
-                await call(config)
+                await call(config, force)
 
-    async def renew(self) -> None:
-        await self.update(self._config)
+    async def renew(self, force: bool = False) -> None:
+        await self.update(self._config, force)
 
     async def register_verifier(self, verifier: VerifyCallback) -> None:
         self._verifiers.append(verifier)
-        res = await verifier(self.get(), self.get())
+        res = await verifier(self.get(), self.get(), False)
         if res.is_err():
             raise DataParsingError(f"Initial config verification failed with error: {res.unwrap_err()}")
 
@@ -53,7 +53,7 @@ class ConfigStore:
         """
 
         self._callbacks.append(callback)
-        await callback(self.get())
+        await callback(self.get(), False)
 
     def get(self) -> KresConfig:
         return self._config
@@ -64,13 +64,15 @@ def only_on_no_changes_update(selector: Callable[[KresConfig], Any]) -> Callable
         original_value_set: Any = False
         original_value: Any = None
 
-        async def new_func_update(config: KresConfig) -> None:
+        async def new_func_update(config: KresConfig, force: bool = False) -> None:
             nonlocal original_value_set
             nonlocal original_value
             if not original_value_set:
                 original_value_set = True
             elif original_value == selector(config):
-                await orig_func(config)
+                await orig_func(config, force)
+            elif force:
+                await orig_func(config, force)
             original_value = selector(config)
 
         return new_func_update
@@ -83,16 +85,17 @@ def only_on_real_changes_update(selector: Callable[[KresConfig], Any]) -> Callab
         original_value_set: Any = False
         original_value: Any = None
 
-        async def new_func_update(config: KresConfig) -> None:
+        async def new_func_update(config: KresConfig, force: bool) -> None:
             nonlocal original_value_set
             nonlocal original_value
             if not original_value_set:
                 original_value_set = True
-                original_value = selector(config)
-                await orig_func(config)
+                await orig_func(config, force)
             elif original_value != selector(config):
-                original_value = selector(config)
-                await orig_func(config)
+                await orig_func(config, force)
+            elif force:
+                await orig_func(config, force)
+            original_value = selector(config)
 
         return new_func_update
 
@@ -104,16 +107,16 @@ def only_on_real_changes_verifier(selector: Callable[[KresConfig], Any]) -> Call
         original_value_set: Any = False
         original_value: Any = None
 
-        async def new_func_verifier(old: KresConfig, new: KresConfig) -> Result[NoneType, str]:
+        async def new_func_verifier(old: KresConfig, new: KresConfig, force: bool) -> Result[NoneType, str]:
             nonlocal original_value_set
             nonlocal original_value
             if not original_value_set:
                 original_value_set = True
                 original_value = selector(new)
-                await orig_func(old, new)
+                await orig_func(old, new, force)
             elif original_value != selector(new):
                 original_value = selector(new)
-                await orig_func(old, new)
+                await orig_func(old, new, force)
             return Result.ok(None)
 
         return new_func_verifier

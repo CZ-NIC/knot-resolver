@@ -145,7 +145,7 @@ if WATCHDOG_LIB:
 
 
 @only_on_real_changes_update(watched_files_config)
-async def _init_files_watchdog(config: KresConfig) -> None:
+async def _init_files_watchdog(config: KresConfig, force: bool = False) -> None:
     if WATCHDOG_LIB:
         global _files_watchdog
 

@@ -6,7 +6,7 @@ from knot_resolver.datamodel import KresConfig
 logger = logging.getLogger(__name__)
 
 
-async def files_reload(config: KresConfig) -> None:
+async def files_reload(config: KresConfig, force: bool = False) -> None:
     cert_file = config.network.tls.cert_file
     key_file = config.network.tls.key_file
 
