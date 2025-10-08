@@ -75,7 +75,6 @@ kr_quic_cid_t **kr_quic_table_lookup2(const ngtcp2_cid *cid, kr_quic_table_t *ta
 struct pl_quic_conn_sess_data *kr_quic_table_lookup(const ngtcp2_cid *cid, kr_quic_table_t *table)
 {
 	kr_quic_cid_t **pcid = kr_quic_table_lookup2(cid, table);
-	assert(pcid != NULL);
 	return *pcid == NULL ? NULL : (*pcid)->conn_sess;
 }
 
@@ -442,20 +441,15 @@ void kr_quic_table_rem(struct pl_quic_conn_sess_data *conn,
 		return;
 	}
 
-	assert(conn->streams_count <= 0);
-	assert(conn->obufs_size == 0);
-
 	size_t num_scid = ngtcp2_conn_get_scid(conn->conn, NULL);
 	ngtcp2_cid *scids = calloc(num_scid, sizeof(*scids));
 	ngtcp2_conn_get_scid(conn->conn, scids);
 
 	for (size_t i = 0; i < num_scid; i++) {
 		kr_quic_cid_t **pcid = kr_quic_table_lookup2(&scids[i], table);
-		assert(pcid != NULL);
 		if (*pcid == NULL) {
 			continue;
 		}
-		assert((*pcid)->conn == conn);
 		kr_quic_table_rem2(pcid, table);
 	}
 

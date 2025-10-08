@@ -236,7 +236,7 @@ static void quic_debug_cb(void *user_data, const char *format, ...)
 	va_list args;
 	va_start(args, format);
 	(void)vsnprintf(buf, sizeof(buf), format, args);
-	kr_log_warning(DOQ, "%s\n", buf);
+	kr_log_debug(DOQ_LIBNGTCP2, "%s\n", buf);
 	va_end(args);
 }
 

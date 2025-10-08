@@ -150,7 +150,7 @@ void kr_quic_stream_mark_sent(struct pl_quic_stream_sess_data *stream,
 	kr_require(stream);
 
 	stream->unsent_offset += amount_sent;
-	assert(stream->unsent_offset <= stream->unsent_obuf->len);
+	kr_assert(stream->unsent_offset <= stream->unsent_obuf->len);
 	if (stream->unsent_offset == stream->unsent_obuf->len) {
 		stream->unsent_offset = 0;
 		stream->unsent_obuf =
