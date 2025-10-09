@@ -101,7 +101,7 @@ async def _set_logging_handler(config: KresConfig) -> None:
 
 
 @only_on_real_changes_update(lambda config: config.logging)
-async def _configure_logger(config: KresConfig) -> None:
+async def _configure_logger(config: KresConfig, force: bool = False) -> None:
     await _set_logging_handler(config)
     await _set_log_level(config)
 

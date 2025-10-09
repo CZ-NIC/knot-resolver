@@ -9,7 +9,7 @@ async def test_only_once():
     count = 0
 
     @only_on_real_changes_update(lambda config: config.logging.level)
-    async def change_callback(config: KresConfig) -> None:
+    async def change_callback(config: KresConfig, force: bool = False) -> None:
         nonlocal count
         count += 1
 

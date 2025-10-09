@@ -52,12 +52,18 @@ if PROMETHEUS_LIB:
         # response latency histogram
         bucket_names_in_resolver = ("1ms", "10ms", "50ms", "100ms", "250ms", "500ms", "1000ms", "1500ms", "slow")
         bucket_names_in_prometheus = ("0.001", "0.01", "0.05", "0.1", "0.25", "0.5", "1.0", "1.5", "+Inf")
+
+        # add smaller bucket counts
+        def _bucket_count(answer: Dict[str, int], duration: str) -> int:
+            index = bucket_names_in_resolver.index(duration)
+            return sum([int(answer[bucket_names_in_resolver[i]]) for i in range(index + 1)])
+
         yield _histogram(
             "resolver_response_latency",
             "Time it takes to respond to queries in seconds",
             label=("instance_id", sid),
             buckets=[
-                (bnp, metrics["answer"][f"{duration}"])
+                (bnp, _bucket_count(metrics["answer"], duration))
                 for bnp, duration in zip(bucket_names_in_prometheus, bucket_names_in_resolver)
             ],
             sum_value=metrics["answer"]["sum_ms"] / 1_000,
@@ -395,7 +401,7 @@ if PROMETHEUS_LIB:
                 compat.asyncio.run(self.collect_kresd_stats(_triggered_from_prometheus_library=True))
 
     @only_on_real_changes_update(lambda c: c.monitoring.graphite)
-    async def _init_graphite_bridge(config: KresConfig) -> None:
+    async def _init_graphite_bridge(config: KresConfig, force: bool = False) -> None:
         """
         Starts graphite bridge if required
         """
@@ -413,7 +419,9 @@ if PROMETHEUS_LIB:
                 interval=config.monitoring.graphite.interval.seconds(), prefix=str(config.monitoring.graphite.prefix)
             )
 
-    async def _deny_turning_off_graphite_bridge(old_config: KresConfig, new_config: KresConfig) -> Result[None, str]:
+    async def _deny_turning_off_graphite_bridge(
+        old_config: KresConfig, new_config: KresConfig, force: bool = False
+    ) -> Result[None, str]:
         if old_config.monitoring.graphite and not new_config.monitoring.graphite:
             return Result.err(
                 "You can't turn off graphite monitoring dynamically. If you really want this feature, please let the developers know."

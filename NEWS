@@ -4,6 +4,15 @@ Knot Resolver 6.0.16 (2025-0m-dd)
 Improvements
 ------------
 - reduce validation strictness for domain names (#934, !1727)
+- manager: force a configuration reload via management HTTP API 'api/reload/force' (#939, !1748)
+  - kresctl: reload: added '--force' flag
+
+Bugfixes
+--------
+- /options/query-case-randomization: respect this even on TCP issues (!1732)
+- prometheus metrics: make the latency histogram cumulative (!1731, GH#117)
+- fix file permission checks when running as root (!1741)
+- /network/address-renumbering: fix conversion to Lua configuration (!1739)
 
 
 Knot Resolver 6.0.15 (2025-07-17)

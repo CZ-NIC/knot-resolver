@@ -52,7 +52,9 @@ class _FixCounter:
         return self._counter >= FIX_COUNTER_ATTEMPTS_MAX
 
 
-async def _deny_max_worker_changes(config_old: KresConfig, config_new: KresConfig) -> Result[None, str]:
+async def _deny_max_worker_changes(
+    config_old: KresConfig, config_new: KresConfig, force: bool = False
+) -> Result[None, str]:
     if config_old.max_workers != config_new.max_workers:
         return Result.err(
             "Changing 'max-workers', the maximum number of workers allowed to run, is not allowed at runtime."
@@ -231,7 +233,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
     def add_shutdown_trigger(self, trigger: Callable[[int], None]) -> None:
         self._shutdown_triggers.append(trigger)
 
-    async def validate_config(self, _old: KresConfig, new: KresConfig) -> Result[NoneType, str]:
+    async def validate_config(self, _old: KresConfig, new: KresConfig, force: bool = False) -> Result[NoneType, str]:
         async with self._manager_lock:
             if _old.rate_limiting != new.rate_limiting:
                 logger.debug("Unlinking shared ratelimiting memory")
@@ -270,7 +272,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
             self._gc = None
             await self._collect_already_running_workers()
 
-    async def reset_workers_policy_rules(self, _config: KresConfig) -> None:
+    async def reset_workers_policy_rules(self, _config: KresConfig, force: bool = False) -> None:
         # command all running 'kresd' workers to reset their old policy rules,
         # unless the workers have already been started with a new config so reset is not needed
         if self._workers_reset_needed and get_registered_workers_kresids():
@@ -285,7 +287,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                 " the workers are already running with new configuration"
             )
 
-    async def set_new_tls_sticket_secret(self, config: KresConfig) -> None:
+    async def set_new_tls_sticket_secret(self, config: KresConfig, force: bool = False) -> None:
         if config.network.tls.sticket_secret or config.network.tls.sticket_secret_file:
             logger.debug("User-configured TLS resumption secret found - skipping auto-generation.")
             return
@@ -298,7 +300,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
             if res not in (0, True):
                 logger.error("Failed to set TLS session ticket secret in %s: %s", worker, res)
 
-    async def apply_config(self, config: KresConfig, _noretry: bool = False) -> None:
+    async def apply_config(self, config: KresConfig, force: bool = False, _noretry: bool = False) -> None:
         try:
             async with self._manager_lock:
                 logger.debug("Applying config to all workers")
@@ -328,9 +330,10 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                 await self._reload_system_state()
                 await self.apply_config(config, _noretry=True)
 
+        logger.info("Config applied successfully to all workers")
         self._workers_reset_needed = False
 
-    async def load_policy_rules(self, _old: KresConfig, new: KresConfig) -> Result[NoneType, str]:
+    async def load_policy_rules(self, _old: KresConfig, new: KresConfig, force: bool = False) -> Result[NoneType, str]:
         try:
             async with self._manager_lock:
                 logger.debug("Running kresd 'policy-loader'")

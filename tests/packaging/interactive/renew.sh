@@ -13,16 +13,16 @@ function count_apply(){
 err_count=$(count_errors)
 rel_count=$(count_apply)
 
-kresctl reload
+curl -X POST --unix-socket /run/knot-resolver/kres-api.sock http://api/renew
 sleep 6
 if [ $(count_errors) -ne $err_count ] || [ $(count_apply) -ne $rel_count ]; then
-    echo "Failed to reload."
+    echo "Failed to renew."
     exit 1
 fi
 
-kresctl reload --force
+curl -X POST --unix-socket /run/knot-resolver/kres-api.sock http://api/renew/force
 sleep 6
 if [ $(count_errors) -ne $err_count ] || [ $(count_apply) -eq $rel_count ]; then
-    echo "Failed to force a reload."
+    echo "Failed to force a renew."
     exit 1
 fi
