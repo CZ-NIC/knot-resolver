@@ -313,6 +313,10 @@ single ``kresctl`` command.
 
     Requires a connection to the management API.
 
+    .. option:: --force
+
+        Force a reload, even if the configuration hasn't changed.
+
 
 .. option:: stop
 

@@ -10,6 +10,7 @@ from knot_resolver.utils.requests import request
 class ReloadCommand(Command):
     def __init__(self, namespace: argparse.Namespace) -> None:
         super().__init__(namespace)
+        self.force: bool = namespace.force
 
     @staticmethod
     def register_args_subparser(
@@ -21,7 +22,12 @@ class ReloadCommand(Command):
             " Old processes are replaced by new ones (with updated configuration) using rolling restarts."
             " So there will be no DNS service unavailability during reload operation.",
         )
-
+        reload.add_argument(
+            "--force",
+            help="Force a reload, even if the configuration hasn't changed.",
+            action="store_true",
+            default=False,
+        )
         return reload, ReloadCommand
 
     @staticmethod
@@ -29,7 +35,7 @@ class ReloadCommand(Command):
         return {}
 
     def run(self, args: CommandArgs) -> None:
-        response = request(args.socket, "POST", "reload")
+        response = request(args.socket, "POST", "reload/force" if self.force else "reload")
 
         if response.status != 200:
             print(response, file=sys.stderr)
