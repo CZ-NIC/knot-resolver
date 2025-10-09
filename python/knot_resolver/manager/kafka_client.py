@@ -324,7 +324,7 @@ if KAFKA_LIB:
 
 
 @only_on_real_changes_update(kafka_config)
-async def _init_kafka_client(config: KresConfig) -> None:
+async def _init_kafka_client(config: KresConfig, _force: bool = False) -> None:
     if KAFKA_LIB and config.kafka.enable:
         global _kafka
         if _kafka:
@@ -333,7 +333,7 @@ async def _init_kafka_client(config: KresConfig) -> None:
         _kafka = KresKafkaClient(config)
 
 
-async def _deny_kafka_change(old_config: KresConfig, new_config: KresConfig) -> Result[None, str]:
+async def _deny_kafka_change(old_config: KresConfig, new_config: KresConfig, _force: bool = False) -> Result[None, str]:
     if old_config.kafka != new_config.kafka:
         return Result.err("Changing 'kafka' configuration is not allowed at runtime.")
     return Result.ok(None)
