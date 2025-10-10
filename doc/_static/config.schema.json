@@ -1136,6 +1136,42 @@
             "description": "List of Forward Zones and its configuration.",
             "default": null
         },
+        "tunnel-filter": {
+            "description": "Block suspected attempts of data exfiltration via DNS tunneling.",
+            "type": "object",
+            "properties": {
+                "enable": {
+                    "type": "boolean",
+                    "description": "enable/disable this filtering",
+                    "default": false
+                },
+                "file": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "description": "path to the neural network to be used",
+                    "default": null
+                },
+                "tags": {
+                    "type": [
+                        "array",
+                        "null"
+                    ],
+                    "items": {
+                        "type": "string",
+                        "pattern": "^(?!-)[a-z0-9-]*[a-z0-9]+$"
+                    },
+                    "description": "set of tags when to apply the filtering (same as in other local-data)",
+                    "default": null
+                }
+            },
+            "default": {
+                "enable": false,
+                "file": null,
+                "tags": null
+            }
+        },
         "cache": {
             "description": "DNS resolver cache configuration.",
             "type": "object",
@@ -1582,7 +1618,8 @@
                             "exterr",
                             "rules",
                             "prlayr",
-                            "defer"
+                            "defer",
+                            "tunnel"
                         ]
                     },
                     "description": "List of groups for which 'debug' logging level is set.",
