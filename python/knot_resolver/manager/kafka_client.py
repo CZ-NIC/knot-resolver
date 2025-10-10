@@ -104,6 +104,9 @@ if KAFKA_LIB:
         # current config
         with open(config_file_path, "r") as backup_file:
             current_config = KresConfig(try_to_parse(backup_file.read()))
+        if current_config.tunnel_filter.file:
+            used_files.append(current_config.tunnel_filter.file.to_path().resolve())
+            used_files.append(Path(f"{current_config.tunnel_filter.file.to_path()}.backup").resolve())
         if current_config.local_data.rpz:
             for rpz in current_config.local_data.rpz:
                 used_files.append(rpz.file.to_path().resolve())
@@ -113,6 +116,9 @@ if KAFKA_LIB:
         if config_file_backup_path.exists():
             with open(config_file_backup_path, "r") as backup_file:
                 backup_config = KresConfig(try_to_parse(backup_file.read()))
+            if backup_config.tunnel_filter.file:
+                used_files.append(backup_config.tunnel_filter.file.to_path().resolve())
+                used_files.append(Path(f"{backup_config.tunnel_filter.file.to_path()}.backup").resolve())
             if backup_config.local_data.rpz:
                 for backup_rpz in backup_config.local_data.rpz:
                     used_files.append(backup_rpz.file.to_path().resolve())
