@@ -462,6 +462,7 @@ test:valgrind:
   script:
     - >
         ${MESON_TEST}
+        --timeout-multiplier 8
         --suite unit
         --suite config
         --no-suite skip_valgrind
