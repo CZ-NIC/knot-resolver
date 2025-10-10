@@ -156,7 +156,7 @@ class KresConfig(ConfigSchema):
     views: Optional[List[ViewSchema]]
     local_data: LocalDataSchema
     forward: Optional[List[ForwardSchema]]
-    tunnel_filter: TunnelFilterSchema 
+    tunnel_filter: TunnelFilterSchema
     cache: CacheSchema
     dnssec: Union[Literal[False], DnssecSchema]
     dns64: Union[Literal[False], Dns64Schema]
@@ -232,7 +232,7 @@ class KresConfig(ConfigSchema):
             rpz_tags, rpz_errs = _check_local_data_tags(views_tags, self.local_data.rpz)
             errs += rpz_errs
             local_data_tags += rpz_tags
-        if self.tunnel_filter: # do we want this conditioning?
+        if self.tunnel_filter:  # do we want this conditioning?
             tunnel_tags, tunnel_errs = _check_local_data_tags(views_tags, [self.tunnel_filter])
             errs += tunnel_errs
             local_data_tags += tunnel_tags

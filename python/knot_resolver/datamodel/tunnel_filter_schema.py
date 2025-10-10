@@ -1,6 +1,8 @@
-from knot_resolver.utils.modeling import ConfigSchema
 from typing import List, Optional
+
 from knot_resolver.datamodel.types import IDPattern, ReadableFile
+from knot_resolver.utils.modeling import ConfigSchema
+
 
 class TunnelFilterSchema(ConfigSchema):
     """
@@ -15,7 +17,6 @@ class TunnelFilterSchema(ConfigSchema):
     enable: bool = False
     file: Optional[ReadableFile] = None
     tags: Optional[List[IDPattern]] = None
-
 
     def _validate(self) -> None:
         if not self.enable:
