@@ -213,16 +213,14 @@ if KAFKA_LIB:
                 cleanup_files_dir(file_path, config.kafka.files_dir.to_path())
 
                 # trigger reload
-                trigger_reload(config)
+                trigger_reload(config, force=True)
 
             # other files (.rpz, .pt, ...)
             else:
                 # backup and replace file with new data
                 backup_and_replace(file_tmp_path, file_path)
                 # trigger renew
-                trigger_renew(config)
-                if file_extension in binary_file_extensions:
-                    pass
+                trigger_renew(config, force=True)
 
     logger.info("Successfully processed message")
 
