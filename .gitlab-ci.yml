@@ -465,6 +465,7 @@ test:valgrind:
   script:
     - >
         ${MESON_TEST}
+        -t 8
         --suite unit
         --suite config
         --no-suite skip_valgrind
