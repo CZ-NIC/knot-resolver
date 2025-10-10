@@ -902,10 +902,10 @@ python:kafka:
     - poetry run python ./tests/kafka/create_topic.py localhost knot-resolver
     # run in background and log to file
     - poe run etc/config/config.test-kafka.yaml > knot-resolver.log 2>&1 &
-    - sleep 30
+    - sleep 60
     # start kafka test
     - poetry run ./tests/kafka/kafka_test.sh localhost knot-resolver
-    - sleep 30
+    - sleep 60
     # kill the resolver
     - kill %1
   after_script:
