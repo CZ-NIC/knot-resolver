@@ -301,7 +301,7 @@ if KAFKA_LIB:
                 try:
                     logger.info("Started consuming messages...")
                     messages: Dict[TopicPartition, List[ConsumerRecord]] = self._consumer.poll(timeout_ms=100)
-                    logger.debug(f"Successfully consumed messages: {messages}")
+                    logger.debug(f"Successfully consumed {len(messages)} messages")
                 except KafkaError as e:
                     logger.error(f"{error_msg_prefix} Kafka error:\n{e}")
                     self._consumer_connect()
