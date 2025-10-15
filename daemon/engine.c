@@ -578,7 +578,22 @@ int engine_init(void)
 	engine_register("validate", NULL, NULL);
 	engine_register("cache", NULL, NULL);
 
-	ret = array_push(the_engine->backends, kr_cdb_lmdb());
+    ret = array_push(the_engine->backends, kr_cdb_lmdb());
+    if (ret != 0) {
+        engine_deinit();
+        return ret;
+    }
+    /* Optional ultra-fast in-memory backend (volatile) */
+    extern const struct kr_cdb_api *kr_cdb_mem(void);
+    (void)kr_cdb_mem; /* avoid -Wmissing-prototypes if not linked */
+    const struct kr_cdb_api *mem_api = NULL;
+    /* If compiled in, expose it as a selectable backend */
+    /* Weak-link style: safety check via symbol address */
+    if (kr_cdb_mem) {
+        mem_api = kr_cdb_mem();
+        if (mem_api)
+            ret = array_push(the_engine->backends, mem_api);
+    }
 	if (ret != 0) {
 		engine_deinit();
 		return ret;
