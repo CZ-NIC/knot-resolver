@@ -56,6 +56,13 @@ class Triggers:
         if cmd in self._cmd_timers:
             self._cmd_timers[cmd].cancel()
 
+    def trigger_config(self, config_json_str: str, force: bool = False) -> None:
+        response = request(self._socket, "PUT", "v1/config", body=config_json_str)
+        if response.status != 200:
+            logger.error(f"Failed to apply configuration: {response.body}")
+            return
+        logger.info("Applying configuration has finished")
+
     def trigger_renew(self, force: bool = False) -> None:
         def _renew() -> None:
             response = request(self._socket, "POST", "renew/force" if force else "renew")
@@ -75,7 +82,7 @@ class Triggers:
                 logger.info("Skipping renewing configuration, it was already triggered")
                 return
             self._renew_timer.cancel()
-            self.renew_force = False
+            self._renew_force = False
 
         logger.info("Delayed configuration renew has started")
         # start a 5sec timer
@@ -123,6 +130,13 @@ def cancel_cmd(cmd: str) -> None:
     global _triggers  # noqa: PLW0602
     if _triggers:
         _triggers.cancel_cmd(cmd)
+
+
+def trigger_config(config: KresConfig, config_json_str: str, force: bool = False) -> None:
+    global _triggers
+    if not _triggers:
+        _triggers = Triggers(config)
+    _triggers.trigger_config(config_json_str, force)
 
 
 def trigger_renew(config: KresConfig, force: bool = False) -> None:

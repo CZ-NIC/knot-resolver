@@ -8,7 +8,7 @@ from knot_resolver.constants import KAFKA_LIB
 from knot_resolver.datamodel import KresConfig
 from knot_resolver.manager.config_store import ConfigStore
 from knot_resolver.manager.exceptions import KresKafkaClientError
-from knot_resolver.manager.triggers import trigger_reload, trigger_renew
+from knot_resolver.manager.triggers import trigger_config, trigger_renew
 from knot_resolver.utils.functional import Result
 from knot_resolver.utils.modeling import try_to_parse
 from knot_resolver.utils.modeling.exceptions import DataParsingError, DataValidationError
@@ -204,7 +204,8 @@ if KAFKA_LIB:
             # configuration files (.yaml, .json, ...all)
             if file_extension in config_file_extensions:
                 # validate configuration
-                KresConfig(try_to_parse(value.decode("utf-8")))
+                config_json_str = value.decode("utf-8")
+                KresConfig(try_to_parse(config_json_str))
 
                 # backup and replace file with new data
                 backup_and_replace(file_tmp_path, file_path)
@@ -213,7 +214,7 @@ if KAFKA_LIB:
                 cleanup_files_dir(file_path, config.kafka.files_dir.to_path())
 
                 # trigger reload
-                trigger_reload(config, force=True)
+                trigger_config(config, config_json_str, force=True)
 
             # other files (.rpz, .pt, ...)
             else:
@@ -253,6 +254,14 @@ if KAFKA_LIB:
 
             brokers = []
             kafka_conf = config.kafka
+
+            config_json_path = kafka_conf.files_dir.to_path() / "config.json"
+            if config_json_path.exists():
+                logger.info(f"Reading configuration from '{config_json_path}'")
+                with open(config_json_path, "r") as json_file:
+                    config_json_str = json_file.read()
+                    trigger_config(config, config_json_str)
+
             for server in kafka_conf.server.to_std():
                 broker = str(server)
                 brokers.append(broker.replace("@", ":") if server.port else f"{broker}:9092")
