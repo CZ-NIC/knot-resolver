@@ -3,6 +3,7 @@
  */
 
 #include "quic_common.h"
+#include "quic_conn.h"
 #include "session2.h"
 #include <ngtcp2/ngtcp2.h>
 #include "quic_stream.h"
@@ -250,12 +251,17 @@ static enum protolayer_event_cb_result pl_quic_stream_event_unwrap(
 		enum protolayer_event_type event, void **baton,
 		struct session2 *session, void *sess_data)
 {
-	if (event == PROTOLAYER_EVENT_CLOSE || event == PROTOLAYER_EVENT_FORCE_CLOSE) {
+	if (event == PROTOLAYER_EVENT_FORCE_CLOSE) {
+		struct pl_quic_stream_sess_data *stream = sess_data;
+		quic_event_close_connection(stream->conn_ref, session->transport.parent);
+		return PROTOLAYER_EVENT_CONSUME;
+	}
+	if (event == PROTOLAYER_EVENT_CLOSE) {
 		pl_quic_stream_sess_deinit(session, sess_data);
 		return PROTOLAYER_EVENT_CONSUME;
 	}
 
-	return PROTOLAYER_EVENT_CONSUME;
+	return PROTOLAYER_EVENT_PROPAGATE;
 }
 
 __attribute__((constructor))
