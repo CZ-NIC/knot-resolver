@@ -1,0 +1,11 @@
+workers: 1
+rundir: /opt/homebrew/var/knot-resolver
+network:
+  listen:
+    - interface:
+        - 127.0.0.1@53
+        - ::1@53
+cache:
+  storage: /opt/homebrew/var/cache/knot-resolver
+management:
+  unix-socket: /opt/homebrew/var/knot-resolver/kres-api.sock
