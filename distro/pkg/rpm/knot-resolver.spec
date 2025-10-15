@@ -278,6 +278,7 @@ getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysc
 %if "x%{?suse_version}" == "x"
 %{_libdir}/knot-resolver/kres_modules/experimental_dot_auth.lua
 %endif
+%{_libdir}/knot-resolver/kres_modules/fallback.lua
 %{_libdir}/knot-resolver/kres_modules/graphite.lua
 %{_libdir}/knot-resolver/kres_modules/policy.lua
 %{_libdir}/knot-resolver/kres_modules/predict.lua

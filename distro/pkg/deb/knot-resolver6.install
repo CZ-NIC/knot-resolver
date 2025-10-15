@@ -11,6 +11,7 @@ usr/lib/knot-resolver/kres_modules/dns64.lua
 usr/lib/knot-resolver/kres_modules/edns_keepalive.so
 usr/lib/knot-resolver/kres_modules/experimental_dot_auth.lua
 usr/lib/knot-resolver/kres_modules/extended_error.so
+usr/lib/knot-resolver/kres_modules/fallback.lua
 usr/lib/knot-resolver/kres_modules/graphite.lua
 usr/lib/knot-resolver/kres_modules/hints.so
 usr/lib/knot-resolver/kres_modules/nsid.so

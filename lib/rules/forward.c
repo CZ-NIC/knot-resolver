@@ -127,6 +127,13 @@ fallback:
 	return kr_ok();
 }
 
+
+void kr_rule_coalesce_targets(const struct sockaddr * targets[], void *data)
+{
+	for (uint8_t *d = data; *targets; ++targets, d += sizeof(union kr_sockaddr))
+		memcpy(d, *targets, kr_sockaddr_len(*targets));
+}
+
 int kr_rule_forward(const knot_dname_t *apex, kr_rule_fwd_flags_t flags,
 			const struct sockaddr * targets[])
 {

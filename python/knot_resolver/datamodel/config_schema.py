@@ -8,7 +8,7 @@ from knot_resolver.datamodel.cache_schema import CacheSchema
 from knot_resolver.datamodel.defer_schema import DeferSchema
 from knot_resolver.datamodel.dns64_schema import Dns64Schema
 from knot_resolver.datamodel.dnssec_schema import DnssecSchema
-from knot_resolver.datamodel.forward_schema import ForwardSchema
+from knot_resolver.datamodel.forward_schema import FallbackSchema, ForwardSchema
 from knot_resolver.datamodel.globals import Context, get_global_validation_context, set_global_validation_context
 from knot_resolver.datamodel.local_data_schema import LocalDataSchema, RPZSchema, RuleSchema
 from knot_resolver.datamodel.logging_schema import LoggingSchema
@@ -102,6 +102,7 @@ class KresConfig(ConfigSchema):
         views: List of views and its configuration.
         local_data: Local data for forward records (A/AAAA) and reverse records (PTR).
         forward: List of Forward Zones and its configuration.
+        fallback: Config for fallback on resolution failure.
         cache: DNS resolver cache configuration.
         dnssec: Disable DNSSEC, enable with defaults or set new configuration.
         dns64: Disable DNS64 (RFC 6147), enable with defaults or set new configuration.
@@ -125,6 +126,7 @@ class KresConfig(ConfigSchema):
         views: Optional[List[ViewSchema]] = None
         local_data: LocalDataSchema = LocalDataSchema()
         forward: Optional[List[ForwardSchema]] = None
+        fallback: FallbackSchema = FallbackSchema()
         cache: CacheSchema = lazy_default(CacheSchema, {})
         dnssec: Union[bool, DnssecSchema] = True
         dns64: Union[bool, Dns64Schema] = False
@@ -148,6 +150,7 @@ class KresConfig(ConfigSchema):
     views: Optional[List[ViewSchema]]
     local_data: LocalDataSchema
     forward: Optional[List[ForwardSchema]]
+    fallback: FallbackSchema
     cache: CacheSchema
     dnssec: Union[Literal[False], DnssecSchema]
     dns64: Union[Literal[False], Dns64Schema]
