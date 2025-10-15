@@ -102,7 +102,6 @@ static int kr_recv_stream_data_cb(ngtcp2_conn *ngconn, uint32_t flags,
 				wire_buf_data_length(&stream->pers_inbuf) + datalen);
 		kr_require(new_buf);
 		stream->pers_inbuf.buf = new_buf;
-		stream->pers_inbuf.end += datalen;
 		stream->pers_inbuf.size += datalen;
 	}
 
@@ -901,7 +900,7 @@ static enum protolayer_event_cb_result pl_quic_conn_event_unwrap(
 		WALK_LIST_FIRST(s_node, conn->streams) {
 			struct pl_quic_stream_sess_data *s =
 				container_of(s_node, struct pl_quic_stream_sess_data, list_node);
-			session2_force_close(s->h.session);
+			session2_close(s->h.session);
 			rem_node(&s->list_node);
 			--conn->streams_count;
 		}
