@@ -9,6 +9,7 @@
 #include "libdnssec/error.h"
 #include "session2.h"
 #include "worker.h"
+#include <libknot/wire.h>
 #include <ngtcp2/ngtcp2.h>
 
 #define EPHEMERAL_CERT_EXPIRATION_SECONDS_RENEW_BEFORE ((time_t)60*60*24*7)
@@ -89,11 +90,10 @@ static int kr_recv_stream_data_cb(ngtcp2_conn *ngconn, uint32_t flags,
 	size_t datalen, void *user_data, void *stream_user_data)
 {
 	(void)ngconn;
-	(void)(offset);
 
 	struct pl_quic_conn_sess_data *conn = user_data;
-
 	struct pl_quic_stream_sess_data *stream = stream_user_data;
+
 	stream->incflags = flags;
 	stream->sdata_offset = offset;
 
@@ -105,8 +105,16 @@ static int kr_recv_stream_data_cb(ngtcp2_conn *ngconn, uint32_t flags,
 		stream->pers_inbuf.size += datalen;
 	}
 
-	memcpy(wire_buf_free_space(&stream->pers_inbuf), data, datalen);
-	kr_require(wire_buf_consume(&stream->pers_inbuf, datalen) == kr_ok());
+	if (offset == 0) {
+		memcpy(wire_buf_free_space(&stream->pers_inbuf), data, datalen);
+		kr_require(wire_buf_consume(&stream->pers_inbuf, datalen) == kr_ok());
+	} else {
+		/* remove size header from new data and add it to the start of wb. */
+		memcpy(wire_buf_free_space(&stream->pers_inbuf), data + sizeof(uint16_t), datalen - sizeof(uint16_t));
+		knot_wire_write_u16(wire_buf_data(&stream->pers_inbuf),
+				knot_wire_read_u16(wire_buf_data(&stream->pers_inbuf)) + datalen - sizeof(uint16_t));
+		kr_require(wire_buf_consume(&stream->pers_inbuf, datalen - sizeof(uint16_t)) == kr_ok());
+	}
 
 	if (flags & NGTCP2_STREAM_DATA_FLAG_FIN) {
 		queue_push(conn->pending_unwrap, stream);
