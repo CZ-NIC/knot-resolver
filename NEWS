@@ -14,6 +14,7 @@ Bugfixes
 - prometheus metrics: make the latency histogram cumulative (!1731, GH#117)
 - fix file permission checks when running as root (!1741)
 - /network/address-renumbering: fix conversion to Lua configuration (!1739)
+- manager: avoid uncommon bugs when starting/quitting policy-loader (!1742)
 
 
 Knot Resolver 6.0.15 (2025-07-17)

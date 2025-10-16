@@ -344,6 +344,12 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                 while not self._is_policy_loader_exited():
                     await asyncio.sleep(1)
 
+                # Clean up policy-loader configuration.
+                # If we don't do this, we may start with
+                # an old configuration and fail to detect a bug.
+                if self._policy_loader:
+                    await self._policy_loader.cleanup()
+
         except (SubprocessError, SubprocessControllerError) as e:
             logger.error(f"Failed to load policy rules: {e}")
             return Result.err("kresd 'policy-loader' process failed to start. Config might be invalid.")

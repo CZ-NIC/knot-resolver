@@ -73,10 +73,9 @@ def _stop_supervisord(config: KresConfig) -> None:
             # something wrong happened, let's be loud about it
             raise
 
-    # We could remove the configuration, but there is actually no specific need to do so.
-    # If we leave it behind, someone might find it and use it to start us from scratch again,
-    # which is perfectly fine.
-    # supervisord_config_file(config).unlink()
+    # It is always better to clean up.
+    # This way, we can be sure that we are starting with a newly generated configuration.
+    supervisord_config_file(config).unlink()
 
 
 async def _is_supervisord_available() -> bool:
