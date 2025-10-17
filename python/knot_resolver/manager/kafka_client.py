@@ -244,12 +244,12 @@ if KAFKA_LIB:
                     logger.error(f"{error_msg_prefix} unknown error:\n{e}")
 
     class KresKafkaClient:
-        def __init__(self, config: KresConfig) -> None:
+        def __init__(self, config: KresConfig) -> None:  # noqa: PLR0912, PLR0915
             self._config = config
             self._consumer_timer: Optional[Timer] = None
             self._consumer: Optional[KafkaConsumer] = None
 
-            # reduce the verbosity of kafka module logger
+            # reduce the verbosity of kafka modulminutese logger
             kafka_logger = logging.getLogger("kafka")
             # kafka_logger.setLevel(logging.ERROR)
             kafka_logger.propagate = False
@@ -263,33 +263,60 @@ if KAFKA_LIB:
             self._brokers: List[str] = brokers
             self._consumer_run()
 
+            config_json_failed = True
             config_json_path = kafka_conf.files_dir.to_path() / "config.json"
+            if config_json_path.exists():
+                logger.info(f"Found '{config_json_path}' configuration file")
+                try:
+                    with open(config_json_path, "r") as json_file:
+                        config_json_str = json_file.read()
+                        KresConfig(try_to_parse(config_json_str))
+                    response = request(socket_from_config(config), "PUT", "v1/config", body=config_json_str)
+                    if response.status == 200:
+                        config_json_failed = False
+                    else:
+                        logger.error(f"Failed to apply configuration from '{config_json_path}':\n{response.body}")
+                except (DataParsingError, DataValidationError) as e:
+                    logger.error(f"The configuration data in '{config_json_path}' are not valid:\n{e}")
+                    logger.info(f"Removing invalid '{config_json_path}' configuration file")
+                except Exception as e:
+                    logger.error(f"Checking '{config_json_path}' failed with unknown error:\n{e}")
 
-            time_min = 1
-            timeout = time.time() + 60 * time_min
+            # remove the invalid configuration and wait for the valid one
+            if config_json_failed:
+                logger.info(f"Removing invalid '{config_json_path}' configuration file")
+                config_json_path.unlink()
+                cleanup_files_dir(config_json_path, config.kafka.files_dir.to_path())
 
-            # block until configuration is valid
-            while True:
-                logger.info(f"Checking '{config_json_path}' configuration file")
-                if config_json_path.exists():
-                    logger.info(f"Loading configuration from existing '{config_json_path}' file.")
-                    try:
-                        with open(config_json_path, "r") as json_file:
-                            config_json_str = json_file.read()
-                        response = request(socket_from_config(config), "PUT", "v1/config", body=config_json_str)
-                        if response.status == 200:
-                            break
-                        logger.error(f"Failed to apply configuration from '{config_json_path}': {response.body}")
-                    except Exception as e:
-                        logger.error(
-                            f"Failed to apply configuration from '{config_json_path}' with unknown error:\n{e}"
+                timeout_minutes = 6
+                timeout = time.time() + 60 * timeout_minutes
+
+                # block until received configuration is valid
+                while True:
+                    if config_json_path.exists():
+                        logger.info(f"Loading configuration from new '{config_json_path}' file.")
+
+                        try:
+                            with open(config_json_path, "r") as json_file:
+                                config_json_str = json_file.read()
+                            response = request(socket_from_config(config), "PUT", "v1/config/", body=config_json_str)
+                            if response.status == 200:
+                                break
+                            logger.error(f"Failed to apply configuration from '{config_json_path}': {response.body}")
+                        except Exception as e:
+                            logger.error(
+                                f"Failed to apply configuration from '{config_json_path}' with unknown error:\n{e}"
+                            )
+
+                    else:
+                        logger.debug(f"The configuration file '{config_json_path}' does not exist yet")
+
+                    # check timeout
+                    if time.time() > timeout:
+                        raise KafkaError(
+                            f"The time ({timeout_minutes} min) allocated for obtaining a valid '{config_json_path}' configuration has expired"
                         )
-
-                if time.time() > timeout:
-                    raise KafkaError(
-                        f"The time ({time_min} min) allocated for obtaining a valid '{config_json_path}' configuration has expired"
-                    )
-                time.sleep(3)
+                    time.sleep(10)
 
         def _consumer_connect(self) -> None:
             error_msg_prefix = f"Connecting to Kafka broker(s) '{self._brokers}' has failed with"
