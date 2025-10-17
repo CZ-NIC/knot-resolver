@@ -13,27 +13,29 @@ logger = logging.getLogger(__name__)
 _triggers: Optional["Triggers"] = None
 
 
+def socket_from_config(config: KresConfig) -> SocketDesc:
+    management = config.management
+    if management.interface:
+        return SocketDesc(
+            f"http://{management.interface.addr}:{management.interface.port}",
+            'Key "/management/interface" in validated configuration',
+        )
+    return SocketDesc(
+        f'http+unix://{quote(str(management.unix_socket), safe="")}/',
+        'Key "/management/unix-socket" in validated configuration',
+    )
+
+
 class Triggers:
     def __init__(self, config: KresConfig) -> None:
         self._config = config
+        self._socket = socket_from_config(config)
 
         self._reload_force = False
         self._renew_force = False
         self._renew_timer: Optional[Timer] = None
         self._reload_timer: Optional[Timer] = None
         self._cmd_timers: Dict[str, Timer] = {}
-
-        management = config.management
-        socket = SocketDesc(
-            f'http+unix://{quote(str(management.unix_socket), safe="")}/',
-            'Key "/management/unix-socket" in validated configuration',
-        )
-        if management.interface:
-            socket = SocketDesc(
-                f"http://{management.interface.addr}:{management.interface.port}",
-                'Key "/management/interface" in validated configuration',
-            )
-        self._socket = socket
 
     def trigger_cmd(self, cmd: str) -> None:
         def _cmd() -> None:

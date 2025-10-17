@@ -1,5 +1,6 @@
 import logging
 import shutil
+import time
 from pathlib import Path
 from threading import Timer
 from typing import Any, Dict, List, Optional, Tuple
@@ -8,10 +9,11 @@ from knot_resolver.constants import KAFKA_LIB
 from knot_resolver.datamodel import KresConfig
 from knot_resolver.manager.config_store import ConfigStore
 from knot_resolver.manager.exceptions import KresKafkaClientError
-from knot_resolver.manager.triggers import trigger_config, trigger_renew
+from knot_resolver.manager.triggers import socket_from_config, trigger_config, trigger_renew
 from knot_resolver.utils.functional import Result
 from knot_resolver.utils.modeling import try_to_parse
 from knot_resolver.utils.modeling.exceptions import DataParsingError, DataValidationError
+from knot_resolver.utils.requests import request
 
 logger = logging.getLogger(__name__)
 
@@ -255,18 +257,39 @@ if KAFKA_LIB:
             brokers = []
             kafka_conf = config.kafka
 
-            config_json_path = kafka_conf.files_dir.to_path() / "config.json"
-            if config_json_path.exists():
-                logger.info(f"Reading configuration from '{config_json_path}'")
-                with open(config_json_path, "r") as json_file:
-                    config_json_str = json_file.read()
-                    trigger_config(config, config_json_str)
-
             for server in kafka_conf.server.to_std():
                 broker = str(server)
                 brokers.append(broker.replace("@", ":") if server.port else f"{broker}:9092")
             self._brokers: List[str] = brokers
             self._consumer_run()
+
+            config_json_path = kafka_conf.files_dir.to_path() / "config.json"
+
+            time_min = 1
+            timeout = time.time() + 60 * time_min
+
+            # block until configuration is valid
+            while True:
+                logger.info(f"Checking '{config_json_path}' configuration file")
+                if config_json_path.exists():
+                    logger.info(f"Loading configuration from existing '{config_json_path}' file.")
+                    try:
+                        with open(config_json_path, "r") as json_file:
+                            config_json_str = json_file.read()
+                        response = request(socket_from_config(config), "PUT", "v1/config", body=config_json_str)
+                        if response.status == 200:
+                            break
+                        logger.error(f"Failed to apply configuration from '{config_json_path}': {response.body}")
+                    except Exception as e:
+                        logger.error(
+                            f"Failed to apply configuration from '{config_json_path}' with unknown error:\n{e}"
+                        )
+
+                if time.time() > timeout:
+                    raise KafkaError(
+                        f"The time ({time_min} min) allocated for obtaining a valid '{config_json_path}' configuration has expired"
+                    )
+                time.sleep(3)
 
         def _consumer_connect(self) -> None:
             error_msg_prefix = f"Connecting to Kafka broker(s) '{self._brokers}' has failed with"

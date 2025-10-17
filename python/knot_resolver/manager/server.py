@@ -624,13 +624,13 @@ async def start_server(config: List[str]) -> int:  # noqa: PLR0915
         # can flush the buffer into the proper place
         await logger_init(config_store)
 
+        await kafka_client.init_kafka_client(config_store)
+
         # With configuration on hand, we can initialize monitoring. We want to do this before any subprocesses are
         # started, therefore before initializing manager
         await metrics.init_prometheus(config_store)
 
         await files.init_files_watchdog(config_store)
-
-        await kafka_client.init_kafka_client(config_store)
 
         # After we have loaded the configuration, we can start worrying about subprocess management.
         manager = await _init_manager(config_store)
