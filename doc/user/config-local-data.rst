@@ -100,6 +100,16 @@ It provides various input formats described in following subsections.
 
          Optional, restrict when this RPZ applies.  See :ref:`config-policy-new-tags`.
 
+      .. option:: watchdog: auto | true | false 
+
+         This option controls whether the RPZ file is automatically reloaded whenever it changes.
+
+         That feature needs ``python-watchdog`` package to be present.
+
+         - ``auto``: this is the default, watch the file if possible
+         - ``true``: watch the file and fail config validation if dependency is missing
+         - ``false``: don't watch the file
+
       .. option:: log: <list, subset of [ name, ip ]>
 
          Optional, indicate that each application of a rule should log the domain name
