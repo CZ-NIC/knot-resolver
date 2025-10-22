@@ -9,6 +9,7 @@ Improvements
   This should also resolve the issue with user and group  
   configuration during installation (GH#130).
 - make DoH cache-control header respect our cache's TTL limits (!1832)
+- support libdnssec merged into libknot, as planned for knot >= 3.6 (!1833)
 
 
 Bugfixes
