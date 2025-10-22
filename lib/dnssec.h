@@ -9,8 +9,23 @@
 #include <libknot/packet/pkt.h>
 
 // This is the central place in Knot Resolver which includes the (former) libdnssec.
+#if KNOT_VERSION_HEX < 0x030600
 #include <libdnssec/dnssec.h>
 #include <libdnssec/digest.h>
+#else
+#include <libknot/libknot.h>
+#include <libknot/dnssec/digest.h>
+// Now some compatibility
+enum {
+	// These should be OK to replace everywhere.
+	DNSSEC_EOK = KNOT_EOK,
+	DNSSEC_NOT_FOUND = KNOT_ENOENT, // could be just -ENOENT anyway
+
+	// These might not be OK to simply replace everywhere.
+	DNSSEC_INVALID_KEY_ALGORITHM = KNOT_INVALID_KEY_ALGORITHM,
+	DNSSEC_INVALID_DIGEST_ALGORITHM = KNOT_EALGORITHM,
+};
+#endif
 
 /**
  * Initialise cryptographic back-end.
