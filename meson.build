@@ -20,7 +20,11 @@ endif
 message('--- required dependencies ---')
 knot_version = '>=3.3'
 libknot = dependency('libknot', version: knot_version)
-libdnssec = dependency('libdnssec', version: knot_version)
+if libknot.version() < '3.6'
+  libdnssec = dependency('libdnssec', version: knot_version)
+else
+  libdnssec = libknot # the libraries merged
+endif
 libzscanner = dependency('libzscanner', version: knot_version)
 libuv = dependency('libuv', version: '>=1.27')  # need uv_udp_connect()
 lmdb = dependency('lmdb', required: false)
