@@ -7,6 +7,9 @@ Improvements
 - manager: force a configuration reload via management HTTP API 'api/reload/force' (#939, !1748)
   - kresctl: reload: added '--force' flag
 - /fallback: add this feature/module (!1733)
+- systemd: do not force-fail knot-resolver.service on OOM (!1724)
+  In basically all cases the OOM killer will kill a kresd process
+  and supervisord will just restart it, and everything will keep working.
 
 Bugfixes
 --------
