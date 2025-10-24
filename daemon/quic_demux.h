@@ -31,7 +31,6 @@ typedef struct kr_quic_table {
 typedef struct pl_quic_demux_sess_data {
 	struct protolayer_data h;
 	ngtcp2_settings settings;
-	struct wire_buf outbuf;
 	struct kr_quic_table *conn_table;
 	uint64_t first_stream_id;
 	struct kr_request *req;

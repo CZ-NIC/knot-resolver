@@ -2359,7 +2359,7 @@ static void pl_dns_stream_request_init(struct session2 *session,
                                        struct kr_request *req,
                                        void *sess_data)
 {
-	req->qsource.comm_flags.tcp = true;
+	req->qsource.comm_flags.tcp = !req->qsource.comm_flags.quic;
 }
 
 __attribute__((constructor))

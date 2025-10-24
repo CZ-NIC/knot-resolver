@@ -3,6 +3,7 @@
  */
 
 #include "lib/defines.h"
+#include "network.h"
 #include "quic_common.h"
 
 #include "libdnssec/random.h"
@@ -45,7 +46,8 @@ void quic_conn_mark_used(struct pl_quic_conn_sess_data *conn,
 	if (table == NULL || conn == NULL || conn->conn == NULL) {
 		return;
 	}
-	conn->h.heap_value = ngtcp2_conn_get_expiry(conn->conn);
+
+	conn->h.heap_value = ngtcp2_conn_get_expiry(conn->conn) * QUIC_CAN_SEND(conn);
 	conn_heap_reschedule(conn, table);
 }
 
@@ -121,10 +123,17 @@ int kr_quic_table_add(struct pl_quic_conn_sess_data *conn_sess,
 	return kr_ok();
 }
 
-void kr_quic_table_sweep(struct kr_quic_table *table)
+static void send_excessive_load(struct pl_quic_conn_sess_data *conn,
+		struct protolayer_iter_ctx *ctx, kr_quic_table_t *table)
+{
+	(void)send_special(conn, ctx, DOQ_EXCESSIVE_LOAD);
+}
+
+void kr_quic_table_sweep(struct kr_quic_table *table,
+		struct protolayer_iter_ctx *ctx)
 {
 	uint64_t now = 0;
-	// uint64_t now = quic_timestamp();
+	size_t removed = 0;
 
 	while (!EMPTY_HEAP(table->expiry_heap)) {
 		struct pl_quic_conn_sess_data *c =
@@ -134,18 +143,34 @@ void kr_quic_table_sweep(struct kr_quic_table *table)
 		if ((c->state & QUIC_STATE_BLOCKED)) {
 			break;
 		} else if (table->usage > table->max_conns) {
-			// knot_sweep_stats_incr(stats, KNOT_SWEEP_CTR_LIMIT_CONN);
-			// send_excessive_load(c, sweep_reply, table);
-			// knot_quic_table_rem(c, table);
+			send_excessive_load(c, ctx, table);
+			kr_quic_table_rem(c, table);
+			session2_event(c->h.session,
+					PROTOLAYER_EVENT_DISCONNECT,
+					NULL);
+			++removed;
+		} else if (c->state >= QUIC_STATE_CLOSING) {
+			send_special(c, ctx, QUIC_SEND_CONN_CLOSE);
+			kr_quic_table_rem(c, table);
+			session2_event(c->h.session,
+					PROTOLAYER_EVENT_DISCONNECT,
+					NULL);
+			++removed;
+
+
 		} else if (kr_quic_conn_timeout(c, &now)) {
 			int ret = ngtcp2_conn_handle_expiry(c->conn, now);
 			if (ret != NGTCP2_NO_ERROR) {
+				if (ret != NGTCP2_ERR_IDLE_CLOSE) {
+					send_special(c, ctx, QUIC_SEND_CONN_CLOSE);
+				}
 				kr_quic_table_rem(c, table);
 				session2_event(c->h.session,
 						PROTOLAYER_EVENT_DISCONNECT,
 						NULL);
+				++removed;
 			} else {
-				quic_conn_mark_used(c, table);
+				// quic_conn_mark_used(c, table);
 			}
 		}
 		// HHEAD already handled, NOOP, avoid infinite loop
@@ -153,6 +178,10 @@ void kr_quic_table_sweep(struct kr_quic_table *table)
 				HHEAD(table->expiry_heap) == c) {
 			break;
 		}
+	}
+
+	if (removed > 0) {
+		kr_log_debug(DOQ, "Closing %zu idle quic connections\n", removed);
 	}
 }
 
@@ -215,13 +244,14 @@ static enum protolayer_iter_cb_result pl_quic_demux_unwrap(void *sess_data,
 
 	qconn = kr_quic_table_lookup(&dcid, demux->conn_table);
 	if (!qconn) {
-
 		/* Clear idle connections */
-		kr_quic_table_sweep(demux->conn_table);
+		kr_quic_table_sweep(demux->conn_table, ctx);
 
 		if (demux->conn_table->usage >= demux->conn_table->max_conns) {
 			kr_log_warning(DOQ,
 				"Refusing to open new connection, reached limit of active conns\n");
+			/* we may inform the client that limits have been reached */
+			return protolayer_break(ctx, kr_ok());
 		}
 
 		ngtcp2_pkt_hd header = { 0 };
@@ -313,22 +343,20 @@ static enum protolayer_iter_cb_result pl_quic_demux_unwrap(void *sess_data,
 			ctx->finished_cb_baton);
 
 	quic_conn_mark_used(qconn, demux->conn_table);
+	kr_quic_table_sweep(demux->conn_table, ctx);
 
 	return protolayer_break(ctx, kr_ok());
 }
 
-kr_quic_table_t *kr_quic_table_new(size_t max_conns, size_t max_ibufs,
-		size_t max_obufs, size_t udp_payload,
+kr_quic_table_t *kr_quic_table_new(size_t max_conns, size_t udp_payload,
 		struct tls_credentials *creds)
 {
 	int ret;
-	kr_require(creds);
 	size_t table_size = max_conns * BUCKETS_PER_CONNS;
 
 	kr_quic_table_t *new_table = calloc(1, sizeof(*new_table) + (table_size * sizeof(new_table->conns[0])));
 	if (new_table == NULL) {
-		kr_log_error(DOQ, "Calloc in kr_quic_table_new_failed %d %d\n",
-				new_table == NULL, creds == NULL);
+		kr_log_error(DOQ, "Calloc in kr_quic_table_new_failed\n");
 		return NULL;
 	}
 
@@ -406,11 +434,8 @@ static int pl_quic_demux_sess_init(struct session2 *session, void *sess_data, vo
 	kr_require(creds->credentials != NULL);
 
 	if (!quic->conn_table) {
-		// 9000/4.6: only streams with a stream ID less than
-		// (max_streams * 4 + first_stream_id_of_type) can be opened
-		// bufsizes -> magic nums from knot (see: libknot/.../quic-requestor.c)
-		quic->conn_table = kr_quic_table_new(
-			1024, 4096, 4096, NGTCP2_MAX_UDP_PAYLOAD_SIZE, creds);
+		quic->conn_table = kr_quic_table_new(QUIC_MAX_OPEN_CONNS,
+				NGTCP2_MAX_UDP_PAYLOAD_SIZE, creds);
 
 		if (!quic->conn_table) {
 			kr_log_error(DOQ, "Failed to create QUIC connection table\n");
@@ -433,33 +458,33 @@ int kr_quic_table_rem2(kr_quic_cid_t **pcid, kr_quic_table_t *table)
 	return kr_ok();
 }
 
-
 void kr_quic_table_rem(struct pl_quic_conn_sess_data *conn,
 		kr_quic_table_t *table)
 {
-	if (conn == NULL || conn->conn == NULL || table == NULL) {
+	if (conn == NULL || table == NULL) {
 		return;
 	}
 
-	size_t num_scid = ngtcp2_conn_get_scid(conn->conn, NULL);
-	ngtcp2_cid *scids = calloc(num_scid, sizeof(*scids));
-	ngtcp2_conn_get_scid(conn->conn, scids);
+	if (conn->conn) {
+		size_t num_scid = ngtcp2_conn_get_scid(conn->conn, NULL);
+		ngtcp2_cid *scids = calloc(num_scid, sizeof(*scids));
+		ngtcp2_conn_get_scid(conn->conn, scids);
 
-	for (size_t i = 0; i < num_scid; i++) {
-		kr_quic_cid_t **pcid = kr_quic_table_lookup2(&scids[i], table);
-		if (*pcid == NULL) {
-			continue;
+		for (size_t i = 0; i < num_scid; i++) {
+			kr_quic_cid_t **pcid = kr_quic_table_lookup2(&scids[i], table);
+			if (*pcid == NULL) {
+				continue;
+			}
+			kr_quic_table_rem2(pcid, table);
 		}
-		kr_quic_table_rem2(pcid, table);
+
+		conn->cid_pointers--;
+		table->usage--;
+		free(scids);
 	}
 
 	int pos = heap_find(table->expiry_heap, (heap_val_t *)conn);
 	heap_delete(table->expiry_heap, pos);
-
-	free(scids);
-
-	conn->cid_pointers--;
-	table->usage--;
 }
 
 void kr_quic_table_free(kr_quic_table_t *table)
@@ -487,7 +512,6 @@ static int pl_quic_demux_sess_deinit(struct session2 *session, void *data)
 {
 	struct pl_quic_demux_sess_data *quic = data;
 	kr_quic_table_free(quic->conn_table);
-	wire_buf_deinit(&quic->outbuf);
 
 	return kr_ok();
 }
@@ -561,9 +585,10 @@ static enum protolayer_event_cb_result pl_quic_demux_event_unwrap(
 					PROTOLAYER_EVENT_DISCONNECT, NULL);
 		}
 
-		pl_quic_demux_sess_deinit(session, sess_data);
+		session2_dec_refs(session);
 		return PROTOLAYER_EVENT_CONSUME;
 	}
+
 	if (event == PROTOLAYER_EVENT_DISCONNECT) {
 		if (*baton == NULL)
 			return PROTOLAYER_EVENT_CONSUME;
@@ -574,7 +599,7 @@ static enum protolayer_event_cb_result pl_quic_demux_event_unwrap(
 		return PROTOLAYER_EVENT_CONSUME;
 	}
 
-	return PROTOLAYER_EVENT_CONSUME;
+	return PROTOLAYER_EVENT_PROPAGATE;
 }
 
 __attribute__((constructor))

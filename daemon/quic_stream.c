@@ -2,6 +2,7 @@
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#include "lib/resolve.h"
 #include "quic_common.h"
 #include "quic_conn.h"
 #include "session2.h"
@@ -87,11 +88,6 @@ static enum protolayer_iter_cb_result pl_quic_stream_wrap(void *sess_data,
 			fin, &sent);
 
 	if (nwrite <= 0) {
-		if (ngtcp2_err_is_fatal(nwrite)) {
-			quic_event_close_connection(stream->conn_ref,
-					stream->h.session);
-		}
-
 		if (nwrite == NGTCP2_ERR_NOMEM) {
 			kr_log_error(DOQ, "Insufficient memory available\n");
 			return protolayer_break(ctx, kr_error(ENOMEM));
@@ -239,11 +235,6 @@ static int pl_quic_stream_sess_deinit(struct session2 *session, void *sess_data)
 	kr_quic_stream_ack_data(stream, stream->stream_id, SIZE_MAX, false);
 	wire_buf_deinit(&stream->pers_inbuf);
 	wire_buf_deinit(&stream->outbuf);
-
-	while (session2_tasklist_del_first(session, true) != NULL);
-
-	WALK_LIST_FREE(stream->outbufs);
-
 	return kr_ok();
 }
 
@@ -251,17 +242,19 @@ static enum protolayer_event_cb_result pl_quic_stream_event_unwrap(
 		enum protolayer_event_type event, void **baton,
 		struct session2 *session, void *sess_data)
 {
-	if (event == PROTOLAYER_EVENT_FORCE_CLOSE) {
-		struct pl_quic_stream_sess_data *stream = sess_data;
-		quic_event_close_connection(stream->conn_ref, session->transport.parent);
-		return PROTOLAYER_EVENT_CONSUME;
-	}
 	if (event == PROTOLAYER_EVENT_CLOSE) {
-		pl_quic_stream_sess_deinit(session, sess_data);
+		session2_dec_refs(session);
 		return PROTOLAYER_EVENT_CONSUME;
 	}
 
 	return PROTOLAYER_EVENT_PROPAGATE;
+}
+
+static void pl_quic_stream_request_init(struct session2 *session,
+					struct kr_request *req,
+					void *sess_data)
+{
+	req->qsource.comm_flags.quic = true;
 }
 
 __attribute__((constructor))
@@ -269,11 +262,11 @@ static void quic_conn_protolayers_init(void)
 {
 	protolayer_globals[PROTOLAYER_TYPE_QUIC_STREAM] = (struct protolayer_globals) {
 		.sess_size = sizeof(struct pl_quic_stream_sess_data),
-		.wire_buf_overhead = MAX_QUIC_FRAME_SIZE,
 		.sess_init = pl_quic_stream_sess_init,
 		.sess_deinit = pl_quic_stream_sess_deinit,
 		.unwrap = pl_quic_stream_unwrap,
 		.wrap = pl_quic_stream_wrap,
 		.event_unwrap = pl_quic_stream_event_unwrap,
+		.request_init = pl_quic_stream_request_init,
 	};
 }
