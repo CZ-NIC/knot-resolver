@@ -1,4 +1,9 @@
+logging:
+  dnstap:
+    unix-socket: /tmp/dnstap.sock
+
 kafka:
   enable: true
   topic: knot-resolver
+  topic-dnstap: dnstap
   server: localhost@9092

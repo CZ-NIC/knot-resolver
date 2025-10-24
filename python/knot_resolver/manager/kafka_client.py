@@ -1,3 +1,4 @@
+import json
 import logging
 import shutil
 from pathlib import Path
@@ -24,7 +25,7 @@ def kafka_config(config: KresConfig) -> List[Any]:
 
 
 if KAFKA_LIB:
-    from kafka import KafkaConsumer  # type: ignore[import-untyped,import-not-found]
+    from kafka import KafkaConsumer, KafkaProducer  # type: ignore[import-untyped,import-not-found]
     from kafka.consumer.fetcher import ConsumerRecord  # type: ignore[import-untyped,import-not-found]
     from kafka.errors import KafkaError  # type: ignore[import-untyped,import-not-found]
     from kafka.structs import TopicPartition  # type: ignore[import-untyped,import-not-found]
@@ -245,6 +246,7 @@ if KAFKA_LIB:
             self._config = config
             self._consumer_timer: Optional[Timer] = None
             self._consumer: Optional[KafkaConsumer] = None
+            self._producer: Optional[KafkaProducer] = None
 
             # reduce the verbosity of kafka module logger
             kafka_logger = logging.getLogger("kafka")
@@ -258,9 +260,10 @@ if KAFKA_LIB:
                 brokers.append(broker.replace("@", ":") if server.port else f"{broker}:9092")
             self._brokers: List[str] = brokers
             self._consumer_run()
+            self._producer_connect()
 
         def _consumer_connect(self) -> None:
-            error_msg_prefix = f"Connecting to Kafka broker(s) '{self._brokers}' has failed with"
+            error_msg_prefix = f"Connecting consumer to Kafka broker(s) '{self._brokers}' has failed with"
             kafka_conf = self._config.kafka
 
             # close old consumer connection
@@ -268,7 +271,7 @@ if KAFKA_LIB:
                 self._consumer.close()
                 self._consumer = None
 
-            logger.info("Connecting to Kafka broker(s)...")
+            logger.info("Connecting consumer to Kafka broker(s)...")
             try:
                 consumer = KafkaConsumer(
                     str(kafka_conf.topic),
@@ -280,7 +283,7 @@ if KAFKA_LIB:
                     ssl_keyfile=str(kafka_conf.key_file) if kafka_conf.key_file else None,
                 )
                 self._consumer = consumer
-                logger.info("Successfully connected to Kafka broker")
+                logger.info("Successfully connected consumer to Kafka broker")
             except KafkaError as e:
                 logger.error(f"{error_msg_prefix} {e}")
             except Exception as e:
@@ -292,6 +295,29 @@ if KAFKA_LIB:
             if self._consumer:
                 self._consumer.close()
                 self._consumer = None
+            if self._producer:
+                self._producer.close()
+                self._producer = None
+
+        def _producer_connect(self) -> None:
+            error_msg_prefix = f"Connecting producer to Kafka broker(s) '{self._brokers}' has failed with"
+
+            # close old producer connection
+            if self._producer:
+                self._producer.close()
+                self._producer = None
+
+            logger.info("Connecting producer to Kafka broker(s)...")
+            try:
+                producer = KafkaProducer(
+                    bootstrap_servers=self._brokers, value_serializer=lambda v: json.dumps(v).encode("utf-8")
+                )
+                self._producer = producer
+                logger.info("Successfully connected producer to Kafka broker")
+            except KafkaError as e:
+                logger.error(f"{error_msg_prefix} {e}")
+            except Exception as e:
+                logger.error(f"{error_msg_prefix} unknown error:\n{e}")
 
         def _consumer_run(self) -> None:
             keep_consuming = False

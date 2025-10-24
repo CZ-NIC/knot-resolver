@@ -27,7 +27,7 @@ script = "build_c_extensions.py"
 generate-setup-file = true
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.9"
 aiohttp = "*"
 jinja2 = "*"
 pyyaml = "*"
@@ -36,11 +36,14 @@ typing-extensions = "*"
 prometheus-client = { version = "*", optional = true }
 watchdog = { version = "*", optional = true }
 kafka-python = { version = "*", optional = true }
+fstrm = { version = "*", optional = true }
+protobuf = { version = "*", optional = true }
 
 [tool.poetry.extras]
 prometheus = ["prometheus-client"]
 watchdog = ["watchdog"]
 kafka = ["kafka-python"]
+dnstap = ["fstrm", "protobuf"]
 
 [tool.poetry.group.build.dependencies]
 poetry-core = ">=1.0.0"
@@ -62,6 +65,7 @@ toml = "^0.10.2"
 ruff = "^0.6.9"
 mypy = "^1.8.0"
 types-pyyaml = "^6.0.12.12"
+types-protobuf = "^6.32.1.20250918"
 
 [tool.poetry.group.docs.dependencies]
 sphinx = "^5.3.0"
@@ -93,7 +97,7 @@ clean = { cmd = "scripts/poe-tasks/clean", help="Cleanup build directories and f
 
 [tool.ruff]
 line-length = 120
-target-version = "py38"
+target-version = "py39"
 exclude = ["setup.py"]
 
 [tool.ruff.lint]
@@ -118,7 +122,7 @@ ignore = [
 known-first-party=["knot_resolver"]
 
 [tool.mypy]
-python_version = "3.8"
+python_version = "3.9"
 disallow_any_generics = true
 disallow_subclassing_any = true
 disallow_untyped_calls = false

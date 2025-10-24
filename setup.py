@@ -15,6 +15,7 @@ packages = \
  'knot_resolver.datamodel.templates',
  'knot_resolver.datamodel.types',
  'knot_resolver.manager',
+ 'knot_resolver.manager.dnstap',
  'knot_resolver.manager.files',
  'knot_resolver.manager.metrics',
  'knot_resolver.utils',
@@ -28,7 +29,8 @@ install_requires = \
 ['aiohttp', 'jinja2', 'pyyaml', 'supervisor', 'typing-extensions']
 
 extras_require = \
-{'kafka': ['kafka-python'],
+{'dnstap': ['fstrm', 'protobuf'],
+ 'kafka': ['kafka-python'],
  'prometheus': ['prometheus-client'],
  'watchdog': ['watchdog']}
 
@@ -52,7 +54,7 @@ setup_kwargs = {
     'install_requires': install_requires,
     'extras_require': extras_require,
     'entry_points': entry_points,
-    'python_requires': '>=3.8,<4.0',
+    'python_requires': '>=3.9,<4.0',
 }
 from build_c_extensions import *
 build(setup_kwargs)

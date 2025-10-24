@@ -67,6 +67,8 @@ Requires:       python3-typing-extensions
 Recommends:     python3-prometheus_client
 Recommends:     python3-watchdog
 Recommends:     python3-kafka
+Recommends:     python3-fstrm
+Recommends:     python3-protobuf
 
 # dnstap module dependencies
 # SUSE is missing protoc protobuf compiler

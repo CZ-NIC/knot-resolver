@@ -1851,6 +1851,11 @@
                     "description": "Topic to subscribe data from.",
                     "default": "knot-resolver"
                 },
+                "topic-dnstap": {
+                    "type": "string",
+                    "description": "Topic to send dnstap data to.",
+                    "default": "dnstap"
+                },
                 "server": {
                     "anyOf": [
                         {
@@ -1918,6 +1923,7 @@
             "default": {
                 "enable": false,
                 "topic": "knot-resolver",
+                "topic_dnstap": "dnstap",
                 "server": [
                     "localhost@9092"
                 ],

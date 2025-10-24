@@ -19,6 +19,7 @@ class KafkaSchema(ConfigSchema):
     ---
     enable: Enable/disable Kafka client.
     topic: Topic to subscribe data from.
+    topic_dnstap: Topic to send dnstap data to.
     server: Kafka server(s) to connect.
     files_dir: Directory for storing files received via Kafka.
     security_protocol: Protocol used to communicate with server(broker).
@@ -29,6 +30,7 @@ class KafkaSchema(ConfigSchema):
 
     enable: bool = False
     topic: EscapedStr = EscapedStr("knot-resolver")
+    topic_dnstap: EscapedStr = EscapedStr("dnstap")
     server: ListOrItem[Union[IPAddressOptionalPort, DomainNameOptionalPort]] = ListOrItem(
         DomainNameOptionalPort("localhost@9092")
     )

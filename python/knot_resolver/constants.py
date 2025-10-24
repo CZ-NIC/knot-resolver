@@ -31,3 +31,11 @@ if importlib.util.find_spec("prometheus_client"):
 KAFKA_LIB = False
 if importlib.util.find_spec("kafka"):
     KAFKA_LIB = True
+
+FSTRM_LIB = False
+if importlib.util.find_spec("fstrm"):
+    FSTRM_LIB = True
+
+PROTOBUF_LIB = False
+if importlib.util.find_spec("google.protobuf"):
+    PROTOBUF_LIB = True

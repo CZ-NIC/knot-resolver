@@ -59,6 +59,8 @@ Recommends:
  python3-prometheus-client,
  python3-watchdog,
  python3-kafka,
+ python3-fstrm,
+ python3-protobuf,
 Suggests:
  knot-resolver6-module-http,
 Description: caching, DNSSEC-validating DNS resolver - core binaries

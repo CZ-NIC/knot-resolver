@@ -29,6 +29,7 @@ from knot_resolver.datamodel.config_schema import KresConfig, get_rundir_without
 from knot_resolver.datamodel.globals import Context, set_global_validation_context
 from knot_resolver.datamodel.management_schema import ManagementSchema
 from knot_resolver.manager import files, kafka_client, metrics
+from knot_resolver.manager.dnstap.listener import init_dnstap_listener
 from knot_resolver.utils import custom_atexit as atexit
 from knot_resolver.utils import ignore_exceptions_optional
 from knot_resolver.utils.async_utils import readfile
@@ -631,6 +632,8 @@ async def start_server(config: List[str]) -> int:  # noqa: PLR0915
         await files.init_files_watchdog(config_store)
 
         await kafka_client.init_kafka_client(config_store)
+
+        await init_dnstap_listener(config_store)
 
         # After we have loaded the configuration, we can start worrying about subprocess management.
         manager = await _init_manager(config_store)
