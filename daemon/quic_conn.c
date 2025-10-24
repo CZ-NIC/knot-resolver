@@ -31,42 +31,48 @@ static int handle_packet(struct pl_quic_conn_sess_data *conn,
 	const ngtcp2_path *path = ngtcp2_conn_get_path(conn->conn);
 	ngtcp2_pkt_info pi = { .ecn = NGTCP2_ECN_NOT_ECT, };
 
-	int ret = ngtcp2_conn_read_pkt(conn->conn, path, &pi,
-			wire_buf_data(ctx->payload.wire_buf),
-			wire_buf_data_length(ctx->payload.wire_buf), now);
+	int ret = -1;
+	if (ctx->payload.type == PROTOLAYER_PAYLOAD_WIRE_BUF) {
+		ret = ngtcp2_conn_read_pkt(conn->conn, path, &pi,
+				wire_buf_data(ctx->payload.wire_buf),
+				wire_buf_data_length(ctx->payload.wire_buf), now);
+	} else {
+		ret = ngtcp2_conn_read_pkt(conn->conn, path, &pi,
+				ctx->payload.buffer.buf,
+				ctx->payload.buffer.len, now);
+	}
+
+	if (ret == 0) {
+		/* given the 0 return value the pkt has been processed */
+		wire_buf_reset(ctx->payload.wire_buf);
+		return kr_ok();
+	}
 
 	switch (ret) {
-	case 0:
-		break;
 	case NGTCP2_ERR_RETRY:
 		return QUIC_SEND_RETRY;
 	case NGTCP2_ERR_DROP_CONN:
 		QUIC_SET_DRAINING(conn);
-		session2_force_close(conn->h.session);
 		break;
 	case NGTCP2_ERR_DRAINING:
 		QUIC_SET_DRAINING(conn);
-		quic_event_close_connection(conn, conn->h.session);
-		return -1;
+		break;
 	case NGTCP2_ERR_CLOSING:
-		QUIC_SET_CLOSING(conn);
+		/* Since we received the CLOSING, we are not allowed to
+		 * send last packet, therefore DRAINING */
+		QUIC_SET_DRAINING(conn);
 		break;
 	case NGTCP2_ERR_CRYPTO:
 		kr_log_error(DOQ, "TLS stack error %d\n",
 				ngtcp2_conn_get_tls_alert(conn->conn));
 		QUIC_SET_DRAINING(conn);
-		quic_event_close_connection(conn, conn->h.session);
-		return -1;
+		break;
 	default:
 		/* unknown error */
 		QUIC_SET_DRAINING(conn);
-		quic_event_close_connection(conn, conn->h.session);
-		break;
 	}
 
-	/* given the 0 return value the pkt has been processed */
-	wire_buf_reset(ctx->payload.wire_buf);
-	return kr_ok();
+	return -1;
 }
 
 static struct tls_credentials *tls_credentials_reserve(struct tls_credentials *tls_credentials)
@@ -105,6 +111,19 @@ static int kr_recv_stream_data_cb(ngtcp2_conn *ngconn, uint32_t flags,
 		stream->pers_inbuf.size += datalen;
 	}
 
+	if (datalen == 0) {
+		/* This is invalid see ngtcp2_recv_stream_data doc */
+		if (!(flags & NGTCP2_STREAM_DATA_FLAG_FIN)) {
+			// return NGTCP2_PROTOCOL_VIOLATION;
+			return NGTCP2_ERR_CALLBACK_FAILURE;
+		}
+
+		goto finished;
+	}
+
+	if (datalen <= 1)
+		return NGTCP2_PROTOCOL_VIOLATION;
+
 	if (offset == 0) {
 		memcpy(wire_buf_free_space(&stream->pers_inbuf), data, datalen);
 		kr_require(wire_buf_consume(&stream->pers_inbuf, datalen) == kr_ok());
@@ -116,6 +135,7 @@ static int kr_recv_stream_data_cb(ngtcp2_conn *ngconn, uint32_t flags,
 		kr_require(wire_buf_consume(&stream->pers_inbuf, datalen - sizeof(uint16_t)) == kr_ok());
 	}
 
+finished:
 	if (flags & NGTCP2_STREAM_DATA_FLAG_FIN) {
 		queue_push(conn->pending_unwrap, stream);
 	}
@@ -509,7 +529,6 @@ static int tls_init_conn_session(struct pl_quic_conn_sess_data *conn, bool serve
 	return kr_ok();
 }
 
-
 int quic_init_server_conn(struct pl_quic_conn_sess_data *conn,
 		struct protolayer_iter_ctx *ctx)
 {
@@ -533,7 +552,6 @@ int quic_init_server_conn(struct pl_quic_conn_sess_data *conn,
 
 	return ret;
 }
-
 
 static void copy_comm_storage(
 		struct pl_quic_conn_sess_data *conn,
@@ -560,14 +578,27 @@ static void copy_comm_storage(
 	}
 }
 
-static int send_special(struct pl_quic_conn_sess_data *conn,
+int send_special(struct pl_quic_conn_sess_data *conn,
 		struct protolayer_iter_ctx *ctx, int action)
 {
 	kr_require(ctx->payload.type == PROTOLAYER_PAYLOAD_WIRE_BUF);
-	if (wire_buf_data_length(ctx->payload.wire_buf) != 0) {
-		wire_buf_reset(ctx->payload.wire_buf);
-		return kr_error(EINVAL);
-	}
+	char *err_buf = mm_alloc(&ctx->pool, /* FIXME */2048);
+	if (!err_buf)
+		return kr_error(ENOMEM);
+	struct wire_buf err_wb = {
+		.buf = err_buf,
+		.end = 0,
+		.size = 2048 /*FIXME*/,
+		.start = 0,
+	};
+
+	struct wire_buf *save = ctx->payload.wire_buf;
+	ctx->payload.wire_buf = &err_wb;
+
+	// if (wire_buf_data_length(ctx->payload.wire_buf) != 0) {
+	// 	wire_buf_reset(ctx->payload.wire_buf);
+	// 	return kr_error(EINVAL);
+	// }
 
 	uint64_t now = quic_timestamp();
 
@@ -627,6 +658,9 @@ static int send_special(struct pl_quic_conn_sess_data *conn,
 		break;
 
 	case QUIC_SEND_STATELESS_RESET:
+		if (!QUIC_CAN_SEND(conn)) {
+			break;
+		}
 		ret = ngtcp2_pkt_write_stateless_reset(
 			wire_buf_free_space(ctx->payload.wire_buf),
 			wire_buf_free_space_length(ctx->payload.wire_buf),
@@ -634,15 +668,25 @@ static int send_special(struct pl_quic_conn_sess_data *conn,
 		);
 		break;
 	case QUIC_SEND_CONN_CLOSE:
+		if (!QUIC_CAN_SEND(conn)) {
+			ccerr.type = NGTCP2_CCERR_TYPE_IDLE_CLOSE;
+		} else {
+			ccerr.type = NGTCP2_CCERR_TYPE_APPLICATION;
+		}
+		// ccerr.error_code = NGTCP2_ERR_HANDSHAKE_TIMEOUT;
 		ret = ngtcp2_conn_write_connection_close(
 			conn->conn, NULL, &pi,
 			wire_buf_free_space(ctx->payload.wire_buf),
 			wire_buf_free_space_length(ctx->payload.wire_buf),
 			&ccerr, now);
-		if (ret < 0)
+		if (ret < 0) {
 			QUIC_SET_DRAINING(conn);
+		}
 		break;
 	case QUIC_SEND_EXCESSIVE_LOAD:
+		if (!QUIC_CAN_SEND(conn)) {
+			break;
+		}
 		ccerr.type = NGTCP2_CCERR_TYPE_APPLICATION;
 		ccerr.error_code = KR_QUIC_ERR_EXCESSIVE_LOAD;
 		ret = ngtcp2_conn_write_connection_close(
@@ -658,10 +702,7 @@ static int send_special(struct pl_quic_conn_sess_data *conn,
 		break;
 	}
 
-	if (ret < 0) {
-		wire_buf_reset(ctx->payload.wire_buf);
-		return kr_error(EINVAL);
-	} else {
+	if (ret > 0) {
 		kr_require(wire_buf_consume(ctx->payload.wire_buf, ret) == kr_ok());
 		session2_wrap(conn->h.session,
 				ctx->payload,
@@ -669,8 +710,11 @@ static int send_special(struct pl_quic_conn_sess_data *conn,
 				NULL,
 				ctx->finished_cb,
 				ctx->finished_cb_baton);
-		return kr_ok();
+		ret = kr_ok();
 	}
+
+	mm_free(&ctx->pool, ctx->payload.wire_buf);
+	ctx->payload.wire_buf = save;
 
 	return ret;
 }
@@ -681,8 +725,7 @@ static enum protolayer_iter_cb_result pl_quic_conn_unwrap(void *sess_data,
 	int ret = kr_ok();
 	struct pl_quic_conn_sess_data *conn = sess_data;
 	if (ctx->payload.type == PROTOLAYER_PAYLOAD_BUFFER) {
-		struct wire_buf *wb = mm_calloc(&ctx->pool, 1,
-				sizeof(struct wire_buf));
+		struct wire_buf *wb = mm_alloc(&ctx->pool, sizeof(struct wire_buf));
 		wb->size = ctx->payload.buffer.len;
 		wb->buf = ctx->payload.buffer.buf;
 		wb->end = wb->size;
@@ -702,19 +745,10 @@ static enum protolayer_iter_cb_result pl_quic_conn_unwrap(void *sess_data,
 
 	ret = handle_packet(conn, ctx);
 	if (ret != kr_ok()) {
-		if (!QUIC_CAN_SEND(conn)) {
-			/* connection doomed */
-			quic_event_close_connection(conn, conn->h.session);
-		} else if (ret == QUIC_SEND_RETRY ||
-				ret == QUIC_SEND_CONN_CLOSE) {
+		if (QUIC_CAN_SEND(conn)) {
 			if (send_special(conn, ctx, ret) >= 0) {
 				ngtcp2_conn_update_pkt_tx_time(conn->conn,
 						quic_timestamp());
-
-				session2_wrap(conn->h.session, ctx->payload,
-						ctx->comm, NULL,
-						ctx->finished_cb,
-						ctx->finished_cb_baton);
 			}
 		}
 
@@ -750,7 +784,6 @@ static enum protolayer_iter_cb_result pl_quic_conn_wrap(void *sess_data,
 	struct pl_quic_conn_sess_data *conn = sess_data;
 
 	if (!QUIC_CAN_SEND(conn)) {
-		quic_event_close_connection(conn, conn->h.session);
 		return protolayer_break(ctx, kr_ok());
 	}
 
@@ -761,7 +794,9 @@ static enum protolayer_iter_cb_result pl_quic_conn_wrap(void *sess_data,
 		ngtcp2_pkt_info pi = { 0 };
 
 		kr_require(ctx->payload.type == PROTOLAYER_PAYLOAD_WIRE_BUF);
-		kr_require(wire_buf_data_length(ctx->payload.wire_buf) == 0);
+		if (wire_buf_data_length(ctx->payload.wire_buf) > 0) {
+			return protolayer_continue(ctx);
+		}
 
 		int nwrite = ngtcp2_conn_writev_stream(conn->conn, 
 				(ngtcp2_path *)ngtcp2_conn_get_path(conn->conn),
@@ -908,12 +943,11 @@ static enum protolayer_event_cb_result pl_quic_conn_event_unwrap(
 		WALK_LIST_FIRST(s_node, conn->streams) {
 			struct pl_quic_stream_sess_data *s =
 				container_of(s_node, struct pl_quic_stream_sess_data, list_node);
-			session2_close(s->h.session);
 			rem_node(&s->list_node);
+			session2_close(s->h.session);
 			--conn->streams_count;
 		}
-
-		pl_quic_conn_sess_deinit(session, sess_data);
+		session2_dec_refs(session);
 		return PROTOLAYER_EVENT_CONSUME;
 	}
 
@@ -925,7 +959,6 @@ static void quic_conn_protolayers_init(void)
 {
 	protolayer_globals[PROTOLAYER_TYPE_QUIC_CONN] = (struct protolayer_globals) {
 		.sess_size = sizeof(struct pl_quic_conn_sess_data),
-		.wire_buf_overhead = MAX_QUIC_PKT_SIZE,
 		.sess_init = pl_quic_conn_sess_init,
 		.sess_deinit = pl_quic_conn_sess_deinit,
 		.unwrap = pl_quic_conn_unwrap,

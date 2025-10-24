@@ -19,6 +19,7 @@ typedef struct {
 
 #define KR_QUIC_HANDLE_RET_CLOSE	2000
 #define KR_QUIC_ERR_EXCESSIVE_LOAD	0x4
+#define QUIC_MAX_OPEN_CONNS 1024
 
 typedef enum {
 	KR_QUIC_SEND_IGNORE_LASTBYTE = (1 << 0),
@@ -108,3 +109,6 @@ struct pl_quic_conn_sess_data {
 	quic_conn_state_t state;
 	size_t cid_pointers;
 };
+
+int send_special(struct pl_quic_conn_sess_data *conn,
+		struct protolayer_iter_ctx *ctx, int action);
