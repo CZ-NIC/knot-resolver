@@ -35,19 +35,6 @@ void init_random_cid(ngtcp2_cid *cid, size_t len)
 		/* DNSSEC_EOK */0 ? len : 0;
 }
 
-void quic_event_close_connection(struct pl_quic_conn_sess_data *conn,
-		struct session2 *session)
-{
-	if (!session || !conn)
-		return;
-
-	while (session->transport.type != SESSION2_TRANSPORT_IO) {
-		session = session->transport.parent;
-	}
-
-	session2_event(session, PROTOLAYER_EVENT_DISCONNECT, conn);
-}
-
 ssize_t send_version_negotiation(struct wire_buf *dest, ngtcp2_version_cid dec_cids,
 		ngtcp2_cid dcid, ngtcp2_cid scid)
 {
