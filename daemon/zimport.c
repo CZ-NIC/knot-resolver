@@ -32,8 +32,6 @@
 #include <libknot/rrset.h>
 #include <libzscanner/scanner.h>
 
-#include <libdnssec/digest.h>
-
 #include "daemon/worker.h"
 #include "lib/dnssec/ta.h"
 #include "lib/dnssec.h"

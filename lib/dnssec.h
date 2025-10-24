@@ -8,6 +8,10 @@
 #include "lib/utils.h"
 #include <libknot/packet/pkt.h>
 
+// This is the central place in Knot Resolver which includes the (former) libdnssec.
+#include <libdnssec/dnssec.h>
+#include <libdnssec/digest.h>
+
 /**
  * Initialise cryptographic back-end.
  */

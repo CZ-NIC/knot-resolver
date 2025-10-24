@@ -50,8 +50,10 @@ Size (`loads_bits` = log2 length):
 
 #include "./kru.h"
 #include "contrib/ucw/lib.h"
-#include "libdnssec/error.h"
-#include "libdnssec/random.h"
+
+// We only need the original libdnssec here, but...
+#include "lib/dnssec.h"
+
 #if USE_AES
 	/// 4-8 rounds should be an OK choice, most likely.
 	#define AES_ROUNDS 4
