@@ -2,11 +2,6 @@
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include <libdnssec/binary.h>
-#include <libdnssec/crypto.h>
-#include <libdnssec/error.h>
-#include <libdnssec/key.h>
-#include <libdnssec/sign.h>
 #include <libknot/descriptor.h>
 #include <libknot/packet/wire.h>
 #include <libknot/rdataset.h>

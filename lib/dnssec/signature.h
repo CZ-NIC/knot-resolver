@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <libdnssec/key.h>
+#include "lib/dnssec.h"
 #include <libknot/rrset.h>
 
 /**

@@ -6,7 +6,7 @@
 
 #include <libknot/packet/pkt.h>
 #include <libknot/rrtype/nsec3.h>
-#include <libdnssec/nsec.h>
+#include "lib/dnssec.h"
 
 
 static inline unsigned int kr_nsec3_price(unsigned int iterations, unsigned int salt_len)

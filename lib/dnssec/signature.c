@@ -5,9 +5,6 @@
 #include <arpa/inet.h>
 #include <string.h>
 
-#include <libdnssec/error.h>
-#include <libdnssec/key.h>
-#include <libdnssec/sign.h>
 #include <libknot/descriptor.h>
 #include <libknot/packet/rrset-wire.h>
 #include <libknot/packet/wire.h>
@@ -18,6 +15,7 @@
 
 #include "lib/defines.h"
 #include "lib/utils.h"
+#include "lib/dnssec.h"
 #include "lib/dnssec/signature.h"
 
 static int authenticate_ds(const dnssec_key_t *key, dnssec_binary_t *ds_rdata, uint8_t digest_type)
