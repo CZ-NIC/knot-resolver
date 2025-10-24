@@ -4,15 +4,13 @@
 
 #include <string.h>
 
-#include <libdnssec/binary.h>
-#include <libdnssec/error.h>
-#include <libdnssec/nsec.h>
 #include <libknot/descriptor.h>
 #include <contrib/base32hex.h>
 #include <libknot/rrset.h>
 #include <libknot/rrtype/nsec3.h>
 
 #include "lib/defines.h"
+#include "lib/dnssec.h"
 #include "lib/dnssec/nsec.h"
 #include "lib/dnssec/nsec3.h"
 #include "lib/utils.h"

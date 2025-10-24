@@ -7,8 +7,6 @@
 #include <libknot/rdataset.h>
 #include <libknot/rrset.h>
 #include <libknot/packet/wire.h>
-#include <libdnssec/key.h>
-#include <libdnssec/error.h>
 
 #include "lib/defines.h"
 #include "lib/dnssec.h"

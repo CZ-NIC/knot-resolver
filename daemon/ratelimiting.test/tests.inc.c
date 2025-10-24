@@ -20,8 +20,7 @@
 #include <stdatomic.h>
 
 #include "tests/unit/test.h"
-#include "libdnssec/crypto.h"
-#include "libdnssec/random.h"
+#include "lib/dnssec.h"
 #include "libknot/libknot.h"
 #include "contrib/openbsd/siphash.h"
 #include "lib/resolve.h"
