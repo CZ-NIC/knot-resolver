@@ -8,7 +8,7 @@ from knot_resolver.constants import KAFKA_LIB
 from knot_resolver.datamodel import KresConfig
 from knot_resolver.manager.config_store import ConfigStore
 from knot_resolver.manager.exceptions import KresKafkaClientError
-from knot_resolver.manager.triggers import trigger_reload, trigger_renew
+from knot_resolver.manager.triggers import trigger_reload
 from knot_resolver.utils.functional import Result
 from knot_resolver.utils.modeling import try_to_parse
 from knot_resolver.utils.modeling.exceptions import DataParsingError, DataValidationError
@@ -219,8 +219,10 @@ if KAFKA_LIB:
             else:
                 # backup and replace file with new data
                 backup_and_replace(file_tmp_path, file_path)
-                # trigger renew
-                trigger_renew(config, force=True)
+
+                # We don't need to renew the configuration
+                # because the new JSON configuration should always follow the other files.
+                # trigger_renew(config, force=True)
 
     logger.info("Successfully processed message")
 
