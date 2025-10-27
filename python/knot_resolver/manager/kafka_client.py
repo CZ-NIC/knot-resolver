@@ -135,11 +135,24 @@ if KAFKA_LIB:
         value: bytes = record.value
         headers = Headers(record.headers)
 
-        logger.info(f"Received message with '{key}' key")
+        logger.info(f"Received message with '{key}' key (group-id)")
 
-        # check hostname
-        if not hostname_match(headers, str(config.hostname)):
-            return
+        hostname = str(config.hostname)
+        group_id = config.kafka.group_id
+
+        if not group_id and not headers.hostname:
+            raise KresKafkaClientError(
+                "The 'group-id' option is not configured and the 'hostname' message header is also missing:"
+                " It is not possible to determine which resolver the message is intended for."
+            )
+        if headers.hostname and headers.hostname != hostname:
+            if config.kafka.group_id and key != str(group_id):
+                logger.info(
+                    f"The resolver's group-id '{str(group_id)}' or hostname '{hostname}'"
+                    f" do not match with the message key (group-id) '{key}' or headers hostname '{hostname}':"
+                    " The message is intended for a resolver with the matching group-id or hostname."
+                )
+                return
 
         # check chunks
         check_chunk_headers(headers)
@@ -254,16 +267,15 @@ if KAFKA_LIB:
             kafka_logger.propagate = False
 
             brokers = []
-            kafka_conf = config.kafka
-            for server in kafka_conf.server.to_std():
+            for server in config.kafka.server.to_std():
                 broker = str(server)
                 brokers.append(broker.replace("@", ":") if server.port else f"{broker}:9092")
             self._brokers: List[str] = brokers
             self._consumer_run()
 
         def _consumer_connect(self) -> None:
-            error_msg_prefix = f"Connecting to Kafka broker(s) '{self._brokers}' has failed with"
-            kafka_conf = self._config.kafka
+            error_msg_prefix = f"Connecting consumer to Kafka broker(s) '{self._brokers}' has failed with"
+            config_kafka = self._config.kafka
 
             # close old consumer connection
             if self._consumer:
@@ -273,13 +285,14 @@ if KAFKA_LIB:
             logger.info("Connecting to Kafka broker(s)...")
             try:
                 consumer = KafkaConsumer(
-                    str(kafka_conf.topic),
+                    str(config_kafka.topic),
                     bootstrap_servers=self._brokers,
                     client_id=str(self._config.hostname),
-                    security_protocol=str(kafka_conf.security_protocol).upper(),
-                    ssl_cafile=str(kafka_conf.ca_file) if kafka_conf.ca_file else None,
-                    ssl_certfile=str(kafka_conf.cert_file) if kafka_conf.cert_file else None,
-                    ssl_keyfile=str(kafka_conf.key_file) if kafka_conf.key_file else None,
+                    group_id=str(config_kafka.group_id),
+                    security_protocol=str(config_kafka.security_protocol).upper(),
+                    ssl_cafile=str(config_kafka.ca_file) if config_kafka.ca_file else None,
+                    ssl_certfile=str(config_kafka.cert_file) if config_kafka.cert_file else None,
+                    ssl_keyfile=str(config_kafka.key_file) if config_kafka.key_file else None,
                 )
                 self._consumer = consumer
                 logger.info("Successfully connected to Kafka broker")

@@ -1876,6 +1876,14 @@
                     "description": "Kafka server(s) to connect.",
                     "default": "localhost@9092"
                 },
+                "group-id": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "description": "Optional, identifier for determining the recipient(s) using a key in the Kafka message.",
+                    "default": null
+                },
                 "files-dir": {
                     "type": "string",
                     "description": "Directory for storing files received via Kafka.",
@@ -1921,6 +1929,7 @@
                 "server": [
                     "localhost@9092"
                 ],
+                "group_id": null,
                 "files_dir": "/var/lib/knot-resolver",
                 "security_protocol": "plaintext",
                 "cert_file": null,

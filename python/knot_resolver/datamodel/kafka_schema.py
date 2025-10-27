@@ -20,6 +20,7 @@ class KafkaSchema(ConfigSchema):
     enable: Enable/disable Kafka client.
     topic: Topic to subscribe data from.
     server: Kafka server(s) to connect.
+    group_id: Optional, identifier for determining the recipient(s) using a key in the Kafka message.
     files_dir: Directory for storing files received via Kafka.
     security_protocol: Protocol used to communicate with server(broker).
     cert_file: Optional, the client's certificate file in PEM format.
@@ -32,6 +33,7 @@ class KafkaSchema(ConfigSchema):
     server: ListOrItem[Union[IPAddressOptionalPort, DomainNameOptionalPort]] = ListOrItem(
         DomainNameOptionalPort("localhost@9092")
     )
+    group_id: Optional[EscapedStr] = None
     files_dir: WritableDir = lazy_default(WritableDir, str(WORK_DIR))
     security_protocol: Literal["plaintext", "ssl"] = "plaintext"
     cert_file: Optional[ReadableFile] = None
