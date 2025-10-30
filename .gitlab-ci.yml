@@ -827,13 +827,13 @@ docs:website:
     refs:
       - tags
   script:
-    - "git clone \"https://gitlab-ci-token:${WEBSITE_DOCS_CI_TOKEN}@${CI_SERVER_HOST}:${CI_SERVER_PORT}/websites/knot-resolver.cz.git\" website"
-    - "cp --recursive --verbose \"doc/html\" \"website/content/documentation/${CI_COMMIT_REF_NAME}\""
+    - git clone https://gitlab-ci-token:${WEBSITE_DOCS_CI_TOKEN}@${CI_SERVER_HOST}:${CI_SERVER_PORT}/websites/knot-resolver.cz.git website
+    - cp --recursive --verbose doc/html website/content/documentation/${CI_COMMIT_REF_NAME}
     - cd website
-    - "git checkout -b \"docs/${CI_COMMIT_REF_NAME}\""
-    - "git add \"content/documentation/${CI_COMMIT_REF_NAME}\""
+    - git checkout -b docs/${CI_COMMIT_REF_NAME}
+    - git add content/documentation/${CI_COMMIT_REF_NAME}
     - "git commit -m \"docs: ${CI_COMMIT_REF_NAME}\""
-    - "git push --force --set-upstream origin \"docs/${CI_COMMIT_REF_NAME}\""
+    - git push --force --set-upstream origin "docs/${CI_COMMIT_REF_NAME}"
 
 # }}}
 
