@@ -19,6 +19,7 @@
 #include "lib/log.h"
 #include "lib/resolve.h"
 #include "lib/rules/api.h"
+#include "lib/cache/prefetch.h"
 
 #include <arpa/inet.h>
 #include <getopt.h>
@@ -629,6 +630,8 @@ int main(int argc, char **argv)
 		ret = EXIT_FAILURE;
 		goto cleanup;
 	}
+
+	kr_cache_prefetch_init(loop, worker_prefetch);
 
 	ret = kr_rules_init_ensure();
 	if (ret) {

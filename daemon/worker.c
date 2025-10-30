@@ -1631,6 +1631,15 @@ int worker_resolve_exec(struct qr_task *task, knot_pkt_t *query)
 	return qr_task_step(task, NULL, query);
 }
 
+int worker_prefetch(knot_dname_t *qname, uint16_t qtype) {
+	struct kr_qflags flags = {.NO_CACHE = true};
+	knot_pkt_t *pkt = worker_resolve_mk_pkt_dname(qname, qtype, KNOT_CLASS_IN, &flags);  // malloc'ed, (or _dname version)
+	struct qr_task *task = worker_resolve_start(pkt, flags);
+	// task.ctx.req.trace_finish = finish_cb;  // for freeing or not needed? TODO
+	// task.ctx.req.cache_top_context.bloom // TODO
+	return worker_resolve_exec(task, pkt);
+}
+
 int worker_task_numrefs(const struct qr_task *task)
 {
 	return task->refs;

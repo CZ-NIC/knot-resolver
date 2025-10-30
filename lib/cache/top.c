@@ -201,8 +201,11 @@ char *kr_cache_top_strkey(void *key, size_t len)
 						force_bytes = INT_MAX;
 						break;
 					case 'E':
-						force_bytes = true;
+						force_bytes = 2;
 						decimal_bytes = true;
+						break;
+					case 'P':
+						force_bytes = 6;
 						break;
 				}
 			}
