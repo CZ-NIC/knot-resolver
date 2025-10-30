@@ -11,7 +11,7 @@ variables:
   RESPDIFF_COUNT: 1
   RESPDIFF_FORCE: 0
   RESPERF_FORCE: 0
-  KNOT_VERSION: '3.3'
+  KNOT_VERSION: '3.5'
   LIBKRES_ABI: 9
   LIBKRES_NAME: libkres
   MESON_TEST: meson test -C build_ci* -t 4 --print-errorlogs
@@ -21,10 +21,10 @@ variables:
   # IMAGE_TAG is a Git branch/tag name from https://gitlab.nic.cz/knot/knot-resolver-ci
   # In general, keep it pointing to a tag - use a branch only for development.
   # More info in the knot-resolver-ci repository.
-  IMAGE_TAG: 'v20250930'
+  IMAGE_TAG: 'v20251016'
   IMAGE_PREFIX: '$CI_REGISTRY/knot/knot-resolver-ci'
 
-image: $IMAGE_PREFIX/debian12-knot_3_3:$IMAGE_TAG
+image: $IMAGE_PREFIX/debian12-knot_3_5:$IMAGE_TAG
 default:
   interruptible: true
   tags:
@@ -136,18 +136,15 @@ build-stable:
     - ninja -C build_ci_stable install >/dev/null
     - ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite snowflake
 
-# This is currently the same as stable - uncomment this once Knot 3.4 is
-# released and we are building against that, to keep sanity-checking the 3.3
-# support.
-#
-#build-deb12-knot33:
-#  <<: *build
-#  image: $IMAGE_PREFIX/debian12-knot_3_3:$IMAGE_TAG
-#  script:
-#    - meson build_ci_deb12_knot33 --prefix=$PREFIX -Dmalloc=disabled -Dwerror=true -Dextra_tests=enabled
-#    - ninja -C build_ci_deb12_knot33
-#    - ninja -C build_ci_deb12_knot33 install >/dev/null
-#    - ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite snowflake
+# This version diverges from latest release. Used as a sanity-check for Knot 3.3 support.
+.build-deb12-knot33:
+ <<: *build
+ image: $IMAGE_PREFIX/debian12-knot_3_3:$IMAGE_TAG
+ script:
+   - meson build_ci_deb12_knot33 --prefix=$PREFIX -Dmalloc=disabled -Dwerror=true -Dextra_tests=enabled
+   - ninja -C build_ci_deb12_knot33
+   - ninja -C build_ci_deb12_knot33 install >/dev/null
+   - ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite snowflake
 
 build-deb12-knot-master:
   <<: *build
@@ -381,6 +378,9 @@ lint:coverity:
     - ninja -C build_ci_lib daemon/kresd
     - ninja -C build_ci_lib kres-gen
     - git diff --quiet || (git diff; exit 1)
+kres-gen-35:
+  <<: *kres-gen
+  image: $IMAGE_PREFIX/debian12-knot_3_5:$IMAGE_TAG
 kres-gen-33:
   <<: *kres-gen
   image: $IMAGE_PREFIX/debian12-knot_3_3:$IMAGE_TAG
@@ -462,6 +462,7 @@ test:valgrind:
   script:
     - >
         ${MESON_TEST}
+        --timeout-multiplier 8
         --suite unit
         --suite config
         --no-suite skip_valgrind
