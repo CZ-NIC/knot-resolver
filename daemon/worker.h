@@ -54,6 +54,14 @@ worker_resolve_start(knot_pkt_t *query, struct kr_qflags options);
  */
 KR_EXPORT int worker_resolve_exec(struct qr_task *task, knot_pkt_t *query);
 
+/**
+ * Invoke prefetching of given cache record.
+ * It performs resolution even if the record is valid in cache.
+ *
+ * @return 0 or an error code
+ */
+KR_EXPORT int worker_prefetch(knot_dname_t *qname, uint16_t qtype);
+
 /** @return struct kr_request associated with opaque task */
 struct kr_request *worker_task_request(struct qr_task *task);
 
