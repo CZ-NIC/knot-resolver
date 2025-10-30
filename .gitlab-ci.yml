@@ -293,13 +293,15 @@ docker:dockerhub:
     - tags
   needs:
     - docker:test:cross-platform
-  before_script:
-    - echo "$DOCKER_HUB_TOKEN" | docker login -u $DOCKER_HUB_USER --password-stdin
   script:
+    - echo "$DOCKER_HUB_TOKEN" | docker login -u $DOCKER_HUB_USER --password-stdin
+    - >
+      docker buildx imagetools create
+      -t ${DOCKER_HUB_REGISTRY}:6
+      ${GITLAB_REGISTRY}:${CI_COMMIT_REF_NAME}
     - >
       docker buildx imagetools create
       -t ${DOCKER_HUB_REGISTRY}:${CI_COMMIT_REF_NAME}
-      -t ${DOCKER_HUB_REGISTRY}:6
       ${GITLAB_REGISTRY}:${CI_COMMIT_REF_NAME}
 # }}}
 
