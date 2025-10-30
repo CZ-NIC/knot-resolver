@@ -100,6 +100,8 @@ int kr_gc_key_consistent(knot_db_val_t key)
 		return KNOT_RRTYPE_NSEC3;
 	case 'S':
 		return KNOT_CACHE_RTT;
+	case 'P':
+		return KNOT_CACHE_PREFETCH;
 	default:
 		kr_assert(!EINVAL);
 		return kr_error(EINVAL);
@@ -207,7 +209,7 @@ int kr_gc_cache_iter(knot_db_t * knot_db, const  kr_cache_gc_cfg_t *cfg,
 		info.valid = false;
 		const int entry_type = kr_gc_key_consistent(key);
 		const struct entry_h *entry = NULL;
-		if (entry_type == KNOT_CACHE_RTT) {
+		if ((entry_type == KNOT_CACHE_RTT) || (entry_type == KNOT_CACHE_PREFETCH)) {
 			counter_gc_consistent++;
 			info.valid = true;
 			info.rrtype = entry_type;
@@ -229,7 +231,7 @@ int kr_gc_cache_iter(knot_db_t * knot_db, const  kr_cache_gc_cfg_t *cfg,
 		counter_iter++;
 		counter_kr_consistent += info.valid;
 		if (VERBOSE_STATUS) {
-			if (!entry_type || ((entry_type != KNOT_CACHE_RTT) && !entry)) {  // don't log fully consistent entries
+			if (!entry_type || ((entry_type != KNOT_CACHE_RTT) && (entry_type != KNOT_CACHE_PREFETCH) && !entry)) {  // don't log fully consistent entries
 				printf
 				    ("GC %sconsistent, KR %sconsistent, size %zu, key len %zu: ",
 				     entry_type ? "" : "in", entry ? "" : "IN",

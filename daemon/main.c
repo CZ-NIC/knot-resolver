@@ -20,6 +20,7 @@
 #include "lib/log.h"
 #include "lib/resolve.h"
 #include "lib/rules/api.h"
+#include "lib/cache/prefetch.h"
 
 #include <arpa/inet.h>
 #include <getopt.h>
@@ -648,6 +649,7 @@ int main(int argc, char **argv)
 		static idletimer_t mempool_timer;
 		idletimer_init(&mempool_timer, mp_balance_reusable, 1000);
 	}
+	kr_cache_prefetch_init(loop, worker_prefetch);
 
 	ret = kr_rules_init_ensure();
 	if (ret) {
