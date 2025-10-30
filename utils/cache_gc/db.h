@@ -27,6 +27,7 @@ int kr_gc_cache_iter(knot_db_t * knot_db, const  kr_cache_gc_cfg_t *cfg,
  */
 int kr_gc_key_consistent(knot_db_val_t key);
 #define KNOT_CACHE_RTT 0x10000
+#define KNOT_CACHE_PREFETCH 0x10001
 
 /** Printf a *binary* string in a human-readable way. */
 void debug_printbin(const char *str, unsigned int len);
