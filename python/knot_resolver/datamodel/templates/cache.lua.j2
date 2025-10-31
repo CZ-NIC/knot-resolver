@@ -22,7 +22,7 @@ prefill.config({
 modules.load('prefetch')
 {% endif %}
 
-{% if cfg.cache.prefetch.prediction %}
+{% if cfg.cache.prefetch.prediction.enable %}
 -- cache.prefetch.prediction
 modules.load('predict')
 predict.config({

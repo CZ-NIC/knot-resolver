@@ -123,6 +123,7 @@ will be discarded.
 
    network:
      proxy-protocol:
+       enable: true
        allow:
          - 172.22.0.1     # allows '172.22.0.1' specifically
          - 172.18.1.0/24  # allows everyone at '172.18.1.*'

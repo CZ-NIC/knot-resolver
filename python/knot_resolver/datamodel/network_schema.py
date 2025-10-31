@@ -54,44 +54,41 @@ class TLSSchema(ConfigSchema):
         TLS configuration, also affects DNS over TLS and DNS over HTTPS.
 
         ---
-        files_watchdog: Enables files watchdog for TLS certificate files. Requires the optional 'watchdog' dependency.
+        watchdog: Enables watchdog of changes in TLS certificate files. Requires the optional 'watchdog' dependency.
         cert_file: Path to certificate file.
         key_file: Path to certificate key file.
         sticket_secret: Secret for TLS session resumption via tickets. (RFC 5077).
         sticket_secret_file: Path to file with secret for TLS session resumption via tickets. (RFC 5077).
-        auto_discovery: Experimental automatic discovery of authoritative servers supporting DNS-over-TLS.
         padding: EDNS(0) padding of queries and answers sent over an encrypted channel.
         """
 
-        files_watchdog: Union[Literal["auto"], bool] = "auto"
+        watchdog: Union[Literal["auto"], bool] = "auto"
         cert_file: Optional[ReadableFile] = None
         key_file: Optional[ReadableFile] = None
         sticket_secret: Optional[EscapedStr32B] = None
         sticket_secret_file: Optional[ReadableFile] = None
-        auto_discovery: bool = False
         padding: Union[bool, Int0_512] = True
 
     _LAYER = Raw
 
-    files_watchdog: bool
+    watchdog: bool
     cert_file: Optional[ReadableFile] = None
     key_file: Optional[ReadableFile] = None
     sticket_secret: Optional[EscapedStr32B] = None
     sticket_secret_file: Optional[ReadableFile] = None
-    auto_discovery: bool = False
     padding: Union[bool, Int0_512] = True
 
-    def _files_watchdog(self, obj: Raw) -> Any:
-        if obj.files_watchdog == "auto":
+    def _watchdog(self, obj: Raw) -> Any:
+        if obj.watchdog == "auto":
             return WATCHDOG_LIB
-        return obj.files_watchdog
+        return obj.watchdog
 
     def _validate(self):
         if self.sticket_secret and self.sticket_secret_file:
             raise ValueError("'sticket_secret' and 'sticket_secret_file' are both defined, only one can be used")
         if bool(self.cert_file) != bool(self.key_file):
             raise ValueError("'cert-file' and 'key-file' must be configured together")
-        if self.cert_file and self.key_file and self.files_watchdog and not WATCHDOG_LIB:
+        if self.cert_file and self.key_file and self.watchdog and not WATCHDOG_LIB:
             raise ValueError(
                 "'files-watchdog' is enabled, but the required 'watchdog' dependency (optional) is not installed"
             )
@@ -164,10 +161,12 @@ class ProxyProtocolSchema(ConfigSchema):
     PROXYv2 protocol configuration.
 
     ---
+    enable: Enable/disable PROXYv2 protocol.
     allow: Allow usage of the PROXYv2 protocol headers by clients on the specified addresses.
     """
 
-    allow: List[Union[IPAddress, IPNetwork]]
+    enable: bool = False
+    allow: Optional[List[Union[IPAddress, IPNetwork]]] = None
 
 
 class NetworkSchema(ConfigSchema):
@@ -197,7 +196,7 @@ class NetworkSchema(ConfigSchema):
     edns_buffer_size: EdnsBufferSizeSchema = EdnsBufferSizeSchema()
     address_renumbering: Optional[List[AddressRenumberingSchema]] = None
     tls: TLSSchema = TLSSchema()
-    proxy_protocol: Union[Literal[False], ProxyProtocolSchema] = False
+    proxy_protocol: ProxyProtocolSchema = ProxyProtocolSchema()
     listen: List[ListenSchema] = [
         ListenSchema({"interface": "127.0.0.1"}),
         ListenSchema({"interface": "::1", "freebind": True}),

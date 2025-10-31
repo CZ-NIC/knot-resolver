@@ -8,7 +8,7 @@ from jinja2 import Template
 
 from knot_resolver.constants import KRES_CACHE_GC_EXECUTABLE, KRESD_EXECUTABLE
 from knot_resolver.controller.interface import KresID, SubprocessType
-from knot_resolver.datamodel.config_schema import KresConfig
+from knot_resolver.datamodel.config_schema import KresConfig, workers_max_count
 from knot_resolver.datamodel.logging_schema import LogTargetEnum
 from knot_resolver.manager.constants import (
     kres_cache_dir,
@@ -58,21 +58,19 @@ def kres_cache_gc_args(config: KresConfig) -> str:
         args += " -v"
 
     gc_config = config.cache.garbage_collector
-    if gc_config:
-        args += (
-            f" -d {gc_config.interval.millis()}"
-            f" -u {gc_config.threshold}"
-            f" -f {gc_config.release}"
-            f" -l {gc_config.rw_deletes}"
-            f" -L {gc_config.rw_reads}"
-            f" -t {gc_config.temp_keys_space.mbytes()}"
-            f" -m {gc_config.rw_duration.micros()}"
-            f" -w {gc_config.rw_delay.micros()}"
-        )
-        if gc_config.dry_run:
-            args += " -n"
-        return args
-    raise ValueError("missing configuration for the cache garbage collector")
+    args += (
+        f" -d {gc_config.interval.millis()}"
+        f" -u {gc_config.threshold}"
+        f" -f {gc_config.release}"
+        f" -l {gc_config.rw_deletes}"
+        f" -L {gc_config.rw_reads}"
+        f" -t {gc_config.temp_keys_space.mbytes()}"
+        f" -m {gc_config.rw_duration.micros()}"
+        f" -w {gc_config.rw_delay.micros()}"
+    )
+    if gc_config.dry_run:
+        args += " -n"
+    return args
 
 
 @dataclass
@@ -115,7 +113,7 @@ class ProcessTypeConfig:
             workdir=cwd,
             command=f"{KRESD_EXECUTABLE} -c {kresd_config_file_supervisord_pattern(config)} -n",
             environment='SYSTEMD_INSTANCE="%(process_num)d",X-SUPERVISORD-TYPE=notify',
-            max_procs=int(config.max_workers) + 1,  # +1 for the canary process
+            max_procs=int(workers_max_count()) + 1,  # +1 for the canary process
         )
 
     @staticmethod

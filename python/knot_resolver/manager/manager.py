@@ -52,17 +52,6 @@ class _FixCounter:
         return self._counter >= FIX_COUNTER_ATTEMPTS_MAX
 
 
-async def _deny_max_worker_changes(
-    config_old: KresConfig, config_new: KresConfig, force: bool = False
-) -> Result[None, str]:
-    if config_old.max_workers != config_new.max_workers:
-        return Result.err(
-            "Changing 'max-workers', the maximum number of workers allowed to run, is not allowed at runtime."
-        )
-
-    return Result.ok(None)
-
-
 async def _subprocess_desc(subprocess: Subprocess) -> object:
     return {
         "type": subprocess.type.name,
@@ -131,8 +120,6 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                 config.nsid,
                 config.hostname,
                 config.workers,
-                config.max_workers,
-                config.webmgmt,
                 config.options,
                 config.network,
                 config.forward,
@@ -162,9 +149,6 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
 
         # register callback that reloads files (TLS cert files) if selected configuration has not been changed
         await config_store.register_on_change_callback(only_on_no_changes_update(config_nodes)(files_reload))
-
-        # register controller config change listeners
-        await config_store.register_verifier(_deny_max_worker_changes)
 
     async def _spawn_new_worker(self, config: KresConfig) -> None:
         subprocess = await self._controller.create_subprocess(config, SubprocessType.KRESD)
@@ -307,8 +291,8 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                 await self._rolling_restart(config)
                 await self._ensure_number_of_children(config, int(config.workers))
 
-                if self._is_gc_running() != bool(config.cache.garbage_collector):
-                    if config.cache.garbage_collector:
+                if self._is_gc_running() != config.cache.garbage_collector.enable:
+                    if config.cache.garbage_collector.enable:
                         logger.debug("Starting cache GC")
                         await self._start_gc(config)
                     else:

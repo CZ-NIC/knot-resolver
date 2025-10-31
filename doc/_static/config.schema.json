@@ -47,12 +47,6 @@
             "description": "The number of running kresd (Knot Resolver daemon) workers. If set to 'auto', it is equal to number of CPUs available.",
             "default": 1
         },
-        "max-workers": {
-            "type": "integer",
-            "minimum": 1,
-            "description": "The maximum number of workers allowed. Cannot be changed in runtime.",
-            "default": 256
-        },
         "management": {
             "description": "Configuration of management HTTP API.",
             "type": "object",
@@ -79,53 +73,6 @@
                 "interface": null
             }
         },
-        "webmgmt": {
-            "description": "Configuration of legacy web management endpoint.",
-            "type": [
-                "object",
-                "null"
-            ],
-            "properties": {
-                "unix-socket": {
-                    "type": [
-                        "string",
-                        "null"
-                    ],
-                    "description": "Path to unix domain socket to listen to.",
-                    "default": null
-                },
-                "interface": {
-                    "type": [
-                        "string",
-                        "null"
-                    ],
-                    "description": "IP address or interface name with port number to listen to.",
-                    "default": null
-                },
-                "tls": {
-                    "type": "boolean",
-                    "description": "Enable/disable TLS.",
-                    "default": false
-                },
-                "cert-file": {
-                    "type": [
-                        "string",
-                        "null"
-                    ],
-                    "description": "Path to certificate file.",
-                    "default": null
-                },
-                "key-file": {
-                    "type": [
-                        "string",
-                        "null"
-                    ],
-                    "description": "Path to certificate key.",
-                    "default": null
-                }
-            },
-            "default": null
-        },
         "options": {
             "description": "Fine-tuning global parameters of DNS resolver operation.",
             "type": "object",
@@ -137,7 +84,7 @@
                         "strict",
                         "permissive"
                     ],
-                    "description": "Glue records scrictness checking level.",
+                    "description": "Glue records strictness checking level.",
                     "default": "normal"
                 },
                 "minimize": {
@@ -305,7 +252,7 @@
                     "description": "TLS configuration, also affects DNS over TLS and DNS over HTTPS.",
                     "type": "object",
                     "properties": {
-                        "files-watchdog": {
+                        "watchdog": {
                             "anyOf": [
                                 {
                                     "type": "string",
@@ -317,7 +264,7 @@
                                     "type": "boolean"
                                 }
                             ],
-                            "description": "Enables files watchdog for TLS certificate files. Requires the optional 'watchdog' dependency.",
+                            "description": "Enables watchdog of changes in TLS certificate files. Requires the optional 'watchdog' dependency.",
                             "default": "auto"
                         },
                         "cert-file": {
@@ -353,11 +300,6 @@
                             "description": "Path to file with secret for TLS session resumption via tickets. (RFC 5077).",
                             "default": null
                         },
-                        "auto-discovery": {
-                            "type": "boolean",
-                            "description": "Experimental automatic discovery of authoritative servers supporting DNS-over-TLS.",
-                            "default": false
-                        },
                         "padding": {
                             "anyOf": [
                                 {
@@ -374,49 +316,49 @@
                         }
                     },
                     "default": {
-                        "files_watchdog": true,
+                        "watchdog": true,
                         "cert_file": null,
                         "key_file": null,
                         "sticket_secret": null,
                         "sticket_secret_file": null,
-                        "auto_discovery": false,
                         "padding": true
                     }
                 },
                 "proxy-protocol": {
-                    "anyOf": [
-                        {
-                            "type": "string",
-                            "enum": [
-                                false
-                            ]
-                        },
-                        {
-                            "description": "PROXYv2 protocol configuration.",
-                            "type": "object",
-                            "properties": {
-                                "allow": {
-                                    "type": "array",
-                                    "items": {
-                                        "anyOf": [
-                                            {
-                                                "type": "string"
-                                            },
-                                            {
-                                                "type": "string"
-                                            },
-                                            {
-                                                "type": "string"
-                                            }
-                                        ]
-                                    },
-                                    "description": "Allow usage of the PROXYv2 protocol headers by clients on the specified addresses."
-                                }
-                            }
-                        }
-                    ],
                     "description": "PROXYv2 protocol configuration.",
-                    "default": false
+                    "type": "object",
+                    "properties": {
+                        "enable": {
+                            "type": "boolean",
+                            "description": "Enable/disable PROXYv2 protocol.",
+                            "default": false
+                        },
+                        "allow": {
+                            "type": [
+                                "array",
+                                "null"
+                            ],
+                            "items": {
+                                "anyOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "string"
+                                    }
+                                ]
+                            },
+                            "description": "Allow usage of the PROXYv2 protocol headers by clients on the specified addresses.",
+                            "default": null
+                        }
+                    },
+                    "default": {
+                        "enable": false,
+                        "allow": null
+                    }
                 },
                 "listen": {
                     "type": "array",
@@ -533,15 +475,17 @@
                 },
                 "address_renumbering": null,
                 "tls": {
-                    "files_watchdog": true,
+                    "watchdog": true,
                     "cert_file": null,
                     "key_file": null,
                     "sticket_secret": null,
                     "sticket_secret_file": null,
-                    "auto_discovery": false,
                     "padding": true
                 },
-                "proxy_protocol": false,
+                "proxy_protocol": {
+                    "enable": false,
+                    "allow": null
+                },
                 "listen": [
                     {
                         "interface": [
@@ -684,50 +628,8 @@
                 },
                 "nodata": {
                     "type": "boolean",
-                    "description": "Use NODATA synthesis. NODATA will be synthesised for matching name, but mismatching type(e.g. AAAA query when only A exists).",
+                    "description": "Use NODATA synthesis. NODATA will be synthesized for matching name, but mismatching type(e.g. AAAA query when only A exists).",
                     "default": true
-                },
-                "root-fallback-addresses": {
-                    "type": [
-                        "object",
-                        "null"
-                    ],
-                    "additionalProperties": {
-                        "anyOf": [
-                            {
-                                "type": "array",
-                                "items": {
-                                    "anyOf": [
-                                        {
-                                            "type": "string"
-                                        },
-                                        {
-                                            "type": "string"
-                                        }
-                                    ]
-                                }
-                            },
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "string"
-                            }
-                        ]
-                    },
-                    "description": "Direct replace of root hints.",
-                    "default": null
-                },
-                "root-fallback-addresses-files": {
-                    "type": [
-                        "array",
-                        "null"
-                    ],
-                    "items": {
-                        "type": "string"
-                    },
-                    "description": "Direct replace of root hints from a zonefile.",
-                    "default": null
                 },
                 "addresses": {
                     "type": [
@@ -913,7 +815,7 @@
                                     "boolean",
                                     "null"
                                 ],
-                                "description": "Optional, use NODATA synthesis. NODATA will be synthesised for matching name, but mismatching type(e.g. AAAA query when only A exists).",
+                                "description": "Optional, use NODATA synthesis. NODATA will be synthesized for matching name, but mismatching type(e.g. AAAA query when only A exists).",
                                 "default": null
                             }
                         }
@@ -985,8 +887,6 @@
             "default": {
                 "ttl": null,
                 "nodata": true,
-                "root_fallback_addresses": null,
-                "root_fallback_addresses_files": null,
                 "addresses": null,
                 "addresses_files": null,
                 "records": null,
@@ -1245,77 +1145,72 @@
                     "default": "100M"
                 },
                 "garbage-collector": {
-                    "anyOf": [
-                        {
-                            "description": "Configuration options of the cache garbage collector (kres-cache-gc).",
-                            "type": "object",
-                            "properties": {
-                                "interval": {
-                                    "type": "string",
-                                    "pattern": "^(\\d+)(us|ms|s|m|h|d)$",
-                                    "description": "Time interval how often the garbage collector will be run.",
-                                    "default": "1s"
-                                },
-                                "threshold": {
-                                    "type": "integer",
-                                    "minimum": 0,
-                                    "maximum": 100,
-                                    "description": "Cache usage in percent that triggers the garbage collector.",
-                                    "default": 80
-                                },
-                                "release": {
-                                    "type": "integer",
-                                    "minimum": 0,
-                                    "maximum": 100,
-                                    "description": "Percent of used cache to be freed by the garbage collector.",
-                                    "default": 10
-                                },
-                                "temp-keys-space": {
-                                    "type": "string",
-                                    "pattern": "^(\\d+)(B|K|M|G)$",
-                                    "description": "Maximum amount of temporary memory for copied keys (0 = unlimited).",
-                                    "default": "0M"
-                                },
-                                "rw-deletes": {
-                                    "type": "integer",
-                                    "minimum": 0,
-                                    "description": "Maximum number of deleted records per read-write transaction (0 = unlimited).",
-                                    "default": 100
-                                },
-                                "rw-reads": {
-                                    "type": "integer",
-                                    "minimum": 0,
-                                    "description": "Maximum number of readed records per read-write transaction (0 = unlimited).",
-                                    "default": 200
-                                },
-                                "rw-duration": {
-                                    "type": "string",
-                                    "pattern": "^(\\d+)(us|ms|s|m|h|d)$",
-                                    "description": "Maximum duration of read-write transaction (0 = unlimited).",
-                                    "default": "0us"
-                                },
-                                "rw-delay": {
-                                    "type": "string",
-                                    "pattern": "^(\\d+)(us|ms|s|m|h|d)$",
-                                    "description": "Wait time between two read-write transactions.",
-                                    "default": "0us"
-                                },
-                                "dry-run": {
-                                    "type": "boolean",
-                                    "description": "Run the garbage collector in dry-run mode.",
-                                    "default": false
-                                }
-                            }
-                        },
-                        {
-                            "type": "string",
-                            "enum": [
-                                false
-                            ]
-                        }
-                    ],
                     "description": "Use the garbage collector (kres-cache-gc) to periodically clear cache.",
+                    "type": "object",
+                    "properties": {
+                        "enable": {
+                            "type": "boolean",
+                            "description": "Enable/disable cache garbage collector.",
+                            "default": true
+                        },
+                        "interval": {
+                            "type": "string",
+                            "pattern": "^(\\d+)(us|ms|s|m|h|d)$",
+                            "description": "Time interval how often the garbage collector will be run.",
+                            "default": "1s"
+                        },
+                        "threshold": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 100,
+                            "description": "Cache usage in percent that triggers the garbage collector.",
+                            "default": 80
+                        },
+                        "release": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 100,
+                            "description": "Percent of used cache to be freed by the garbage collector.",
+                            "default": 10
+                        },
+                        "temp-keys-space": {
+                            "type": "string",
+                            "pattern": "^(\\d+)(B|K|M|G)$",
+                            "description": "Maximum amount of temporary memory for copied keys (0 = unlimited).",
+                            "default": "0M"
+                        },
+                        "rw-deletes": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "Maximum number of deleted records per read-write transaction (0 = unlimited).",
+                            "default": 100
+                        },
+                        "rw-reads": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "Maximum number of read records per read-write transaction (0 = unlimited).",
+                            "default": 200
+                        },
+                        "rw-duration": {
+                            "type": "string",
+                            "pattern": "^(\\d+)(us|ms|s|m|h|d)$",
+                            "description": "Maximum duration of read-write transaction (0 = unlimited).",
+                            "default": "0us"
+                        },
+                        "rw-delay": {
+                            "type": "string",
+                            "pattern": "^(\\d+)(us|ms|s|m|h|d)$",
+                            "description": "Wait time between two read-write transactions.",
+                            "default": "0us"
+                        },
+                        "dry-run": {
+                            "type": "boolean",
+                            "description": "Run the garbage collector in dry-run mode.",
+                            "default": false
+                        }
+                    },
                     "default": {
+                        "enable": true,
                         "interval": "1s",
                         "threshold": 80,
                         "release": 10,
@@ -1393,11 +1288,13 @@
                         },
                         "prediction": {
                             "description": "Prefetch record by predicting based on usage patterns and repetitive queries.",
-                            "type": [
-                                "object",
-                                "null"
-                            ],
+                            "type": "object",
                             "properties": {
+                                "enable": {
+                                    "type": "boolean",
+                                    "description": "Enable/disable prediction.",
+                                    "default": false
+                                },
                                 "window": {
                                     "type": "string",
                                     "pattern": "^(\\d+)(us|ms|s|m|h|d)$",
@@ -1411,12 +1308,20 @@
                                     "default": 24
                                 }
                             },
-                            "default": null
+                            "default": {
+                                "enable": false,
+                                "window": "15m",
+                                "period": 24
+                            }
                         }
                     },
                     "default": {
                         "expiring": false,
-                        "prediction": null
+                        "prediction": {
+                            "enable": false,
+                            "window": "15m",
+                            "period": 24
+                        }
                     }
                 }
             },
@@ -1424,6 +1329,7 @@
                 "storage": "/var/cache/knot-resolver",
                 "size_max": "100M",
                 "garbage_collector": {
+                    "enable": true,
                     "interval": "1s",
                     "threshold": 80,
                     "release": 10,
@@ -1440,146 +1346,143 @@
                 "prefill": null,
                 "prefetch": {
                     "expiring": false,
-                    "prediction": null
+                    "prediction": {
+                        "enable": false,
+                        "window": "15m",
+                        "period": 24
+                    }
                 }
             }
         },
         "dnssec": {
-            "anyOf": [
-                {
-                    "type": "boolean"
+            "description": "DNSSEC configuration.",
+            "type": "object",
+            "properties": {
+                "enable": {
+                    "type": "boolean",
+                    "description": "Enable/disable DNSSEC.",
+                    "default": true
                 },
-                {
-                    "description": "DNSSEC configuration.",
-                    "type": "object",
-                    "properties": {
-                        "trust-anchor-sentinel": {
-                            "type": "boolean",
-                            "description": "Allows users of DNSSEC validating resolver to detect which root keys are configured in resolver's chain of trust. (RFC 8509)",
-                            "default": true
-                        },
-                        "trust-anchor-signal-query": {
-                            "type": "boolean",
-                            "description": "Signaling Trust Anchor Knowledge in DNSSEC Using Key Tag Query, according to (RFC 8145#section-5).",
-                            "default": true
-                        },
-                        "time-skew-detection": {
-                            "type": "boolean",
-                            "description": "Detection of difference between local system time and expiration time bounds in DNSSEC signatures for '. NS' records.",
-                            "default": true
-                        },
-                        "keep-removed": {
-                            "type": "integer",
-                            "minimum": 0,
-                            "description": "How many removed keys should be held in history (and key file) before being purged.",
-                            "default": 0
-                        },
-                        "refresh-time": {
-                            "type": [
-                                "string",
-                                "null"
-                            ],
-                            "pattern": "^(\\d+)(us|ms|s|m|h|d)$",
-                            "description": "Force trust-anchors to be updated every defined time periodically instead of relying on (RFC 5011) logic and TTLs. Intended only for testing purposes.",
-                            "default": null
-                        },
-                        "hold-down-time": {
-                            "type": "string",
-                            "pattern": "^(\\d+)(us|ms|s|m|h|d)$",
-                            "description": "Modify hold-down timer (RFC 5011). Intended only for testing purposes.",
-                            "default": "30d"
-                        },
-                        "trust-anchors": {
-                            "type": [
-                                "array",
-                                "null"
-                            ],
-                            "items": {
-                                "type": "string"
-                            },
-                            "description": "List of trust-anchors in DS/DNSKEY records format.",
-                            "default": null
-                        },
-                        "negative-trust-anchors": {
-                            "type": [
-                                "array",
-                                "null"
-                            ],
-                            "items": {
+                "log-bogus": {
+                    "type": "boolean",
+                    "description": "Enable logging for each DNSSEC validation failure if '/logging/level' is set to at least 'notice'.",
+                    "default": false
+                },
+                "sentinel": {
+                    "type": "boolean",
+                    "description": "Allows users of DNSSEC validating resolver to detect which root keys are configured in resolver's chain of trust. (RFC 8509)",
+                    "default": true
+                },
+                "signal-query": {
+                    "type": "boolean",
+                    "description": "Signaling Trust Anchor Knowledge in DNSSEC Using Key Tag Query, according to (RFC 8145#section-5).",
+                    "default": true
+                },
+                "trust-anchors-keep-removed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "How many removed keys should be held in history (and key file) before being purged.",
+                    "default": 0
+                },
+                "trust-anchors": {
+                    "type": [
+                        "array",
+                        "null"
+                    ],
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Trust-anchors configuration.",
+                    "default": null
+                },
+                "trust-anchors-files": {
+                    "type": [
+                        "array",
+                        "null"
+                    ],
+                    "items": {
+                        "description": "Trust-anchor zonefile configuration.",
+                        "type": "object",
+                        "properties": {
+                            "file": {
                                 "type": "string",
-                                "pattern": "(?=^.{,253}\\.?$)(^(?!-)[^.]{,62}[^.-](\\.(?!-)[^.]{,62}[^.-])*\\.?$)|^\\.$"
+                                "description": "Path to the zonefile that stores trust-anchors."
                             },
-                            "description": "List of domain names representing negative trust-anchors. (RFC 7646)",
-                            "default": null
-                        },
-                        "trust-anchors-files": {
-                            "type": [
-                                "array",
-                                "null"
-                            ],
-                            "items": {
-                                "description": "Trust-anchor zonefile configuration.",
-                                "type": "object",
-                                "properties": {
-                                    "file": {
-                                        "type": "string",
-                                        "description": "Path to the zonefile that stores trust-anchors."
-                                    },
-                                    "read-only": {
-                                        "type": "boolean",
-                                        "description": "Blocks zonefile updates according to RFC 5011.",
-                                        "default": false
-                                    }
-                                }
-                            },
-                            "description": "List of zonefiles where trust-anchors are stored.",
-                            "default": null
+                            "read-only": {
+                                "type": "boolean",
+                                "description": "Blocks zonefile updates according to RFC 5011.",
+                                "default": false
+                            }
                         }
-                    }
+                    },
+                    "description": "List of zone-files where trust-anchors are stored.",
+                    "default": null
+                },
+                "negative-trust-anchors": {
+                    "type": [
+                        "array",
+                        "null"
+                    ],
+                    "items": {
+                        "type": "string",
+                        "pattern": "(?=^.{,253}\\.?$)(^(?!-)[^.]{,62}[^.-](\\.(?!-)[^.]{,62}[^.-])*\\.?$)|^\\.$"
+                    },
+                    "description": "List of domain names representing negative trust-anchors. (RFC 7646)",
+                    "default": null
                 }
-            ],
-            "description": "Disable DNSSEC, enable with defaults or set new configuration.",
-            "default": true
+            },
+            "default": {
+                "enable": true,
+                "log_bogus": false,
+                "sentinel": true,
+                "signal_query": true,
+                "trust_anchors_keep_removed": 0,
+                "trust_anchors": null,
+                "trust_anchors_files": null,
+                "negative_trust_anchors": null
+            }
         },
         "dns64": {
-            "anyOf": [
-                {
-                    "type": "boolean"
+            "description": "DNS64 (RFC 6147) configuration.",
+            "type": "object",
+            "properties": {
+                "enable": {
+                    "type": "boolean",
+                    "description": "Enable/disable DNS64.",
+                    "default": false
                 },
-                {
-                    "description": "DNS64 (RFC 6147) configuration.",
-                    "type": "object",
-                    "properties": {
-                        "prefix": {
-                            "type": "string",
-                            "description": "IPv6 prefix to be used for synthesizing AAAA records.",
-                            "default": "64:ff9b::/96"
-                        },
-                        "rev-ttl": {
-                            "type": [
-                                "string",
-                                "null"
-                            ],
-                            "pattern": "^(\\d+)(us|ms|s|m|h|d)$",
-                            "description": "TTL in CNAME generated in the reverse 'ip6.arpa.' subtree.",
-                            "default": null
-                        },
-                        "exclude-subnets": {
-                            "type": [
-                                "array",
-                                "null"
-                            ],
-                            "items": {
-                                "type": "string"
-                            },
-                            "description": "IPv6 subnets that are disallowed in answer.",
-                            "default": null
-                        }
-                    }
+                "prefix": {
+                    "type": "string",
+                    "description": "IPv6 prefix to be used for synthesizing AAAA records.",
+                    "default": "64:ff9b::/96"
+                },
+                "reverse-ttl": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "pattern": "^(\\d+)(us|ms|s|m|h|d)$",
+                    "description": "TTL in CNAME generated in the reverse 'ip6.arpa.' subtree.",
+                    "default": null
+                },
+                "exclude-subnets": {
+                    "type": [
+                        "array",
+                        "null"
+                    ],
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "IPv6 subnets that are disallowed in answer.",
+                    "default": null
                 }
-            ],
-            "description": "Disable DNS64 (RFC 6147), enable with defaults or set new configuration.",
-            "default": false
+            },
+            "default": {
+                "enable": false,
+                "prefix": "64:ff9b::/96",
+                "reverse_ttl": null,
+                "exclude_subnets": null
+            }
         },
         "logging": {
             "description": "Logging and debugging configuration.",
@@ -1681,67 +1584,45 @@
                     "description": "List of groups for which 'debug' logging level is set.",
                     "default": null
                 },
-                "dnssec-bogus": {
-                    "type": "boolean",
-                    "description": "Logging a message for each DNSSEC validation failure.",
-                    "default": false
-                },
                 "dnstap": {
-                    "anyOf": [
-                        {
-                            "type": "string",
-                            "enum": [
-                                false
-                            ]
-                        },
-                        {
-                            "description": "Logging DNS queries and responses to a unix socket.",
-                            "type": "object",
-                            "properties": {
-                                "unix-socket": {
-                                    "type": "string",
-                                    "description": "Path to unix domain socket where dnstap messages will be sent."
-                                },
-                                "log-queries": {
-                                    "type": "boolean",
-                                    "description": "Log queries from downstream in wire format.",
-                                    "default": true
-                                },
-                                "log-responses": {
-                                    "type": "boolean",
-                                    "description": "Log responses to downstream in wire format.",
-                                    "default": true
-                                },
-                                "log-tcp-rtt": {
-                                    "type": "boolean",
-                                    "description": "Log TCP RTT (Round-trip time).",
-                                    "default": true
-                                }
-                            }
-                        }
-                    ],
                     "description": "Logging DNS requests and responses to a unix socket.",
-                    "default": false
-                },
-                "debugging": {
-                    "description": "Advanced debugging parameters for kresd (Knot Resolver daemon).",
                     "type": "object",
                     "properties": {
-                        "assertion-abort": {
+                        "enable": {
                             "type": "boolean",
-                            "description": "Allow the process to be aborted in case it encounters a failed assertion.",
+                            "description": "Enable/disable DNS queries logging.",
                             "default": false
                         },
-                        "assertion-fork": {
-                            "type": "string",
-                            "pattern": "^(\\d+)(us|ms|s|m|h|d)$",
-                            "description": "Fork and abord child kresd process to obtain a coredump, while the parent process recovers and keeps running.",
-                            "default": "5m"
+                        "unix-socket": {
+                            "type": [
+                                "string",
+                                "null"
+                            ],
+                            "description": "Path to unix domain socket where dnstap messages will be sent.",
+                            "default": null
+                        },
+                        "log-queries": {
+                            "type": "boolean",
+                            "description": "Log queries from downstream in wire format.",
+                            "default": false
+                        },
+                        "log-responses": {
+                            "type": "boolean",
+                            "description": "Log responses to downstream in wire format.",
+                            "default": false
+                        },
+                        "log-tcp-rtt": {
+                            "type": "boolean",
+                            "description": "Log TCP RTT (Round-trip time).",
+                            "default": false
                         }
                     },
                     "default": {
-                        "assertion_abort": false,
-                        "assertion_fork": "5m"
+                        "enable": false,
+                        "unix_socket": null,
+                        "log_queries": false,
+                        "log_responses": false,
+                        "log_tcp_rtt": false
                     }
                 }
             },
@@ -1749,107 +1630,126 @@
                 "level": "notice",
                 "target": "stdout",
                 "groups": null,
-                "dnssec_bogus": false,
-                "dnstap": false,
-                "debugging": {
-                    "assertion_abort": false,
-                    "assertion_fork": "5m"
+                "dnstap": {
+                    "enable": false,
+                    "unix_socket": null,
+                    "log_queries": false,
+                    "log_responses": false,
+                    "log_tcp_rtt": false
                 }
             }
         },
         "monitoring": {
-            "description": "Metrics exposisition configuration (Prometheus, Graphite)",
+            "description": "Metrics exposition configuration (Prometheus, Graphite)",
             "type": "object",
             "properties": {
-                "enabled": {
+                "metrics": {
                     "type": "string",
                     "enum": [
                         "manager-only",
                         "lazy",
                         "always"
                     ],
-                    "description": "configures, whether statistics module will be loaded into resolver",
+                    "description": "configures, whether metrics/statistics will be collected by the resolver",
                     "default": "lazy"
                 },
                 "graphite": {
-                    "anyOf": [
-                        {
-                            "type": "string",
-                            "enum": [
-                                false
-                            ]
+                    "type": "object",
+                    "properties": {
+                        "enable": {
+                            "type": "boolean",
+                            "default": false
                         },
-                        {
-                            "type": "object",
-                            "properties": {
-                                "host": {
-                                    "anyOf": [
-                                        {
-                                            "type": "string"
-                                        },
-                                        {
-                                            "type": "string"
-                                        },
-                                        {
-                                            "type": "string",
-                                            "pattern": "(?=^.{,253}\\.?$)(^(?!-)[^.]{,62}[^.-](\\.(?!-)[^.]{,62}[^.-])*\\.?$)|^\\.$"
-                                        }
-                                    ]
+                        "host": {
+                            "anyOf": [
+                                {
+                                    "type": "null"
                                 },
-                                "port": {
-                                    "type": "integer",
-                                    "minimum": 1,
-                                    "maximum": 65535,
-                                    "default": 2003
+                                {
+                                    "type": "string"
                                 },
-                                "prefix": {
+                                {
+                                    "type": "string"
+                                },
+                                {
                                     "type": "string",
-                                    "default": ""
-                                },
-                                "interval": {
-                                    "type": "string",
-                                    "pattern": "^(\\d+)(us|ms|s|m|h|d)$",
-                                    "default": "5s"
-                                },
-                                "tcp": {
-                                    "type": "boolean",
-                                    "default": false
+                                    "pattern": "(?=^.{,253}\\.?$)(^(?!-)[^.]{,62}[^.-](\\.(?!-)[^.]{,62}[^.-])*\\.?$)|^\\.$"
                                 }
-                            }
+                            ],
+                            "default": null
+                        },
+                        "port": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 65535,
+                            "default": 2003
+                        },
+                        "prefix": {
+                            "type": "string",
+                            "default": ""
+                        },
+                        "interval": {
+                            "type": "string",
+                            "pattern": "^(\\d+)(us|ms|s|m|h|d)$",
+                            "default": "5s"
+                        },
+                        "tcp": {
+                            "type": "boolean",
+                            "default": false
                         }
-                    ],
+                    },
                     "description": "optionally configures where should graphite metrics be sent to",
-                    "default": false
+                    "default": {
+                        "enable": false,
+                        "host": null,
+                        "port": 2003,
+                        "prefix": "",
+                        "interval": "5s",
+                        "tcp": false
+                    }
                 }
             },
             "default": {
-                "enabled": "lazy",
-                "graphite": false
+                "metrics": "lazy",
+                "graphite": {
+                    "enable": false,
+                    "host": null,
+                    "port": 2003,
+                    "prefix": "",
+                    "interval": "5s",
+                    "tcp": false
+                }
             }
         },
         "rate-limiting": {
             "description": "Configuration of rate limiting.",
-            "type": [
-                "object",
-                "null"
-            ],
+            "type": "object",
             "properties": {
-                "capacity": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "description": "Expected maximal number of blocked networks/hosts at the same time.",
-                    "default": 524288
+                "enable": {
+                    "type": "boolean",
+                    "description": "Enable/disable rate limiting",
+                    "default": false
                 },
                 "rate-limit": {
-                    "type": "integer",
+                    "type": [
+                        "integer",
+                        "null"
+                    ],
                     "minimum": 1,
-                    "description": "Maximal number of allowed queries per second from a single host."
+                    "description": "Maximal number of allowed queries per second from a single host.",
+                    "default": null
                 },
                 "instant-limit": {
                     "type": "integer",
                     "minimum": 1,
                     "description": "Maximal number of allowed queries at a single point in time from a single host.",
                     "default": 50
+                },
+                "capacity": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Expected maximal number of blocked networks/hosts at the same time.",
+                    "default": 524288
                 },
                 "slip": {
                     "type": "integer",
@@ -1870,13 +1770,21 @@
                     "default": false
                 }
             },
-            "default": null
+            "default": {
+                "enable": false,
+                "rate_limit": null,
+                "instant_limit": 50,
+                "capacity": 524288,
+                "slip": 2,
+                "log_period": "0s",
+                "dry_run": false
+            }
         },
         "defer": {
             "description": "Configuration of request prioritization (defer).",
             "type": "object",
             "properties": {
-                "enabled": {
+                "enable": {
                     "type": "boolean",
                     "description": "Use request prioritization.",
                     "default": false
@@ -1889,7 +1797,7 @@
                 }
             },
             "default": {
-                "enabled": false,
+                "enable": false,
                 "log_period": "0s"
             }
         },
