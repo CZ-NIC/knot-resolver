@@ -532,37 +532,37 @@ pytests:
 fwd-tls6-kresd.udp6:
   <<: *respdiff
   variables:
-    RESPDIFF_TEST: shortlist.fwd-tls6-kresd.udp6
+    RESPDIFF_TEST: odvr.fwd-tls6-kresd.udp6
 
 fwd-udp6-kresd.udp6:
   <<: *respdiff
   variables:
-    RESPDIFF_TEST: shortlist.fwd-udp6-kresd.udp6
+    RESPDIFF_TEST: odvr.fwd-udp6-kresd.udp6
 
 iter.udp6:
   <<: *respdiff
   variables:
-    RESPDIFF_TEST: shortlist.iter.udp6
+    RESPDIFF_TEST: odvr.iter.udp6
 
 iter.tls6:
   <<: *respdiff
   variables:
-    RESPDIFF_TEST: shortlist.iter.tls6
+    RESPDIFF_TEST: odvr.iter.tls6
 
 fwd-udp6-unbound.udp6:
   <<: *respdiff
   variables:
-    RESPDIFF_TEST: shortlist.fwd-udp6-unbound.udp6
+    RESPDIFF_TEST: odvr.fwd-udp6-unbound.udp6
 
 fwd-udp6-unbound.tcp6:
   <<: *respdiff
   variables:
-    RESPDIFF_TEST: shortlist.fwd-udp6-unbound.tcp6
+    RESPDIFF_TEST: odvr.fwd-udp6-unbound.tcp6
 
 fwd-udp6-unbound.tls6:
   <<: *respdiff
   variables:
-    RESPDIFF_TEST: shortlist.fwd-udp6-unbound.tls6
+    RESPDIFF_TEST: odvr.fwd-udp6-unbound.tls6
 
 .resperf:  &resperf
   <<: *condor
