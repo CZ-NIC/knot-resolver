@@ -129,6 +129,7 @@ static void send_excessive_load(struct pl_quic_conn_sess_data *conn,
 	(void)send_special(conn, ctx, DOQ_EXCESSIVE_LOAD);
 }
 
+/* unused for now, compare performance with per conn uv_timer_t spawns */
 void kr_quic_table_sweep(struct kr_quic_table *table,
 		struct protolayer_iter_ctx *ctx)
 {
@@ -245,20 +246,23 @@ static enum protolayer_iter_cb_result pl_quic_demux_unwrap(void *sess_data,
 	qconn = kr_quic_table_lookup(&dcid, demux->conn_table);
 	if (!qconn) {
 		/* Clear idle connections */
-		kr_quic_table_sweep(demux->conn_table, ctx);
+		// kr_quic_table_sweep(demux->conn_table, ctx);
 
 		if (demux->conn_table->usage >= demux->conn_table->max_conns) {
 			kr_log_warning(DOQ,
 				"Refusing to open new connection, reached limit of active conns\n");
-			/* we may inform the client that limits have been reached */
+			/* we might want to inform the client
+			 * that limits have been reached */
 			return protolayer_break(ctx, kr_ok());
 		}
 
 		ngtcp2_pkt_hd header = { 0 };
-		if (ngtcp2_accept(&header,
+		ret = ngtcp2_accept(&header,
 			wire_buf_data(ctx->payload.wire_buf),
-			wire_buf_data_length(ctx->payload.wire_buf))
-				!= NGTCP2_NO_ERROR) {
+			wire_buf_data_length(ctx->payload.wire_buf));
+		if (ret != NGTCP2_NO_ERROR) {
+			kr_log_debug(DOQ, "error accepting new conn: %s (%d)\n",
+					ngtcp2_strerror(ret), ret);
 
 			/* either the packet is not acceptable as the first
 			 * packet of a new connection, or the function failed
@@ -332,7 +336,6 @@ static enum protolayer_iter_cb_result pl_quic_demux_unwrap(void *sess_data,
 					PROTOLAYER_TYPE_QUIC_CONN);
 		kr_quic_table_add(conn_sess_data, &dcid,
 				demux->conn_table);
-
 		qconn = conn_sess_data;
 	}
 
@@ -343,7 +346,7 @@ static enum protolayer_iter_cb_result pl_quic_demux_unwrap(void *sess_data,
 			ctx->finished_cb_baton);
 
 	quic_conn_mark_used(qconn, demux->conn_table);
-	kr_quic_table_sweep(demux->conn_table, ctx);
+	// kr_quic_table_sweep(demux->conn_table, ctx);
 
 	return protolayer_break(ctx, kr_ok());
 }
@@ -512,7 +515,6 @@ static int pl_quic_demux_sess_deinit(struct session2 *session, void *data)
 {
 	struct pl_quic_demux_sess_data *quic = data;
 	kr_quic_table_free(quic->conn_table);
-
 	return kr_ok();
 }
 
@@ -589,7 +591,8 @@ static enum protolayer_event_cb_result pl_quic_demux_event_unwrap(
 		return PROTOLAYER_EVENT_CONSUME;
 	}
 
-	if (event == PROTOLAYER_EVENT_DISCONNECT) {
+	if (event == PROTOLAYER_EVENT_DISCONNECT ||
+			event == PROTOLAYER_EVENT_CONNECT_TIMEOUT) {
 		if (*baton == NULL)
 			return PROTOLAYER_EVENT_CONSUME;
 

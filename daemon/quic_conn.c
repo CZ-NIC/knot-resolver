@@ -3,6 +3,7 @@
  */
 
 #include "quic_conn.h"
+#include "lib/log.h"
 #include "quic_stream.h"
 #include "quic_common.h"
 #include "libdnssec/random.h"
@@ -11,6 +12,7 @@
 #include "worker.h"
 #include <libknot/wire.h>
 #include <ngtcp2/ngtcp2.h>
+#include <uv.h>
 
 #define EPHEMERAL_CERT_EXPIRATION_SECONDS_RENEW_BEFORE ((time_t)60*60*24*7)
 
@@ -95,8 +97,6 @@ static int kr_recv_stream_data_cb(ngtcp2_conn *ngconn, uint32_t flags,
 	int64_t stream_id, uint64_t offset, const uint8_t *data,
 	size_t datalen, void *user_data, void *stream_user_data)
 {
-	(void)ngconn;
-
 	struct pl_quic_conn_sess_data *conn = user_data;
 	struct pl_quic_stream_sess_data *stream = stream_user_data;
 
@@ -134,6 +134,11 @@ static int kr_recv_stream_data_cb(ngtcp2_conn *ngconn, uint32_t flags,
 				knot_wire_read_u16(wire_buf_data(&stream->pers_inbuf)) + datalen - sizeof(uint16_t));
 		kr_require(wire_buf_consume(&stream->pers_inbuf, datalen - sizeof(uint16_t)) == kr_ok());
 	}
+
+	/* we can ignore ret return value, it can only be ENOMEM, at which point
+	 * there is nothing we can do anyway and the connection will timeout cleanly*/
+	(void)ngtcp2_conn_extend_max_stream_offset(ngconn, stream_id, datalen);
+	ngtcp2_conn_extend_max_offset(ngconn, datalen);
 
 finished:
 	if (flags & NGTCP2_STREAM_DATA_FLAG_FIN) {
@@ -181,7 +186,10 @@ static int stream_open_cb(ngtcp2_conn *ngconn,
 				1,
 				false);
 
-	kr_require(new_subsession);
+	if (!new_subsession) {
+		kr_log_error(DOQ, "Failed to create new quic stream session\n");
+		return kr_error(ENOMEM);
+	}
 
 	struct pl_quic_stream_sess_data *stream =
 		protolayer_sess_data_get_proto(new_subsession,
@@ -189,7 +197,6 @@ static int stream_open_cb(ngtcp2_conn *ngconn,
 	kr_require(stream);
 
 	stream->conn_ref = conn;
-
 	if (conn->streams_count <= 0) {
 		add_head(&conn->streams, &stream->list_node);
 	} else {
@@ -207,8 +214,7 @@ static int stream_close_cb(ngtcp2_conn *ngconn, uint32_t flags,
 		int64_t stream_id, uint64_t app_error_code,
 		void *user_data, void *stream_user_data)
 {
-	(void)ngconn;
-
+	ngtcp2_conn_extend_max_streams_bidi(ngconn, 1);
 	struct pl_quic_conn_sess_data *conn = user_data;
 	struct pl_quic_stream_sess_data *stream = stream_user_data;
 	rem_node(&stream->list_node);
@@ -231,8 +237,7 @@ static int get_new_connection_id_cb(ngtcp2_conn *ngconn, ngtcp2_cid *cid,
 	(void)ngconn;
 	struct pl_quic_conn_sess_data *conn = user_data;
 	session2_event(conn->h.session->transport.parent,
-			PROTOLAYER_EVENT_CONNECT_UPDATE,
-			conn);
+			PROTOLAYER_EVENT_CONNECT_UPDATE, conn);
 	memcpy(cid, &conn->dcid, sizeof(ngtcp2_cid));
 
 	if (ngtcp2_crypto_generate_stateless_reset_token(token, conn->secret,
@@ -595,11 +600,6 @@ int send_special(struct pl_quic_conn_sess_data *conn,
 	struct wire_buf *save = ctx->payload.wire_buf;
 	ctx->payload.wire_buf = &err_wb;
 
-	// if (wire_buf_data_length(ctx->payload.wire_buf) != 0) {
-	// 	wire_buf_reset(ctx->payload.wire_buf);
-	// 	return kr_error(EINVAL);
-	// }
-
 	uint64_t now = quic_timestamp();
 
 	ngtcp2_cid new_dcid;
@@ -673,7 +673,6 @@ int send_special(struct pl_quic_conn_sess_data *conn,
 		} else {
 			ccerr.type = NGTCP2_CCERR_TYPE_APPLICATION;
 		}
-		// ccerr.error_code = NGTCP2_ERR_HANDSHAKE_TIMEOUT;
 		ret = ngtcp2_conn_write_connection_close(
 			conn->conn, NULL, &pi,
 			wire_buf_free_space(ctx->payload.wire_buf),
@@ -743,6 +742,7 @@ static enum protolayer_iter_cb_result pl_quic_conn_unwrap(void *sess_data,
 		}
 	}
 
+	uv_timer_again(&conn->h.session->timer);
 	ret = handle_packet(conn, ctx);
 	if (ret != kr_ok()) {
 		if (QUIC_CAN_SEND(conn)) {
@@ -888,6 +888,7 @@ static int pl_quic_conn_sess_init(struct session2 *session, void *sess_data, voi
 
 	conn->conn = NULL;
 	conn->priority = NULL;
+	conn->streams_count = 0;
 	conn->tls_session = NULL;
 	conn->server_credentials = NULL;
 	if (quic_generate_secret(conn->secret, sizeof(conn->secret)) != kr_ok()) {
@@ -895,6 +896,10 @@ static int pl_quic_conn_sess_init(struct session2 *session, void *sess_data, voi
 		kr_log_error(DOQ, "Failed to init connection session\n");
 		return kr_error(EINVAL);
 	}
+
+	session2_timer_start(session, PROTOLAYER_EVENT_CONNECT_TIMEOUT,
+			QUIC_CONN_IDLE_TIMEOUT / NGTCP2_MILLISECONDS,
+			QUIC_CONN_IDLE_TIMEOUT / NGTCP2_MILLISECONDS);
 
 	return kr_ok();
 }
@@ -919,7 +924,6 @@ static int pl_quic_conn_sess_deinit(struct session2 *session, void *sess_data)
 		kr_log_error(DOQ, "Client side of QUIC is not implemented\n");
 	}
 
-
 	conn->priority = NULL;
 	conn->tls_session = NULL;
 	conn->server_credentials = NULL;
@@ -935,6 +939,11 @@ static enum protolayer_event_cb_result pl_quic_conn_event_unwrap(
 		struct session2 *session, void *sess_data)
 {
 	struct pl_quic_conn_sess_data *conn = sess_data;
+	if (event == PROTOLAYER_EVENT_CONNECT_TIMEOUT) {
+		session2_event(conn->h.session->transport.parent, event, conn);
+		return PROTOLAYER_EVENT_CONSUME;
+	}
+
 	if (event == PROTOLAYER_EVENT_DISCONNECT ||
 			event == PROTOLAYER_EVENT_CLOSE ||
 			event == PROTOLAYER_EVENT_FORCE_CLOSE) {
@@ -948,6 +957,7 @@ static enum protolayer_event_cb_result pl_quic_conn_event_unwrap(
 			--conn->streams_count;
 		}
 		session2_dec_refs(session);
+		session2_timer_stop(session);
 		return PROTOLAYER_EVENT_CONSUME;
 	}
 

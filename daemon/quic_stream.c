@@ -190,7 +190,6 @@ void kr_quic_stream_ack_data(struct pl_quic_stream_sess_data *stream,
 {
 	kr_require(stream);
 	struct list *obs = &stream->outbufs;
-
 	struct kr_quic_obuf *first;
 
 	while (!EMPTY_LIST(*obs) && end_acked >=
@@ -231,6 +230,7 @@ int update_stream_pers_buffer(struct pl_quic_stream_sess_data *stream,
 static int pl_quic_stream_sess_deinit(struct session2 *session, void *sess_data)
 {
 	struct pl_quic_stream_sess_data *stream = sess_data;
+	ngtcp2_conn_shutdown_stream(stream->conn, 0, stream->stream_id, 0);
 	kr_require(queue_len(session->waiting) <= 0);
 	kr_quic_stream_ack_data(stream, stream->stream_id, SIZE_MAX, false);
 	wire_buf_deinit(&stream->pers_inbuf);
