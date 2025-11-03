@@ -49,14 +49,14 @@ typedef enum {
 #define BUCKETS_PER_CONNS 8
 
 #define MAX_STREAMS_BIDI 1024
-#define MAX_STREAMS_ACTIVE 16
+#define MAX_STREAMS_ACTIVE 64
 
 #define MAX_QUIC_PKT_SIZE 65536
 #define MAX_QUIC_FRAME_SIZE 65536
 #define QUIC_MAX_SEND_PER_RECV	4
 
-#define QUIC_CONN_IDLE_TIMEOUT (3 * NGTCP2_SECONDS)
-#define QUIC_HS_IDLE_TIMEOUT   (3 * NGTCP2_SECONDS)
+#define QUIC_CONN_IDLE_TIMEOUT (5 * NGTCP2_SECONDS)
+#define QUIC_HS_IDLE_TIMEOUT   (5 * NGTCP2_SECONDS)
 
 /* HACK adjust pointer of conn->streams head so it points to
  * struct pl_quic_stream_sess_data, this is hacky */
