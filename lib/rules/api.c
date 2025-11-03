@@ -1144,8 +1144,12 @@ int kr_rule_local_unblock(const knot_dname_t *apex, kr_rule_tags_t tags)
 		if (kr_fails_assert(val.len == val_len))
 			return kr_error(EINVAL);
 		kr_rule_tags_t tags_old;
-		memcpy(&tags_old, val.data, sizeof(tags_old));
+		uint8_t *data = val.data + sizeof(ztype);
+		memcpy(&tags_old, data, sizeof(tags_old));
 		tags = kr_rule_tags_combine(tags, tags_old);
+		// ATM ruledb does not overwrite, so we `remove` before `write`.
+		ret = ruledb_op(remove, &key, 1);
+		kr_assert(ret == 1);
 	}
 
 	// Construct the data to write
