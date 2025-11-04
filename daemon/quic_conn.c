@@ -162,14 +162,6 @@ static int stream_open_cb(ngtcp2_conn *ngconn,
 		int64_t stream_id, void *user_data)
 {
 	struct pl_quic_conn_sess_data *conn = user_data;
-
-	if (conn->streams_count >= MAX_STREAMS_ACTIVE) {
-		kr_log_warning(DOQ,
-			"Refusing to open stream stream_id: %zu, reached limit of active streams\n",
-			stream_id);
-		return NGTCP2_ERR_STREAM_LIMIT;
-	}
-
 	struct kr_quic_stream_param params = {
 		.stream_id = stream_id,
 		.conn = ngconn,

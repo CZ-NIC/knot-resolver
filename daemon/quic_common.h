@@ -48,8 +48,11 @@ typedef enum {
 #define QUIC_SEND_EXCESSIVE_LOAD         (-KR_QUIC_ERR_EXCESSIVE_LOAD)
 #define BUCKETS_PER_CONNS 8
 
+/* Application is responsible for extending the stream limit.
+ * This mainly means that this value limits the number of concurrent streams
+ * because only once a stream is closed is this max_streams frame sent to the
+ * remote endpoint. */
 #define MAX_STREAMS_BIDI 1024
-#define MAX_STREAMS_ACTIVE 64
 
 #define MAX_QUIC_PKT_SIZE 65536
 #define MAX_QUIC_FRAME_SIZE 65536
