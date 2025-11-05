@@ -31,7 +31,6 @@ If you are a completely new user or new to version 6, please start with chapters
    config-logging-monitoring
    config-dnssec
    config-lua
-   config-experimental
 
 .. toctree::
    :caption: Deployment
