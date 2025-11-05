@@ -24,6 +24,10 @@ In the declarative configuration there is a ``lua`` section where you can insert
    **Therefore, use this only when you don't have any other option.
    And please let us know about it and we might try to accomodate your usecase in the declarative configuration.**
 
+   A reference to many internals like Lua options can be found in
+   `the developer documentation <./dev/index.html>`_.
+   The Lua layer and this docs are very similar to what they were in Knot Resolver 5.x.
+
 .. option:: lua/script-only: true|false
 
    :default: false
