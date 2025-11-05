@@ -23,9 +23,6 @@ modules.load('ta_signal_query')
 modules.unload('ta_signal_query')
 {% endif %}
 
--- dnssec.trust-anchors-keep-removed
-trust_anchors.keep_removed = {{ cfg.dnssec.trust_anchors_keep_removed }}
-
 {% if cfg.dnssec.trust_anchors %}
 -- dnssec.trust-anchors
 {% for ta in cfg.dnssec.trust_anchors %}

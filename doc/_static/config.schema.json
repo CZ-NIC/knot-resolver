@@ -1378,12 +1378,6 @@
                     "description": "Signaling Trust Anchor Knowledge in DNSSEC Using Key Tag Query, according to (RFC 8145#section-5).",
                     "default": true
                 },
-                "trust-anchors-keep-removed": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "description": "How many removed keys should be held in history (and key file) before being purged.",
-                    "default": 0
-                },
                 "trust-anchors": {
                     "type": [
                         "array",
@@ -1436,7 +1430,6 @@
                 "log_bogus": false,
                 "sentinel": true,
                 "signal_query": true,
-                "trust_anchors_keep_removed": 0,
                 "trust_anchors": null,
                 "trust_anchors_files": null,
                 "negative_trust_anchors": null
