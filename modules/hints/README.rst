@@ -124,6 +124,7 @@ Properties
   Example:
 
   .. code-block:: lua
+    :force:
 
     > hints.root({
       ['l.root-servers.net.'] = '199.7.83.42',

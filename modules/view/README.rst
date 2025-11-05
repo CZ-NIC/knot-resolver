@@ -65,6 +65,7 @@ For each request the rules in these chains get tried one by one until a :ref:`no
 By default :ref:`policy module <mod-policy>` acts before ``view`` module due to ``policy`` being loaded by default. If you want to intermingle universal rules with ``view:addr``, you may simply wrap the universal policy rules in view closure like this:
 
 .. code-block:: lua
+    :force:
 
     view:addr('0.0.0.0/0', policy.<rule>) -- and
     view:addr('::0/0',     policy.<rule>)
