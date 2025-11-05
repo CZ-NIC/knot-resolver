@@ -115,6 +115,7 @@ class MigrateCommand(Command):
         _remove(new, "/dnssec/refresh-time")
         _remove(new, "/dnssec/hold-down-time")
         _remove(new, "/dnssec/time-skew-detection")
+        _remove(new, "/dnssec/keep-removed")
         _remove(new, "/local-data/root-fallback-addresses")
         _remove(new, "/local-data/root-fallback-addresses-files")
         _remove(new, "/logging/debugging")
@@ -156,7 +157,6 @@ class MigrateCommand(Command):
             else:
                 # by default the DNSSEC is enabled
                 pass
-        _rename(new, "/dnssec/keep-removed", "/dnssec/trust-anchors-keep-removed")
         _rename(new, "/dnssec/trust-anchor-sentinel", "/dnssec/sentinel")
         _rename(new, "/dnssec/trust-anchor-signal-query", "/dnssec/signal-query")
         logging_key = "logging"

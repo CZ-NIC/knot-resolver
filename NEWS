@@ -9,11 +9,12 @@ Incompatible changes
 --------------------
 See upgrading guide for incompatible configuration changes:  
 https://www.knot-resolver.cz/documentation/v6.0.16/upgrading.html
-- Removed options from declarative configuration model (YAML). (!1672)  
+- Removed options from declarative configuration model (YAML). (!1672, !1754)  
   These are mostly experimental and debugging/testing options that are not useful for general users (remain in Lua):
   - /dnssec/refresh-time
   - /dnssec/hold-down-time
   - /dnssec/time-skew-detection
+  - /dnssec/keep-removed
   - /local-data/root-fallback-addresses*
   - /logging/debugging
   - /max-workers
@@ -26,7 +27,6 @@ https://www.knot-resolver.cz/documentation/v6.0.16/upgrading.html
   - /dns64: true|false -> /dns64/enable: true|false
   - /dns64/rev-ttl -> /dns64/reverse-ttl
   - /dnssec: true|false -> /dnssec/enable: true|false
-  - /dnssec/keep-removed -> /dnssec/trust-anchors-keep-removed
   - /dnssec/trust-anchor-sentinel -> /dnssec/sentinel
   - /dnssec/trust-anchor-signal-query -> /dnssec/signal-query
   - /logging/dnstap -> /logging/dnstap/enable
