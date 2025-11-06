@@ -50,7 +50,7 @@ Execute command
 
 .. code-block:: bash
 
-	systemctl edit kresd@.service
+	systemctl edit knot-resolver.service
 
 And insert these lines:
 
@@ -89,8 +89,7 @@ but you are still allowed to specify interface by an address
 	net.listen('203.0.113.53', 53, { kind = 'xdp' })
 	net.listen('203.0.113.53', 53, { kind = 'dns' })
 
-The default selection of queues is tailored for the usual naming convention:
-``kresd@1.service``, ``kresd@2.service``, ...
+The default selection of queues is tailored for the usual conventions,
 but you can still specify them explicitly, e.g. the default is effectively the same as:
 
 .. code-block:: lua

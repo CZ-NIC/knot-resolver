@@ -2,6 +2,8 @@
 
 Notes for packagers
 -------------------
+*  The supported 6.x style only has a single systemd unit: knot-resolver.service.
+   The others are legacy from older versions.
 
 *  kresd.target should be enabled by default by linking it to systemd lib/
    directory. Instances of kresd@.service are then added manually to

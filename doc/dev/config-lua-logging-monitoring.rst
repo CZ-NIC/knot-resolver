@@ -5,7 +5,7 @@ Logging, monitoring, diagnostics
 ********************************
 
 To read service logs use commands usual for your distribution.
-E.g. on distributions using systemd-journald use command ``journalctl -u kresd@* -f``.
+E.g. on distributions using systemd-journald use command ``journalctl -u knot-resolver -f``.
 
 Knot Resolver supports 6 logging levels - ``crit``, ``err``, ``warning``,
 ``notice``, ``info``, ``debug``. All levels with the same meaning as is defined
