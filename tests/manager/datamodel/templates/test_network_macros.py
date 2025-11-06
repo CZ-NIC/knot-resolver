@@ -18,11 +18,11 @@ def test_network_listen():
 
     ip = ListenSchema({"interface": "::1@55", "freebind": True})
     assert tmpl.render(listen=ip) == "net.listen('::1',55,{kind='dns',freebind=true})\n"
-    ip_list = ListenSchema({"interface": [ip.interface.to_std()[0], "127.0.0.1@5353"]})
+    ip_list = ListenSchema({"interface": [ip.interface.to_std()[0], "127.0.0.1@5335"]})
     assert (
         tmpl.render(listen=ip_list)
         == "net.listen('::1',55,{kind='dns',freebind=false})\n"
-        + "net.listen('127.0.0.1',5353,{kind='dns',freebind=false})\n"
+        + "net.listen('127.0.0.1',5335,{kind='dns',freebind=false})\n"
     )
 
     intrfc = ListenSchema({"interface": "eth0", "kind": "doh2"})

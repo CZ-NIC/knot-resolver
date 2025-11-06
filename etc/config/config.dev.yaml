@@ -6,6 +6,6 @@ logging:
     - supervisord
 network:
   listen:
-    - interface: 127.0.0.1@5353
+    - interface: 127.0.0.1@5335
 # management:
 #   interface: 127.0.0.1@5000

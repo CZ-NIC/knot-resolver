@@ -416,10 +416,10 @@ Actions :func:`policy.FORWARD`, :func:`policy.TLS_FORWARD` and :func:`policy.STU
    .. code-block:: lua
 
       -- Answers for reverse queries about the 192.168.1.0/24 subnet
-      -- are to be obtained from IP address 192.0.2.1 port 5353
+      -- are to be obtained from IP address 192.0.2.1 port 5335
       -- This disables DNSSEC validation!
       policy.add(policy.suffix(
-          policy.STUB('192.0.2.1@5353'),
+          policy.STUB('192.0.2.1@5335'),
           {todname('1.168.192.in-addr.arpa')}))
 
 .. note:: By default, forwarding targets must support

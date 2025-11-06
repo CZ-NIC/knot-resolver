@@ -38,12 +38,12 @@ Firewall rules are declarative and consist of filters and actions. Filters have 
 
     -- Mirror queries matching given name to DNS logger
     daf.add('qname ~ %w+.example.com mirror 127.0.0.2')
-    daf.add('qname ~ example-%d.com mirror 127.0.0.3@5353')
+    daf.add('qname ~ example-%d.com mirror 127.0.0.3@5335')
 
     -- Forward queries from subnet
-    daf.add('src = 127.0.0.1/8 forward 127.0.0.1@5353')
+    daf.add('src = 127.0.0.1/8 forward 127.0.0.1@5335')
     -- Forward to multiple targets
-    daf.add('src = 127.0.0.1/8 forward 127.0.0.1@5353,127.0.0.2@5353')
+    daf.add('src = 127.0.0.1/8 forward 127.0.0.1@5335,127.0.0.2@5335')
 
     -- Truncate queries based on destination IPs
     daf.add('dst = 192.0.2.51 truncate')

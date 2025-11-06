@@ -42,7 +42,7 @@ address + port combination.
 
       IP address or interface name to listen on. May also be a list of addresses
       and interface names. Optionally, the port number may be specified using
-      ``@`` as a separator, e.g. ``127.0.0.1@3535`` or ``eth0@5353``.
+      ``@`` as a separator, e.g. ``127.0.0.1@3535`` or ``eth0@5335``.
 
       .. warning::
 
@@ -76,7 +76,7 @@ address + port combination.
        - interface: '::1'
          port: 3535
        - interface: eth0
-         port: 5353  # custom port number, default is 53 for XDP
+         port: 5335  # custom port number, default is 53 for XDP
          kind: xdp
        - unix-socket: /tmp/kres-socket  # bind to unix domain socked
 
