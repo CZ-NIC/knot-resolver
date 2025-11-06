@@ -28,11 +28,9 @@ address + port combination.
    ":ref:`dns-over-https`","``doh2``"
    "`Legacy DNS-over-HTTPS (DoH) <./dev/modules-http.html#mod-http-doh>`_","``doh-legacy``"
 
-.. note::
-
-   By default, **unencrypted DNS and DNS-over-TLS** are configured to **listen on localhost**.
-
 .. option:: network/listen: <list>
+
+   If you specify no ``listen:`` config, unencrypted DNS is configured for ``127.0.0.1`` and ``::1``.
 
    .. option:: unix-socket: <path>
 
