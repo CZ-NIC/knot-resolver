@@ -125,7 +125,7 @@ The following example allows only queries from clients on the subnet ``192.0.2.0
      # refuse everything that hasn't matched
      - subnets: [ 0.0.0.0/0, "::/0" ]
        answer: refused
-     # whitelist queries identified by subnet
+     # allow queries identified by subnet
      - subnets: [ 192.0.2.0/24 ]
        answer: allow
 

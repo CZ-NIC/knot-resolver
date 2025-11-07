@@ -6,7 +6,7 @@ Views and ACLs
 ==============
 
 The :ref:`policy <mod-policy>` module implements policies for global query matching, e.g. solves "how to react to certain query".
-This module combines it with query source matching, e.g. "who asked the query". This allows you to create personalized blacklists, filters and ACLs.
+This module combines it with query source matching, e.g. "who asked the query". This allows you to create personalized blocklists, filters and ACLs.
 
 There are two identification mechanisms:
 

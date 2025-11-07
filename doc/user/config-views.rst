@@ -6,7 +6,7 @@ Views and ACLs
 ==============
 
 Views allow to differentiate resolver behavior based on "who asked the query".
-This allows you to achieve access control, personalized blacklists and filters based on how the DNS request came.
+This allows you to achieve access control, personalized blocklists and filters based on how the DNS request arrived.
 
 .. code-block:: yaml
 

@@ -33,4 +33,4 @@ hints.root({
 })
 
 -- Apply RPZ for all clients, default rule is DENY
-policy.add(policy.rpz(policy.DENY, 'blacklist.rpz'))
+policy.add(policy.rpz(policy.DENY, 'blocklist.rpz'))

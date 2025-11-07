@@ -119,7 +119,7 @@ Following actions stop the policy matching on the query, i.e. other rules are no
 
    Let the query pass through; it's useful to make exceptions before wider rules. For example:
 
-   More specific whitelist rule must precede generic blacklist rule:
+   More specific whitelist rule must precede generic blocklist rule:
 
    .. code-block:: lua
 
