@@ -1,6 +1,6 @@
 .. SPDX-License-Identifier: GPL-3.0-or-later
 
-.. _config-serve-stale:
+.. _config-fallback:
 
 Fallback on resolution failure
 ==============================
