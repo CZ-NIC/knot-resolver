@@ -123,19 +123,81 @@ int kr_quic_table_add(struct pl_quic_conn_sess_data *conn_sess,
 	return kr_ok();
 }
 
+int kr_quic_table_rem2(kr_quic_cid_t **pcid, kr_quic_table_t *table)
+{
+	kr_quic_cid_t *cid = *pcid;
+	*pcid = cid->next;
+	free(cid);
+	table->pointers--;
+
+	return kr_ok();
+}
+
+void kr_quic_table_rem(struct pl_quic_conn_sess_data *conn,
+		kr_quic_table_t *table)
+{
+	if (conn == NULL || table == NULL) {
+		return;
+	}
+
+	if (conn->conn) {
+		size_t num_scid = ngtcp2_conn_get_scid(conn->conn, NULL);
+		ngtcp2_cid *scids = calloc(num_scid, sizeof(*scids));
+		ngtcp2_conn_get_scid(conn->conn, scids);
+
+		for (size_t i = 0; i < num_scid; i++) {
+			kr_quic_cid_t **pcid = kr_quic_table_lookup2(&scids[i], table);
+			if (*pcid == NULL) {
+				continue;
+			}
+			kr_quic_table_rem2(pcid, table);
+		}
+
+		conn->cid_pointers--;
+		free(scids);
+	} else {
+		kr_quic_cid_t **pcid = kr_quic_table_lookup2(&conn->dcid, table);
+		if (pcid != NULL) {
+			kr_quic_table_rem2(pcid, table);
+		}
+	}
+
+	int pos = heap_find(table->expiry_heap, (heap_val_t *)conn);
+	heap_delete(table->expiry_heap, pos);
+	table->usage--;
+}
+
+void kr_quic_table_free(kr_quic_table_t *table)
+{
+	if (!table)
+		return;
+
+	while (!EMPTY_HEAP(table->expiry_heap)) {
+		struct pl_quic_conn_sess_data *c =
+			*(struct pl_quic_conn_sess_data **)HHEAD(table->expiry_heap);
+
+		kr_quic_table_rem(c, table);
+	}
+
+	kr_assert(table->usage == 0);
+	kr_assert(table->pointers == 0);
+
+	gnutls_priority_deinit(table->priority);
+	heap_deinit(table->expiry_heap);
+	free(table->expiry_heap);
+	free(table);
+}
+
 static void send_excessive_load(struct pl_quic_conn_sess_data *conn,
 		struct protolayer_iter_ctx *ctx, kr_quic_table_t *table)
 {
 	(void)send_special(conn, ctx, DOQ_EXCESSIVE_LOAD);
 }
 
-/* unused for now, compare performance with per conn uv_timer_t spawns */
 void kr_quic_table_sweep(struct kr_quic_table *table,
 		struct protolayer_iter_ctx *ctx)
 {
 	uint64_t now = 0;
-	size_t removed = 0;
-
 	while (!EMPTY_HEAP(table->expiry_heap)) {
 		struct pl_quic_conn_sess_data *c =
 			*(struct pl_quic_conn_sess_data **)
@@ -143,20 +205,24 @@ void kr_quic_table_sweep(struct kr_quic_table *table,
 
 		if ((c->state & QUIC_STATE_BLOCKED)) {
 			break;
-		} else if (table->usage > table->max_conns) {
+		/* when we reach the limit of open conns we lookup the most idle
+		 * one but only close it if it has has received at least one query.
+		 * This is to prevent closing brand new connections which has
+		 * crippling effects on the number of answered queries when
+		 * conn limits are reached. */
+		} else if (table->usage >= table->max_conns &&
+				// c->streams_count <= 0 &&
+				c->finished_streams > 0) {
 			send_excessive_load(c, ctx, table);
-			kr_quic_table_rem(c, table);
-			session2_event(c->h.session,
+			session2_event(c->h.session->transport.parent,
 					PROTOLAYER_EVENT_DISCONNECT,
-					NULL);
-			++removed;
+					c);
 		} else if (c->state >= QUIC_STATE_CLOSING) {
 			send_special(c, ctx, QUIC_SEND_CONN_CLOSE);
-			kr_quic_table_rem(c, table);
-			session2_event(c->h.session,
+			// kr_quic_table_rem(c, table);
+			session2_event(c->h.session->transport.parent,
 					PROTOLAYER_EVENT_DISCONNECT,
 					NULL);
-			++removed;
 
 
 		} else if (kr_quic_conn_timeout(c, &now)) {
@@ -169,7 +235,6 @@ void kr_quic_table_sweep(struct kr_quic_table *table,
 				session2_event(c->h.session,
 						PROTOLAYER_EVENT_DISCONNECT,
 						NULL);
-				++removed;
 			} else {
 				// quic_conn_mark_used(c, table);
 			}
@@ -179,10 +244,6 @@ void kr_quic_table_sweep(struct kr_quic_table *table,
 				HHEAD(table->expiry_heap) == c) {
 			break;
 		}
-	}
-
-	if (removed > 0) {
-		kr_log_debug(DOQ, "Closing %zu idle quic connections\n", removed);
 	}
 }
 
@@ -245,15 +306,12 @@ static enum protolayer_iter_cb_result pl_quic_demux_unwrap(void *sess_data,
 
 	qconn = kr_quic_table_lookup(&dcid, demux->conn_table);
 	if (!qconn) {
-		/* Clear idle connections */
-		// kr_quic_table_sweep(demux->conn_table, ctx);
-
 		if (demux->conn_table->usage >= demux->conn_table->max_conns) {
-			kr_log_warning(DOQ,
-				"Refusing to open new connection, reached limit of active conns\n");
-			/* we might want to inform the client
-			 * that limits have been reached */
-			return protolayer_break(ctx, kr_ok());
+			kr_quic_table_sweep(demux->conn_table, ctx);
+			if (demux->conn_table->usage >= demux->conn_table->max_conns) {
+				/* no luck */
+				return protolayer_break(ctx, kr_ok());
+			}
 		}
 
 		ngtcp2_pkt_hd header = { 0 };
@@ -270,11 +328,12 @@ static enum protolayer_iter_cb_result pl_quic_demux_unwrap(void *sess_data,
 			return protolayer_break(ctx, kr_ok());
 		}
 
-		if (header.tokenlen == 0 /*&& quic_require_retry(table)*/) {
-			kr_log_error(DOQ, "received empty header.token\n");
+		/* additional RTT seems quite expensive for all new connections */
+		// if (header.tokenlen == 0 /*&& quic_require_retry(table)*/) {
+			// kr_log_error(DOQ, "received empty header.token\n");
 			// ret = -QUIC_SEND_RETRY;
 			// goto finish;
-		}
+		// }
 
 		if (header.tokenlen > 0) {
 			if (header.token[0] == NGTCP2_CRYPTO_TOKEN_MAGIC_RETRY) {
@@ -449,66 +508,6 @@ static int pl_quic_demux_sess_init(struct session2 *session, void *sess_data, vo
 	}
 
 	return kr_ok();
-}
-
-int kr_quic_table_rem2(kr_quic_cid_t **pcid, kr_quic_table_t *table)
-{
-	kr_quic_cid_t *cid = *pcid;
-	*pcid = cid->next;
-	free(cid);
-	table->pointers--;
-
-	return kr_ok();
-}
-
-void kr_quic_table_rem(struct pl_quic_conn_sess_data *conn,
-		kr_quic_table_t *table)
-{
-	if (conn == NULL || table == NULL) {
-		return;
-	}
-
-	if (conn->conn) {
-		size_t num_scid = ngtcp2_conn_get_scid(conn->conn, NULL);
-		ngtcp2_cid *scids = calloc(num_scid, sizeof(*scids));
-		ngtcp2_conn_get_scid(conn->conn, scids);
-
-		for (size_t i = 0; i < num_scid; i++) {
-			kr_quic_cid_t **pcid = kr_quic_table_lookup2(&scids[i], table);
-			if (*pcid == NULL) {
-				continue;
-			}
-			kr_quic_table_rem2(pcid, table);
-		}
-
-		conn->cid_pointers--;
-		table->usage--;
-		free(scids);
-	}
-
-	int pos = heap_find(table->expiry_heap, (heap_val_t *)conn);
-	heap_delete(table->expiry_heap, pos);
-}
-
-void kr_quic_table_free(kr_quic_table_t *table)
-{
-	if (!table)
-		return;
-
-	while (!EMPTY_HEAP(table->expiry_heap)) {
-		struct pl_quic_conn_sess_data *c =
-			*(struct pl_quic_conn_sess_data **)HHEAD(table->expiry_heap);
-
-		kr_quic_table_rem(c, table);
-	}
-
-	kr_assert(table->usage == 0);
-	kr_assert(table->pointers == 0);
-
-	gnutls_priority_deinit(table->priority);
-	heap_deinit(table->expiry_heap);
-	free(table->expiry_heap);
-	free(table);
 }
 
 static int pl_quic_demux_sess_deinit(struct session2 *session, void *data)

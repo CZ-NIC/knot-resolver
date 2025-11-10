@@ -3,7 +3,11 @@
  */
 
 #include "quic_conn.h"
+#include "engine.h"
+#include "lib/generic/trie.h"
 #include "lib/log.h"
+#include "lib/resolve.h"
+#include "network.h"
 #include "quic_stream.h"
 #include "quic_common.h"
 #include "libdnssec/random.h"
@@ -122,7 +126,7 @@ static int kr_recv_stream_data_cb(ngtcp2_conn *ngconn, uint32_t flags,
 	}
 
 	if (datalen <= 1)
-		return NGTCP2_PROTOCOL_VIOLATION;
+		return kr_error(EINVAL);
 
 	if (offset == 0) {
 		memcpy(wire_buf_free_space(&stream->pers_inbuf), data, datalen);
@@ -136,7 +140,7 @@ static int kr_recv_stream_data_cb(ngtcp2_conn *ngconn, uint32_t flags,
 	}
 
 	/* we can ignore ret return value, it can only be ENOMEM, at which point
-	 * there is nothing we can do anyway and the connection will timeout cleanly*/
+	 * there is nothing we can do anyway and the connection will timeout cleanly */
 	(void)ngtcp2_conn_extend_max_stream_offset(ngconn, stream_id, datalen);
 	ngtcp2_conn_extend_max_offset(ngconn, datalen);
 
@@ -212,6 +216,7 @@ static int stream_close_cb(ngtcp2_conn *ngconn, uint32_t flags,
 	rem_node(&stream->list_node);
 	session2_close(stream->h.session);
 	--conn->streams_count;
+	++conn->finished_streams;
 
 	return NGTCP2_NO_ERROR;
 }
@@ -424,12 +429,11 @@ int kr_tls_server_session(struct pl_quic_conn_sess_data *conn)
 					kr_log_error(TLS, "Failed to renew expiring ephemeral X.509 cert, using existing one\n");
 				}
 			}
-		} else {
-			/* non-ephemeral cert: warn once when certificate expires */
-			if (now >= the_network->tls_credentials->valid_until) {
-				kr_log_error(TLS, "X.509 certificate has expired!\n");
-				the_network->tls_credentials->valid_until = GNUTLS_X509_NO_WELL_DEFINED_EXPIRATION;
-			}
+		/* non-ephemeral cert: warn once when certificate expires */
+		} else if (now >= the_network->tls_credentials->valid_until) {
+			kr_log_error(TLS, "X.509 certificate has expired!\n");
+			the_network->tls_credentials->valid_until =
+				GNUTLS_X509_NO_WELL_DEFINED_EXPIRATION;
 		}
 	}
 
@@ -473,15 +477,17 @@ int kr_tls_server_session(struct pl_quic_conn_sess_data *conn)
 					  conn->tls_session);
 	}
 
-	const gnutls_datum_t alpn_datum = { (void *)"doq", '\x03' };
+	const gnutls_datum_t alpn_datum = {
+		.data = (void *)"doq",
+		.size = 3
+	};
 	gnutls_alpn_set_protocols(conn->tls_session, &alpn_datum, 1,
 			GNUTLS_ALPN_MANDATORY);
 	if (ret != GNUTLS_E_SUCCESS) {
 		kr_log_error(TLS, "gnutls_alpn_set_protocols(): %s (%d)\n", gnutls_strerror_name(ret), ret);
-		return ret;
 	}
 
-	return kr_ok();
+	return ret;
 }
 
 static ngtcp2_conn *get_conn(ngtcp2_crypto_conn_ref *conn_ref)
@@ -901,6 +907,19 @@ static int pl_quic_conn_sess_deinit(struct session2 *session, void *sess_data)
 	struct pl_quic_conn_sess_data *conn = sess_data;
 	while (session2_tasklist_del_first(session, false) != NULL);
 
+	kr_log_debug(DOQ, "Closing connection, %s useful, served %zu streams\n",
+			conn->finished_streams ? "was" : "wasn't",
+			conn->finished_streams);
+
+	struct pl_quic_stream_sess_data *s_node;
+	WALK_LIST_FIRST(s_node, conn->streams) {
+		struct pl_quic_stream_sess_data *s =
+			container_of(s_node, struct pl_quic_stream_sess_data, list_node);
+		rem_node(&s->list_node);
+		session2_close(s->h.session);
+		--conn->streams_count;
+	}
+
 	kr_require(conn->streams_count == 0);
 	if (conn->priority) {
 		gnutls_priority_deinit(conn->priority);
@@ -923,6 +942,7 @@ static int pl_quic_conn_sess_deinit(struct session2 *session, void *sess_data)
 	ngtcp2_conn_del(conn->conn);
 	conn->conn = NULL;
 
+	session2_timer_stop(session);
 	return kr_ok();
 }
 
@@ -939,17 +959,7 @@ static enum protolayer_event_cb_result pl_quic_conn_event_unwrap(
 	if (event == PROTOLAYER_EVENT_DISCONNECT ||
 			event == PROTOLAYER_EVENT_CLOSE ||
 			event == PROTOLAYER_EVENT_FORCE_CLOSE) {
-
-		struct pl_quic_stream_sess_data *s_node;
-		WALK_LIST_FIRST(s_node, conn->streams) {
-			struct pl_quic_stream_sess_data *s =
-				container_of(s_node, struct pl_quic_stream_sess_data, list_node);
-			rem_node(&s->list_node);
-			session2_close(s->h.session);
-			--conn->streams_count;
-		}
 		session2_dec_refs(session);
-		session2_timer_stop(session);
 		return PROTOLAYER_EVENT_CONSUME;
 	}
 

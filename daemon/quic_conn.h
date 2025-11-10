@@ -106,6 +106,7 @@ struct pl_quic_conn_sess_data {
 	list_t streams;
 	// number of allocated streams structures
 	int16_t streams_count;
+	uint64_t finished_streams;
 	quic_conn_state_t state;
 	size_t cid_pointers;
 };
