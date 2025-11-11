@@ -102,9 +102,13 @@ specification of which clients are allowed to send PROXYv2 headers. Queries with
 PROXYv2 headers from clients who are not explicitly allowed to use the protocol
 will be discarded.
 
-.. option:: network/proxy-protocol: false|<options>
+.. option:: network/proxy-protocol:
 
-   :default: false
+   .. option:: enable: true|false
+
+      :default: false
+
+      Enable/disable PROXYv2 protocol.
 
    .. option:: allow: <list of addresses and subnets>
 
