@@ -7,6 +7,7 @@ from secrets import token_hex
 from subprocess import SubprocessError
 from typing import Any, Callable, List, Optional
 
+from knot_resolver.constants import APPLE_SYS
 from knot_resolver.controller.exceptions import SubprocessControllerError
 from knot_resolver.controller.interface import Subprocess, SubprocessController, SubprocessStatus, SubprocessType
 from knot_resolver.controller.registered_workers import command_registered_workers, get_registered_workers_kresids
@@ -142,10 +143,12 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
         # register callback to reset policy rules for each 'kresd' worker
         await config_store.register_on_change_callback(self.reset_workers_policy_rules)
 
-        # register and immediately call a callback to set new TLS session ticket secret for 'kresd' workers
-        await config_store.register_on_change_callback(
-            only_on_real_changes_update(config_nodes)(self.set_new_tls_sticket_secret)
-        )
+        # This is not necessary on Apple systems, as only one kresd worker runs here
+        if not APPLE_SYS:
+            # register and immediately call a callback to set new TLS session ticket secret for 'kresd' workers
+            await config_store.register_on_change_callback(
+                only_on_real_changes_update(config_nodes)(self.set_new_tls_sticket_secret)
+            )
 
         # register callback that reloads files (TLS cert files) if selected configuration has not been changed
         await config_store.register_on_change_callback(only_on_no_changes_update(config_nodes)(files_reload))
