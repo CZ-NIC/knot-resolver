@@ -214,7 +214,7 @@ char *kr_cache_top_strkey(void *key, size_t len)
 						decimal_bytes = true;
 						break;
 					case 'P':
-						force_bytes = 6;
+						force_bytes = 5;
 						break;
 				}
 			}
