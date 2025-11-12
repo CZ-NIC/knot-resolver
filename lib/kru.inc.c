@@ -179,6 +179,10 @@ static inline void update_time(struct load_cl *l, const uint32_t time_now,
 	}
 }
 
+static double decay_mult(struct kru *kru, uint32_t ticks) {
+	return exp2(-kru->decay.shift_bits * ticks);
+}
+
 static_assert(LOADS_LEN == 15 && TABLE_COUNT == 2, "");
 // So, the pair of cache lines hold up to 2*15 elements.
 // Let's say that we can reliably store 16 = 1 << (1+3).
@@ -678,4 +682,5 @@ static bool kru_limited(struct kru *kru, uint32_t time_now, uint8_t key[static 1
 	.load_multi_prefix_max = kru_load_multi_prefix_max, \
 	.load_hash = kru_load_hash, \
 	.hash_bytes = kru_hash_bytes, \
+	.decay_mult = decay_mult, \
 }

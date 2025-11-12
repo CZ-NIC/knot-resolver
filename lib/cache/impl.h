@@ -42,7 +42,8 @@ struct entry_h {
 	uint8_t  rank : 6;	/**< See enum kr_rank */
 	bool is_packet : 1;	/**< Negative-answer packet for insecure/bogus name. */
 	bool has_optout : 1;	/**< Only for packets; persisted DNSSEC_OPTOUT. */
-	uint8_t _pad;		/**< We need even alignment for data now. */
+	uint8_t prefetch_priority;
+	/**< We need even alignment for data now. */
 	uint8_t data[];
 /* Well, we don't really need packing or alignment changes,
  * but due to LMDB the whole structure may not be stored at an aligned address,
