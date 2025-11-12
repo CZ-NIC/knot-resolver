@@ -14,8 +14,10 @@ void kr_cache_prefetch_init(uv_loop_t *loop, kr_cache_prefetch_callback_t callba
 
 struct entry_h;
 
+// Try scheduling prefetching.
+// To be called during write transaction of (key, eh); eh may be modified inside.
 KR_EXPORT
-uint16_t kr_cache_prefetch_sched(struct kr_request *req, knot_db_val_t key, struct entry_h *eh);
+void kr_cache_prefetch_sched(struct kr_request *req, knot_db_val_t key, struct entry_h *eh, size_t data_len, uint16_t rrtype);
 	// XXX call either directly or from top_access to compute hash just once
 
 // Pauses prefetching if deferred packets exist.

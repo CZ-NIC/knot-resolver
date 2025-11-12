@@ -20,6 +20,7 @@
 #pragma once
 #include <stdalign.h>
 #include "lib/mmapped.h"
+#include "lib/kru.h"
 
 struct kr_request;
 
@@ -56,6 +57,11 @@ static inline uint32_t kr_cache_top_entry_price(struct kr_cache_top *top, uint32
 	return top->data->base_price_norm / size;
 }
 
+/// Decay multiplier for the given time period in seconds.
+static inline double kr_cache_top_decay_mult(struct kr_cache_top *top, uint32_t ticks) {
+	return KRU.decay_mult((struct kru *)&top->data->kru, ticks);
+}
+
 /// Size of the top data as part of the cache size, LMDB should occupy the rest;
 /// currently between 6 and 13 %.
 KR_EXPORT
@@ -70,6 +76,12 @@ int kr_cache_top_init(struct kr_cache_top *top, const char *mmap_file, size_t ca
 /// Deinitialize shared memory, keeping the data stored in file.
 KR_EXPORT
 void kr_cache_top_deinit(struct kr_cache_top *top);
+
+/// (Re)initialize bloom filter inside top_context;
+/// either by zeroes or by ones to skip incrementing kru for the request.
+static inline void kr_cache_top_context_reinit(struct kr_cache_top_context *ctx, bool bypass_kru) {
+	memset(&ctx->bloom, bypass_kru ? 0xFF : 0x00, sizeof(ctx->bloom));
+}
 
 /// Charge cache access to the accessed key
 /// unless it was already accessed in the current request context.
