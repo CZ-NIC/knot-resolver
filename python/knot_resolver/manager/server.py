@@ -44,7 +44,7 @@ from knot_resolver.utils.systemd_notify import systemd_notify
 from .config_store import ConfigStore
 from .constants import PID_FILE_NAME, init_user_constants
 from .exceptions import KresManagerException
-from .logging import logger_init
+from .logger import logger_init
 from .manager import KresManager
 
 logger = logging.getLogger(__name__)

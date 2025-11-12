@@ -8,7 +8,7 @@ import sys
 from typing import NoReturn
 
 from knot_resolver.constants import CONFIG_FILE, VERSION
-from knot_resolver.manager.logging import logger_startup
+from knot_resolver.manager.logger import logger_startup
 from knot_resolver.manager.server import start_server
 from knot_resolver.utils import compat
 
