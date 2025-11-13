@@ -45,10 +45,13 @@ struct kr_rule_opts {
 	    https://datatracker.ietf.org/doc/html/draft-ietf-dnsop-structured-dns-error#name-new-registry-for-dns-sub-er
 	*/
 	uint8_t ede_sub : 3;
+	/// Whether the rule is considered a "block"; relevant for kr_rule_local_unblock()
+	bool is_block : 1;
 };
 typedef struct kr_rule_opts kr_rule_opts_t;
 static_assert(sizeof(kr_rule_opts_t) == 2, "kr_rule_opts_t size changed unexpectedly");
 /// Default opts; in particular used for the RFC-mandated special-use names
+///   Note that for RPZ we add .is_block = true
 KR_EXPORT extern const kr_rule_opts_t KR_RULE_OPTS_DEFAULT;
 enum { // Default minimal score of a rule to log/apply it.
 	KR_RULE_SCORE_LOG     =  3,
