@@ -215,7 +215,8 @@ int entry_h_splice(
 	knot_db_val_t *val_new_entry, uint8_t rank,
 	const knot_db_val_t key, const uint16_t ktype, const uint16_t type,
 	const knot_dname_t *owner/*log only*/,
-	const struct kr_query *qry, struct kr_cache *cache, uint32_t timestamp)
+	const struct kr_query *qry, struct kr_cache *cache, uint32_t timestamp,
+	size_t *cache_record_size_out)
 {
 	//TODO: another review, perhaps including the API
 	if (kr_fails_assert(val_new_entry && val_new_entry->len > 0))
@@ -272,6 +273,7 @@ int entry_h_splice(
 
 	if (!i_type) {
 		/* The non-list types are trivial now. */
+		*cache_record_size_out = val_new_entry->len;
 		return cache_write_or_clear(cache, &key, val_new_entry, qry);
 	}
 	/* Now we're in trouble.  In some cases, parts of data to be written
@@ -291,6 +293,7 @@ int entry_h_splice(
 	};
 	uint8_t buf[val.len];
 	entry_list_memcpy((struct entry_apex *)buf, el);
+	*cache_record_size_out = val.len;
 	ret = cache_write_or_clear(cache, &key, &val, qry);
 	if (ret) return kr_error(ret);
 	memcpy(val.data, buf, val.len); /* we also copy the "empty" space, but well... */

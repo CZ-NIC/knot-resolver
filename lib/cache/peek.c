@@ -123,12 +123,13 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 		knot_db_val_t key = key_exact_type_maypkt(k, qry->stype);
 		knot_db_val_t val = { NULL, 0 };
 		ret = cache_op(cache, read, &key, &val, 1);
+		size_t whole_val_len = val.len;
 		if (!ret) {
 			/* found an entry: test conditions, materialize into pkt, etc. */
 			ret = found_exact_hit(qry, pkt, val, lowest_rank);
 		}
 		if (!ret) {
-			kr_cache_top_access(req, key.data, key.len, val.len, "peek_nosync:exact");  // hits only
+			kr_cache_top_access(req, key.data, key.len, whole_val_len, "peek_nosync:exact");  // hits only
 			return KR_STATE_DONE;
 		} else if (kr_fails_assert(ret == kr_error(ENOENT))) {
 			VERBOSE_MSG(qry, "=> exact hit error: %d %s\n", ret, kr_strerror(ret));
