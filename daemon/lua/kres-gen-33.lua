@@ -211,6 +211,7 @@ struct kr_rule_opts {
 	uint8_t log_level : 2;
 	uint8_t ede_code : 2;
 	uint8_t ede_sub : 3;
+	_Bool is_block : 1;
 };
 typedef struct kr_rule_opts kr_rule_opts_t;
 struct kr_rule_zonefile_config {

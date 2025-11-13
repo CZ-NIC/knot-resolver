@@ -461,11 +461,6 @@ static int subtree_search(const size_t lf_start_i, const knot_db_val_t key,
 			return RET_CONT_CACHE;
 		}
 
-		// Only forward rules apply to unblocked requests.
-		// LATER(optim.): we might cache the state of having no forward rules
-		if (kr_request_unblocked(req))
-			goto shorten;
-
 		// Let's never audit _UNBLOCK actions.
 		const bool allow_audit = ztype != VAL_ZLAT_UNBLOCK;
 		// The other ztype possibilities are similar; check the tags now.
@@ -486,13 +481,16 @@ static int subtree_search(const size_t lf_start_i, const knot_db_val_t key,
 			VERBOSE_MSG(qry, "=> unblocked\n");
 			if (kr_fails_assert(val.len == 0))
 				kr_log_error(RULES, "ERROR: unused bytes: %zu\n", val.len);
-			goto shorten; // the same situation as kr_request_unblocked()
+			// nothing to search, as RULESET_START is dedicated to all _UNBLOCK
+			return RET_CONTINUE;
 		}
 
 		// Process opts.
 		kr_rule_opts_t opts;
 		if (deserialize_fails_assert(&val, &opts))
 			return kr_error(EILSEQ);
+		if (opts.is_block && kr_request_unblocked(req))
+			goto shorten; // continue looking for rules
 		log_rule(opts, qry);
 		if (opts.score < req->rule_score_apply)
 			goto shorten; // continue looking for rules
@@ -587,8 +585,6 @@ int rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt)
 				goto skip_exact;
 			}
 		}
-		if (kr_request_unblocked(qry->request))
-			goto skip_exact;
 
 		// Probe for exact and CNAME rule.
 		memcpy(key_data_ruleset_end, &KEY_EXACT_MATCH, sizeof(KEY_EXACT_MATCH));
@@ -652,6 +648,8 @@ static int answer_exact_match(struct kr_query *qry, knot_pkt_t *pkt, uint16_t ty
 	kr_rule_opts_t opts;
 	if (deserialize_fails_assert(val, &opts))
 		return kr_error(EILSEQ);
+	if (opts.is_block && kr_request_unblocked(qry->request))
+		return RET_CONTINUE;
 	log_rule(opts, qry);
 	if (opts.score < qry->request->rule_score_apply)
 		return RET_CONTINUE;

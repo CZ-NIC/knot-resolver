@@ -55,6 +55,7 @@ assert(C.kr_rule_local_hosts('{{ file }}', {{ boolean(nodata) }},
 {% endif %}
 {# .opts are complicated #}
 {{ id }}.opts = C.KR_RULE_OPTS_DEFAULT
+{{ id }}.opts.is_block = {{ boolean(is_rpz) }} {# default heuristic right now #}
 {% if extra is not none -%}
 {%   if false and extra.dry_run is not none and extra.dry_run -%}
 {{     id }}.opts.score = 4
