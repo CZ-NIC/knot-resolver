@@ -46,13 +46,6 @@ net.tls_sticket_secret('{{ cfg.network.tls.sticket_secret }}')
 net.tls_sticket_secret_file('{{ cfg.network.tls.sticket_secret_file }}')
 {% endif %}
 
-{% if cfg.network.tls.auto_discovery %}
--- network.tls.auto-discovery
-modules.load('experimental_dot_auth')
-{% else %}
--- modules.unload('experimental_dot_auth')
-{% endif %}
-
 -- network.tls.padding
 net.tls_padding(
 {%- if cfg.network.tls.padding == true -%}
@@ -85,7 +78,7 @@ modules.load('http')
 {{ http_config(cfg.network.tls,"doh_legacy") }}
 {% endif %}
 
-{% if cfg.network.proxy_protocol %}
+{% if cfg.network.proxy_protocol.enable %}
 -- network.proxy-protocol
 net.proxy_allowed({
 {% for item in cfg.network.proxy_protocol.allow %}

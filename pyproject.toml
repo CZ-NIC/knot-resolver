@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "knot-resolver"
-version = "6.0.15"
+version = "6.0.16"
 description = "Knot Resolver Manager - a Python program that automatically manages the other components of the resolver"
 license = "GPL-3.0-or-later"
 authors = [
@@ -90,6 +90,7 @@ gen-setuppy = { cmd = "scripts/poe-tasks/gen-setuppy", help = "Generate 'setup.p
 format = { cmd = "scripts/poe-tasks/format", help = "Check and fix code formatting using Ruff." }
 kresctl = { cmd = "scripts/poe-tasks/kresctl", help="Run kresctl utility" }
 clean = { cmd = "scripts/poe-tasks/clean", help="Cleanup build directories and files" }
+test-migrate = { cmd = "scripts/poe-tasks/test-migrate", help = "Migrate testing configuration using 'kresctl migrate' utility and validate it" }
 
 [tool.ruff]
 line-length = 120

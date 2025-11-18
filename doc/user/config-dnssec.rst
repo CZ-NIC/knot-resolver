@@ -20,7 +20,8 @@ system by doing so, add the following snippet to your configuration file.
 .. code-block:: yaml
 
    # turns off DNSSEC validation
-   dnssec: false
+   dnssec:
+     enable: false
 
 The resolver supports DNSSEC including :rfc:`5011` automated DNSSEC TA updates
 and :rfc:`7646` negative trust anchors.  Depending on your distribution, DNSSEC
@@ -30,11 +31,17 @@ policy, or automatically maintained by the resolver itself.
 In practice this means that you can forget about it and your favorite Linux
 distribution will take care of it for you.
 
-Following :option:`dnssec <dnssec: false|<options>>` section allow to modify DNSSEC configuration *if you really have to*:
+Following :option:`dnssec <dnssec: <options>>` section allows to modify DNSSEC configuration *if you really have to*:
 
-.. option:: dnssec: false|<options>
+.. option:: dnssec: <options>
 
-   DNSSEC configuration options. If ``false``, DNSSEC is disabled.
+   DNSSEC configuration options.
+
+   .. option:: enable: true|false
+
+      :default: true
+
+      If ``false``, DNSSEC is disabled.
 
    .. option:: trust-anchors-files: <list>
 
@@ -62,25 +69,6 @@ Following :option:`dnssec <dnssec: false|<options>>` section allow to modify DNS
            trust-anchors-files:
              - file: root.key
                read-only: false
-
-   .. option:: hold-down-time: <time ms|s|m|h|d>
-
-      :default: 30d (30 days)
-
-      Modify :rfc:`5011` hold-down timer to given value. Intended only for testing purposes.
-
-   .. option:: refresh-time: <time ms|s|m|h|d>
-
-      Modify RFC5011 refresh timer to given value (not set by default), this will force trust anchors
-      to be updated every N seconds periodically instead of relying on RFC5011 logic and TTLs.
-      Intended only for testing purposes.
-
-   .. option:: keep-removed: <int>
-
-      :default: 0
-
-      How many ``Removed`` keys should be held in history (and key file) before being purged.
-      Note: all ``Removed`` keys will be purged from key file after restarting the process.
 
    .. option:: negative-trust-anchors: <list of domain names>
 

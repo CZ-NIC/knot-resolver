@@ -23,7 +23,7 @@ The limits can be adjusted for different packet origins using :option:`price-fac
 
    The data of all deferred queries may occupy 64 MiB of memory per :ref:`worker <config-multiple-workers>`.
 
-.. option:: defer/enabled: true|false
+.. option:: defer/enable: true|false
 
     :default: false
 

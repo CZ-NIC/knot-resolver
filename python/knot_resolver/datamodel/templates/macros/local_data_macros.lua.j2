@@ -2,21 +2,6 @@
 {% from 'macros/policy_macros.lua.j2' import policy_get_tagset, policy_todname %}
 
 
-{% macro local_data_root_fallback_addresses(pairs) -%}
-hints.root({
-{% for name, addresses in pairs.items() %}
-  ['{{ name }}']={{ string_table(addresses) }},
-{% endfor %}
-})
-{%- endmacro %}
-
-
-{% macro local_data_root_fallback_addresses_files(files) -%}
-{% for file in files %}
-hints.root_file('{{ file }}')
-{% endfor %}
-{%- endmacro %}
-
 {%- macro local_data_ttl(ttl) -%}
 {%- if ttl -%}
 {{ ttl.seconds() }}

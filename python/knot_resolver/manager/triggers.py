@@ -75,7 +75,7 @@ class Triggers:
                 logger.info("Skipping renewing configuration, it was already triggered")
                 return
             self._renew_timer.cancel()
-            self.renew_force = False
+            self._renew_force = False
 
         logger.info("Delayed configuration renew has started")
         # start a 5sec timer

@@ -270,6 +270,7 @@ union kr_sockaddr {
 	struct sockaddr_in ip4;
 	struct sockaddr_in6 ip6;
 };
+KR_EXPORT extern const size_t KR_SOCKADDR_SIZE;
 
 /** Simple storage for IPx addresses. */
 union kr_in_addr {

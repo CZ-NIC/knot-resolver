@@ -29,6 +29,7 @@ impact than cache settings and number of workers.
    config-cache-predict
    config-cache-prefill
    config-serve-stale
+   config-fallback
    config-rfc7706
    config-priming
    config-edns-keepalive

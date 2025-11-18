@@ -8,7 +8,7 @@ from knot_resolver.datamodel.cache_schema import CacheSchema
 from knot_resolver.datamodel.defer_schema import DeferSchema
 from knot_resolver.datamodel.dns64_schema import Dns64Schema
 from knot_resolver.datamodel.dnssec_schema import DnssecSchema
-from knot_resolver.datamodel.forward_schema import ForwardSchema
+from knot_resolver.datamodel.forward_schema import FallbackSchema, ForwardSchema
 from knot_resolver.datamodel.globals import Context, get_global_validation_context, set_global_validation_context
 from knot_resolver.datamodel.kafka_schema import KafkaSchema
 from knot_resolver.datamodel.local_data_schema import LocalDataSchema, RPZSchema, RuleSchema
@@ -19,11 +19,10 @@ from knot_resolver.datamodel.monitoring_schema import MonitoringSchema
 from knot_resolver.datamodel.network_schema import NetworkSchema
 from knot_resolver.datamodel.options_schema import OptionsSchema
 from knot_resolver.datamodel.rate_limiting_schema import RateLimitingSchema
-from knot_resolver.datamodel.templates import POLICY_CONFIG_TEMPLATE, WORKER_CONFIG_TEMPLATE
+from knot_resolver.datamodel.templates import KRESD_CONFIG_TEMPLATE, POLICY_LOADER_CONFIG_TEMPLATE
 from knot_resolver.datamodel.tunnel_filter_schema import TunnelFilterSchema
 from knot_resolver.datamodel.types import EscapedStr, IntPositive, WritableDir
 from knot_resolver.datamodel.view_schema import ViewSchema
-from knot_resolver.datamodel.webmgmt_schema import WebmgmtSchema
 from knot_resolver.utils.modeling import ConfigSchema
 from knot_resolver.utils.modeling.base_schema import lazy_default
 from knot_resolver.utils.modeling.exceptions import AggregateDataValidationError, DataValidationError
@@ -44,7 +43,7 @@ def _cpu_count() -> Optional[int]:
         return cpus
 
 
-def _workers_max_count() -> int:
+def workers_max_count() -> int:
     c = _cpu_count()
     if c:
         return c * 10
@@ -98,20 +97,19 @@ class KresConfig(ConfigSchema):
         hostname: Internal DNS resolver hostname. Default is machine hostname.
         rundir: Directory where the resolver can create files and which will be it's cwd.
         workers: The number of running kresd (Knot Resolver daemon) workers. If set to 'auto', it is equal to number of CPUs available.
-        max_workers: The maximum number of workers allowed. Cannot be changed in runtime.
         management: Configuration of management HTTP API.
-        webmgmt: Configuration of legacy web management endpoint.
         options: Fine-tuning global parameters of DNS resolver operation.
         network: Network connections and protocols configuration.
         views: List of views and its configuration.
         local_data: Local data for forward records (A/AAAA) and reverse records (PTR).
         forward: List of Forward Zones and its configuration.
+        fallback: Config for fallback on resolution failure.
         tunnel_filter: Block suspected attempts of data exfiltration via DNS tunneling.
         cache: DNS resolver cache configuration.
-        dnssec: Disable DNSSEC, enable with defaults or set new configuration.
-        dns64: Disable DNS64 (RFC 6147), enable with defaults or set new configuration.
+        dnssec: DNSSEC configuration.
+        dns64: DNS64 (RFC 6147) configuration.
         logging: Logging and debugging configuration.
-        monitoring: Metrics exposisition configuration (Prometheus, Graphite)
+        monitoring: Metrics exposition configuration (Prometheus, Graphite)
         lua: Custom Lua configuration.
         rate_limiting: Configuration of rate limiting.
         defer: Configuration of request prioritization (defer).
@@ -123,21 +121,20 @@ class KresConfig(ConfigSchema):
         hostname: Optional[EscapedStr] = None
         rundir: WritableDir = lazy_default(WritableDir, str(RUN_DIR))
         workers: Union[Literal["auto"], IntPositive] = IntPositive(1)
-        max_workers: IntPositive = IntPositive(WORKERS_MAX)
         management: ManagementSchema = lazy_default(ManagementSchema, {"unix-socket": str(API_SOCK_FILE)})
-        webmgmt: Optional[WebmgmtSchema] = None
         options: OptionsSchema = OptionsSchema()
         network: NetworkSchema = NetworkSchema()
         views: Optional[List[ViewSchema]] = None
         local_data: LocalDataSchema = LocalDataSchema()
         forward: Optional[List[ForwardSchema]] = None
+        fallback: FallbackSchema = FallbackSchema()
         tunnel_filter: TunnelFilterSchema = TunnelFilterSchema()
         cache: CacheSchema = lazy_default(CacheSchema, {})
-        dnssec: Union[bool, DnssecSchema] = True
-        dns64: Union[bool, Dns64Schema] = False
+        dnssec: DnssecSchema = DnssecSchema()
+        dns64: Dns64Schema = Dns64Schema()
         logging: LoggingSchema = LoggingSchema()
         monitoring: MonitoringSchema = MonitoringSchema()
-        rate_limiting: Optional[RateLimitingSchema] = None
+        rate_limiting: RateLimitingSchema = RateLimitingSchema()
         defer: DeferSchema = DeferSchema()
         kafka: KafkaSchema = lazy_default(KafkaSchema, {})
         lua: LuaSchema = LuaSchema()
@@ -148,21 +145,20 @@ class KresConfig(ConfigSchema):
     hostname: EscapedStr
     rundir: WritableDir
     workers: IntPositive
-    max_workers: IntPositive
     management: ManagementSchema
-    webmgmt: Optional[WebmgmtSchema]
     options: OptionsSchema
     network: NetworkSchema
     views: Optional[List[ViewSchema]]
     local_data: LocalDataSchema
     forward: Optional[List[ForwardSchema]]
+    fallback: FallbackSchema
     tunnel_filter: TunnelFilterSchema
     cache: CacheSchema
-    dnssec: Union[Literal[False], DnssecSchema]
-    dns64: Union[Literal[False], Dns64Schema]
+    dnssec: DnssecSchema
+    dns64: Dns64Schema
     logging: LoggingSchema
     monitoring: MonitoringSchema
-    rate_limiting: Optional[RateLimitingSchema]
+    rate_limiting: RateLimitingSchema
     defer: DeferSchema
     kafka: KafkaSchema
     lua: LuaSchema
@@ -183,16 +179,6 @@ class KresConfig(ConfigSchema):
             )
         return obj.workers
 
-    def _dnssec(self, obj: Raw) -> Any:
-        if obj.dnssec is True:
-            return DnssecSchema()
-        return obj.dnssec
-
-    def _dns64(self, obj: Raw) -> Any:
-        if obj.dns64 is True:
-            return Dns64Schema()
-        return obj.dns64
-
     def _validate(self) -> None:
         # warn about '/management/unix-socket' not located in '/rundir'
         if self.management.unix_socket and self.management.unix_socket.to_path().parent != self.rundir.to_path():
@@ -203,7 +189,7 @@ class KresConfig(ConfigSchema):
             )
 
         # enforce max-workers config
-        workers_max = _workers_max_count()
+        workers_max = workers_max_count()
         if int(self.workers) > workers_max:
             raise ValueError(
                 f"can't run with more workers than the recommended maximum {workers_max} or hardcoded {WORKERS_MAX}"
@@ -251,14 +237,14 @@ class KresConfig(ConfigSchema):
         if len(errs) > 1:
             raise AggregateDataValidationError("/", errs)
 
-    def render_lua(self) -> str:
+    def render_kresd_lua(self) -> str:
         # FIXME the `cwd` argument is used only for configuring control socket path
         # it should be removed and relative path used instead as soon as issue
         # https://gitlab.nic.cz/knot/knot-resolver/-/issues/720 is fixed
-        return WORKER_CONFIG_TEMPLATE.render(cfg=self, cwd=os.getcwd())
+        return KRESD_CONFIG_TEMPLATE.render(cfg=self, cwd=os.getcwd())
 
-    def render_lua_policy(self) -> str:
-        return POLICY_CONFIG_TEMPLATE.render(cfg=self, cwd=os.getcwd())
+    def render_policy_loader_lua(self) -> str:
+        return POLICY_LOADER_CONFIG_TEMPLATE.render(cfg=self, cwd=os.getcwd())
 
 
 def get_rundir_without_validation(data: Dict[str, Any]) -> WritableDir:

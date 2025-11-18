@@ -394,9 +394,14 @@ static int notify_ready(const char *state)
 	int sockfd;
 	struct sockaddr_un addr;
 	char *socket_path = getenv("NOTIFY_SOCKET");
+	/* If the supervisor does not set $NOTIFY_SOCKET,
+	 * it means that it does not expect a READY notification. */
 	if (!socket_path) {
-		kr_log_error(WORKER, "Failed retrieving env variable $NOTIFY_SOCKET\n");
-		return EXIT_FAILURE;
+		kr_log_debug(WORKER,
+			"skipped the READY notification, "
+			"$NOTIFY_SOCKET env variable is not configured\n"
+		);
+		return kr_ok();
 	}
 	if ((sockfd = socket(AF_UNIX, SOCK_DGRAM, 0)) == -1) {
 		kr_log_error(WORKER, "Failed to create unix socket at $NOTIFY_SOCKET ('%s'): %s\n",

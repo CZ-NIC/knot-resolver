@@ -24,7 +24,7 @@ class ForwardServerSchema(ConfigSchema):
 
     def _validate(self) -> None:
         if self.pin_sha256 and (self.hostname or self.ca_file):
-            raise ValueError("'pin-sha256' cannot be configurad together with 'hostname' or 'ca-file'")
+            raise ValueError("'pin-sha256' cannot be configured together with 'hostname' or 'ca-file'")
 
 
 class ForwardOptionsSchema(ConfigSchema):
@@ -51,7 +51,7 @@ class ForwardSchema(ConfigSchema):
     """
 
     subtree: ListOrItem[DomainName]
-    servers: Union[List[IPAddressOptionalPort], List[ForwardServerSchema]]
+    servers: List[Union[IPAddressOptionalPort, ForwardServerSchema]]
     options: ForwardOptionsSchema = ForwardOptionsSchema()
 
     def _validate(self) -> None:
@@ -74,3 +74,20 @@ class ForwardSchema(ConfigSchema):
 
         if self.options.authoritative and is_transport_tls(self.servers):
             raise ValueError("Forwarding to authoritative servers using TLS protocol is not supported.")
+
+
+class FallbackSchema(ConfigSchema):
+    """
+    Configuration for fallback after resolution failure.
+
+    ---
+    enable: Enable/disable the fallback.
+    servers: Forward servers configuration for fallback.
+    """
+
+    enable: bool = False
+    servers: Optional[List[Union[IPAddressOptionalPort, ForwardServerSchema]]] = None
+
+    def _validate(self) -> None:
+        if self.enable and self.servers is None:
+            raise ValueError("Fallback enabled without configuring servers.")

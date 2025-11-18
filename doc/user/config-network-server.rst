@@ -102,9 +102,13 @@ specification of which clients are allowed to send PROXYv2 headers. Queries with
 PROXYv2 headers from clients who are not explicitly allowed to use the protocol
 will be discarded.
 
-.. option:: network/proxy-protocol: false|<options>
+.. option:: network/proxy-protocol:
 
-   :default: false
+   .. option:: enable: true|false
+
+      :default: false
+
+      Enable/disable PROXYv2 protocol.
 
    .. option:: allow: <list of addresses and subnets>
 
@@ -123,6 +127,7 @@ will be discarded.
 
    network:
      proxy-protocol:
+       enable: true
        allow:
          - 172.22.0.1     # allows '172.22.0.1' specifically
          - 172.18.1.0/24  # allows everyone at '172.18.1.*'

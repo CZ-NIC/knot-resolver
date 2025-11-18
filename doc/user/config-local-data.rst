@@ -100,6 +100,16 @@ It provides various input formats described in following subsections.
 
          Optional, restrict when this RPZ applies.  See :ref:`config-policy-new-tags`.
 
+      .. option:: watchdog: auto | true | false 
+
+         This option controls whether the RPZ file is automatically reloaded whenever it changes.
+
+         That feature needs ``python-watchdog`` package to be present.
+
+         - ``auto``: this is the default, watch the file if possible
+         - ``true``: watch the file and fail config validation if dependency is missing
+         - ``false``: don't watch the file
+
       .. option:: log: <list, subset of [ name, ip ]>
 
          Optional, indicate that each application of a rule should log the domain name
@@ -110,10 +120,10 @@ It provides various input formats described in following subsections.
 
             [rules ] => local data applied, user: ::1, name: foo.bar.93.100.in-addr.arpa.
 
-   .. hide this for now
-      .. option:: dry-run: <boolean, false by default>
+      .. hide this for now
+         .. option:: dry-run: <boolean, false by default>
 
-         Do not apply these rules.  You want to combine this with ``log``.
+            Do not apply these rules.  You want to combine this with ``log``.
 
    .. code-block:: yaml
 
@@ -123,6 +133,8 @@ It provides various input formats described in following subsections.
             tags: [ adult ]
           # security blocklist applied for everyone
           - file: /tmp/security.rpz
+
+   .. hide this for now
           # log these but do not block them
           - file: /tmp/suspicious.rpz
             dry-run: true

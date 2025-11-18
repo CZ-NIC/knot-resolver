@@ -14,6 +14,20 @@ We advise users to also read :ref:`release_notes` for respective versions.
 
 See the detailed guide for :ref:`upgrading to version 6.x <upgrading-to-6>`.
 
+Upgrading incompatible configuration changes
+============================================
+
+All configuration changes should be listed in :ref:`NEWS <release_notes>`.
+This allows you to see the differences between the original version and the new version and adjust the configuration accordingly.
+Alternatively, you can use :ref:`kresctl <manager-client>` utility to migrate your old configuration to the new one automatically.
+Please backup your configuration just in case.
+
+.. code-block:: bash
+
+   # the migrated configuration will be printed
+   # or you can choose the destination file where the new configuration will be saved
+   $ kresctl migrate /etc/knot-resolver/config.yaml     # /etc/knot-resolver/config.new.yaml
+
 Older versions
 ==============
 

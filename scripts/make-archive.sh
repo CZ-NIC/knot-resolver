@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Create a development tarball
+#
+# Create an archive from project sources
+#
+# This script is used by apkg to generate archive from current sources.
+# It must only output valid YAML to stdout!
+
 set -o errexit -o nounset -o xtrace
 
 cd "$(dirname ${0})/.."
@@ -9,7 +14,7 @@ cd "$(dirname ${0})/.."
 (git diff-index --quiet HEAD && git diff-index --cached --quiet HEAD) || \
     (echo 'git index has uncommitted changes!'; exit 1)
 
-if ! git describe --tags --exact-match; then
+if ! git describe --tags --exact-match >&2; then
     # devel version
     VERSION_TAG=$(git describe --tags | cut -d- -f1)
     VERSION=${VERSION_TAG#v}
@@ -21,8 +26,8 @@ if ! git describe --tags --exact-match; then
     sed -i "s/^\(\s*version\s*:\s*'\)\([^']\+\)\('.*\)/\1$FULL_VERSION\3/" meson.build
 
     : changed version in meson.build, changes must be committed to git
-    git add meson.build
-    git commit -m 'DROP: devel version archive'
+    git add meson.build >&2
+    git commit -m 'DROP: devel version archive' >&2
 
     cleanup() {
         # undo commit
@@ -33,8 +38,8 @@ fi
 
 # create tarball
 rm -rf build_dist ||:
-meson build_dist
-ninja -C build_dist dist
+meson build_dist >&2
+ninja -C build_dist dist >&2
 
 # copy tarball to apkg path
 DIST_ARCHIVE=$(find "build_dist/meson-dist/" -name "knot-resolver-*.tar.xz")
@@ -46,4 +51,4 @@ cp "$DIST_ARCHIVE" "$APKG_ARCHIVE"
 rm -rf build_dist ||:
 
 # print path to generated tarball as expected by apkg
-echo "$APKG_ARCHIVE"
+echo "archive: '$APKG_ARCHIVE'"

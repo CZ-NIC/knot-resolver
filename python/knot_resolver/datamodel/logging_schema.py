@@ -1,7 +1,7 @@
 import os
 from typing import Any, List, Literal, Optional, Set, Type, Union, cast
 
-from knot_resolver.datamodel.types import TimeUnit, WritableFilePath
+from knot_resolver.datamodel.types import WritableFilePath
 from knot_resolver.utils.modeling import ConfigSchema
 from knot_resolver.utils.modeling.base_schema import is_obj_type_valid
 
@@ -69,29 +69,22 @@ class DnstapSchema(ConfigSchema):
     Logging DNS queries and responses to a unix socket.
 
     ---
+    enable: Enable/disable DNS queries logging.
     unix_socket: Path to unix domain socket where dnstap messages will be sent.
     log_queries: Log queries from downstream in wire format.
     log_responses: Log responses to downstream in wire format.
     log_tcp_rtt: Log TCP RTT (Round-trip time).
     """
 
-    unix_socket: WritableFilePath
-    log_queries: bool = True
-    log_responses: bool = True
-    log_tcp_rtt: bool = True
+    enable: bool = False
+    unix_socket: Optional[WritableFilePath] = None
+    log_queries: bool = False
+    log_responses: bool = False
+    log_tcp_rtt: bool = False
 
-
-class DebuggingSchema(ConfigSchema):
-    """
-    Advanced debugging parameters for kresd (Knot Resolver daemon).
-
-    ---
-    assertion_abort: Allow the process to be aborted in case it encounters a failed assertion.
-    assertion_fork: Fork and abord child kresd process to obtain a coredump, while the parent process recovers and keeps running.
-    """
-
-    assertion_abort: bool = False
-    assertion_fork: TimeUnit = TimeUnit("5m")
+    def _validate(self) -> None:
+        if self.enable and self.unix_socket is None:
+            raise ValueError("DNS queries logging enabled, but 'unix-socket' not specified")
 
 
 class LoggingSchema(ConfigSchema):
@@ -103,26 +96,20 @@ class LoggingSchema(ConfigSchema):
         level: Global logging level.
         target: Global logging stream target. "from-env" uses $KRES_LOGGING_TARGET and defaults to "stdout".
         groups: List of groups for which 'debug' logging level is set.
-        dnssec_bogus: Logging a message for each DNSSEC validation failure.
         dnstap: Logging DNS requests and responses to a unix socket.
-        debugging: Advanced debugging parameters for kresd (Knot Resolver daemon).
         """
 
         level: LogLevelEnum = "notice"
         target: Union[LogTargetEnum, Literal["from-env"]] = "from-env"
         groups: Optional[List[LogGroupsEnum]] = None
-        dnssec_bogus: bool = False
-        dnstap: Union[Literal[False], DnstapSchema] = False
-        debugging: DebuggingSchema = DebuggingSchema()
+        dnstap: DnstapSchema = DnstapSchema()
 
     _LAYER = Raw
 
     level: LogLevelEnum
     target: LogTargetEnum
     groups: Optional[List[LogGroupsEnum]]
-    dnssec_bogus: bool
-    dnstap: Union[Literal[False], DnstapSchema]
-    debugging: DebuggingSchema
+    dnstap: DnstapSchema
 
     def _target(self, raw: Raw) -> LogTargetEnum:
         if raw.target == "from-env":

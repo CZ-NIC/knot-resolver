@@ -273,6 +273,8 @@ void kr_pkt_make_auth_header(knot_pkt_t *pkt)
 	knot_wire_set_aa(pkt->wire);
 }
 
+const size_t KR_SOCKADDR_SIZE = sizeof(union kr_sockaddr);
+
 const char *kr_inaddr(const struct sockaddr *addr)
 {
 	if (!addr) {
