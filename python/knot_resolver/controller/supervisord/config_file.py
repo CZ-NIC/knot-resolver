@@ -7,7 +7,7 @@ from typing import Literal
 
 from jinja2 import Template
 
-from knot_resolver.constants import APPLE_SYS, KRES_CACHE_GC_EXECUTABLE, KRESD_EXECUTABLE, LINUX_SYS
+from knot_resolver.constants import FREEBSD_SYS, KRES_CACHE_GC_EXECUTABLE, KRESD_EXECUTABLE, LINUX_SYS
 from knot_resolver.controller.interface import KresID, SubprocessType
 from knot_resolver.datamodel.config_schema import KresConfig, workers_max_count
 from knot_resolver.datamodel.logging_schema import LogTargetEnum
@@ -112,17 +112,21 @@ class ProcessTypeConfig:
     @staticmethod
     def create_kresd_config(config: KresConfig) -> "ProcessTypeConfig":
         cwd = str(os.getcwd())
-        startsecs = 3
         environment = 'SYSTEMD_INSTANCE="%(process_num)d"'
 
+        # Default for non-Linux systems without SO_REUSEPORT/SO_REUSEPORT_LB support.
+        # This means that there is no support for multiple kresd workers and NOTIFY messages.
+        startsecs = 0
+
         if LINUX_SYS:
-            # Wait for NOTIFY message
+            # There is support for the SO_REUSEPORT option and support for NOTIFY message.
+            # Here, 'startsecs' serves as a timeout for waiting for NOTIFY message.
             startsecs = 60
             environment += ",X-SUPERVISORD-TYPE=notify"
-        if APPLE_SYS:
-            # There is no need to wait for anything on macOS
-            # No NOTIFY message and only 1 kresd worker
-            startsecs = 0
+        elif FREEBSD_SYS:
+            # There is support for the SO_REUSEPORT_LB option, but no support for NOTIFY message.
+            # Therefore, we need to give the kresd workers a few seconds to start properly.
+            startsecs = 3
 
         return ProcessTypeConfig(  # type: ignore[call-arg]
             logfile=supervisord_subprocess_log_dir(config) / "kresd%(process_num)d.log",
