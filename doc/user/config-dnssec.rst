@@ -70,13 +70,6 @@ Following :option:`dnssec <dnssec: <options>>` section allows to modify DNSSEC c
              - file: root.key
                read-only: false
 
-   .. option:: trust-anchors-keep-removed: <int>
-
-      :default: 0
-
-      How many ``Removed`` keys should be held in history (and key file) before being purged.
-      Note: all ``Removed`` keys will be purged from key file after restarting the process.
-
    .. option:: negative-trust-anchors: <list of domain names>
 
       When you use a domain name as an *negative trust anchor* (NTA), DNSSEC validation will be turned off at/below these names.

@@ -66,7 +66,6 @@ def test_dnssec_default_true():
     assert config.dnssec.enable == True
     assert config.dnssec.sentinel == True
     assert config.dnssec.signal_query == True
-    assert int(config.dnssec.trust_anchors_keep_removed) == 0
     assert config.dnssec.trust_anchors == None
     assert config.dnssec.trust_anchors_files == None
     assert config.dnssec.negative_trust_anchors == None

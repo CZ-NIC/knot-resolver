@@ -11,7 +11,7 @@ and server internals, and offers them as a key-value storage.
 .. code-block:: yaml
 
    monitoring:
-     enable: always
+     metrics: always
 
 These metrics can be either exported to :ref:`config-monitoring-graphite` or
 exposed as :ref:`config-monitoring-prometheus`.
