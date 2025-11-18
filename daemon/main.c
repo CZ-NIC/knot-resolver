@@ -192,10 +192,10 @@ static int run_worker(uv_loop_t *loop, struct args *args)
 		uv_listen((uv_stream_t *)pipe, 16, io_tty_accept);
 	}
 
-	/* Notify supervisor. */
+	/* Notify the supervisor only on Linux platform */
 #if ENABLE_LIBSYSTEMD
 	sd_notify(0, "READY=1");
-#else
+#elif __linux__
 	notify_ready("READY=1");
 #endif
 	/* Run event loop */
