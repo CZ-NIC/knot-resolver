@@ -1,5 +1,5 @@
 import importlib.util
-import sys
+import platform
 from pathlib import Path
 
 VERSION = "@version@"
@@ -21,12 +21,12 @@ KRESD_EXECUTABLE = SBIN_DIR / "kresd"
 KRES_CACHE_GC_EXECUTABLE = SBIN_DIR / "kres-cache-gc"
 
 LINUX_SYS = False
-if sys.platform.startswith("linux"):
+if platform.system() == "Linux":
     LINUX_SYS = True
 
-APPLE_SYS = False
-if sys.platform == "darwin":
-    APPLE_SYS = True
+FREEBSD_SYS = False
+if platform.system() == "FreeBSD":
+    FREEBSD_SYS = True
 
 WATCHDOG_LIB = False
 if importlib.util.find_spec("watchdog"):
