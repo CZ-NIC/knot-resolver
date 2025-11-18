@@ -3,7 +3,7 @@ import os
 import socket
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
-from knot_resolver.constants import API_SOCK_FILE, APPLE_SYS, RUN_DIR, VERSION
+from knot_resolver.constants import API_SOCK_FILE, FREEBSD_SYS, LINUX_SYS, RUN_DIR, VERSION
 from knot_resolver.datamodel.cache_schema import CacheSchema
 from knot_resolver.datamodel.defer_schema import DeferSchema
 from knot_resolver.datamodel.dns64_schema import Dns64Schema
@@ -161,16 +161,18 @@ class KresConfig(ConfigSchema):
         return obj.hostname
 
     def _workers(self, obj: Raw) -> Any:
-        apple_sys_msg = (
-            "On macOS, you cannot run more than one worker because SO_REUSEPORT socket option support is absent."
-        )
+        no_support_msg = "On this system, you cannot run more than one worker because SO_REUSEPORT/SO_REUSEPORT_LB socket option is not supported."
 
-        if APPLE_SYS and (int(obj.workers) > 1):
-            raise ValueError(apple_sys_msg)
+        workers_support = LINUX_SYS or FREEBSD_SYS
+        if not workers_support and (int(obj.workers) > 1):
+            raise ValueError(no_support_msg)
 
         if obj.workers == "auto":
-            if APPLE_SYS:
-                logger.info(f"Running on macOS, 'workers' configuration automatically set to 1. {apple_sys_msg}")
+            if not workers_support:
+                logger.info(
+                    "Running on system without support for multiple workers,"
+                    f"' workers' configuration automatically set to 1. {no_support_msg}"
+                )
                 return IntPositive(1)
 
             count = _cpu_count()
