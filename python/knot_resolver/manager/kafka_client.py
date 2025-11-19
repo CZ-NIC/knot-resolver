@@ -146,14 +146,19 @@ if KAFKA_LIB:
                 "The 'group-id' option is not configured and the 'hostname' message header is also missing:"
                 " It is not possible to determine which resolver the message is intended for."
             )
-        if headers.hostname and headers.hostname != hostname:
-            if config.kafka.group_id and key != str(group_id):
-                logger.info(
-                    f"The resolver's group-id '{str(group_id)}' or hostname '{hostname}'"
-                    f" do not match with the message key (group-id) '{key}' or headers hostname '{hostname}':"
-                    " The message is intended for a resolver with the matching group-id or hostname."
-                )
-                return
+
+        if headers.hostname and headers.hostname == hostname:
+            logger.info("The message headers hostname matches the resolver's. The message will be processed.")
+        elif group_id and key == str(group_id):
+            logger.info("The message key (group-id) matches the resolver's. The message will be processed.")
+        else:
+            logger.info(
+                f"The resolver's group-id '{str(group_id)}' or hostname '{hostname}'"
+                f" do not match with the message key (group-id) '{key}' or headers hostname '{headers.hostname}':"
+                " The message is intended for a resolver with the matching group-id or hostname."
+                " Message processing is skipped."
+            )
+            return
 
         # check chunks
         check_chunk_headers(headers)
