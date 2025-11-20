@@ -4,6 +4,7 @@ Knot Resolver 6.0.17 (2025-mm-dd)
 Improvements
 ------------
 - kresctl migrate: new command for migrating the configuration to a newer version (!1672)
+- manager: basic support for non-Linux systems (macOS, FreeBSD) (!1758)
 
 Incompatible changes
 --------------------
