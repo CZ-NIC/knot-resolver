@@ -319,20 +319,21 @@ if KAFKA_LIB:
                 self._consumer = None
 
         async def _consumer_run(self) -> None:
+            error_msg_prefix = "Consuming messages failed with"
+
             while True:
                 if not self._consumer:
                     # connect to brokers
                     self._consumer_connect()
+                    logger.info("Starting to consume messages every 10 seconds")
                 else:
                     # ready to consume messages
-                    error_msg_prefix = "Consuming messages failed with"
                     try:
-                        logger.info("Started consuming messages...")
                         messages: Dict[TopicPartition, List[ConsumerRecord]] = self._consumer.poll(timeout_ms=100)
-                        logger.debug(f"Successfully consumed {len(messages)} messages")
-                        # ready to process messages
-                        process_messages(messages, self._config)
-                        if not messages:
+                        if messages:
+                            # ready to process messages
+                            process_messages(messages, self._config)
+                        else:
                             await asyncio.sleep(10)
                     except KafkaError as e:
                         logger.error(f"{error_msg_prefix} Kafka error:\n{e}")
