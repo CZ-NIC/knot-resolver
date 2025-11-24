@@ -461,7 +461,7 @@ static inline void process_single_deferred(void)
 			}
 		}
 
-		break_query(ctx, ETIME);
+		break_query(ctx, ETIMEDOUT);
 		return;
 	}
 
@@ -528,7 +528,7 @@ static inline void cleanup_queues(void)
 			uint64_t age_ns = defer_sample_state.stamp - idata->req_stamp;
 			if (age_ns < REQ_TIMEOUT) break;
 			pop_query_queue(i);
-			break_query(ctx, ETIME);
+			break_query(ctx, ETIMEDOUT);
 			cnt++;
 		}
 		if (cnt > 0) {
