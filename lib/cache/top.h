@@ -63,7 +63,7 @@ size_t kr_cache_top_get_size(size_t cache_size);
 /// If cache_size differs from the previously used value, the data are cleared,
 /// otherwise they are persistent across restarts.
 KR_EXPORT
-int kr_cache_top_init(struct kr_cache_top *top, char *mmap_file, size_t cache_size);
+int kr_cache_top_init(struct kr_cache_top *top, const char *mmap_file, size_t cache_size);
 
 /// Deinitialize shared memory, keeping the data stored in file.
 KR_EXPORT

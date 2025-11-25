@@ -100,7 +100,7 @@ size_t kr_cache_top_get_size(size_t cache_size)
 	return top_size;
 }
 
-int kr_cache_top_init(struct kr_cache_top *top, char *mmap_file, size_t cache_size)
+int kr_cache_top_init(struct kr_cache_top *top, const char *mmap_file, size_t cache_size)
 {
 	size_t size = 0, capacity_log = 0;
 	if (cache_size > 0) {

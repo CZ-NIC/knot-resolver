@@ -161,13 +161,13 @@ int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct k
 	cache->ttl_max = KR_CACHE_DEFAULT_TTL_MAX;
 	kr_cache_make_checkpoint(cache);
 
-	char *top_path = kr_absolutize_path(opts->path, "top");
+	const char *top_path = kr_absolutize_path(opts->path, "top");
 	if (kr_fails_assert(top_path)) {
 		ret = kr_error(errno);
 	}
 	if (ret == 0) {
 		ret = kr_cache_top_init(&cache->top, top_path, orig_maxsize);
-		free(top_path);
+		free_const(top_path);
 	}
 	if (ret != 0) {
 		cache->api->close(cache->db, &cache->stats);
