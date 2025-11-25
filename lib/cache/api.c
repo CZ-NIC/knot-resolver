@@ -140,13 +140,9 @@ int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct k
 		ret = cache->api->open(&cache->db, &cache->stats, &opts2, mm);
 	}
 
-	char *fpath = kr_absolutize_path(opts->path, "data.mdb");
-	if (kr_fails_assert(fpath)) {
-		/* non-critical, but still */
-		fpath = "<ENOMEM>";
-	} else {
-		kr_cache_emergency_file_to_remove = fpath;
-	}
+	free_const(kr_cache_emergency_file_to_remove);
+	kr_cache_emergency_file_to_remove = kr_absolutize_path(opts->path, "data.mdb");
+	kr_assert(kr_cache_emergency_file_to_remove); // non-critical, but still
 
 	size_t maxsize = 0;
 	if (ret == 0) {
@@ -194,7 +190,7 @@ void kr_cache_close(struct kr_cache *cache)
 		cache_op(cache, close);
 		cache->db = NULL;
 	}
-	free(/*const-cast*/(char*)kr_cache_emergency_file_to_remove);
+	free_const(kr_cache_emergency_file_to_remove);
 	kr_cache_emergency_file_to_remove = NULL;
 }
 
