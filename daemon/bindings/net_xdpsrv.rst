@@ -70,12 +70,15 @@ With XDP this is more important than with vanilla UDP, as we only support one in
 per queue and unclaimed queues will fall back to vanilla UDP.
 Ideally you can set these numbers as high as the number of CPUs that you want kresd to use.
 
-Modification of ``/etc/knot-resolver/kresd.conf`` may often be quite simple, for example:
+Modification of ``/etc/knot-resolver/config.yaml`` may often be quite simple, for example:
 
-.. code-block:: lua
+.. code-block:: yaml
 
-	net.listen('eth2', 53, { kind = 'xdp' })
-	net.listen('203.0.113.53', 53, { kind = 'dns' })
+   network:
+     listen:
+       - interface: eth2  # default port 53
+         kind: xdp
+       - interface: 203.0.113.53  # default port 53, standard DNS
 
 Note that you want to also keep the vanilla DNS line to service TCP
 and possibly any fallback UDP (e.g. from unclaimed queues).
@@ -84,17 +87,24 @@ and the target addresses of incoming packets aren't checked in any way,
 but you are still allowed to specify interface by an address
 (if it's unambiguous at that moment):
 
-.. code-block:: lua
+.. code-block:: yaml
 
-	net.listen('203.0.113.53', 53, { kind = 'xdp' })
-	net.listen('203.0.113.53', 53, { kind = 'dns' })
+   network:
+     listen:
+       - interface: 203.0.113.53  # default port 53
+         kind: xdp
+       - interface: 203.0.113.53  # default port 53, standard DNS
 
-The default selection of queues is tailored for the usual conventions,
-but you can still specify them explicitly, e.g. the default is effectively the same as:
+The default selection of queues is tailored for the usual conventions.
 
-.. code-block:: lua
+.. We do not allow configuring nic_queue in declarative configuration.
 
-	net.listen('eth2', 53, { kind = 'xdp', nic_queue = env.SYSTEMD_INSTANCE - 1 })
+..
+   but you can still specify them explicitly, e.g. the default is effectively the same as:
+
+   .. code-block:: lua
+
+      net.listen('eth2', 53, { kind = 'xdp', nic_queue = env.SYSTEMD_INSTANCE - 1 })
 
 
 Optimizations
