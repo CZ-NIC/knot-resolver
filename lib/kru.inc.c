@@ -268,7 +268,7 @@ static inline void kru_limited_prefetch(struct kru *kru, uint32_t time_now, uint
 {
 	// Obtain hash of *buf.
 	kru_hash_t hash;
-	static_assert(sizeof(kru_hash_t) * 8 <= 64);
+	static_assert(sizeof(kru_hash_t) * 8 <= 64, "bad size of kru_hash_t");
 #if !USE_AES
 	hash = SipHash(&kru->hash_key, SIPHASH_RC, SIPHASH_RF, key, 16);
 #else
@@ -292,7 +292,7 @@ static inline void kru_limited_prefetch_prefix(struct kru *kru, uint32_t time_no
 {
 	// Obtain hash of *buf.
 	kru_hash_t hash;
-	static_assert(sizeof(kru_hash_t) * 8 <= 64);
+	static_assert(sizeof(kru_hash_t) * 8 <= 64, "bad size of kru_hash_t");
 
 #if !USE_AES
 	{
@@ -354,10 +354,10 @@ static kru_hash_t kru_hash_bytes(struct kru *kru, uint8_t *key, size_t key_size)
 {
 	// Obtain hash of *buf.
 	kru_hash_t hash;
-	static_assert(sizeof(kru_hash_t) * 8 <= 64);
+	static_assert(sizeof(kru_hash_t) * 8 <= 64, "bad size of kru_hash_t");
 
 	// We use SipHash even for otherwise optimized KRU variant, which has diffent type of hash_key.
-	static_assert(sizeof(kru->hash_key) >= sizeof(SIPHASH_KEY));
+	static_assert(sizeof(kru->hash_key) >= sizeof(SIPHASH_KEY), "bad size of kru::hash_key");
 	SIPHASH_KEY *hash_key = (void *)&kru->hash_key;
 
 	hash = SipHash(hash_key, SIPHASH_RC, SIPHASH_RF, key, key_size);

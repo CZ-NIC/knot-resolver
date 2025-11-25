@@ -46,15 +46,15 @@ static inline uint32_t ticks_now(void)
 static inline bool first_access_ro(struct kr_cache_top_context *ctx, kru_hash_t hash)
 {
 	// struct kr_cache_top_context { uint32_t bloom[32]; }
-	static_assert(sizeof(((struct kr_cache_top_context *)0)->bloom[0]) * 8 == 32);
-	static_assert(sizeof(((struct kr_cache_top_context *)0)->bloom)    * 8 == 32 * 32);
+	static_assert(sizeof(((struct kr_cache_top_context *)0)->bloom[0]) * 8 == 32, "");
+	static_assert(sizeof(((struct kr_cache_top_context *)0)->bloom)    * 8 == 32 * 32, "");
 		// expected around 40 unique cache accesses per request context, possibly up to ~200;
 		// prob. of collision of 50th unique access with the preceeding ones: ~0.1 %;
 		// 75th: ~0.4 %; 100th: ~1.1 %; 150th: ~3.9 %; 200th: ~8.7 %; 300th: ~23 %; 400th: ~39 %
 		//   -> collision means not counting the cache access in KRU while it should be
 
 	uint8_t *h = (uint8_t *)&hash;
-	static_assert(sizeof(kru_hash_t) >= 8);
+	static_assert(sizeof(kru_hash_t) >= 8, "bad size of kru_hash_t");
 
 	bool accessed = 1u &
 		(ctx->bloom[h[0] % 32] >> (h[1] % 32)) &
@@ -70,7 +70,7 @@ static inline bool first_access(struct kr_cache_top_context *ctx, kru_hash_t has
 	if (!first_access_ro(ctx, hash)) return false;
 
 	uint8_t *h = (uint8_t *)&hash;
-	static_assert(sizeof(kru_hash_t) >= 8);
+	static_assert(sizeof(kru_hash_t) >= 8, "bad size of kru_hash_t");
 
 	ctx->bloom[h[0] % 32] |= 1u << (h[1] % 32);
 	ctx->bloom[h[2] % 32] |= 1u << (h[3] % 32);

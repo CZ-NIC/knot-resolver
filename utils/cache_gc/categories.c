@@ -34,7 +34,7 @@ category_t kr_gc_categorize(struct kr_cache_top *top, gc_record_info_t * info, v
 		// evict all expired before any non-expired (incl. RTT)
 		res = res / 2 + 65;  // 65..97
 	}
-	static_assert(CATEGORIES - 1 > 97);
+	static_assert(CATEGORIES - 1 > 97, "inssuficient CATEGORIES number");
 
 	if (!kr_log_is_debug(CACHE, NULL)) // skip these computations if not needed
 		goto finish;
