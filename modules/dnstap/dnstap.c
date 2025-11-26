@@ -254,7 +254,10 @@ static int dnstap_log(kr_layer_t *ctx, enum dnstap_log_phase phase) {
 		m.type = DNSTAP__MESSAGE__TYPE__CLIENT_RESPONSE;
 
 		if (req->rule.action) {
-			tags_str = kr_rule_tags2str(req->rule.tags); // to get auto_free'd
+			kr_rule_tags_t tags = req->rule.action == KREQ_ACTION_PASS
+				? req->rule.tags_pass
+				: req->rule.tags;
+			tags_str = kr_rule_tags2str(tags); // to get auto_free'd
 			policy.rule.data = (uint8_t *)tags_str;
 			policy.rule.len = strlen(tags_str);
 			policy.has_rule = true;

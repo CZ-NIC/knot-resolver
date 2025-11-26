@@ -238,6 +238,7 @@ struct kr_extended_error {
 struct kr_request_rule {
 	int8_t action;
 	kr_rule_tags_t tags;
+	kr_rule_tags_t tags_pass;
 };
 struct kr_request {
 	struct kr_context *ctx;

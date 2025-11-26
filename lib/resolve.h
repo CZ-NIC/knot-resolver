@@ -215,7 +215,8 @@ typedef array_t(union kr_sockaddr) kr_sockaddr_array_t;
  * TODO: when multiple actions happen during one kr_request... */
 struct kr_request_rule {
 	int8_t action;
-	kr_rule_tags_t tags; /// TagSet that caused the action
+	kr_rule_tags_t tags; /// TagSet that caused the action (except _PASS)
+	kr_rule_tags_t tags_pass; /// TagSet that caused the _PASS action
 };
 enum kr_request_rule_action {
 	// zero == unset

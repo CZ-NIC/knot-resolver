@@ -478,6 +478,10 @@ static int subtree_search(const size_t lf_start_i, const knot_db_val_t key,
 		// Unblock rules also don't have opts+ttl.
 		if (ztype == VAL_ZLAT_UNBLOCK) {
 			kr_request_unblock(req);
+ 			// correct what kr_rule_consume_tags() set
+			req->rule.tags_pass = req->rule.tags;
+			req->rule.tags = 0;
+
 			VERBOSE_MSG(qry, "=> unblocked\n");
 			if (kr_fails_assert(val.len == 0))
 				kr_log_error(RULES, "ERROR: unused bytes: %zu\n", val.len);
