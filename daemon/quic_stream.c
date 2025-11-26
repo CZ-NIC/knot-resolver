@@ -4,12 +4,7 @@
 
 #include "lib/resolve.h"
 #include "quic_common.h"
-#include "quic_conn.h"
-#include "session2.h"
-#include <ngtcp2/ngtcp2.h>
 #include "quic_stream.h"
-
-#define OUTBUF_SIZE 4096
 
 /* forward declaration */
 static int send_stream(struct pl_quic_stream_sess_data *stream,
@@ -25,7 +20,6 @@ static enum protolayer_iter_cb_result pl_quic_stream_unwrap(void *sess_data,
 		return protolayer_break(ctx, kr_error(EINVAL));
 	}
 
-	kr_assert(stream->incflags & NGTCP2_STREAM_DATA_FLAG_FIN);
 	ctx->payload = protolayer_payload_wire_buf(&stream->pers_inbuf, false);
 	return protolayer_continue(ctx);
 }
@@ -33,10 +27,6 @@ static enum protolayer_iter_cb_result pl_quic_stream_unwrap(void *sess_data,
 uint8_t *kr_quic_stream_add_data(struct pl_quic_stream_sess_data *s,
 		   uint8_t *data, size_t len)
 {
-	if (s == NULL) {
-		return NULL;
-	}
-
 	size_t prefix = sizeof(uint16_t);
 
 	struct kr_quic_obuf *obuf = malloc(sizeof(*obuf) + prefix + len);
@@ -63,13 +53,13 @@ uint8_t *kr_quic_stream_add_data(struct pl_quic_stream_sess_data *s,
 static enum protolayer_iter_cb_result pl_quic_stream_wrap(void *sess_data,
 		void *iter_data, struct protolayer_iter_ctx *ctx)
 {
-	kr_require(ctx->payload.type = PROTOLAYER_PAYLOAD_IOVEC);
 	struct pl_quic_stream_sess_data *stream = sess_data;
-	kr_require(stream->stream_id >= 0);
 	ngtcp2_ssize sent = 0;
 
-	kr_quic_stream_add_data(stream, ctx->payload.iovec.iov[1].iov_base,
-			ctx->payload.iovec.iov[1].iov_len);
+	if (unlikely(kr_quic_stream_add_data(stream, ctx->payload.iovec.iov[1].iov_base,
+			ctx->payload.iovec.iov[1].iov_len) == NULL)) {
+		return kr_error(ENOMEM);
+	}
 
 	ctx->payload = protolayer_payload_wire_buf(&stream->outbuf, false);
 
@@ -137,15 +127,13 @@ static int send_stream(struct pl_quic_stream_sess_data *stream,
 		*sent = 0;
 	}
 
-	kr_require(wire_buf_consume(ctx->payload.wire_buf, nwrite) == kr_ok());
+	wire_buf_consume(ctx->payload.wire_buf, nwrite);
 	return nwrite;
 }
 
 void kr_quic_stream_mark_sent(struct pl_quic_stream_sess_data *stream,
 		size_t amount_sent)
 {
-	kr_require(stream);
-
 	stream->unsent_offset += amount_sent;
 	kr_assert(stream->unsent_offset <= stream->unsent_obuf->len);
 	if (stream->unsent_offset == stream->unsent_obuf->len) {
@@ -165,16 +153,15 @@ static int pl_quic_stream_sess_init(struct session2 *session,
 	struct pl_quic_stream_sess_data *stream = sess_data;
 	stream->h.session = session;
 
-	wire_buf_init(&stream->pers_inbuf, OUTBUF_SIZE);
-	wire_buf_init(&stream->outbuf, OUTBUF_SIZE);
+	wire_buf_init(&stream->pers_inbuf, NGTCP2_MAX_UDP_PAYLOAD_SIZE);
+	wire_buf_init(&stream->outbuf, NGTCP2_MAX_UDP_PAYLOAD_SIZE);
 
 	session->secure = true;
 
-	kr_require(param);
 	struct kr_quic_stream_param *p = param;
 	stream->conn = p->conn;
 	stream->stream_id = p->stream_id;
-	stream->comm_storage = p->comm_storage;
+	session->comm_storage = p->comm_storage;
 
 	if (stream->obufs_size == 0) {
 		init_list(&stream->outbufs);
@@ -188,7 +175,6 @@ static int pl_quic_stream_sess_init(struct session2 *session,
 void kr_quic_stream_ack_data(struct pl_quic_stream_sess_data *stream,
 		int64_t stream_id, size_t end_acked, bool keep_stream)
 {
-	kr_require(stream);
 	struct list *obs = &stream->outbufs;
 	struct kr_quic_obuf *first;
 
@@ -206,32 +192,10 @@ void kr_quic_stream_ack_data(struct pl_quic_stream_sess_data *stream,
 	}
 }
 
-int update_stream_pers_buffer(struct pl_quic_stream_sess_data *stream,
-		const uint8_t *data, size_t len, int64_t stream_id)
-{
-	kr_require(len > 0 && data && stream);
-
-	if (wire_buf_free_space_length(&stream->pers_inbuf) < len) {
-		size_t inc = MIN(stream->outbuf.size, 1024);
-		char *new_buf = realloc(stream->pers_inbuf.buf,
-				wire_buf_data_length(&stream->pers_inbuf) + inc);
-		kr_require(new_buf);
-		stream->pers_inbuf.buf = new_buf;
-		stream->pers_inbuf.end += inc;
-		stream->pers_inbuf.size += inc;
-	}
-
-	memcpy(wire_buf_free_space(&stream->pers_inbuf), data, len);
-	kr_require(wire_buf_consume(&stream->pers_inbuf, len) == kr_ok());
-
-	return kr_ok();
-}
-
 static int pl_quic_stream_sess_deinit(struct session2 *session, void *sess_data)
 {
 	struct pl_quic_stream_sess_data *stream = sess_data;
 	ngtcp2_conn_shutdown_stream(stream->conn, 0, stream->stream_id, 0);
-	kr_require(queue_len(session->waiting) <= 0);
 	kr_quic_stream_ack_data(stream, stream->stream_id, SIZE_MAX, false);
 	wire_buf_deinit(&stream->pers_inbuf);
 	wire_buf_deinit(&stream->outbuf);

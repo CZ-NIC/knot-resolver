@@ -17,7 +17,6 @@ typedef struct {
 } quic_params_t;
 
 
-#define KR_QUIC_HANDLE_RET_CLOSE	2000
 #define KR_QUIC_ERR_EXCESSIVE_LOAD	0x4
 #define QUIC_MAX_OPEN_CONNS 1024
 
@@ -89,6 +88,7 @@ struct pl_quic_conn_sess_data {
 	ngtcp2_cid odcid;
 	ngtcp2_version_cid dec_cids;
 	uint8_t secret[32];
+	ngtcp2_path *path;
 	struct comm_info comm_storage;
 	struct comm_addr_storage comm_addr_storage;
 

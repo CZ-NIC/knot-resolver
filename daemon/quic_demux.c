@@ -8,11 +8,6 @@
 
 #include "libdnssec/random.h"
 #include "contrib/openbsd/siphash.h"
-#include "quic_conn.h"
-#include "session2.h"
-#include "worker.h"
-#include <ngtcp2/ngtcp2.h>
-#include <sys/cdefs.h>
 #include "quic_demux.h"
 
 #define BUCKETS_PER_CONNS 8 // Each connecion has several dCIDs, and each CID takes one hash table bucket.
@@ -54,7 +49,6 @@ void quic_conn_mark_used(struct pl_quic_conn_sess_data *conn,
 static uint64_t cid2hash(const ngtcp2_cid *cid, kr_quic_table_t *table)
 {
 	SIPHASH_CTX ctx;
-	kr_require(table->hash_secret != NULL);
 	SipHash24_Init(&ctx, (const SIPHASH_KEY *)(table->hash_secret));
 	SipHash24_Update(&ctx, cid->data, MIN(cid->datalen, 8));
 	uint64_t ret = SipHash24_End(&ctx);
@@ -223,8 +217,6 @@ void kr_quic_table_sweep(struct kr_quic_table *table,
 			session2_event(c->h.session->transport.parent,
 					PROTOLAYER_EVENT_DISCONNECT,
 					NULL);
-
-
 		} else if (kr_quic_conn_timeout(c, &now)) {
 			int ret = ngtcp2_conn_handle_expiry(c->conn, now);
 			if (ret != NGTCP2_NO_ERROR) {
@@ -265,10 +257,11 @@ static enum protolayer_iter_cb_result pl_quic_demux_unwrap(void *sess_data,
 	struct pl_quic_conn_sess_data *qconn = NULL;
 	struct pl_quic_demux_sess_data *demux = sess_data;
 
-	if (kr_fails_assert(ctx->payload.type == PROTOLAYER_PAYLOAD_WIRE_BUF)) {
-		kr_log_warning(DOQ, "Unexpected payload type in quic-conn\n");
-		return protolayer_break(ctx, kr_error(ENOTSUP));
-	}
+	/* Currently we only receive WIRE_BUF payload */
+	// if (ctx->payload.type == PROTOLAYER_PAYLOAD_WIRE_BUF) {
+	// 	kr_log_warning(DOQ, "Unexpected payload type in quic-demux\n");
+	// 	return protolayer_break(ctx, kr_error(ENOTSUP));
+	// }
 
 	ngtcp2_version_cid dec_cids;
 	ngtcp2_cid odcid;
@@ -361,7 +354,8 @@ static enum protolayer_iter_cb_result pl_quic_demux_unwrap(void *sess_data,
 			memcpy(&odcid, &dcid, sizeof(odcid));
 		}
 
-		if (!demux->h.session->outgoing) {
+		/* TODO remove likely once outgoing DoQ is supported */
+		if (likely(!demux->h.session->outgoing)) {
 			if (!init_unique_cid(&dcid, 0, demux->conn_table)) {
 				kr_log_error(DOQ, "Failed to initialize unique cid (servers choice)\n");
 				return protolayer_break(ctx, kr_ok());
@@ -388,8 +382,6 @@ static enum protolayer_iter_cb_result pl_quic_demux_unwrap(void *sess_data,
 					1,
 					false);
 
-		new_conn_sess->comm_storage = demux->h.session->comm_storage;
-
 		struct pl_quic_conn_sess_data *conn_sess_data =
 			protolayer_sess_data_get_proto(new_conn_sess,
 					PROTOLAYER_TYPE_QUIC_CONN);
@@ -401,12 +393,21 @@ static enum protolayer_iter_cb_result pl_quic_demux_unwrap(void *sess_data,
 	ret = session2_unwrap(qconn->h.session,
 			ctx->payload,
 			ctx->comm,
+			// NULL,
 			ctx->finished_cb,
 			ctx->finished_cb_baton);
 
-	quic_conn_mark_used(qconn, demux->conn_table);
-	// kr_quic_table_sweep(demux->conn_table, ctx);
+	
+	if (!QUIC_CAN_SEND(qconn)) {
+		/* Explicitly remove the connection session. */
+		session2_event(qconn->h.session->transport.parent,
+				PROTOLAYER_EVENT_DISCONNECT,
+				NULL);
+		return protolayer_break(ctx, kr_ok());
+	}
 
+	quic_conn_mark_used(qconn, demux->conn_table);
+	kr_quic_table_sweep(demux->conn_table, ctx);
 	return protolayer_break(ctx, kr_ok());
 }
 
@@ -493,7 +494,6 @@ static int pl_quic_demux_sess_init(struct session2 *session, void *sess_data, vo
 	}
 
 	struct tls_credentials *creds = the_network->tls_credentials;
-	kr_require(creds->credentials != NULL);
 
 	if (!quic->conn_table) {
 		quic->conn_table = kr_quic_table_new(QUIC_MAX_OPEN_CONNS,
@@ -503,8 +503,6 @@ static int pl_quic_demux_sess_init(struct session2 *session, void *sess_data, vo
 			kr_log_error(DOQ, "Failed to create QUIC connection table\n");
 			return kr_error(ENOMEM);
 		}
-
-		kr_require(quic->conn_table);
 	}
 
 	return kr_ok();
@@ -556,11 +554,27 @@ static enum protolayer_event_cb_result pl_quic_demux_event_unwrap(
 		struct session2 *session, void *sess_data)
 {
 	struct pl_quic_demux_sess_data *demux = sess_data;
+	if (event == PROTOLAYER_EVENT_CLOSE || event == PROTOLAYER_EVENT_FORCE_CLOSE) {
+		while (!EMPTY_HEAP(demux->conn_table->expiry_heap)) {
+			struct pl_quic_conn_sess_data *c =
+				*(struct pl_quic_conn_sess_data **)HHEAD(
+						demux->conn_table->expiry_heap);
+			kr_quic_table_rem(c, demux->conn_table);
+			session2_close(c->h.session);
+		}
+
+		session2_dec_refs(session);
+		return PROTOLAYER_EVENT_CONSUME;
+	}
+
+	if (*baton == NULL) {
+		return PROTOLAYER_EVENT_PROPAGATE;
+	}
+
+	struct pl_quic_conn_sess_data *conn = *baton;
 
 	/* received NEW_CONNECTION_ID, update mapping to conn_sess_data */
 	if (event == PROTOLAYER_EVENT_CONNECT_UPDATE) {
-		kr_require(*baton);
-		struct pl_quic_conn_sess_data *conn = *baton;
 		if (update_connection_id_map(demux, conn) != kr_ok()) {
 			event = PROTOLAYER_EVENT_DISCONNECT;
 			/* fallthrough */
@@ -568,36 +582,16 @@ static enum protolayer_event_cb_result pl_quic_demux_event_unwrap(
 	}
 
 	if (event == PROTOLAYER_EVENT_CONNECT_RETIRE) {
-		kr_require(*baton);
-		struct pl_quic_conn_sess_data *conn = *baton;
 		if (remove_connection_id(demux, &conn->dcid, conn) != kr_ok()) {
 			event = PROTOLAYER_EVENT_DISCONNECT;
 			/* fallthrough */
 		}
 	}
 
-	if (event == PROTOLAYER_EVENT_CLOSE || event == PROTOLAYER_EVENT_FORCE_CLOSE) {
-		while (!EMPTY_HEAP(demux->conn_table->expiry_heap)) {
-			struct pl_quic_conn_sess_data *c =
-				*(struct pl_quic_conn_sess_data **)HHEAD(
-						demux->conn_table->expiry_heap);
-			kr_quic_table_rem(c, demux->conn_table);
-			session2_event(c->h.session,
-					PROTOLAYER_EVENT_DISCONNECT, NULL);
-		}
-
-		session2_dec_refs(session);
-		return PROTOLAYER_EVENT_CONSUME;
-	}
-
 	if (event == PROTOLAYER_EVENT_DISCONNECT ||
 			event == PROTOLAYER_EVENT_CONNECT_TIMEOUT) {
-		if (*baton == NULL)
-			return PROTOLAYER_EVENT_CONSUME;
-
-		struct pl_quic_conn_sess_data *conn = *baton;
 		kr_quic_table_rem(conn, demux->conn_table);
-		session2_event(conn->h.session, PROTOLAYER_EVENT_DISCONNECT, NULL);
+		session2_close(conn->h.session);
 		return PROTOLAYER_EVENT_CONSUME;
 	}
 
