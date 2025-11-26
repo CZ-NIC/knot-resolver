@@ -32,7 +32,7 @@ static int net_list_add(const char *b_key, uint32_t key_len, trie_val_t *val, vo
 			lua_pushliteral(L, "tls");
 		} else if (ep->flags.xdp) {
 			lua_pushliteral(L, "xdp");
-		} else if (ep->flags.doq) {
+		} else if (ep->flags.quic) {
 			lua_pushliteral(L, "doq");
 		} else {
 			lua_pushliteral(L, "dns");
@@ -142,17 +142,17 @@ static bool net_listen_addrs(lua_State *L, int port, endpoint_flags_t flags, int
 			flags.sock_type = SOCK_DGRAM;
 			ret = network_listen(str, port, nic_queue, flags);
 		}
-		if (!flags.kind && flags.doq && ret == 0) {
+		if (!flags.kind && flags.quic && ret == 0) {
 			flags.sock_type = SOCK_DGRAM;
 			ret = network_listen(str, port, nic_queue, flags);
 		}
-		if (!flags.kind && !flags.xdp && ret == 0) { /* common for TCP, DoT and DoH (v2) */
+		if (!flags.kind && !flags.xdp && !flags.quic && ret == 0) { /* common for TCP, DoT and DoH (v2) */
 			flags.sock_type = SOCK_STREAM;
 			ret = network_listen(str, port, nic_queue, flags);
 		}
 		if (flags.kind) {
 			flags.kind = strdup(flags.kind);
-			if (flags.doq)
+			if (flags.quic)
 				flags.sock_type =  SOCK_DGRAM;
 			else
 				flags.sock_type = SOCK_STREAM; /* TODO: allow to override this? */
@@ -265,7 +265,7 @@ static int net_listen(lua_State *L)
 		} else if (k && strcasecmp(k, "doh2") == 0) {
 			flags.tls = flags.http = true;
 		} else if (k && strcasecmp(k, "doq") == 0) {
-			flags.tls = flags.doq = true;
+			flags.tls = flags.quic = true;
 		} else if (k) {
 			flags.kind = k;
 			if (strcasecmp(k, "doh") == 0) {

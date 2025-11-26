@@ -26,7 +26,7 @@ typedef struct {
 	bool tls;         /**< only used together with .kind == NULL and SOCK_STREAM */
 	bool http;        /**< DoH2, implies .tls (in current implementation) */
 	bool xdp;         /**< XDP is special (not a normal socket, in particular) */
-	bool doq;         /**< TODO: Comment */
+	bool quic;         /**< DoQ, implies .tls (in current implementation) */
 	bool freebind;    /**< used for binding to non-local address */
 	const char *kind; /**< tag for other types: "control" or module-handled kinds */
 } endpoint_flags_t;
