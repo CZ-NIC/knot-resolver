@@ -21,21 +21,11 @@ API_SOCK_FILE = RUN_DIR / "kres-api.sock"
 KRESD_EXECUTABLE = SBIN_DIR / "kresd"
 KRES_CACHE_GC_EXECUTABLE = SBIN_DIR / "kres-cache-gc"
 
-LINUX_SYS = False
-if platform.system() == "Linux":
-    LINUX_SYS = True
+LINUX_SYS = platform.system() == "Linux"
+FREEBSD_SYS = platform.system() == "FreeBSD"
 
-FREEBSD_SYS = False
-if platform.system() == "FreeBSD":
-    FREEBSD_SYS = True
-
-WATCHDOG_LIB = False
-if importlib.util.find_spec("watchdog"):
-    WATCHDOG_LIB = True
-
-PROMETHEUS_LIB = False
-if importlib.util.find_spec("prometheus_client"):
-    PROMETHEUS_LIB = True
+WATCHDOG_LIB = bool(importlib.util.find_spec("watchdog"))
+PROMETHEUS_LIB = bool(importlib.util.find_spec("prometheus_client"))
 
 
 def _freebsd_workers_support() -> bool:
