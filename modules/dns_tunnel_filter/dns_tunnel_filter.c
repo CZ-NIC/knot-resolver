@@ -142,6 +142,8 @@ static void do_filter(kr_layer_t *ctx, knot_pkt_t *pkt)
 	struct kr_query *qry = req->current_query;
 	if (!ensure_loaded())
 		return;
+	if (kr_request_unblocked(req))
+		return;
 	if (!req->qsource.addr)
 		return;  // don't consider internal requests
 	if (req->qsource.price_factor16 == 0)
