@@ -3,7 +3,7 @@ import os
 import socket
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
-from knot_resolver.constants import API_SOCK_FILE, FREEBSD_SYS, LINUX_SYS, RUN_DIR, VERSION
+from knot_resolver.constants import API_SOCK_FILE, RUN_DIR, VERSION, WORKERS_SUPPORT
 from knot_resolver.datamodel.cache_schema import CacheSchema
 from knot_resolver.datamodel.defer_schema import DeferSchema
 from knot_resolver.datamodel.dns64_schema import Dns64Schema
@@ -161,17 +161,18 @@ class KresConfig(ConfigSchema):
         return obj.hostname
 
     def _workers(self, obj: Raw) -> Any:
-        no_support_msg = "On this system, you cannot run more than one worker because SO_REUSEPORT/SO_REUSEPORT_LB socket option is not supported."
-
-        workers_support = LINUX_SYS or FREEBSD_SYS
-        if not workers_support and (int(obj.workers) > 1):
-            raise ValueError(no_support_msg)
+        no_workers_support_msg = (
+            "On this system, you cannot run more than one worker because "
+            "SO_REUSEPORT (Linux) or SO_REUSEPORT_LB (FreeBSD) socket option is not supported."
+        )
+        if not WORKERS_SUPPORT and (int(obj.workers) > 1):
+            raise ValueError(no_workers_support_msg)
 
         if obj.workers == "auto":
-            if not workers_support:
+            if not WORKERS_SUPPORT:
                 logger.info(
                     "Running on system without support for multiple workers,"
-                    f"' workers' configuration automatically set to 1. {no_support_msg}"
+                    f"' workers' configuration automatically set to 1. {no_workers_support_msg}"
                 )
                 return IntPositive(1)
 
