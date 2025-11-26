@@ -27,7 +27,7 @@ target = {{ config.target }}
 supervisor.rpcinterface_factory = knot_resolver.controller.supervisord.plugin.manager_integration:inject
 
 {# sd_notify is supported only on Linux based systems #}
-{% if config.linux_sys -%}
+{% if config.notify_support -%}
 [rpcinterface:sd_notify]
 supervisor.rpcinterface_factory = knot_resolver.controller.supervisord.plugin.sd_notify:inject
 {%- endif %}

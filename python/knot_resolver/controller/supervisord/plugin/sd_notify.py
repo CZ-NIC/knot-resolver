@@ -2,9 +2,9 @@
 # ruff: noqa: SLF001
 # pylint: disable=c-extension-no-member
 
-from knot_resolver.constants import LINUX_SYS
+from knot_resolver.constants import NOTIFY_SUPPORT
 
-if LINUX_SYS:
+if NOTIFY_SUPPORT:
     import os
     import signal
     import time

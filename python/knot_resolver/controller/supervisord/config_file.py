@@ -7,7 +7,7 @@ from typing import Literal
 
 from jinja2 import Template
 
-from knot_resolver.constants import FREEBSD_SYS, KRES_CACHE_GC_EXECUTABLE, KRESD_EXECUTABLE, LINUX_SYS
+from knot_resolver.constants import KRES_CACHE_GC_EXECUTABLE, KRESD_EXECUTABLE, LINUX_SYS, NOTIFY_SUPPORT
 from knot_resolver.controller.interface import KresID, SubprocessType
 from knot_resolver.datamodel.config_schema import KresConfig, workers_max_count
 from knot_resolver.datamodel.logging_schema import LogTargetEnum
@@ -114,19 +114,15 @@ class ProcessTypeConfig:
         cwd = str(os.getcwd())
         environment = 'SYSTEMD_INSTANCE="%(process_num)d"'
 
-        # Default for non-Linux systems without SO_REUSEPORT/SO_REUSEPORT_LB support.
-        # This means that there is no support for multiple kresd workers and NOTIFY messages.
-        startsecs = 0
+        # Default for non-Linux systems without support for systemd NOTIFY message.
+        # Therefore, we need to give the kresd workers a few seconds to start properly.
+        startsecs = 3
 
-        if LINUX_SYS:
-            # There is support for the SO_REUSEPORT option and support for NOTIFY message.
+        if NOTIFY_SUPPORT:
+            # There is support for systemd NOTIFY message.
             # Here, 'startsecs' serves as a timeout for waiting for NOTIFY message.
             startsecs = 60
             environment += ",X-SUPERVISORD-TYPE=notify"
-        elif FREEBSD_SYS:
-            # There is support for the SO_REUSEPORT_LB option, but no support for NOTIFY message.
-            # Therefore, we need to give the kresd workers a few seconds to start properly.
-            startsecs = 3
 
         return ProcessTypeConfig(  # type: ignore[call-arg]
             logfile=supervisord_subprocess_log_dir(config) / "kresd%(process_num)d.log",
@@ -156,13 +152,13 @@ class ProcessTypeConfig:
 
         cmd = '"' + '" "'.join(args) + '"'
         environment = "KRES_SUPRESS_LOG_PREFIX=true"
-        if LINUX_SYS:
+        if NOTIFY_SUPPORT:
             environment += ",X-SUPERVISORD-TYPE=notify"
 
         return ProcessTypeConfig(  # type: ignore[call-arg]
             workdir=user_constants().working_directory_on_startup,
             command=cmd,
-            startsecs=600 if LINUX_SYS else 0,
+            startsecs=600 if NOTIFY_SUPPORT else 0,
             environment=environment,
             logfile=Path(""),  # this will be ignored
         )
@@ -176,7 +172,7 @@ class SupervisordConfig:
     logfile: Path
     loglevel: Literal["critical", "error", "warn", "info", "debug", "trace", "blather"]
     target: LogTargetEnum
-    linux_sys: bool
+    notify_support: bool
 
     @staticmethod
     def create(config: KresConfig) -> "SupervisordConfig":
@@ -200,7 +196,7 @@ class SupervisordConfig:
             logfile=Path("syslog" if config.logging.target == "syslog" else "/dev/null"),
             loglevel=loglevel,  # type: ignore[arg-type]
             target=config.logging.target,
-            linux_sys=LINUX_SYS,
+            notify_support=NOTIFY_SUPPORT,
         )
 
 
