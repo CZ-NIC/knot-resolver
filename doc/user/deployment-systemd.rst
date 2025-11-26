@@ -13,7 +13,7 @@ If you don't have systemd service file for Knot Resolver already installed in yo
 
 
 .. literalinclude:: ../../systemd/knot-resolver.service.in
-    :language: bash
+    :language: systemd
 
 .. note::
 

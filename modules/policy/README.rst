@@ -119,7 +119,7 @@ Following actions stop the policy matching on the query, i.e. other rules are no
 
    Let the query pass through; it's useful to make exceptions before wider rules. For example:
 
-   More specific whitelist rule must precede generic blacklist rule:
+   More specific whitelist rule must precede generic blocklist rule:
 
    .. code-block:: lua
 
@@ -416,10 +416,10 @@ Actions :func:`policy.FORWARD`, :func:`policy.TLS_FORWARD` and :func:`policy.STU
    .. code-block:: lua
 
       -- Answers for reverse queries about the 192.168.1.0/24 subnet
-      -- are to be obtained from IP address 192.0.2.1 port 5353
+      -- are to be obtained from IP address 192.0.2.1 port 5335
       -- This disables DNSSEC validation!
       policy.add(policy.suffix(
-          policy.STUB('192.0.2.1@5353'),
+          policy.STUB('192.0.2.1@5335'),
           {todname('1.168.192.in-addr.arpa')}))
 
 .. note:: By default, forwarding targets must support

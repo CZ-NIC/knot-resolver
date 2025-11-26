@@ -5,7 +5,7 @@ from knot_resolver.datamodel.forward_schema import ForwardSchema
 from knot_resolver.utils.modeling.exceptions import DataValidationError
 
 
-@pytest.mark.parametrize("port,auth", [(5353, False), (53, True)])
+@pytest.mark.parametrize("port,auth", [(5335, False), (53, True)])
 def test_forward_valid(port: int, auth: bool):
     assert ForwardSchema(
         {"subtree": ".", "options": {"authoritative": auth, "dnssec": True}, "servers": [f"127.0.0.1", "::1"]}
@@ -33,7 +33,7 @@ def test_forward_valid(port: int, auth: bool):
 
 @pytest.mark.parametrize(
     "port,auth,tls",
-    [(5353, True, False), (53, True, True)],
+    [(5335, True, False), (53, True, True)],
 )
 def test_forward_invalid(port: int, auth: bool, tls: bool):
     if not tls:

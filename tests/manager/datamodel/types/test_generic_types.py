@@ -17,7 +17,7 @@ def test_list_or_item_inner_type(val: Any):
 @pytest.mark.parametrize(
     "typ,val",
     [
-        (int, [1, 65_535, 5353, 5000]),
+        (int, [1, 65_535, 5335, 5000]),
         (int, 65_535),
         (str, ["string1", "string2"]),
         (str, "string1"),
@@ -42,7 +42,7 @@ def test_list_or_item_valid(typ: Any, val: Any):
     [
         (str, [True, False, True, False]),
         (str, False),
-        (bool, [1, 65_535, 5353, 5000]),
+        (bool, [1, 65_535, 5335, 5000]),
         (bool, 65_535),
         (int, "string1"),
         (int, ["string1", "string2"]),

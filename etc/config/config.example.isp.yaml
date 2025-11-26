@@ -25,14 +25,14 @@ views:
   # refuse everything that hasn't matched
   - subnets: [ 0.0.0.0/0, "::/0" ]
     answer: refused
-  # whitelist queries identified by subnet
+  # allow queries identified by subnet
   - subnets: [ 192.0.2.0/24 ]
     answer: allow
 
 local-data:
   rpz:
     # apply RPZ for all clients, default rule is DENY
-    - file: blacklist.rpz
+    - file: blocklist.rpz
 
 lua:
   script: |

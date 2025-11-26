@@ -39,6 +39,7 @@ Following functions allow to modify DNSSEC configuration *if you really have to*
    Example output:
 
    .. code-block:: lua
+      :force:
 
       > trust_anchors.add_file('root.key')
       [ ta ] new state of trust anchors for a domain:

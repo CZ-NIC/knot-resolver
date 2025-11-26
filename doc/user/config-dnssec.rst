@@ -73,7 +73,7 @@ Following :option:`dnssec <dnssec: <options>>` section allows to modify DNSSEC c
    .. option:: negative-trust-anchors: <list of domain names>
 
       When you use a domain name as an *negative trust anchor* (NTA), DNSSEC validation will be turned off at/below these names.
-      If you want to disable DNSSEC validation completely, set ``dnssec: false`` instead.
+      If you want to disable DNSSEC validation completely, set ``dnssec/enable: false`` instead (see above).
 
       .. code-block:: yaml
 

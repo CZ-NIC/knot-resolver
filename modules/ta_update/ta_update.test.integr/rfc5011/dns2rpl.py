@@ -32,12 +32,12 @@ def store_answer(qname, qtype, template):
 
 def resolver_init():
     """
-    Configure dns.resolver to ask ::1@5353 with EDNS0 DO set.
+    Configure dns.resolver to ask ::1@5335 with EDNS0 DO set.
     """
     dns.resolver.reset_default_resolver()
     dns.resolver.default_resolver.use_edns(0, dns.flags.DO, 4096)
     dns.resolver.default_resolver.nameservers = ['::1']
-    dns.resolver.default_resolver.nameserver_ports = {'::1': 5353}
+    dns.resolver.default_resolver.nameserver_ports = {'::1': 5335}
     dns.resolver.default_resolver.flags = 0
 
 
