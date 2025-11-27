@@ -70,44 +70,6 @@ void kr_gc_cache_close(struct kr_cache *kres_db, knot_db_t * knot_db)
 	kr_cache_close(kres_db);
 }
 
-int kr_gc_key_consistent(knot_db_val_t key)
-{
-	const uint8_t *kd = key.data;
-	ssize_t i;
-	/* CACHE_KEY_DEF */
-	if (key.len >= 2 && kd[0] == '\0') {
-		/* Beware: root zone is special and starts with
-		 *         a single \0 followed by type sign */
-		i = 1;
-	} else {
-		/* find the first double zero in the key */
-		for (i = 2; (i < key.len) && (kd[i - 1] || kd[i - 2]); ++i);
-		if (kr_fails_assert(i < key.len))
-			return kr_error(EINVAL);
-	}
-	// the next character can be used for classification
-	switch (kd[i]) {
-	case 'E':
-		(void)0; // C can't have a variable definition following a label
-		uint16_t type;
-		if (kr_fails_assert(i + 1 + sizeof(type) <= key.len))
-			return kr_error(EINVAL);
-		memcpy(&type, kd + i + 1, sizeof(type));
-		return type;
-	case '1':
-		return KNOT_RRTYPE_NSEC;
-	case '3':
-		return KNOT_RRTYPE_NSEC3;
-	case 'S':
-		return KNOT_CACHE_RTT;
-	case 'P':
-		return KNOT_CACHE_PREFETCH;
-	default:
-		kr_assert(!EINVAL);
-		return kr_error(EINVAL);
-	}
-}
-
 /// expects that key is consistent! CACHE_KEY_DEF
 static uint8_t entry_labels(knot_db_val_t * key, uint16_t rrtype)
 {
@@ -207,7 +169,7 @@ int kr_gc_cache_iter(knot_db_t * knot_db, const  kr_cache_gc_cfg_t *cfg,
 		gc_record_info_t info = { 0 };
 		info.entry_size = kr_cache_top_entry_size(key.len, val.len);
 		info.valid = false;
-		const int entry_type = kr_gc_key_consistent(key);
+		const int entry_type = key_consistent(key);
 		const struct entry_h *entry = NULL;
 		if ((entry_type == KNOT_CACHE_RTT) || (entry_type == KNOT_CACHE_PREFETCH)) {
 			counter_gc_consistent++;

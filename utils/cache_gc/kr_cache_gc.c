@@ -263,7 +263,7 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 		switch (ret) {
 		case KNOT_EOK:
 			deleted_records++;
-			const int entry_type = kr_gc_key_consistent(*val);
+			const int entry_type = key_consistent(*val);
 			if (entry_type >= 0) { // some "inconsistent" entries are OK
 				if (entry_type == KNOT_CACHE_RTT) {
 					deleted_rtt = true;
