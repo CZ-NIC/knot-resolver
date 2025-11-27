@@ -897,18 +897,21 @@ static int pl_quic_conn_sess_deinit(struct session2 *session, void *sess_data)
 	struct pl_quic_conn_sess_data *conn = sess_data;
 	while (session2_tasklist_del_first(session, false) != NULL);
 
-	kr_log_info(DOQ, "Closing connection, %s useful, served %zu streams\n",
-			conn->finished_streams ? "was" : "wasn't",
-			conn->finished_streams);
-
 	struct pl_quic_stream_sess_data *s_node;
 	WALK_LIST_FIRST(s_node, conn->streams) {
 		struct pl_quic_stream_sess_data *s =
 			container_of(s_node, struct pl_quic_stream_sess_data, list_node);
 		rem_node(&s->list_node);
 		session2_close(s->h.session);
+		/* These streams die with the connection, stream_close_cb
+		 * will not be called so adjust counters here. */
 		--conn->streams_count;
+		++conn->finished_streams;
 	}
+
+	kr_log_info(DOQ, "Closing connection, %s useful, served %zu streams\n",
+			conn->finished_streams ? "was" : "wasn't",
+			conn->finished_streams);
 
 	if (conn->priority) {
 		gnutls_priority_deinit(conn->priority);
