@@ -21,14 +21,6 @@ typedef int (*kr_gc_iter_callback)(const knot_db_val_t * key,
 int kr_gc_cache_iter(knot_db_t * knot_db, const  kr_cache_gc_cfg_t *cfg,
 			kr_gc_iter_callback callback, void *ctx);
 
-/** Return RR type corresponding to the key, KNOT_CACHE_RTT or negative error code.
- *
- * Error is returned on unexpected values (those also trigger assertion).
- */
-int kr_gc_key_consistent(knot_db_val_t key);
-#define KNOT_CACHE_RTT 0x10000
-#define KNOT_CACHE_PREFETCH 0x10001
-
 /** Printf a *binary* string in a human-readable way. */
 void debug_printbin(const char *str, unsigned int len);
 
