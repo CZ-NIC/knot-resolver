@@ -32,16 +32,6 @@ typedef struct {
 
 struct endpoint_key;
 
-static inline bool endpoint_flags_eq(endpoint_flags_t f1, endpoint_flags_t f2)
-{
-	if (f1.sock_type != f2.sock_type)
-		return false;
-	if (f1.kind && f2.kind)
-		return strcasecmp(f1.kind, f2.kind);
-	else
-		return f1.tls == f2.tls && f1.kind == f2.kind;
-}
-
 /** Wrapper for a single socket to listen on.
  * There are two types: normal have handle, special have flags.kind (and never both).
  *
@@ -142,7 +132,7 @@ void network_unregister(void);
 void network_deinit(void);
 
 /** Start listening on addr#port with flags.
- * \note if we did listen on that combination already,
+ * \note if we did listen on a colliding combination already,
  *       nothing is done and kr_error(EADDRINUSE) is returned.
  * \note there's no short-hand to listen both on UDP and TCP.
  * \note ownership of flags.* is taken on success.  TODO: non-success?

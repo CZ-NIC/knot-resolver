@@ -466,10 +466,7 @@ finish_ret:
 	return kr_error(ret);
 }
 
-/** @internal Fetch a pointer to endpoint of given parameters (or NULL).
- * Beware that there might be multiple matches, though that's not common.
- * The matching isn't really precise in the sense that it might not find
- * and endpoint that would *collide* the passed one. */
+/** Fetch a pointer to endpoint of given parameters or a colliding one (or NULL). */
 static struct endpoint * endpoint_get(const char *addr_str,
                                       const struct sockaddr *sa,
                                       endpoint_flags_t flags)
@@ -483,10 +480,22 @@ static struct endpoint * endpoint_get(const char *addr_str,
 		return NULL;
 	endpoint_array_t *ep_array = *val;
 
-	uint16_t port = kr_inaddr_port(sa);
 	for (int i = 0; i < ep_array->len; ++i) {
 		struct endpoint *ep = &ep_array->at[i];
-		if ((flags.xdp || ep->port == port) && endpoint_flags_eq(ep->flags, flags)) {
+		if (flags.xdp) {
+			/* `key` matched by interface name */
+			kr_assert(ep_array->len == 1);
+			return ep;
+		}
+		if (kr_straddr_family(addr_str) == AF_UNIX) {
+			/* `key` matched by path */
+			kr_assert(ep_array->len == 1);
+			return ep;
+		}
+		/* `key` already matched IP address + port,
+		 * so the only remaining distinction is UDP vs. TCP */
+		if (ep->flags.sock_type == flags.sock_type) {
+			kr_assert(ep_array->len <= 2);
 			return ep;
 		}
 	}
