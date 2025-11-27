@@ -220,6 +220,44 @@ int kr_cache_clear(struct kr_cache *cache)
 	return ret;
 }
 
+int key_consistent(knot_db_val_t key)
+{
+	const uint8_t *kd = key.data;
+	ssize_t i;
+	/* CACHE_KEY_DEF */
+	if (key.len >= 2 && kd[0] == '\0') {
+		/* Beware: root zone is special and starts with
+		 *         a single \0 followed by type sign */
+		i = 1;
+	} else {
+		/* find the first double zero in the key */
+		for (i = 2; (i < key.len) && (kd[i - 1] || kd[i - 2]); ++i);
+		if (kr_fails_assert(i < key.len))
+			return kr_error(EINVAL);
+	}
+	// the next character can be used for classification
+	switch (kd[i]) {
+	case 'E':
+		(void)0; // C can't have a variable definition following a label
+		uint16_t type;
+		if (kr_fails_assert(i + 1 + sizeof(type) <= key.len))
+			return kr_error(EINVAL);
+		memcpy(&type, kd + i + 1, sizeof(type));
+		return type;
+	case '1':
+		return KNOT_RRTYPE_NSEC;
+	case '3':
+		return KNOT_RRTYPE_NSEC3;
+	case 'S':
+		return KNOT_CACHE_RTT;
+	case 'P':
+		return KNOT_CACHE_PREFETCH;
+	default:
+		kr_assert(!EINVAL);
+		return kr_error(EINVAL);
+	}
+}
+
 /* When going stricter, BEWARE of breaking entry_h_consistent_NSEC() */
 struct entry_h * entry_h_consistent_E(knot_db_val_t data, uint16_t type)
 {

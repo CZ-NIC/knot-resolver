@@ -51,6 +51,15 @@ struct entry_h {
 } __attribute__ ((packed,aligned(1)));
 struct entry_apex;
 
+/** Return RR type corresponding to the key, KNOT_CACHE_RTT, KNOT_CACHE_PREFETCH or negative error code.
+ *
+ * Error is returned on unexpected values (those also trigger assertion).
+ */
+KR_EXPORT
+int key_consistent(knot_db_val_t key);
+#define KNOT_CACHE_RTT 0x10000
+#define KNOT_CACHE_PREFETCH 0x10001
+
 /** Check basic consistency of entry_h for 'E' entries, not looking into ->data.
  * (for is_packet the length of data is checked)
  */

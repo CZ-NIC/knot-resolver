@@ -3,6 +3,7 @@
 
 #include <libknot/libknot.h>
 #include "lib/utils.h"
+#include "lib/cache/impl.h"
 #include "lib/cache/top.h"
 #include "lib/kru.h"
 #include "utils/cache_gc/db.h"
