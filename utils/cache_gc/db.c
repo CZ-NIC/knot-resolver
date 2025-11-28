@@ -4,6 +4,7 @@
 
 #include "lib/cache/cdb_lmdb.h"
 #include "lib/cache/impl.h"
+#include "lib/cache/prefetch.h"
 
 #include <ctype.h>
 #include <time.h>
@@ -171,24 +172,35 @@ int kr_gc_cache_iter(knot_db_t * knot_db, const  kr_cache_gc_cfg_t *cfg,
 		info.valid = false;
 		const int entry_type = key_consistent(key);
 		const struct entry_h *entry = NULL;
-		if ((entry_type == KNOT_CACHE_RTT) || (entry_type == KNOT_CACHE_PREFETCH)) {
+		if (entry_type >= 0) {
 			counter_gc_consistent++;
-			info.valid = true;
-			info.rrtype = entry_type;
-		} else if (entry_type >= 0) {
-			counter_gc_consistent++;
-			entry = val2entry(val, entry_type);
-		}
-		/* TODO: perhaps improve some details around here:
-		 *  - xNAME have .rrtype NS
-		 *  - DNAME hidden on NS name will not be considered here
-		 *  - if zone has NSEC* meta-data but no NS, it will be seen
-		 *    here as kr_inconsistent */
-		if (entry != NULL) {
-			info.valid = true;
-			info.rrtype = entry_type;
-			info.expires_in = entry->time + entry->ttl - now;
-			info.no_labels = entry_labels(&key, entry_type);
+			switch (entry_type) {
+				case KNOT_CACHE_PREFETCH:
+					uint32_t exp_time;
+					knot_db_val_t ekey = { 0 };
+					kr_cache_prefetch_parse_pkey(key, &ekey, &exp_time);
+					info.expires_in = exp_time - now;
+					info.prefetch_ekey = ekey.data;
+					info.prefetch_ekey_len = ekey.len;
+					// fall through
+				case KNOT_CACHE_RTT:
+					info.valid = true;
+					info.rrtype = entry_type;
+					break;
+				default:
+					/* TODO: perhaps improve some details around here:
+					 *  - xNAME have .rrtype NS
+					 *  - DNAME hidden on NS name will not be considered here
+					 *  - if zone has NSEC* meta-data but no NS, it will be seen
+					 *    here as kr_inconsistent */
+					entry = val2entry(val, entry_type);
+					if (!entry) break;
+					info.valid = true;
+					info.rrtype = entry_type;
+					info.expires_in = entry->time + entry->ttl - now;
+					info.no_labels = entry_labels(&key, entry_type);
+					break;
+			}
 		}
 		counter_iter++;
 		counter_kr_consistent += info.valid;

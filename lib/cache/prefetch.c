@@ -11,11 +11,10 @@
 #define VERBOSE_LOG(fmt, ...) kr_log_notice(CACHE, "PREFETCH  " fmt "\n", ## __VA_ARGS__)
 #define VERBOSE_LOGp(fmt, ...) { VERBOSE_LOG("%-7s" fmt, log_prefix, ## __VA_ARGS__); log_prefix = ""; }
 
-#define MIN_ACCESSES_PER_UPDATE    4     // the k-parameter from slides
+#define MIN_ACCESSES_PER_UPDATE    4     // the k-parameter from slides (real)
 #define UPDATE_BEFORE_EXP_S        5     // s
 #define FIRST_TIMEOUT_MS           1000  // ms, no prefetch during this time after init; increase?
 #define TIMER_PERIOD_MS            1000  // ms
-
 
 struct sched {
 	knot_db_val_t ekey; // RRSet record key (E type)
@@ -82,6 +81,14 @@ bool pkey2sched(knot_db_val_t pkey, struct sched *sched) {
 	return true;
 }
 
+void kr_cache_prefetch_parse_pkey(knot_db_val_t pkey, knot_db_val_t *ekey, uint32_t *exp_time) {
+	struct sched sched = { 0 };
+	pkey2sched(pkey, &sched);  // XXX false?
+	*ekey = sched.ekey;
+	*exp_time = sched.exp_time;
+	// TODO  efficiency?
+}
+
 void kr_cache_prefetch_init(uv_loop_t *loop, kr_cache_prefetch_callback_t callback) {
 	VERBOSE_LOG("INIT");
 	uv_timer_init(loop, &timer_handle);
@@ -92,24 +99,18 @@ void kr_cache_prefetch_init(uv_loop_t *loop, kr_cache_prefetch_callback_t callba
 	// + possibly configure k, etc.
 }
 
-static inline bool ekey_valid(knot_db_val_t *ekey) {
-	const uint8_t *ekey_type = ekey->data + ekey->len - 3;
-	return (ekey->len >= 4) && (ekey_type[-1] == '\0') && (ekey_type[0] == 'E');
-}
-
-void kr_cache_prefetch_sched(struct kr_request *req, knot_db_val_t key, struct entry_h *eh, size_t data_len, uint16_t rrtype) {
+void kr_cache_prefetch_sched(knot_db_val_t key, struct entry_h *eh, size_t data_len, uint16_t rrtype) {
 	if (!loop_handle) return;
-	const struct kr_cache *cache = &req->ctx->cache;  // or (&the_resolver->cache) as elsewhere?
+	struct kr_cache *cache = &the_resolver->cache;
 	VERBOSE_LOG("SCHED         %6d  %s", eh->ttl, kr_cache_top_strkey(key.data, key.len));
-	if (!ekey_valid(&key)) {
+	if (key_consistent(key) & ~0xFFFF) {
 		VERBOSE_LOG("    not E-type key");
 		return;
 	}
 
-	// FIXME  check data_len -- we need whole cache entry size
 	const int32_t time_to_update = eh->ttl - UPDATE_BEFORE_EXP_S;
 	if (time_to_update < 1) return;
-	const uint16_t load = kr_cache_top_load(&req->ctx->cache.top, key.data, key.len);
+	const uint16_t load = kr_cache_top_load(&cache->top, key.data, key.len);
 	const double accesses = (double)load * (1<<16) / kr_cache_top_entry_price(&cache->top, kr_cache_top_entry_size(key.len, data_len));
 		// includes the just occurring write access
 	const double exp_acc_decrease = accesses * (1 - kr_cache_top_decay_mult(&cache->top, time_to_update));
@@ -127,28 +128,40 @@ void kr_cache_prefetch_sched(struct kr_request *req, knot_db_val_t key, struct e
 	sched.ekey = key;
 	sched.rrtype = rrtype;
 	sched.exp_time = eh->time + eh->ttl;
-	sched.priority = MIN(sqrt(accesses * /* top base price */ 5), 255);  // TODO  consider this vs lin-log gc categories
-		// accesses distributed in range of 1B for normal-size records (capped for larger)
+	sched.priority = MIN(sqrt(accesses * /* top base price */ 5) + 1, 255);  // TODO  consider this vs lin-log gc categories
+		// accesses distributed in range of 1B for normal-size records (non-zero, capped for larger)
 
 	knot_db_val_t pkey = sched2pkey(sched);
-	cache_op(&req->ctx->cache, write, &pkey, &key, 1);
+	knot_db_val_t data = { 0 };
+	cache_op(cache, write, &pkey, &data, 1);
 
 	eh->prefetch_priority = sched.priority;
 
 	// to be called during another write transaction, so we are not committing here
 }
 
+void kr_cache_prefetch_unsched(knot_db_val_t key, struct entry_h *eh, uint16_t rrtype) {
+	if (!eh || !eh->prefetch_priority) return;
+	VERBOSE_LOG("UNSCHED               %s", kr_cache_top_strkey(key.data, key.len));
+	struct sched sched = {
+		.ekey = key,
+		.rrtype = rrtype,
+		.exp_time = eh->time + eh->ttl,
+		.priority = eh->prefetch_priority,
+	};
+	knot_db_val_t pkey = sched2pkey(sched);
+	cache_op(&the_resolver->cache, remove, &pkey, 1);
+}
+
 bool resolve_ekey(knot_db_val_t *ekey, uint16_t rrtype) {
 	if (!update_callback) return false;
-	const uint8_t *ekey_name = ekey->data;
-	const uint8_t *ekey_type = ekey->data + ekey->len - 3;
-	if (!ekey_valid(ekey)) {
-		VERBOSE_LOG("    invalid ekey: %d %d %s", ekey_type[-1], ekey_type[0], kr_cache_top_strkey(ekey->data, ekey->len));
+	if (key_consistent(*ekey) & ~0xFFFF) {  // E-type key
+		VERBOSE_LOG("    invalid ekey: %s", kr_cache_top_strkey(ekey->data, ekey->len));
 		return false;
 	}
 
 	knot_dname_t qname[KNOT_DNAME_MAXLEN];
-	int qname_len = knot_dname_lf2wire(qname, ekey_type - ekey_name - 1, ekey_name);
+	int qname_len = knot_dname_lf2wire(qname, ekey->len - 4, ekey->data);
 	if (qname_len < 0) {
 		VERBOSE_LOG("    cannot convert to qname");
 		return false;
@@ -208,11 +221,10 @@ void timer_callback(uv_timer_t *handle) {
 
 		ret = cache_op(&the_resolver->cache, read, &sched.ekey, &val, 1);
 		if (ret != 0) {
-			VERBOSE_LOGp("ekey not found in cache", kr_cache_top_strkey(sched.ekey.data, sched.ekey.len));
+			VERBOSE_LOGp("ekey not found in cache");
 			continue;
 		}
 
-		entry_list_t el;
 		ret = entry_h_seek(&val, sched.rrtype);
 		if (ret != 0) {
 			VERBOSE_LOGp("invalid data for ekey");

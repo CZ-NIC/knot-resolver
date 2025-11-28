@@ -7,6 +7,7 @@
  */
 
 #include "lib/cache/impl.h"
+#include "lib/cache/prefetch.h"
 #include "lib/utils.h"
 
 
@@ -234,21 +235,20 @@ int entry_h_splice(
 	const struct entry_h *eh_orig = NULL;
 	entry_list_t el;
 	int ret = -1;
-	if (!kr_rank_test(rank, KR_RANK_SECURE) || ktype == KNOT_RRTYPE_NS) {
+	{
 		knot_db_val_t val;
 		ret = cache_op(cache, read, &key, &val, 1);
 		if (i_type) {
 			if (!ret) ret = entry_list_parse(val, el);
 			if (ret) memset(el, 0, sizeof(el));
 			val = el[i_type];
+		} else {
+			memset(el, 0, sizeof(el));
 		}
 		/* val is on the entry, in either case (or error) */
 		if (!ret) {
 			eh_orig = entry_h_consistent_E(val, type);
 		}
-	} else {
-		/* We want to fully overwrite the entry, so don't even read it. */
-		memset(el, 0, sizeof(el));
 	}
 
 	if (!kr_rank_test(rank, KR_RANK_SECURE) && eh_orig) {
@@ -270,6 +270,8 @@ int entry_h_splice(
 			return kr_error(EEXIST);
 		}
 	}
+
+	kr_cache_prefetch_unsched(key, eh_orig, type);
 
 	if (!i_type) {
 		/* The non-list types are trivial now. */

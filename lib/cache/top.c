@@ -188,6 +188,7 @@ char *kr_cache_top_strkey(void *key, size_t len)
 	bool decimal_bytes = false;
 	int force_bytes = 0;
 	char *strp = str;
+	int zeroes = 1;  // consecutive zeroes or key beginning in text mode (not fully reliable but good enough)
 	for (size_t i = 0; i < len; i++) {
 		unsigned char c = k[i];
 		if ((force_bytes-- <= 0) &&
@@ -195,13 +196,18 @@ char *kr_cache_top_strkey(void *key, size_t len)
 			//if (c == ' ') c = '_';
 			if (c == 0)   c = '|';
 			if (bytes_mode) {
-				if (decimal_bytes) strp--;
+				if (decimal_bytes) {
+					strp--;
+				} else {
+					*strp++ = 'x';
+				}
 				*strp++ = '>';
 				bytes_mode = false;
 				decimal_bytes = false;
 			}
 			*strp++ = c;
-			if ((i > 0) && (k[i - 1] == '\0') && ((i == 1) || k[i - 2] == '\0')) {
+			if (zeroes >= 2) {
+				zeroes = 0;
 				switch (k[i]) {
 					case 'S':
 						if (len == 6) decimal_bytes = true;
@@ -215,7 +221,14 @@ char *kr_cache_top_strkey(void *key, size_t len)
 						break;
 					case 'P':
 						force_bytes = 5;
+						zeroes = 1;  // E-key begins after forced bytes
 						break;
+				}
+			} else {
+				if (k[i] == '\0') {
+					zeroes++;
+				} else {
+					zeroes = 0;
 				}
 			}
 		} else {
