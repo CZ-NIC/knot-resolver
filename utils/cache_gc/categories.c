@@ -25,10 +25,18 @@ category_t kr_gc_categorize(struct kr_cache_top *top, gc_record_info_t * info, v
 
 	if (!info->valid) {
 		// invalid entries will be evicted first
-		return CATEGORIES - 1;
+		res = CATEGORIES - 1;
+		goto done;
 	}
 
-	uint16_t load = kr_cache_top_load(top, key, key_len);
+	if ((info->rrtype == KNOT_CACHE_PREFETCH) && (info->expires_in <= 0)) {
+		res = CATEGORIES - 1;
+		goto done;
+	}
+
+	uint16_t load = info->rrtype == KNOT_CACHE_PREFETCH ?
+			kr_cache_top_load(top, info->prefetch_ekey, info->prefetch_ekey_len) :
+			kr_cache_top_load(top, key, key_len);
 	res = load2cat(load);  // 0..64
 
 	if ((info->rrtype != KNOT_CACHE_RTT) && (info->expires_in <= 0)) {
@@ -38,15 +46,22 @@ category_t kr_gc_categorize(struct kr_cache_top *top, gc_record_info_t * info, v
 	static_assert(CATEGORIES - 1 > 97, "inssuficient CATEGORIES number");
 
 	if (!kr_log_is_debug(CACHE, NULL)) // skip these computations if not needed
-		goto finish;
+		return res;
 
-	const kru_price_t price = kr_cache_top_entry_price(top, info->entry_size);
-	const double accesses = (double)((kru_price_t)load << (KRU_PRICE_BITS - 16)) / price;
-	kr_log_debug(CACHE, "cat %02d %6d l %8.1f acc %6ld B %8ld s  %s\n",
-		res, load, accesses, info->entry_size, info->expires_in,
-		kr_cache_top_strkey(key, key_len)
-	);
+done:
+	if (info->rrtype != KNOT_CACHE_PREFETCH) {
+		const kru_price_t price = kr_cache_top_entry_price(top, info->entry_size);
+		const double accesses = (double)((kru_price_t)load << (KRU_PRICE_BITS - 16)) / price;
+		kr_log_debug(CACHE, "cat %02d %6d l %8.1f acc %6ld B %8ld s  %s\n",
+			res, load, accesses, info->entry_size, info->expires_in,
+			kr_cache_top_strkey(key, key_len)
+		);
+	} else {
+		kr_log_debug(CACHE, "cat %02d                       %6ld B %8ld s  %s\n",
+			res, info->entry_size, info->expires_in,
+			kr_cache_top_strkey(key, key_len)
+		);
+	}
 
-finish:
 	return res;
 }
