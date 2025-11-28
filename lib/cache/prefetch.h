@@ -17,9 +17,17 @@ struct entry_h;
 // Try scheduling prefetching.
 // To be called during write transaction of (key, eh); eh may be modified inside.
 KR_EXPORT
-void kr_cache_prefetch_sched(struct kr_request *req, knot_db_val_t key, struct entry_h *eh, size_t data_len, uint16_t rrtype);
+void kr_cache_prefetch_sched(knot_db_val_t key, struct entry_h *eh, size_t data_len, uint16_t rrtype);
 	// XXX call either directly or from top_access to compute hash just once
+
+// Cancel scheduled prefetching if set. Void if eh is NULL.
+KR_EXPORT
+void kr_cache_prefetch_unsched(knot_db_val_t key, struct entry_h *eh, uint16_t rrtype);
+
 
 // Pauses prefetching if deferred packets exist.
 // To be called from defer to announce its state.
 void kr_cache_prefetch_defer_state(bool waiting_packets); // TODO
+
+KR_EXPORT
+void kr_cache_prefetch_parse_pkey(knot_db_val_t pkey, knot_db_val_t *ekey, uint32_t *exp_time);

@@ -265,7 +265,7 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 			deleted_records++;
 			const int entry_type = key_consistent(*val);
 			if (entry_type >= 0) { // some "inconsistent" entries are OK
-				if (entry_type == KNOT_CACHE_RTT) {
+				if (entry_type == KNOT_CACHE_RTT) {  // TODO add PREFETCH
 					deleted_rtt = true;
 				} else {
 					rrtypelist_add(&deleted_rrtypes, entry_type);
