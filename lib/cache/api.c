@@ -170,7 +170,8 @@ int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct k
 		free_const(top_path);
 	}
 	if (ret != 0) {
-		cache->api->close(cache->db, &cache->stats);
+		cache_op(cache, close);
+		cache->db = NULL;
 		return ret;
 	}
 
