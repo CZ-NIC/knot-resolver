@@ -9,7 +9,7 @@ typedef struct {
 	size_t entry_size;	// amount of bytes occupied in cache by this record
 	bool valid;		// fields further down are valid (ignore them if false)
 	int64_t expires_in;	// < 0 => already expired
-	uint16_t rrtype;
+	uint32_t rrtype;	// RR type or KNOT_CACHE_RTT
 	uint8_t no_labels;	// 0 == ., 1 == root zone member, 2 == TLD member ...
 	uint8_t rank;
 } gc_record_info_t;

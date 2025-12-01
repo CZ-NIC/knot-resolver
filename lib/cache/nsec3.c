@@ -7,6 +7,7 @@
  */
 
 #include "lib/cache/impl.h"
+#include "lib/cache/top.h"
 
 #include "contrib/base32hex.h"
 #include "lib/dnssec/nsec.h"
@@ -181,7 +182,7 @@ static const char * find_leq_NSEC3(struct kr_cache *cache, const struct kr_query
 	}
 	if (is_exact) {
 		/* Nothing else to do. */
-		return NULL;
+		goto success;
 	}
 	/* The NSEC3 starts strictly before our target name;
 	 * now check that it still belongs into that zone and chain. */
@@ -215,6 +216,10 @@ static const char * find_leq_NSEC3(struct kr_cache *cache, const struct kr_query
 	if (!covers) {
 		return "range search miss (!covers)";
 	}
+
+success:
+
+	kr_cache_top_access(qry->request, key_found.data, key_found.len, val.len, "leq_nsec3");  // hits only
 	return NULL;
 }
 

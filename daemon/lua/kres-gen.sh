@@ -143,11 +143,14 @@ ${CDEFS} ${LIBKRES} types <<-EOF
 	struct kr_rule_fwd_flags
 	typedef kr_rule_fwd_flags_t
 	struct kr_extended_error
+	struct kr_cache_top_context
 	struct kr_request
 	enum kr_rank
 	typedef kr_cdb_pt
 	struct kr_cdb_stats
 	typedef uv_timer_t
+	struct mmapped
+	struct kr_cache_top
 	struct kr_cache
 	# lib/layer.h
 	kr_layer_t

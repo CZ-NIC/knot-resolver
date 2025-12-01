@@ -178,7 +178,7 @@ int kr_rules_init(const char *path, size_t maxsize, bool overwrite)
 	};
 	int ret = the_rules->api->open(&the_rules->db, &the_rules->stats, &opts, NULL);
 
-	if (ret == 0 && overwrite) ret = ruledb_op(clear);
+	if (ret == 0 && overwrite) ret = ruledb_op(clear, 0);
 	if (ret != 0) goto failure;
 	kr_require(the_rules->db);
 

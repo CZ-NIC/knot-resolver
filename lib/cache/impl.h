@@ -226,14 +226,15 @@ int entry_h_seek(knot_db_val_t *val, uint16_t type);
  * Some checks are performed (rank, TTL), the current entry in cache is copied
  * with a hole ready for the new entry (old one of the same type is cut out).
  *
- * \param val_new_entry The only changing parameter; ->len is read, ->data written.
+ * \param val_new_entry ->len is read, ->data written.
  * \return error code
  */
 int entry_h_splice(
 	knot_db_val_t *val_new_entry, uint8_t rank,
 	const knot_db_val_t key, const uint16_t ktype, const uint16_t type,
 	const knot_dname_t *owner/*log only*/,
-	const struct kr_query *qry, struct kr_cache *cache, uint32_t timestamp);
+	const struct kr_query *qry, struct kr_cache *cache, uint32_t timestamp,
+	size_t *cache_record_size_out);
 
 /** Parse an entry_apex into individual items.  @return error code. */
 KR_EXPORT int entry_list_parse(const knot_db_val_t val, entry_list_t list);
@@ -267,7 +268,7 @@ void entry_list_memcpy(struct entry_apex *ea, entry_list_t list);
  * 		see stash_rrset() for details
  * It assumes check_dname_for_lf(). */
 void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
-		const struct kr_request *req, bool needs_pkt);
+		struct kr_request *req, bool needs_pkt);
 
 /** Try answering from packet cache, given an entry_h.
  *

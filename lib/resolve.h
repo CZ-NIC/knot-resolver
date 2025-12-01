@@ -269,7 +269,6 @@ struct kr_request {
 	bool auth_validated; /**< see answ_validated ^^ ; TODO */
 	bool stale_accounted;
 	bool ratelimited; /**< this request shot over the rate limit */
-
 	/** Overall rank for the request.
 	 *
 	 * Values from kr_rank, currently just KR_RANK_SECURE and _INITIAL.
@@ -299,6 +298,7 @@ struct kr_request {
 	alloc_wire_f alloc_wire_cb; /**< CB to allocate answer wire (can be NULL). */
 	kr_rule_tags_t rule_tags; /**< TagSet applying to this request. */
 	struct kr_extended_error extended_error;  /**< EDE info; don't modify directly, use kr_request_set_extended_error() */
+	struct kr_cache_top_context cache_top_context;
 };
 
 /** Initializer for an array of *_selected. */

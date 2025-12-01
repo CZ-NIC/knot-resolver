@@ -234,6 +234,9 @@ struct kr_extended_error {
 	int32_t info_code;
 	const char *extra_text;
 };
+struct kr_cache_top_context {
+	uint32_t bloom[32];
+};
 struct kr_request {
 	struct kr_context *ctx;
 	knot_pkt_t *answer;
@@ -283,6 +286,7 @@ struct kr_request {
 	alloc_wire_f alloc_wire_cb;
 	kr_rule_tags_t rule_tags;
 	struct kr_extended_error extended_error;
+	struct kr_cache_top_context cache_top_context;
 };
 enum kr_rank {KR_RANK_INITIAL, KR_RANK_OMIT, KR_RANK_TRY, KR_RANK_INDET = 4, KR_RANK_BOGUS, KR_RANK_MISMATCH, KR_RANK_MISSING, KR_RANK_INSECURE, KR_RANK_AUTH = 16, KR_RANK_SECURE = 32};
 typedef struct kr_cdb * kr_cdb_pt;
@@ -306,12 +310,24 @@ struct kr_cdb_stats {
 	double usage_percent;
 };
 typedef struct uv_timer_s uv_timer_t;
+struct mmapped {
+	void *mem;
+	size_t size;
+	int fd;
+	_Bool write_lock;
+	_Bool persistent;
+};
+struct kr_cache_top {
+	struct mmapped mmapped;
+	struct top_data *data;
+};
 struct kr_cache {
 	kr_cdb_pt db;
 	const struct kr_cdb_api *api;
 	struct kr_cdb_stats stats;
 	uint32_t ttl_min;
 	uint32_t ttl_max;
+	struct kr_cache_top top;
 	struct timeval checkpoint_walltime;
 	uint64_t checkpoint_monotime;
 	uv_timer_t *health_timer;

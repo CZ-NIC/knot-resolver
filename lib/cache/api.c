@@ -30,6 +30,7 @@
 #include "lib/utils.h"
 
 #include "lib/cache/impl.h"
+#include "lib/cache/top.h"
 
 /* TODO:
  *	- Reconsider when RRSIGs are put in and retrieved from the cache.
@@ -92,7 +93,7 @@ static int assert_right_version(struct kr_cache *cache)
 					(int)ver, (int)CACHE_VERSION);
 			}
 		}
-		ret = cache_op(cache, clear);
+		ret = cache_op(cache, clear, 0);
 	}
 	/* Rewrite the entry even if it isn't needed.  Because of cache-size-changing
 	 * possibility it's good to always perform some write during opening of cache. */
@@ -108,13 +109,22 @@ static int assert_right_version(struct kr_cache *cache)
 
 int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct kr_cdb_opts *opts, knot_mm_t *mm)
 {
-	if (kr_fails_assert(cache))
+	if (kr_fails_assert(cache && opts))
 		return kr_error(EINVAL);
 	memset(cache, 0, sizeof(*cache));
 	/* Open cache */
 	if (!api)
 		api = kr_cdb_lmdb();
 	cache->api = api;
+
+	const size_t orig_maxsize = opts->maxsize;
+	if (opts->maxsize) {
+		const size_t top_size = kr_cache_top_get_size(opts->maxsize);
+		if (!kr_fails_assert(top_size < opts->maxsize)) {
+			opts->maxsize -= top_size;
+		}
+	}
+
 	int ret = cache->api->open(&cache->db, &cache->stats, opts, mm);
 	if (ret == 0) {
 		ret = assert_right_version(cache);
@@ -130,26 +140,41 @@ int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct k
 		ret = cache->api->open(&cache->db, &cache->stats, &opts2, mm);
 	}
 
-	char *fpath = kr_absolutize_path(opts->path, "data.mdb");
-	if (kr_fails_assert(fpath)) {
-		/* non-critical, but still */
-		fpath = "<ENOMEM>";
-	} else {
-		kr_cache_emergency_file_to_remove = fpath;
-	}
+	free_const(kr_cache_emergency_file_to_remove);
+	kr_cache_emergency_file_to_remove = kr_absolutize_path(opts->path, "data.mdb");
+	kr_assert(kr_cache_emergency_file_to_remove); // non-critical, but still
 
-	if (ret == 0 && opts->maxsize) {
-		size_t maxsize = cache->api->get_maxsize(cache->db);
-		if (maxsize > opts->maxsize) kr_log_warning(CACHE,
-			"Warning: real cache size is %zu instead of the requested %zu bytes."
-			"  To reduce the size you need to remove the file '%s' by hand.\n",
-			maxsize, opts->maxsize, fpath);
+	size_t maxsize = 0;
+	if (ret == 0) {
+		maxsize = cache->api->get_maxsize(cache->db);
+		if (opts->maxsize && (maxsize > opts->maxsize)) {
+			kr_log_notice(CACHE,
+				"real LMDB cache size is %zu instead of the requested %zu bytes, removing all data.\n",
+				maxsize, opts->maxsize);
+			cache_op(cache, clear, opts->maxsize);
+			maxsize = cache->api->get_maxsize(cache->db);
+		}
 	}
 	if (ret != 0)
 		return ret;
 	cache->ttl_min = KR_CACHE_DEFAULT_TTL_MIN;
 	cache->ttl_max = KR_CACHE_DEFAULT_TTL_MAX;
 	kr_cache_make_checkpoint(cache);
+
+	const char *top_path = kr_absolutize_path(opts->path, "top");
+	if (kr_fails_assert(top_path)) {
+		ret = kr_error(errno);
+	}
+	if (ret == 0) {
+		ret = kr_cache_top_init(&cache->top, top_path, orig_maxsize);
+		free_const(top_path);
+	}
+	if (ret != 0) {
+		cache_op(cache, close);
+		cache->db = NULL;
+		return ret;
+	}
+
 	return 0;
 }
 
@@ -160,12 +185,13 @@ const char *kr_cache_emergency_file_to_remove = NULL;
 
 void kr_cache_close(struct kr_cache *cache)
 {
+	kr_cache_top_deinit(&cache->top);
 	kr_cache_check_health(cache, -1);
 	if (cache_isvalid(cache)) {
 		cache_op(cache, close);
 		cache->db = NULL;
 	}
-	free(/*const-cast*/(char*)kr_cache_emergency_file_to_remove);
+	free_const(kr_cache_emergency_file_to_remove);
 	kr_cache_emergency_file_to_remove = NULL;
 }
 
@@ -185,7 +211,7 @@ int kr_cache_clear(struct kr_cache *cache)
 	if (!cache_isvalid(cache)) {
 		return kr_error(EINVAL);
 	}
-	int ret = cache_op(cache, clear);
+	int ret = cache_op(cache, clear, 0);
 	if (ret == 0) {
 		kr_cache_make_checkpoint(cache);
 		ret = assert_right_version(cache);
@@ -370,7 +396,7 @@ static int stash_rrarray_entry(ranked_rr_array_t *arr, int arr_i,
 /** Stash a single nsec_p.  \return 0 (errors are ignored). */
 static int stash_nsec_p(const knot_dname_t *dname, const char *nsec_p_v,
 			struct kr_cache *cache, uint32_t timestamp, knot_mm_t *pool,
-			const struct kr_query *qry/*logging*/);
+			const struct kr_query *qry/*logging + cache_top*/);
 
 /** The whole .consume phase for the cache module. */
 int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
@@ -429,7 +455,7 @@ int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 	for (it = trie_it_begin(nsec_pmap); !trie_it_finished(it); trie_it_next(it)) {
 		stash_nsec_p((const knot_dname_t *)trie_it_key(it, NULL),
 				(const char *)*trie_it_val(it),
-				cache, qry->timestamp.tv_sec, &req->pool, req->current_query);
+				cache, qry->timestamp.tv_sec, &req->pool, qry);
 	}
 	trie_it_free(it);
 	/* LATER(optim.): typically we also have corresponding NS record in the list,
@@ -608,8 +634,9 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 	};
 
 	/* Prepare raw memory for the new entry. */
+	size_t whole_val_len = 0;
 	ret = entry_h_splice(&val_new_entry, rank, key, k->type, rr->type,
-				rr->owner, qry, cache, timestamp);
+				rr->owner, qry, cache, timestamp, &whole_val_len);
 	if (ret) return kr_ok(); /* some aren't really errors */
 	if (kr_fails_assert(val_new_entry.data))
 		return kr_error(EFAULT);
@@ -624,6 +651,8 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 	rdataset_dematerialize(rds_sigs, eh->data + rr_ssize);
 	if (kr_fails_assert(entry_h_consistent_E(val_new_entry, rr->type)))
 		return kr_error(EINVAL);
+	if (qry) // it's possible to insert outside a request
+		kr_cache_top_access(qry->request, key.data, key.len, whole_val_len, "stash_rrset");
 
 	#if 0 /* Occasionally useful when debugging some kinds of changes. */
 	{
@@ -800,6 +829,8 @@ static int stash_nsec_p(const knot_dname_t *dname, const char *nsec_p_v,
 		VERBOSE_MSG(qry, "=> EL write failed (ret: %d)\n", ret);
 		return kr_ok();
 	}
+	if (qry)
+		kr_cache_top_access(qry->request, key.data, key.len, val.len, "stash_nsec_p");
 	if (log_refresh_by) {
 		VERBOSE_MSG(qry, "=> nsec_p stashed for %s (refresh by %d, hash: %x)\n",
 				log_dname, log_refresh_by, log_hash);
@@ -848,7 +879,8 @@ int kr_cache_insert_rr(struct kr_cache *cache,
 	return (int) written;
 }
 
-static int peek_exact_real(struct kr_cache *cache, const knot_dname_t *name, uint16_t type,
+static int peek_exact_real(struct kr_cache *cache, struct kr_request *req,
+			const knot_dname_t *name, uint16_t type,
 			struct kr_cache_p *peek)
 {
 	if (!check_rrtype(type, NULL) || !check_dname_for_lf(name, NULL)) {
@@ -862,7 +894,11 @@ static int peek_exact_real(struct kr_cache *cache, const knot_dname_t *name, uin
 	knot_db_val_t key = key_exact_type(k, type);
 	knot_db_val_t val = { NULL, 0 };
 	ret = cache_op(cache, read, &key, &val, 1);
-	if (!ret) ret = entry_h_seek(&val, type);
+	size_t whole_val_len = 0;
+	if (!ret) {
+		whole_val_len = val.len; // whole size before seeking
+		ret = entry_h_seek(&val, type);
+	}
 	if (ret) return kr_error(ret);
 
 	const struct entry_h *eh = entry_h_consistent_E(val, type);
@@ -877,12 +913,14 @@ static int peek_exact_real(struct kr_cache *cache, const knot_dname_t *name, uin
 		.raw_data = val.data,
 		.raw_bound = knot_db_val_bound(val),
 	};
+	kr_cache_top_access(req, key.data, key.len, whole_val_len, "peek_exact_real"); // hits only
 	return kr_ok();
 }
-int kr_cache_peek_exact(struct kr_cache *cache, const knot_dname_t *name, uint16_t type,
+int kr_cache_peek_exact(struct kr_cache *cache, struct kr_request *req,
+			const knot_dname_t *name, uint16_t type,
 			struct kr_cache_p *peek)
 {	/* Just wrap with extra verbose logging. */
-	const int ret = peek_exact_real(cache, name, type, peek);
+	const int ret = peek_exact_real(cache, req, name, type, peek);
 	if (false && kr_log_is_debug(CACHE, NULL)) { /* too noisy for usual --verbose */
 		auto_free char *type_str = kr_rrtype_text(type),
 			*name_str = kr_dname_text(name);
