@@ -272,8 +272,15 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
             )
 
     async def set_new_tls_sticket_secret(self, config: KresConfig, force: bool = False) -> None:
+        if int(config.workers) == 1:
+            logger.info(
+                "There is no need to synchronize the TLS session secret across all workers"
+                " because only one kresd worker is configured - skipping auto-generation"
+            )
+            return
+
         if config.network.tls.sticket_secret or config.network.tls.sticket_secret_file:
-            logger.debug("User-configured TLS resumption secret found - skipping auto-generation.")
+            logger.debug("User-configured TLS resumption secret found - skipping auto-generation")
             return
 
         logger.debug("Creating TLS session ticket secret")
