@@ -1805,7 +1805,7 @@
             "properties": {
                 "script-only": {
                     "type": "boolean",
-                    "description": "Ignore declarative configuration and use only Lua script or file defined in this section.",
+                    "description": "Ignore declarative configuration intended for workers and use only Lua script or script file configured in this section.",
                     "default": false
                 },
                 "script": {
@@ -1813,7 +1813,7 @@
                         "string",
                         "null"
                     ],
-                    "description": "Custom Lua configuration script.",
+                    "description": "Custom Lua configuration script intended for workers.",
                     "default": null
                 },
                 "script-file": {
@@ -1821,14 +1821,38 @@
                         "string",
                         "null"
                     ],
-                    "description": "Path to file that contains Lua configuration script.",
+                    "description": "Path to file that contains Lua configuration script for workers.",
+                    "default": null
+                },
+                "policy-script-only": {
+                    "type": "boolean",
+                    "description": "Ignore declarative configuration intended for policy-loader and use only Lua script or script file configured in this section.",
+                    "default": false
+                },
+                "policy-script": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "description": "Custom Lua configuration script intended for policy-loader.",
+                    "default": null
+                },
+                "policy-script-file": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "description": "Path to file that contains Lua configuration script for policy-loader.",
                     "default": null
                 }
             },
             "default": {
                 "script_only": false,
                 "script": null,
-                "script_file": null
+                "script_file": null,
+                "policy_script_only": false,
+                "policy_script": null,
+                "policy_script_file": null
             }
         }
     }
