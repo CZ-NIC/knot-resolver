@@ -325,6 +325,8 @@ ${CDEFS} ${LIBKRES} functions <<-EOF
 	kr_rule_local_address
 	kr_rule_local_hosts
 	kr_rule_coalesce_targets
+#   not used directly, but can be useful for advanced "scripting"
+	kr_rule_local_data_ins
 EOF
 
 

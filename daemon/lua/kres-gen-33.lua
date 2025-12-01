@@ -547,6 +547,7 @@ int kr_rule_forward(const knot_dname_t *, kr_rule_fwd_flags_t, const struct sock
 int kr_rule_local_address(const char *, const char *, _Bool, uint32_t, kr_rule_tags_t, kr_rule_opts_t);
 int kr_rule_local_hosts(const char *, _Bool, uint32_t, kr_rule_tags_t, kr_rule_opts_t);
 void kr_rule_coalesce_targets(const struct sockaddr **, void *);
+int kr_rule_local_data_ins(const knot_rrset_t *, const knot_rdataset_t *, kr_rule_tags_t, kr_rule_opts_t);
 struct tls_credentials;
 typedef struct {
 	int sock_type;
