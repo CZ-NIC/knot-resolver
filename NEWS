@@ -1,18 +1,18 @@
-Knot Resolver 6.0.17 (2025-mm-dd)
+Knot Resolver 6.0.17 (2025-12-02)
 =================================
 
 Improvements
 ------------
 - kresctl migrate: new command for migrating the configuration to a newer version (!1672)
 - manager: basic support for non-Linux systems (macOS, FreeBSD) (!1758)
-- cache: collect garbage based on usage statistics (!1726)
+- cache: collect garbage based on usage statistics (!1726)  
   This results in using the cache space better, and in practice
   it reduces latency even in case of answers that remain *uncached*.
 
 Incompatible changes
 --------------------
 See upgrading guide for incompatible configuration changes:  
-https://www.knot-resolver.cz/documentation/v6.0.16/upgrading.html
+https://www.knot-resolver.cz/documentation/v6.0.17/upgrading.html
 - Removed options from declarative configuration model (YAML). (!1672, !1754)  
   These are mostly experimental and debugging/testing options that are not useful for general users (remain in Lua):
   - /dnssec/refresh-time
