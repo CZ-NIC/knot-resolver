@@ -34,8 +34,11 @@ E.g. on distributions using systemd-journald use command ``journalctl -eu knot-r
 
    .. option:: groups: <list of logging groups>
 
-      Use to turn-on ``debug`` logging for the selected `groups <./dev/logging_api.html>`_
-      regardless of the global log level. Other groups are logged to the log based on the initial level.
+      Use to turn-on ``debug`` logging for the selected groups regardless of the global log level.
+      Other groups are logged to the log based on the initial level.
+
+      Most of group names are defined by kresd `here <./dev/logging_api.html>`_,
+      and others are ``manager``, ``supervisord`` and ``cache-gc``.
 
       .. It is also possible to enable ``debug`` logging level for particular requests,
       .. with :ref:`policies <mod-policy-logging>` or as :ref:`an HTTP service <mod-http-trace>`.
