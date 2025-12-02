@@ -759,6 +759,9 @@ pkg:arch:
   before_script:
     # prometheus and watchdog are optional dependencies, but our `apkg test` needs them
     - pacman -Syu --noconfirm python-prometheus_client python-watchdog
+    # TODO TMP hack-fix; shouldn't be needed after we update images to the same apkg version
+    - git config --global user.name CI
+    - git config --global user.email ci@nic
 
 # RHEL 8 derivatives would need more work due to *default* python being old
 #pkg:rocky-8:
