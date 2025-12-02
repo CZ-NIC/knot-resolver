@@ -6,8 +6,8 @@ Improvements
 - kresctl migrate: new command for migrating the configuration to a newer version (!1672)
 - manager: basic support for non-Linux systems (macOS, FreeBSD) (!1758)
 - cache: collect garbage based on usage statistics (!1726)  
-  This results in using the cache space better, and in practice
-  it reduces latency even in case of answers that remain *uncached*.
+  This results in using the cache space better, and in practice  
+  it reduces latency especially in case of answers that are *not* fully cached.
 
 Incompatible changes
 --------------------
