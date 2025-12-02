@@ -1,20 +1,22 @@
-Knot Resolver 6.0.17 (2025-mm-dd)
+Knot Resolver 6.0.17 (2025-12-02)
 =================================
 
 Improvements
 ------------
 - kresctl migrate: new command for migrating the configuration to a newer version (!1672)
 - manager: basic support for non-Linux systems (macOS, FreeBSD) (!1758)
-- cache: collect garbage based on usage statistics (!1726)
-  This results in using the cache space better, and in practice
-  it reduces latency even in case of answers that remain *uncached*.
+- cache: collect garbage based on usage statistics (!1726)  
+  This results in using the cache space better, and in practice  
+  it reduces latency especially in case of answers that are *not* fully cached.
 
 Incompatible changes
 --------------------
 See upgrading guide for incompatible configuration changes:  
-https://www.knot-resolver.cz/documentation/v6.0.16/upgrading.html
+https://www.knot-resolver.cz/documentation/v6.0.17/upgrading.html
+
 - Removed options from declarative configuration model (YAML). (!1672, !1754)  
   These are mostly experimental and debugging/testing options that are not useful for general users (remain in Lua):
+
   - /dnssec/refresh-time
   - /dnssec/hold-down-time
   - /dnssec/time-skew-detection
@@ -25,6 +27,7 @@ https://www.knot-resolver.cz/documentation/v6.0.16/upgrading.html
   - /network/tls/auto-discovery
   - /webmgmt
 - Renamed/moved options in the declarative configuration model (YAML). (!1672)
+
   - /cache/garbage-collector -> /cache/garbage-collector/enable
   - /cache/prefetch/prediction -> /cache/prefetch/prediction/enable
   - /defer/enabled -> /defer/enable
@@ -41,6 +44,7 @@ https://www.knot-resolver.cz/documentation/v6.0.16/upgrading.html
   - /network/tls/files-watchdog -> /network/tls/watchdog
   - /rate-limiting -> /rate-limiting/enable
 - Changed default values in declarative configuration model (YAML). (!1672)
+
   - /logging/dnstap/log-queries: true -> false
   - /logging/dnstap/log-responses: true -> false
   - /logging/dnstap/log-tcp-rtt: true -> false
@@ -53,6 +57,7 @@ Improvements
 ------------
 - reduce validation strictness for domain names (#934, !1727)
 - manager: force a configuration reload via management HTTP API 'api/reload/force' (#939, !1748)
+
   - kresctl: reload: added '--force' flag
 - /fallback: add this feature/module (!1733)
 - systemd: do not force-fail knot-resolver.service on OOM (!1724)
@@ -83,6 +88,7 @@ Security
 Bugfixes
 --------
 - manager: prometheus metrics update (!1703, #917, !1712)
+
   - added missing metrics split by IPv4 and IPv6
   - typo: resolver_answer_flags_rd_total -> resolver_answer_flag_rd_total
 - /dnssec/trust-anchors-files: fix resolver startup (!1704)
@@ -180,6 +186,7 @@ Improvements
 - avoid multiple log lines when IPv6 isn't available (!1633)
 - manager: fix startup on Linux without libsystemd (!1608)
 - auto-reload TLS certificate files (!1626)
+
   - Can be configured using the ``/network/tls/files-watchdog`` option. (!1645)
 - reload TLS certificate files even if the configuration has not changed (!1644)
 - kresctl: bash command-line TAB completion (!1622)
@@ -260,9 +267,11 @@ Improvements
 ------------
 - TLS (DoT, DoH): respect crypto policy overrides in OS (!1526)
 - manager: export metrics to JSON via management HTTP API (!1527)
+
   - JSON is the new default metrics output format
   - the ``prometheus-client`` Python package is now an optional dependency, required only for Prometheus export to work
 - cache: prefetching records
+
   - predict module: prefetching expiring records moved to prefetch module
   - prefetch module: new module to prefetch expiring records
 - stats: add separate metrics for IPv6 and IPv4 (!1545)
