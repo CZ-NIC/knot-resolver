@@ -35,7 +35,7 @@ integr_tests += [
 ]
 
 mod_inc_dir = include_directories('..', '../contrib',
-  luajit.get_pkgconfig_variable('includedir'))
+  luajit.get_variable(pkgconfig: 'includedir'))
 
 mod_deps = [
   contrib_dep,

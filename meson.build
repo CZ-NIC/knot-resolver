@@ -269,15 +269,15 @@ endif
 # Getting *runtime* path to knot-dns libs is surprisingly difficult.
 # Partially it's because meson isn't meant for general-purpose programming.
 foreach libname, lib: { 'libknot': libknot, 'libzscanner': libzscanner }
-  l = lib.get_pkgconfig_variable('libdir')
-  p = lib.get_pkgconfig_variable('prefix')
-  ep = lib.get_pkgconfig_variable('exec_prefix')
+  l = lib.get_variable(pkgconfig: 'libdir')
+  p = lib.get_variable(pkgconfig: 'prefix')
+  ep = lib.get_variable(pkgconfig: 'exec_prefix')
   if ep != p # replace `p` with `ep` at the start of `l`
     assert(l.startswith(p))
     p_len = run_command('sh', '-c', 'echo "' + p + '" | wc -c', check: true).stdout().to_int()
     l = ep / l.substring(p_len)
   endif
-  conf_data.set_quoted(libname + '_SONAME', l / lib.get_pkgconfig_variable('soname'))
+  conf_data.set_quoted(libname + '_SONAME', l / lib.get_variable(pkgconfig: 'soname'))
 endforeach
 
 kresconfig = configure_file(
