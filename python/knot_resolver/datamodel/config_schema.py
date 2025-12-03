@@ -135,6 +135,7 @@ class KresConfig(ConfigSchema):
 
     _LAYER = Raw
 
+    #### When ADDING options, please also update config_nodes() in ../manager/manager.py
     nsid: Optional[EscapedStr]
     hostname: EscapedStr
     rundir: WritableDir
