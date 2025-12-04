@@ -21,7 +21,7 @@ variables:
   # IMAGE_TAG is a Git branch/tag name from https://gitlab.nic.cz/knot/knot-resolver-ci
   # In general, keep it pointing to a tag - use a branch only for development.
   # More info in the knot-resolver-ci repository.
-  IMAGE_TAG: 'v20251016'
+  IMAGE_TAG: 'v20251208'
   IMAGE_PREFIX: '$CI_REGISTRY/knot/knot-resolver-ci'
 
 image: $IMAGE_PREFIX/debian12-knot_3_5:$IMAGE_TAG
@@ -913,6 +913,7 @@ python:unit:
           - '3.11'
           - '3.12'
           - '3.13'
+          - '3.14'
   script:
     - poetry install --all-extras --only main,dev,test
     - poe test
