@@ -11,7 +11,7 @@ Some can be enabled by meson build system and some can be performed by Poetry to
 The manager unit tests
 ======================
 
-The unit tests use ``pytest`` and can be run with the command ``poe test``.
+The unit tests use ``pytest`` and can be run with the command ``poe test-unit``.
 They can be run from a freshly cloned repository and should be successful.
 They are located in the ``manager`` subdirectory.
 
