@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+
+# ensure consistent behaviour
+src_dir="$(dirname "$(realpath "$0")")"
+source $src_dir/utils/_env.sh
+
+# stop failing early, because we wouldn't do anything else than fail
+set +e
+
+# dirs to check
+dirs="python/knot_resolver/ tests/manager scripts/poe-tasks/utils/create_setup.py"
+
+# check imports
+echo -e "${yellow}Checking Python imports using Ruff...${reset}"
+ruff check --select I $dirs
+check_rv $?
+echo
+
+# check format
+echo -e "${yellow}Checking code format using Ruff formatter...${reset}"
+ruff format --diff $dirs
+check_rv $?
+echo
+
+# run static code analysis 
+echo -e "${yellow}Running static code analysis using Ruff linter...${reset}"
+ruff check python/knot_resolver/ tests/pytests
+check_rv $?
+echo
+
+# check typings
+echo -e "${yellow}Checking typings using Mypy...${reset}"
+mypy python/knot_resolver/
+check_rv $?
+echo
+
+# fancy messages at the end :)
+fancy_message
+
+# exit with the aggregate return value
+exit $aggregated_rv
