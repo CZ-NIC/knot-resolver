@@ -119,18 +119,23 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
             return [
                 config.nsid,
                 config.hostname,
+                # config.rundir not allowed to change
                 config.workers,
+                # config.management not allowed to change and not affecting workers anyway
                 config.options,
                 config.network,
+                # config.views fully handled by policy-loader
+                # config.local_data fully handled by policy-loader
                 config.forward,
+                config.fallback,
                 config.cache,
                 config.dnssec,
                 config.dns64,
                 config.logging,
                 config.monitoring,
-                config.lua,
                 config.rate_limiting,
                 config.defer,
+                config.lua,
             ]
 
         # register and immediately call a verifier that validates config with 'canary' kresd process
