@@ -106,7 +106,7 @@ If something fails and you have done all the steps above, please [open a new iss
 Contributing
 ============
 
-Before committing, please ensure that ``poe check``, ``poe lint``, ``poe format`` and ``poe test`` pass.
+Before committing, please ensure that ``poe check-files``, ``poe check-lint``, ``poe check-format`` and ``poe test-unit`` pass.
 Those commands are both run on the CI and if they don't pass, CI fails.
 
 
