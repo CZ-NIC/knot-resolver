@@ -96,18 +96,19 @@ target-version = "py38"
 exclude = ["setup.py"]
 
 [tool.ruff.lint]
-# extend default config
-# https://docs.astral.sh/ruff/rules
-extend-select = [
-    "W",   # pycodestyle warnings
-    "A",   # flake8-builtins
-    "B",   # flake8-bugbearp
-    "PL",  # pylint
-    "N",   # pep8-naming
-    "SLF", # flake8-self
-    "RET", # flake8-return
-]
+select = ["ALL"]
 ignore = [
+    # docstring
+    "D100",       # Missing docstring in public module
+    "D101",       # Missing docstring in public class
+    "D102",       # Missing docstring in public method
+    "D103",       # Missing docstring in public function
+    "D104",       # Missing docstring in public package
+    "D107",       # Missing docstring in `__init__`
+    # Incompatible
+    "D203",       # incompatible with D211 (no-blank-line-before-class)
+    "D212",       # incompatible with D213 (multi-line-summary-second-line)
+
     "B009",     # https://docs.astral.sh/ruff/rules/get-attr-with-constant/
     "PLR2004",  # https://docs.astral.sh/ruff/rules/magic-value-comparison/
     "PLW0603",  # https://docs.astral.sh/ruff/rules/global-statement/
@@ -115,6 +116,12 @@ ignore = [
 
 [tool.ruff.lint.isort]
 known-first-party=["knot_resolver"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
 
 [tool.mypy]
 python_version = "3.8"
