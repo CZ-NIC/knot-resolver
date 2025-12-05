@@ -849,35 +849,29 @@ docs:website:
     - poetry env use python${PYTHON_VERSION}
     - poetry env info
 
-python:examples:
+python:test:examples:
   <<: *python
   script:
     - poetry install --all-extras --only main,dev
-    - poe examples
+    - poe test-examples
 
-python:migrate:
+python:test:migrate:
   <<: *python
   script:
     - poetry install --all-extras --only main,dev
     - poe test-migrate
 
-python:check:
+python:check:files:
   <<: *python
   script:
     - poetry install --all-extras --only main,build,dev,lint
-    - poe check
+    - poe check-files
 
-python:format:
+python:check:code:
   <<: *python
   script:
     - poetry install --all-extras --only main,dev,lint
-    - poe format
-
-python:lint:
-  <<: *python
-  script:
-    - poetry install --all-extras --only main,dev,lint
-    - poe lint
+    - poe check-code
 
 python:run:
   <<: *python
@@ -897,7 +891,7 @@ python:run:
     # return code 124 is also OK
     - timeout 1m poe run etc/config/${ADD_CONFIG_FILE_NAME} || ( [[ $? -eq 124 ]] )
 
-python:unit:
+python:test:unit:
   <<: *python
   stage: test
   parallel:
@@ -912,7 +906,7 @@ python:unit:
           - '3.14'
   script:
     - poetry install --all-extras --only main,dev,test
-    - poe test
+    - poe test-unit
     # the following command makes sure that the source root of the coverage file is at $gitroot
     - poetry run bash -c "coverage combine .coverage; coverage xml"
   artifacts:
