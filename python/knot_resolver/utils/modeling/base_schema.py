@@ -12,6 +12,7 @@ from .base_value_type import BaseValueType
 from .exceptions import AggregateDataValidationError, DataDescriptionError, DataValidationError
 from .renaming import Renamed, renamed
 from .types import (
+    get_annotations,
     get_generic_type_argument,
     get_generic_type_arguments,
     get_generic_type_wrapper_argument,
@@ -139,7 +140,8 @@ def _parse_attrs_docstrings(docstring: str) -> Optional[Dict[str, str]]:
 
 def _get_properties_schema(typ: Type[Any]) -> Dict[Any, Any]:
     schema: Dict[Any, Any] = {}
-    annot: Dict[str, Any] = typ.__dict__.get("__annotations__", {})
+    annot = get_annotations(typ)
+
     docstring: str = typ.__dict__.get("__doc__", "") or ""
     attribute_documentation = _parse_attrs_docstrings(docstring)
     for field_name, python_type in annot.items():
@@ -528,7 +530,7 @@ class ObjectMapper:
           2. assignments with conversion method
         """
         cls = obj.__class__
-        annot = cls.__dict__.get("__annotations__", {})
+        annot = get_annotations(cls)
         errs: List[DataValidationError] = []
 
         used_keys: Set[str] = set()
@@ -733,7 +735,7 @@ class BaseSchema(Serializable):
         if not isinstance(o, cls):
             return False
 
-        annot = cls.__dict__.get("__annotations__", {})
+        annot = get_annotations(cls)
         for name in annot.keys():
             if getattr(self, name) != getattr(o, name):
                 return False
@@ -775,7 +777,7 @@ class BaseSchema(Serializable):
     def to_dict(self) -> Dict[Any, Any]:
         res: Dict[Any, Any] = {}
         cls = self.__class__
-        annot = cls.__dict__.get("__annotations__", {})
+        annot = get_annotations(cls)
 
         for name in annot:
             res[name] = Serializable.serialize(getattr(self, name))
