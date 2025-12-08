@@ -85,12 +85,6 @@ stages:
     reports:
       junit: build_ci*/meson-logs/integration.deckard.junit.xml
 
-.after_build_arch: &after_build_arch
-  <<: *after_build
-  image: $IMAGE_PREFIX/arch:$IMAGE_TAG
-  needs:
-    - build-arch
-
 .nodep: &nodep
   <<: *common
   needs: []
@@ -350,7 +344,9 @@ lint:pedantic:
     - ninja -C build_pedantic_clang
 
 lint:tidy:
-  <<: *after_build_arch
+  <<: *after_build
+  image: $IMAGE_PREFIX/debian13-knot_3_5:$IMAGE_TAG
+  # TODO: when we add a resolver build using the same image, we probably add a `needs:`
   stage: sanity
   script:
     - ninja -C build_ci* tidy
