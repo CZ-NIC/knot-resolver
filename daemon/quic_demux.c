@@ -2,14 +2,16 @@
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include "lib/defines.h"
 #include "network.h"
 #include "quic_common.h"
-
-#include "libdnssec/random.h"
-#include "contrib/openbsd/siphash.h"
+#include "quic_conn.h"
 #include "quic_demux.h"
+#include "libdnssec/random.h"
 
+/* Toggle sending retry for new connections. This is a way to validate the
+ * client address, but it adds 1 round trip to the connection establishment
+ * potentially hindering performance */
+#define DOQ_REQUIRE_RETRY false
 #define BUCKETS_PER_CONNS 8 // Each connecion has several dCIDs, and each CID takes one hash table bucket.
 
 void kr_quic_table_rem(struct pl_quic_conn_sess_data *conn, kr_quic_table_t *table);
@@ -44,34 +46,6 @@ void quic_conn_mark_used(struct pl_quic_conn_sess_data *conn,
 
 	conn->h.heap_value = ngtcp2_conn_get_expiry(conn->conn) * QUIC_CAN_SEND(conn);
 	conn_heap_reschedule(conn, table);
-}
-
-static uint64_t cid2hash(const ngtcp2_cid *cid, kr_quic_table_t *table)
-{
-	SIPHASH_CTX ctx;
-	SipHash24_Init(&ctx, (const SIPHASH_KEY *)(table->hash_secret));
-	SipHash24_Update(&ctx, cid->data, MIN(cid->datalen, 8));
-	uint64_t ret = SipHash24_End(&ctx);
-
-	return ret;
-}
-
-kr_quic_cid_t **kr_quic_table_lookup2(const ngtcp2_cid *cid, kr_quic_table_t *table)
-{
-	uint64_t hash = cid2hash(cid, table);
-
-	kr_quic_cid_t **res = table->conns + (hash % table->size);
-	while (*res != NULL && !ngtcp2_cid_eq(cid, (const ngtcp2_cid *)(*res)->cid_placeholder)) {
-		res = &(*res)->next;
-	}
-
-	return res;
-}
-
-struct pl_quic_conn_sess_data *kr_quic_table_lookup(const ngtcp2_cid *cid, kr_quic_table_t *table)
-{
-	kr_quic_cid_t **pcid = kr_quic_table_lookup2(cid, table);
-	return *pcid == NULL ? NULL : (*pcid)->conn_sess;
 }
 
 kr_quic_cid_t **kr_quic_table_insert(struct pl_quic_conn_sess_data *conn,
@@ -182,12 +156,6 @@ void kr_quic_table_free(kr_quic_table_t *table)
 	free(table);
 }
 
-static void send_excessive_load(struct pl_quic_conn_sess_data *conn,
-		struct protolayer_iter_ctx *ctx, kr_quic_table_t *table)
-{
-	(void)send_special(conn, ctx, DOQ_EXCESSIVE_LOAD);
-}
-
 void kr_quic_table_sweep(struct kr_quic_table *table,
 		struct protolayer_iter_ctx *ctx)
 {
@@ -200,33 +168,42 @@ void kr_quic_table_sweep(struct kr_quic_table *table,
 		if ((c->state & QUIC_STATE_BLOCKED)) {
 			break;
 		/* when we reach the limit of open conns we lookup the most idle
-		 * one but only close it if it has has received at least one query.
+		 * one but only close it if it received at least one query.
 		 * This is to prevent closing brand new connections which has
 		 * crippling effects on the number of answered queries when
 		 * conn limits are reached. */
 		} else if (table->usage >= table->max_conns &&
 				// c->streams_count <= 0 &&
 				c->finished_streams > 0) {
-			send_excessive_load(c, ctx, table);
+			quic_doq_error_t doq_error = DOQ_EXCESSIVE_LOAD;
+			send_special(&c->dec_cids, c->table_ref, ctx,
+					QUIC_SEND_CONN_CLOSE, c, c->h.session,
+					&doq_error);
 			session2_event(c->h.session->transport.parent,
 					PROTOLAYER_EVENT_DISCONNECT,
 					c);
-		} else if (c->state >= QUIC_STATE_CLOSING) {
-			send_special(c, ctx, QUIC_SEND_CONN_CLOSE);
-			// kr_quic_table_rem(c, table);
+		} else if (c->state & QUIC_STATE_DRAINING) {
 			session2_event(c->h.session->transport.parent,
 					PROTOLAYER_EVENT_DISCONNECT,
-					NULL);
+					c);
+		// } else if (c->state & QUIC_STATE_CLOSING) {
+		// 	quic_doq_error_t doq_error = DOQ_NO_ERROR;
+		// 	send_special(&c->dec_cids, c->table_ref,
+		// 			ctx, QUIC_SEND_CONN_CLOSE,
+		// 			c, c->h.session, &doq_error);
+		// 	session2_event(c->h.session->transport.parent,
+		// 			PROTOLAYER_EVENT_DISCONNECT,
+		// 			c);
 		} else if (kr_quic_conn_timeout(c, &now)) {
 			int ret = ngtcp2_conn_handle_expiry(c->conn, now);
 			if (ret != NGTCP2_NO_ERROR) {
-				if (ret != NGTCP2_ERR_IDLE_CLOSE) {
-					send_special(c, ctx, QUIC_SEND_CONN_CLOSE);
-				}
-				kr_quic_table_rem(c, table);
-				session2_event(c->h.session,
+				quic_doq_error_t doq_error = DOQ_NO_ERROR;
+				send_special(&c->dec_cids, c->table_ref,
+						ctx, QUIC_SEND_CONN_CLOSE,
+						c, c->h.session, &doq_error);
+				session2_event(c->h.session->transport.parent,
 						PROTOLAYER_EVENT_DISCONNECT,
-						NULL);
+						c);
 			} else {
 				// quic_conn_mark_used(c, table);
 			}
@@ -237,17 +214,6 @@ void kr_quic_table_sweep(struct kr_quic_table *table,
 			break;
 		}
 	}
-}
-
-static bool init_unique_cid(ngtcp2_cid *cid, size_t len, kr_quic_table_t *table)
-{
-	do {
-		if (init_random_cid(cid, len), cid->datalen == 0)
-			return false;
-
-	} while (kr_quic_table_lookup(cid, table) != NULL);
-
-	return true;
 }
 
 static enum protolayer_iter_cb_result pl_quic_demux_unwrap(void *sess_data,
@@ -263,6 +229,7 @@ static enum protolayer_iter_cb_result pl_quic_demux_unwrap(void *sess_data,
 	// 	return protolayer_break(ctx, kr_error(ENOTSUP));
 	// }
 
+	bool retry_sent = false;
 	ngtcp2_version_cid dec_cids;
 	ngtcp2_cid odcid;
 	ngtcp2_cid dcid;
@@ -277,25 +244,16 @@ static enum protolayer_iter_cb_result pl_quic_demux_unwrap(void *sess_data,
 		kr_log_warning(DOQ, "Could not decode pkt header: (%d) %s\n",
 				ret, ngtcp2_strerror(ret));
 		return protolayer_break(ctx, kr_error(EINVAL));
+	} else if (ret == NGTCP2_ERR_VERSION_NEGOTIATION) {
+		send_special(&dec_cids, demux->conn_table, ctx,
+				QUIC_SEND_VERSION_NEGOTIATION, NULL,
+				demux->h.session, NULL);
+		return protolayer_break(ctx, kr_ok());
 	}
 
 	uint64_t now = quic_timestamp();
-
 	ngtcp2_cid_init(&dcid, dec_cids.dcid, dec_cids.dcidlen);
 	ngtcp2_cid_init(&scid, dec_cids.scid, dec_cids.scidlen);
-
-	if (ret == NGTCP2_ERR_VERSION_NEGOTIATION) {
-		wire_buf_reset(ctx->payload.wire_buf);
-		send_version_negotiation(ctx->payload.wire_buf,
-				dec_cids, dcid, scid);
-		if (ret >= 0) {
-			session2_wrap(demux->h.session, ctx->payload, ctx->comm,
-					ctx->req, ctx->finished_cb,
-					ctx->finished_cb_baton);
-		}
-
-		return protolayer_break(ctx, kr_ok());
-	}
 
 	qconn = kr_quic_table_lookup(&dcid, demux->conn_table);
 	if (!qconn) {
@@ -322,15 +280,21 @@ static enum protolayer_iter_cb_result pl_quic_demux_unwrap(void *sess_data,
 		}
 
 		/* additional RTT seems quite expensive for all new connections */
-		// if (header.tokenlen == 0 /*&& quic_require_retry(table)*/) {
-			// kr_log_error(DOQ, "received empty header.token\n");
-			// ret = -QUIC_SEND_RETRY;
-			// goto finish;
-		// }
+		if (header.tokenlen == 0 && DOQ_REQUIRE_RETRY) {
+			if (send_special(&dec_cids, demux->conn_table, ctx,
+					QUIC_SEND_RETRY, NULL,
+					demux->h.session, NULL) != kr_ok()) {
+
+				kr_log_debug(DOQ, "Failed to send retry packet\n");
+			}
+
+			return protolayer_break(ctx, kr_ok());
+		}
 
 		if (header.tokenlen > 0) {
-			if (header.token[0] == NGTCP2_CRYPTO_TOKEN_MAGIC_RETRY) {
-				ret = ngtcp2_crypto_verify_retry_token(
+			if (header.token[0] == NGTCP2_CRYPTO_TOKEN_MAGIC_RETRY2) {
+				retry_sent = true;
+				ret = ngtcp2_crypto_verify_retry_token2(
 					&odcid, header.token, header.tokenlen,
 					(const uint8_t *)demux->conn_table->hash_secret,
 					sizeof(demux->conn_table->hash_secret), header.version,
@@ -348,21 +312,29 @@ static enum protolayer_iter_cb_result pl_quic_demux_unwrap(void *sess_data,
 					QUIC_REGULAR_TOKEN_TIMEOUT, now);
 			}
 			if (ret != 0) {
+				/* FIXME the generate string might not be correct */
+				kr_log_debug(DOQ, "Failed to verify retry or regular token: %s (%d)\n",
+						ngtcp2_strerror(ret), ret);
 				return protolayer_break(ctx, kr_ok());
+			} else {
+				kr_log_debug(DOQ, "Retry or regular token successfully verified\n");
 			}
+
 		} else {
 			memcpy(&odcid, &dcid, sizeof(odcid));
-		}
 
-		/* TODO remove likely once outgoing DoQ is supported */
-		if (likely(!demux->h.session->outgoing)) {
-			if (!init_unique_cid(&dcid, 0, demux->conn_table)) {
-				kr_log_error(DOQ, "Failed to initialize unique cid (servers choice)\n");
-				return protolayer_break(ctx, kr_ok());
+			/* TODO remove 'likely' once outgoing DoQ is supported */
+			if (likely(!demux->h.session->outgoing)) {
+				if (!init_unique_cid(&dcid, 0, demux->conn_table)) {
+					kr_log_debug(DOQ, "Failed to initialize unique cid (servers choice)\n");
+					return protolayer_break(ctx, kr_ok());
+				}
 			}
 		}
 
 		struct kr_quic_conn_param params = {
+			.retry_sent = retry_sent,
+			.table = demux->conn_table,
 			.dcid = dcid,
 			.scid = scid,
 			.odcid = odcid,
@@ -396,15 +368,6 @@ static enum protolayer_iter_cb_result pl_quic_demux_unwrap(void *sess_data,
 			// NULL,
 			ctx->finished_cb,
 			ctx->finished_cb_baton);
-
-	
-	if (!QUIC_CAN_SEND(qconn)) {
-		/* Explicitly remove the connection session. */
-		session2_event(qconn->h.session->transport.parent,
-				PROTOLAYER_EVENT_DISCONNECT,
-				NULL);
-		return protolayer_break(ctx, kr_ok());
-	}
 
 	quic_conn_mark_used(qconn, demux->conn_table);
 	kr_quic_table_sweep(demux->conn_table, ctx);

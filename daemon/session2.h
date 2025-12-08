@@ -231,8 +231,6 @@ static inline size_t wire_buf_free_space_length(const struct wire_buf *wb)
 	XX(QUIC_DEMUX)\
 	XX(QUIC_CONN)\
 	XX(QUIC_STREAM)\
-	/* deprecated TODO: remove */\
-	XX(QUIC_DEPRECATED)\
 	\
 	/* PROXYv2 */\
 	XX(PROXYV2_DGRAM)\

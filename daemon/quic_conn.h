@@ -5,39 +5,20 @@
 #pragma once
 #include <ngtcp2/ngtcp2.h>
 #include <ngtcp2/ngtcp2_crypto.h>
-#include "daemon/tls.h"
-#include "session2.h"
+
 #include <contrib/ucw/heap.h>
 #include <contrib/ucw/lists.h>
+
+#include "quic_common.h"
+#include "daemon/tls.h"
+
+#define QUIC_MAX_OPEN_CONNS 1024
 
 /** QUIC parameters. */
 typedef struct {
 	/*! Use QUIC indicator. */
 	bool enable;
 } quic_params_t;
-
-
-#define KR_QUIC_ERR_EXCESSIVE_LOAD	0x4
-#define QUIC_MAX_OPEN_CONNS 1024
-
-typedef enum {
-	KR_QUIC_SEND_IGNORE_LASTBYTE = (1 << 0),
-	KR_QUIC_SEND_IGNORE_BLOCKED  = (1 << 1),
-} kr_quic_send_flag_t;
-
-struct pl_quic_conn_sess_data;
-
-int kr_quic_send(struct pl_quic_conn_sess_data *conn,
-		struct protolayer_iter_ctx *ctx,
-		int action,
-		unsigned max_msgs,
-		kr_quic_send_flag_t flags);
-
-typedef struct kr_quic_cid {
-	uint8_t cid_placeholder[32];
-	struct pl_quic_conn_sess_data *conn_sess;
-	struct kr_quic_cid *next;
-} kr_quic_cid_t;
 
 typedef enum {
 	QUIC_STATE_HANDSHAKE_DONE = (1 << 0),
@@ -83,6 +64,7 @@ struct pl_quic_conn_sess_data {
 	 * to proceed in the unwrap direction */
 	queue_t(struct pl_quic_stream_sess_data *) pending_unwrap;
 	bool is_server;
+	bool retry_sent;
 	ngtcp2_cid dcid;
 	ngtcp2_cid scid;
 	ngtcp2_cid odcid;
@@ -109,7 +91,12 @@ struct pl_quic_conn_sess_data {
 	uint64_t finished_streams;
 	quic_conn_state_t state;
 	size_t cid_pointers;
+
+	kr_quic_table_t *table_ref;
 };
 
-int send_special(struct pl_quic_conn_sess_data *conn,
-		struct protolayer_iter_ctx *ctx, int action);
+int send_special(ngtcp2_version_cid *dec_cids,
+		kr_quic_table_t *table,
+		struct protolayer_iter_ctx *ctx, int action,
+		struct pl_quic_conn_sess_data *conn,
+		struct session2 *session, quic_doq_error_t *doq_error);

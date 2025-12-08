@@ -101,7 +101,7 @@ static int send_stream(struct pl_quic_stream_sess_data *stream,
 	uint32_t fl = ((stream_id >= 0 && fin) ? NGTCP2_WRITE_STREAM_FLAG_FIN
 					       : NGTCP2_WRITE_STREAM_FLAG_NONE);
 	ngtcp2_vec vec = { .base = data, .len = len };
-	ngtcp2_pkt_info pi = { 0 };
+	ngtcp2_pkt_info pi = { .ecn = NGTCP2_ECN_NOT_ECT, };
 
 	const ngtcp2_path *path = ngtcp2_conn_get_path(stream->conn);
 
