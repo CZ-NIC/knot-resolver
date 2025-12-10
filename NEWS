@@ -1,6 +1,10 @@
 Knot Resolver 6.0.18 (2026-mm-dd)
 =================================
 
+Improvements:
+-------------
+- logging: improved logging groups (!1768)
+
 Bugfixes
 --------
 - reload did not apply changes to /fallback (!1763)
