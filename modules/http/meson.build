@@ -59,3 +59,6 @@ if openssl.found() and host_machine.system() not in [ 'cygwin', 'darwin' ]
     ],
   )
 endif
+
+summary({'openssl debug lib': openssl.found(),
+        }, section: 'Optional components', bool_yn: true)

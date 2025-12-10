@@ -6,7 +6,7 @@ project(
   license: 'GPLv3+',
   version: '6.0.17',
   default_options: ['c_std=gnu11', 'b_ndebug=true'],
-  meson_version: '>=0.49',
+  meson_version: '>=0.53',
 )
 
 
@@ -91,6 +91,23 @@ else
   rpath = prefix / get_option('libdir')
 endif
 
+summary({'prefix': prefix,
+         'lib_dir': lib_dir,
+         'sbin_dir': sbin_dir,
+         'etc_dir': etc_dir,
+        }, section: 'Paths')
+
+## Root hints
+root_hints = etc_dir / get_option('root_hints')
+if root_hints == etc_dir / 'root.hints'
+  install_root_hints = true
+else
+  install_root_hints = false
+endif
+
+summary({'root.hints': root_hints,
+        }, section: 'Paths')
+
 ## Trust anchors
 managed_ta = get_option('managed_ta') == 'enabled'
 keyfile_default = etc_dir / get_option('keyfile_default')
@@ -102,14 +119,10 @@ if get_option('install_root_keys') == 'auto'
   install_root_keys = managed_ta
 endif
 
-
-## Root hints
-root_hints = etc_dir / get_option('root_hints')
-if root_hints == etc_dir / 'root.hints'
-  install_root_hints = true
-else
-  install_root_hints = false
-endif
+summary({'keyfile_default': keyfile_default,
+         'managed_ta': managed_ta,
+         'install_root_keys': install_root_keys,
+        }, section: 'Trust anchors', bool_yn: true)
 
 ## Additional options
 user = get_option('user')
@@ -142,11 +155,6 @@ endif
 ### XDP: not configurable - we just check if libknot supports it
 xdp = meson.get_compiler('c').has_header('libknot/xdp/xdp.h')
 
-### Systemd
-systemd_files = get_option('systemd_files')
-systemd_legacy_units = get_option('systemd_legacy_units')
-libsystemd = dependency('libsystemd', required: systemd_files == 'enabled')
-
 # Uh, lifted this trivial line from tests/meson.build due to dependency sorting:
 build_extra_tests = get_option('extra_tests') == 'enabled'
 
@@ -159,10 +167,23 @@ endif
 malloc = meson.get_compiler('c').find_library(
   malloc_name,
   required: get_option('malloc') == 'jemalloc',
-  #static: false, #TODO: add when bumping meson to >= 0.51;
-  # static linking would most likely cause issues.
-  # Fortunately it seems unlikely that dynamic wouldn't be found and static would be.
+  static: false, # static linking would most likely cause issues.
 )
+
+summary({'sendmmsg': sendmmsg,
+         'XDP (in libknot)': xdp,
+         'doh2 (serving)': nghttp2.found(),
+         'capabilities': capng.found(),
+         'malloc': malloc.found() ? malloc_name : 'libc default',
+        }, section: 'Features', bool_yn: true)
+
+### Systemd; most is in systemd/meson.build
+systemd_files = get_option('systemd_files')
+systemd_legacy_units = get_option('systemd_legacy_units')
+libsystemd = dependency('libsystemd', required: systemd_files == 'enabled')
+summary({'libsystemd support': libsystemd.found(),
+         'files': systemd_files == 'enabled',
+        }, section: 'Systemd', bool_yn: true)
 
 message('---------------------------')
 
@@ -248,15 +269,15 @@ endif
 # Getting *runtime* path to knot-dns libs is surprisingly difficult.
 # Partially it's because meson isn't meant for general-purpose programming.
 foreach libname, lib: { 'libknot': libknot, 'libzscanner': libzscanner }
-  l = lib.get_pkgconfig_variable('libdir')
-  p = lib.get_pkgconfig_variable('prefix')
-  ep = lib.get_pkgconfig_variable('exec_prefix')
+  l = lib.get_variable(pkgconfig: 'libdir')
+  p = lib.get_variable(pkgconfig: 'prefix')
+  ep = lib.get_variable(pkgconfig: 'exec_prefix')
   if ep != p # replace `p` with `ep` at the start of `l`
     assert(l.startswith(p))
     p_len = run_command('sh', '-c', 'echo "' + p + '" | wc -c', check: true).stdout().to_int()
     l = ep / l.substring(p_len)
   endif
-  conf_data.set_quoted(libname + '_SONAME', l / lib.get_pkgconfig_variable('soname'))
+  conf_data.set_quoted(libname + '_SONAME', l / lib.get_variable(pkgconfig: 'soname'))
 endforeach
 
 kresconfig = configure_file(
@@ -339,63 +360,3 @@ if luacheck.found()
   )
 endif
 
-
-# Summary message
-# NOTE: ternary operator in format() not supported
-# https://github.com/mesonbuild/meson/issues/2404
-s_managed_ta = managed_ta ? 'enabled' : 'disabled'
-s_install_root_keys = install_root_keys ? 'enabled' : 'disabled'
-s_build_utils = build_utils ? 'enabled' : 'disabled'
-s_build_dnstap = build_dnstap ? 'enabled' : 'disabled'
-s_build_unit_tests = build_unit_tests ? 'enabled' : 'disabled'
-s_build_config_tests = build_config_tests ? 'enabled' : 'disabled'
-s_build_extra_tests = build_extra_tests ? 'enabled' : 'disabled'
-s_install_kresd_conf = install_kresd_conf ? 'enabled' : 'disabled'
-s_sendmmsg = sendmmsg ? 'enabled': 'disabled'
-s_xdp = xdp ? 'enabled': 'disabled'
-s_openssl = openssl.found() ? 'present': 'missing'
-s_capng = capng.found() ? 'enabled': 'disabled'
-s_malloc = malloc.found() ? 'jemalloc' : 'libc default'
-s_doh2 = nghttp2.found() ? 'enabled': 'disabled'
-message('''
-
-======================= SUMMARY =======================
-
-  paths
-    prefix:             @0@'''.format(prefix) + '''
-    lib_dir:            @0@'''.format(lib_dir) + '''
-    sbin_dir:           @0@'''.format(sbin_dir) + '''
-    etc_dir:            @0@'''.format(etc_dir) + '''
-    root.hints:         @0@'''.format(root_hints) + '''
-
-  trust_anchors
-    keyfile_default:    @0@'''.format(keyfile_default) + '''
-    managed_ta:         @0@'''.format(s_managed_ta) + '''
-    install_root_keys:  @0@'''.format(s_install_root_keys) + '''
-
-  systemd:
-    files:              @0@'''.format(systemd_files) + '''
-    work_dir:           @0@'''.format(systemd_work_dir) + '''
-    cache_dir:          @0@'''.format(systemd_cache_dir) + '''
-
-  optional components
-    utils:              @0@'''.format(s_build_utils) + '''
-    dnstap:             @0@'''.format(s_build_dnstap) + '''
-    unit_tests:         @0@'''.format(s_build_unit_tests) + '''
-    config_tests:       @0@'''.format(s_build_config_tests) + '''
-    extra_tests:        @0@'''.format(s_build_extra_tests) + '''
-
-  additional
-    user:               @0@'''.format(user) + '''
-    group:              @0@'''.format(group) + '''
-    install_kresd_conf: @0@'''.format(s_install_kresd_conf) + '''
-    sendmmsg:           @0@'''.format(s_sendmmsg) + '''
-    XDP (in libknot):   @0@'''.format(s_xdp) + '''
-    openssl debug:      @0@'''.format(s_openssl) + '''
-    capng:              @0@'''.format(s_capng) + '''
-    malloc:             @0@'''.format(s_malloc) + '''
-    doh2:               @0@'''.format(s_doh2) + '''
-
-=======================================================
-
-''')
