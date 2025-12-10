@@ -1,4 +1,2 @@
-class KresBaseException(Exception):  # noqa: N818
-    """
-    Base class for all custom exceptions we use in Knot Resolver.
-    """
+class KresBaseError(Exception):
+    """Base class for all custom errors used in the knot_resolver module."""

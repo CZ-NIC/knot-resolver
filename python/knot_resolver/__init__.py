@@ -1,6 +1,6 @@
 from .constants import VERSION
-from .exceptions import KresBaseException
+from .exceptions import KresBaseError
 
 __version__ = VERSION
 
-__all__ = ["KresBaseException"]
+__all__ = ["KresBaseError"]
