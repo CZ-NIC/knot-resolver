@@ -849,31 +849,33 @@ docs:website:
     - poetry env use python${PYTHON_VERSION}
     - poetry env info
 
-python:examples:
-  <<: *python
-  script:
-    - poetry install --all-extras --only main,dev
-    - poe test-examples
-
-python:migrate:
-  <<: *python
-  script:
-    - poetry install --all-extras --only main,dev
-    - poe test-migrate
-
-python:check:
+python:check:files:
   <<: *python
   script:
     - poetry install --all-extras --only main,build,dev,lint
     - poe check-files
 
-python:format:
+python:check:code:
   <<: *python
   script:
     - poetry install --all-extras --only main,dev,lint
     - poe check-code
 
-python:run:
+python:test:examples:
+  <<: *python
+  stage: test
+  script:
+    - poetry install --all-extras --only main,dev
+    - poe test-examples
+
+python:test:migrate:
+  <<: *python
+  stage: test
+  script:
+    - poetry install --all-extras --only main,dev
+    - poe test-migrate
+
+python:test:run:
   <<: *python
   stage: test
   parallel:
@@ -891,7 +893,7 @@ python:run:
     # return code 124 is also OK
     - timeout 1m poe run etc/config/${ADD_CONFIG_FILE_NAME} || ( [[ $? -eq 124 ]] )
 
-python:unit:
+python:test:unit:
   <<: *python
   stage: test
   parallel:
