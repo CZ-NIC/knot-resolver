@@ -269,8 +269,7 @@ if KAFKA_LIB:
 
             # reduce the verbosity of kafka module logger
             kafka_logger = logging.getLogger("kafka")
-            # kafka_logger.setLevel(logging.ERROR)
-            kafka_logger.propagate = False
+            kafka_logger.setLevel(logging.WARNING)
 
             brokers = []
             for server in config.kafka.server.to_std():
@@ -329,12 +328,12 @@ if KAFKA_LIB:
                 else:
                     # ready to consume messages
                     try:
-                        messages: Dict[TopicPartition, List[ConsumerRecord]] = self._consumer.poll(timeout_ms=100)
+                        messages: Dict[TopicPartition, List[ConsumerRecord]] = self._consumer.poll(timeout_ms=1000)
                         if messages:
                             # ready to process messages
                             process_messages(messages, self._config)
                         else:
-                            await asyncio.sleep(10)
+                            await asyncio.sleep(5)
                     except KafkaError as e:
                         logger.error(f"{error_msg_prefix} Kafka error:\n{e}")
                         self._consumer_connect()
