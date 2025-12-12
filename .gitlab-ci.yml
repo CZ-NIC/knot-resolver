@@ -912,7 +912,7 @@ python:kafka:
     - poe run etc/config/config.test-kafka.yaml > knot-resolver.log 2>&1 &
     - sleep 60
     # start kafka test
-    - poetry run ./tests/kafka/kafka_test.sh localhost knot-resolver
+    - poetry run ./tests/kafka/kafka_test.sh
     - sleep 60
     # kill the resolver
     - kill %1

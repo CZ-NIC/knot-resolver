@@ -11,7 +11,8 @@ config_extensions = (".json", ".yaml", ".yml")
 # args: send_file.py SERVER TOPIC FILE_PATH
 server = sys.argv[1]
 topic_name = sys.argv[2]
-file_path = Path(sys.argv[3])
+group_id = sys.argv[3]
+file_path = Path(sys.argv[4])
 
 file_name = file_path.name
 extension = file_path.suffix
@@ -43,7 +44,7 @@ def send_rpz_file(file_path: Path) -> None:
         try:
             future = producer.send(
                 topic=topic_name,
-                key=file_name.encode("utf-8"),
+                key=group_id,
                 value=chunk,
                 headers=chunk_headers
             )
