@@ -1,19 +1,24 @@
+from __future__ import annotations
+
 import asyncio
 import itertools
 import json
 import logging
 import struct
 import sys
-from abc import ABC, abstractmethod  # pylint: disable=no-name-in-module
+from abc import ABC, abstractmethod
 from enum import Enum, auto
-from pathlib import Path
-from typing import Dict, Iterable, Optional, Type, TypeVar
+from typing import TYPE_CHECKING, Dict, Iterable, Optional, Type, TypeVar
 from weakref import WeakValueDictionary
 
-from knot_resolver.controller.exceptions import SubprocessControllerError
+from knot_resolver.controller.exceptions import KresControllerError
 from knot_resolver.controller.registered_workers import register_worker, unregister_worker
-from knot_resolver.datamodel.config_schema import KresConfig
 from knot_resolver.manager.constants import kresd_config_file, policy_loader_config_file
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from knot_resolver.datamodel.config_schema import KresConfig
 
 logger = logging.getLogger(__name__)
 
@@ -35,9 +40,7 @@ T = TypeVar("T", bound="KresID")
 
 
 class KresID:
-    """
-    ID object used for identifying subprocesses.
-    """
+    """ID object used for identifying subprocesses."""
 
     _used: "Dict[SubprocessType, WeakValueDictionary[int, KresID]]" = {k: WeakValueDictionary() for k in SubprocessType}
 
@@ -61,9 +64,10 @@ class KresID:
         cls._used[typ][n] = val
         return val
 
-    def __init__(self, typ: SubprocessType, n: int, _i_know_what_i_am_doing: bool = False):
+    def __init__(self, typ: SubprocessType, n: int, _i_know_what_i_am_doing: bool = False) -> None:
         if not _i_know_what_i_am_doing:
-            raise RuntimeError("Don't do this. You seem to have no idea what it does")
+            msg = "Don't do this. You seem to have no idea what it does"
+            raise RuntimeError(msg)
 
         self._id = n
         self._type = typ
@@ -84,40 +88,34 @@ class KresID:
         return False
 
     def __str__(self) -> str:
-        """
-        Returns string representation of the ID usable directly in the underlying service manager
-        """
-        raise NotImplementedError()
+        """Return string representation of the ID usable directly in the underlying service supervisor."""
+        raise NotImplementedError
 
     @staticmethod
-    def from_string(val: str) -> "KresID":
-        """
-        Inverse of __str__
-        """
-        raise NotImplementedError()
+    def from_string(val: str) -> KresID:
+        """Inverse of __str__."""
+        raise NotImplementedError
 
     def __int__(self) -> int:
         return self._id
 
 
 class Subprocess(ABC):
-    """
-    One SubprocessInstance corresponds to one manager's subprocess
-    """
+    """One SubprocessInstance corresponds to one manager's subprocess."""
 
     def __init__(self, config: KresConfig, kresid: KresID) -> None:
         self._id = kresid
         self._config = config
         self._registered_worker: bool = False
-        self._pid: Optional[int] = None
+        self._pid: int | None = None
 
-        self._config_file: Optional[Path] = None
+        self._config_file: Path | None = None
         if self.type is SubprocessType.KRESD:
             self._config_file = kresd_config_file(self._config, self.id)
         elif self.type is SubprocessType.POLICY_LOADER:
             self._config_file = policy_loader_config_file(self._config)
 
-    def _render_lua(self) -> Optional[str]:
+    def _render_lua(self) -> str | None:
         if self.type is SubprocessType.KRESD:
             return self._config.render_kresd_lua()
         if self.type is SubprocessType.POLICY_LOADER:
@@ -127,7 +125,7 @@ class Subprocess(ABC):
     def _write_config(self) -> None:
         config_lua = self._render_lua()
         if config_lua and self._config_file:
-            with open(self._config_file, "w", encoding="utf8") as file:
+            with self._config_file.open("w", encoding="utf8") as file:
                 file.write(config_lua)
 
     def _unlink_config(self) -> None:
@@ -144,7 +142,7 @@ class Subprocess(ABC):
             if self.type is SubprocessType.KRESD:
                 register_worker(self)
                 self._registered_worker = True
-        except SubprocessControllerError as e:
+        except KresControllerError as e:
             self._unlink_config()
             raise e
 

@@ -7,7 +7,7 @@ from knot_resolver.utils.functional import Result
 from knot_resolver.utils.modeling.exceptions import DataParsingError
 from knot_resolver.utils.modeling.types import NoneType
 
-from .exceptions import KresManagerException
+from .exceptions import KresManagerBaseError
 
 VerifyCallback = Callable[[KresConfig, KresConfig, bool], Awaitable[Result[None, str]]]
 UpdateCallback = Callable[[KresConfig, bool], Awaitable[None]]
@@ -28,7 +28,7 @@ class ConfigStore:
         err_res = filter(lambda r: r.is_err(), results)
         errs = list(map(lambda r: r.unwrap_err(), err_res))
         if len(errs) > 0:
-            raise KresManagerException("Configuration validation failed. The reasons are:\n - " + "\n - ".join(errs))
+            raise KresManagerBaseError("Configuration validation failed. The reasons are:\n - " + "\n - ".join(errs))
 
         async with self._update_lock:
             # update the stored config with the new version

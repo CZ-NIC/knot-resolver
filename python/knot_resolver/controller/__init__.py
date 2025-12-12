@@ -1,16 +1,16 @@
 """
-This file contains autodetection logic for available subprocess controllers. Because we have to catch errors
+The file contains autodetection logic for available subprocess controllers. Because we have to catch errors
 from imports, they are located in functions which are invoked at the end of this file.
 
 We supported multiple subprocess controllers while developing it. It now all converged onto just supervisord.
 The interface however remains so that different controllers can be added in the future.
 """
 
-# pylint: disable=import-outside-toplevel
+from __future__ import annotations
+
 
 import asyncio
 import logging
-from typing import List, Optional
 
 from knot_resolver.controller.interface import SubprocessController
 from knot_resolver.datamodel.config_schema import KresConfig
@@ -21,19 +21,17 @@ logger = logging.getLogger(__name__)
 List of all subprocess controllers that are available in order of priority.
 It is filled dynamically based on available modules that do not fail to import.
 """
-_registered_controllers: List[SubprocessController] = []
+_registered_controllers: list[SubprocessController] = []
 
 
-def try_supervisord():
-    """
-    Attempt to load supervisord controllers.
-    """
+def try_supervisord() -> None:
+    """Attempt to load supervisord controllers."""
     try:
         from knot_resolver.controller.supervisord import SupervisordSubprocessController
 
         _registered_controllers.append(SupervisordSubprocessController())
     except ImportError:
-        logger.error("Failed to import modules related to supervisord service manager", exc_info=True)
+        logger.exception("Failed to import modules related to supervisord service manager")
 
 
 async def get_best_controller_implementation(config: KresConfig) -> SubprocessController:

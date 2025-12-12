@@ -98,12 +98,20 @@ exclude = ["setup.py"]
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [
-    # docstring
+    "COM812",
+    "ISC001",
+
+    # annotations
+    # "UP007",      # Use `X | Y` for type annotations
+    # "UP045",      # 
+
+    # docstrings
     "D100",       # Missing docstring in public module
     "D101",       # Missing docstring in public class
     "D102",       # Missing docstring in public method
     "D103",       # Missing docstring in public function
     "D104",       # Missing docstring in public package
+    "D105",       # Missing docstring in magic method (__int__, __str__, ...)
     "D107",       # Missing docstring in `__init__`
     # Incompatible
     "D203",       # incompatible with D211 (no-blank-line-before-class)
