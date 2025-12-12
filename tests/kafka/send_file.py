@@ -44,7 +44,7 @@ def send_rpz_file(file_path: Path) -> None:
         try:
             future = producer.send(
                 topic=topic_name,
-                key=group_id,
+                key=group_id.encode("utf-8"),
                 value=chunk,
                 headers=chunk_headers
             )
@@ -62,7 +62,7 @@ def send_config_file(file_path: Path) -> None:
     try:
         future = producer.send(
             topic=topic_name,
-            key=file_name.encode("utf-8"),
+            key=group_id.encode("utf-8"),
             value=value,
             headers=headers
         )

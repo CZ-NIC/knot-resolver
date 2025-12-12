@@ -297,7 +297,7 @@ if KAFKA_LIB:
                     str(config_kafka.topic),
                     bootstrap_servers=self._brokers,
                     client_id=str(self._config.hostname),
-                    group_id=str(config_kafka.group_id),
+                    # group_id=str(config_kafka.group_id),
                     security_protocol=str(config_kafka.security_protocol).upper(),
                     ssl_cafile=str(config_kafka.ca_file) if config_kafka.ca_file else None,
                     ssl_certfile=str(config_kafka.cert_file) if config_kafka.cert_file else None,
