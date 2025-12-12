@@ -659,6 +659,8 @@ async def start_server(config: List[str]) -> int:  # noqa: PLR0915
         # we'll exec will invoke us again.
         logger.info("Exec requested with arguments: %s", str(e.exec_args))
 
+        kafka_client.deinit_kafka_client()
+
         # unblock signals, this could actually terminate us straight away
         signal.pthread_sigmask(signal.SIG_UNBLOCK, Server.all_handled_signals())
 
