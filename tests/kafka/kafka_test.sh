@@ -16,14 +16,20 @@ if [ -n "$2" ]
     topic="$2"
 fi
 
+group_id="dns-group1"
+if [ -n "$3" ]
+  then
+    group_id="$3"
+fi
+
 # send small list
-python tests/kafka/send_file.py $broker $topic tests/kafka/smalllist.rpz
+python tests/kafka/send_file.py $broker $topic $group_id tests/kafka/smalllist.rpz
 
 # send giga list
-python tests/kafka/send_file.py $broker $topic tests/kafka/gigalist.rpz
+python tests/kafka/send_file.py $broker $topic $group_id tests/kafka/gigalist.rpz
 
 # send new configuration
-python tests/kafka/send_file.py $broker $topic tests/kafka/config.json
+python tests/kafka/send_file.py $broker $topic $group_id tests/kafka/config.json
 
 # compare files
 sleep 10
