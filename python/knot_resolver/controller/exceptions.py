@@ -3,11 +3,11 @@ from __future__ import annotations
 from knot_resolver import KresBaseError
 
 
-class KresControllerError(KresBaseError):
+class KresSubprocessControllerError(KresBaseError):
     """Class for errors that are raised in the controller module."""
 
 
-class KresControllerExec(Exception):  # noqa: N818
+class KresSubprocessControllerExec(Exception):  # noqa: N818
     """
     Custom non-error exception that indicates the need for exec().
 
