@@ -5,10 +5,9 @@ import itertools
 import json
 import logging
 import struct
-import sys
 from abc import ABC, abstractmethod
 from enum import Enum, auto
-from typing import TYPE_CHECKING, Dict, Iterable, Optional, Type, TypeVar
+from typing import TYPE_CHECKING, Iterable, TypeVar
 from weakref import WeakValueDictionary
 
 from knot_resolver.controller.exceptions import KresControllerError
@@ -42,24 +41,25 @@ T = TypeVar("T", bound="KresID")
 class KresID:
     """ID object used for identifying subprocesses."""
 
-    _used: "Dict[SubprocessType, WeakValueDictionary[int, KresID]]" = {k: WeakValueDictionary() for k in SubprocessType}
+    _used: dict[SubprocessType, WeakValueDictionary[int, KresID]] = {k: WeakValueDictionary() for k in SubprocessType}
 
     @classmethod
-    def alloc(cls: Type[T], typ: SubprocessType) -> T:
+    def alloc(cls: type[T], typ: SubprocessType) -> T:
         # find free ID closest to zero
         for i in itertools.count(start=0, step=1):
             if i not in cls._used[typ]:
                 return cls.new(typ, i)
 
-        raise RuntimeError("Reached an end of an infinite loop. How?")
+        msg = "Reached an end of an infinite loop. How?"
+        raise RuntimeError(msg)
 
     @classmethod
-    def new(cls: "Type[T]", typ: SubprocessType, n: int) -> "T":
+    def new(cls: type[T], typ: SubprocessType, n: int) -> T:
         if n in cls._used[typ]:
             # Ignoring typing here, because I can't find a way how to make the _used dict
             # typed based on subclass. I am not even sure that it's different between subclasses,
             # it's probably still the same dict. But we don't really care about it
-            return cls._used[typ][n]  # type: ignore
+            return cls._used[typ][n]
         val = cls(typ, n, _i_know_what_i_am_doing=True)
         cls._used[typ][n] = val
         return val
@@ -132,7 +132,7 @@ class Subprocess(ABC):
         if self._config_file:
             self._config_file.unlink(missing_ok=True)
 
-    async def start(self, new_config: Optional[KresConfig] = None) -> None:
+    async def start(self, new_config: KresConfig | None = None) -> None:
         if new_config:
             self._config = new_config
         self._write_config()
@@ -142,19 +142,19 @@ class Subprocess(ABC):
             if self.type is SubprocessType.KRESD:
                 register_worker(self)
                 self._registered_worker = True
-        except KresControllerError as e:
+        except KresControllerError:
             self._unlink_config()
-            raise e
+            raise
 
     async def apply_new_config(self, new_config: KresConfig) -> None:
         self._config = new_config
 
         # update config file
-        logger.debug(f"Writing config file for {self.id}")
+        logger.debug("Writing config file for %s", self.id)
         self._write_config()
 
         # update runtime status
-        logger.debug(f"Restarting {self.id}")
+        logger.debug("Restarting %s", self.id)
         await self._restart()
 
     async def stop(self) -> None:
@@ -165,8 +165,10 @@ class Subprocess(ABC):
 
     async def cleanup(self) -> None:
         """
-        Remove temporary files and all traces of this instance running. It is NOT SAFE to call this while
-        the kresd is running, because it will break automatic restarts (at the very least).
+        Remove temporary files and all traces of this instance running.
+
+        It is NOT SAFE to call this while the kresd is running,
+        because it will break automatic restarts (at the very least).
         """
         self._unlink_config()
 
@@ -206,10 +208,11 @@ class Subprocess(ABC):
 
     async def command(self, cmd: str) -> object:
         if not self._registered_worker:
-            raise RuntimeError("the command cannot be sent to a process other than the kresd worker")
+            msg = "the command cannot be sent to a process other than the kresd worker"
+            raise RuntimeError(msg)
 
         reader: asyncio.StreamReader
-        writer: Optional[asyncio.StreamWriter] = None
+        writer: asyncio.StreamWriter | None = None
 
         try:
             reader, writer = await asyncio.open_unix_connection(f"./control/{int(self.id)}")
@@ -218,7 +221,7 @@ class Subprocess(ABC):
             _ = await reader.read(2)
 
             # switch to JSON mode
-            writer.write("__json\n".encode("utf8"))
+            writer.write(b"__json\n")
 
             # write command
             writer.write(cmd.encode("utf8"))
@@ -233,43 +236,39 @@ class Subprocess(ABC):
         finally:
             if writer is not None:
                 writer.close()
-
-                # proper closing of the socket is only implemented in later versions of python
-                if sys.version_info.minor >= 7:
-                    await writer.wait_closed()  # type: ignore
+                await writer.wait_closed()
 
 
 class SubprocessController(ABC):
     """
-    The common Subprocess Controller interface. This is what KresManager requires and what has to be implemented by all
-    controllers.
+    The common Subprocess Controller interface.
+
+    This is what KresManager requires and what has to be implemented by all controllers.
     """
 
     @abstractmethod
     async def is_controller_available(self, config: KresConfig) -> bool:
-        """
-        Returns bool, whether the controller is available with the given config
-        """
+        """Return bool, whether the controller is available with the given config."""
 
     @abstractmethod
     async def initialize_controller(self, config: KresConfig) -> None:
         """
-        Should be called when we want to really start using the controller with a specific configuration
+        Initialize the Subprocess Controller.
+
+        Should be called when we want to really start using the controller with a specific configuration.
         """
 
     @abstractmethod
     async def get_all_running_instances(self) -> Iterable[Subprocess]:
-        """
-
-        Must NOT be called before initialize_controller()
-        """
+        """Must NOT be called before initialize_controller()."""
 
     @abstractmethod
     async def shutdown_controller(self) -> None:
         """
-        Called when the manager is gracefully shutting down. Allows us to stop
-        the service manager process or simply cleanup, so that we don't reuse
-        the same resources in a new run.
+        Shutting the Process Cntroller.
+
+        Allows us to stop the service manager process or simply cleanup,
+        so that we don't reuse the same resources in a new run.
 
         Must NOT be called before initialize_controller()
         """
@@ -277,18 +276,20 @@ class SubprocessController(ABC):
     @abstractmethod
     async def create_subprocess(self, subprocess_config: KresConfig, subprocess_type: SubprocessType) -> Subprocess:
         """
-        Return a Subprocess object which can be operated on. The subprocess is not
-        started or in any way active after this call. That has to be performaed manually
-        using the returned object itself.
+        Return a Subprocess object which can be operated on.
+
+        The subprocess is not started or in any way active after this call.
+        That has to be performaed manually using the returned object itself.
 
         Must NOT be called before initialize_controller()
         """
 
     @abstractmethod
-    async def get_subprocess_status(self) -> Dict[KresID, SubprocessStatus]:
+    async def get_subprocess_status(self) -> dict[KresID, SubprocessStatus]:
         """
-        Get a status of running subprocesses as seen by the controller. This method  actively polls
-        for information.
+        Get a status of running subprocesses as seen by the controller.
+
+        This method  actively polls for information.
 
         Must NOT be called before initialize_controller()
         """

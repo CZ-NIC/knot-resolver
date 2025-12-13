@@ -1,19 +1,20 @@
 """
-The file contains autodetection logic for available subprocess controllers. Because we have to catch errors
-from imports, they are located in functions which are invoked at the end of this file.
+The module contains autodetection logic for available controllers.
 
+Because we have to catch errors from imports, they are located in functions which are invoked at the end of this file.
 We supported multiple subprocess controllers while developing it. It now all converged onto just supervisord.
 The interface however remains so that different controllers can be added in the future.
 """
 
 from __future__ import annotations
 
-
 import asyncio
 import logging
+from typing import TYPE_CHECKING
 
-from knot_resolver.controller.interface import SubprocessController
-from knot_resolver.datamodel.config_schema import KresConfig
+if TYPE_CHECKING:
+    from knot_resolver.controller.interface import SubprocessController
+    from knot_resolver.datamodel.config_schema import KresConfig
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,8 @@ async def get_best_controller_implementation(config: KresConfig) -> SubprocessCo
 
     if len(_registered_controllers) == 0:
         logger.error("No controllers are available! Did you install all dependencies?")
-        raise LookupError("No service managers available!")
+        msg = "No service managers available!"
+        raise LookupError(msg)
 
     # check all controllers concurrently
     res = await asyncio.gather(*(cont.is_controller_available(config) for cont in _registered_controllers))
@@ -55,21 +57,23 @@ async def get_best_controller_implementation(config: KresConfig) -> SubprocessCo
             return controller
 
     # or fail
-    raise LookupError("Can't find any available service manager!")
+    msg = "Can't find any available service manager!"
+    raise LookupError(msg)
 
 
-def list_controller_names() -> List[str]:
+def list_controller_names() -> list[str]:
     """
-    Returns a list of names of registered controllers. The listed controllers are not necessarly functional.
-    """
+    Return a list of names of registered controllers.
 
+    The listed controllers are not necessary functional.
+    """
     return [str(controller) for controller in sorted(_registered_controllers, key=str)]
 
 
 async def get_controller_by_name(config: KresConfig, name: str) -> SubprocessController:
-    logger.debug("Subprocess controller selected manualy by the user, testing feasibility...")
+    logger.debug("Subprocess controller selected manually by the user, testing feasibility...")
 
-    controller: Optional[SubprocessController] = None
+    controller: SubprocessController | None = None
     for c in sorted(_registered_controllers, key=str):
         if str(c).startswith(name):
             if str(c) != name:
@@ -79,12 +83,14 @@ async def get_controller_by_name(config: KresConfig, name: str) -> SubprocessCon
 
     if controller is None:
         logger.error("Subprocess controller with name '%s' was not found", name)
-        raise LookupError(f"No subprocess controller named '{name}' found")
+        msg = f"No subprocess controller named '{name}' found"
+        raise LookupError(msg)
 
     if await controller.is_controller_available(config):
         logger.info("Selected controller '%s'", str(controller))
         return controller
-    raise LookupError("The selected subprocess controller is not available for use on this system.")
+    msg = "The selected subprocess controller is not available for use on this system."
+    raise LookupError(msg)
 
 
 # run the imports on module load
