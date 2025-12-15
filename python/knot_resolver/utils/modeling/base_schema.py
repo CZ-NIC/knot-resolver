@@ -197,7 +197,13 @@ def _describe_type(typ: Type[Any]) -> Dict[Any, Any]:  # noqa: PLR0911, PLR0912
         return {"type": "string"}
 
     if is_literal(typ):
-        lit = get_generic_type_arguments(typ)
+        lit: List[Any] = []
+        args = get_generic_type_arguments(typ)
+        for arg in args:
+            if is_literal(arg):
+                lit += get_generic_type_arguments(arg)
+            else:
+                lit.append(arg)
         return {"type": "string", "enum": lit}
 
     if is_optional(typ):

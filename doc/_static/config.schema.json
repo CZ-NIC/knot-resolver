@@ -1524,7 +1524,12 @@
                         "enum": [
                             "manager",
                             "supervisord",
+                            "policy-loader",
+                            "kresd",
                             "cache-gc",
+                            "files",
+                            "metrics",
+                            "server",
                             "system",
                             "cache",
                             "io",

@@ -2,15 +2,17 @@ import logging
 import logging.handlers
 import os
 import sys
-from typing import Optional
 
 from knot_resolver.datamodel.config_schema import KresConfig
-from knot_resolver.datamodel.logging_schema import LogTargetEnum
+from knot_resolver.datamodel.logging_schema import LogGroupsManagerEnum
 from knot_resolver.manager.config_store import ConfigStore, only_on_real_changes_update
+from knot_resolver.utils.modeling.types import get_generic_type_arguments
 
 from .constants import LOGGING_LEVEL_STARTUP
 
-logger = logging.getLogger(__name__)
+STDOUT = "stdout"
+SYSLOG = "syslog"
+STDERR = "stderr"
 
 NOTICE_LEVEL = (logging.WARNING + logging.INFO) // 2
 NOTICE_NAME = "NOTICE"
@@ -33,6 +35,8 @@ _level_to_name = {
     logging.DEBUG: "DEBUG",
 }
 
+logger = logging.getLogger(__name__)
+
 
 def get_log_format(config: KresConfig) -> str:
     """
@@ -44,42 +48,48 @@ def get_log_format(config: KresConfig) -> str:
         return "[%(levelname)s] %(name)s: %(message)s"
     # In this case, we are running standalone during inicialization and we need to add a prefix to each line
     # by ourselves to make it consistent
-    assert config.logging.target != "syslog"
+    assert config.logging.target != SYSLOG
     stream = ""
-    if config.logging.target == "stderr":
-        stream = " (stderr)"
+    if config.logging.target == STDERR:
+        stream = f" ({STDERR})"
 
     pid = os.getpid()
     return f"%(asctime)s manager[{pid}]{stream}: [%(levelname)s] %(name)s: %(message)s"
 
 
 async def _set_log_level(config: KresConfig) -> None:
+    groups = config.logging.groups
+    target = _config_to_level[config.logging.level]
+
     # when logging group is set to make us log with DEBUG
-    if config.logging.groups and "manager" in config.logging.groups:
+    if groups and "manager" in groups:
         target = logging.DEBUG
-    # otherwise, follow the standard log level
-    else:
-        target = _config_to_level[config.logging.level]
 
     # expect exactly one existing log handler on the root
     logger.warning(f"Changing logging level to '{_level_to_name[target]}'")
     logging.getLogger().setLevel(target)
 
+    # set debug groups
+    if groups:
+        package_name = __name__.rsplit(".", 1)[0]
+        for group in groups:
+            if group in get_generic_type_arguments(LogGroupsManagerEnum):
+                logger_name = f"{package_name}.{group}"
+                logger.warning(f"Changing logging level of '{logger_name}' group to '{_level_to_name[logging.DEBUG]}'")
+                logging.getLogger(logger_name).setLevel(logging.DEBUG)
+
 
 async def _set_logging_handler(config: KresConfig) -> None:
-    target: Optional[LogTargetEnum] = config.logging.target
-
-    if target is None:
-        target = "stdout"
+    target = config.logging.target
 
     handler: logging.Handler
-    if target == "syslog":
+    if target == SYSLOG:
         handler = logging.handlers.SysLogHandler(address="/dev/log")
         handler.setFormatter(logging.Formatter("%(name)s: %(message)s"))
-    elif target == "stdout":
+    elif target == STDOUT:
         handler = logging.StreamHandler(sys.stdout)
         handler.setFormatter(logging.Formatter(get_log_format(config)))
-    elif target == "stderr":
+    elif target == STDERR:
         handler = logging.StreamHandler(sys.stderr)
         handler.setFormatter(logging.Formatter(get_log_format(config)))
     else:
