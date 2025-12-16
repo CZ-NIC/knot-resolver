@@ -184,6 +184,24 @@ if PROMETHEUS_LIB:
             label=("instance_id", sid),
             value=metrics["request"]["xdp6"],
         )
+        yield _counter(
+            "resolver_request_doq",
+            "number of external requests received over DNS-over-QUIC (RFC 9250)",
+            label=("instance_id", sid),
+            value=metrics["request"]["doq"],
+        )
+        yield _counter(
+            "resolver_request_doq4",
+            "number of external requests received over IPv4 DNS-over-QUIC (RFC 9250)",
+            label=("instance_id", sid),
+            value=metrics["request"]["doq4"],
+        )
+        yield _counter(
+            "resolver_request_doq6",
+            "number of external requests received over IPv6 DNS-over-QUIC (RF 9250)",
+            label=("instance_id", sid),
+            value=metrics["request"]["doq6"],
+        )
 
         # "answer" metrics
         yield _counter(
