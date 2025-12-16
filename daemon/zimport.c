@@ -249,11 +249,11 @@ do_digest:
 		if (!z_import->digests[i].active)
 			continue;
 		int ret2 = dnssec_digest_finish(z_import->digests[i].ctx, &digs[i]);
-		if (ret == DNSSEC_EOK)
+		if (ret == KNOT_EOK)
 			ret = ret2;
 		// we need to keep going to free all digests[*].ctx
 	}
-	if (ret != DNSSEC_EOK) {
+	if (ret != KNOT_EOK) {
 		for (int i = 0; i < DIGEST_ALG_COUNT; ++i)
 			free(digs[i].data);
 		kr_log_error(PREFILL, "error when computing digest: %s\n",

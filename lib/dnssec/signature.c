@@ -23,7 +23,7 @@ static int authenticate_ds(const dnssec_key_t *key, dnssec_binary_t *ds_rdata, u
 	/* Compute DS RDATA from the DNSKEY. */
 	dnssec_binary_t computed_ds = { 0, };
 	int ret = dnssec_key_create_ds(key, digest_type, &computed_ds);
-	if (ret != DNSSEC_EOK)
+	if (ret != KNOT_EOK)
 		goto fail;
 
 	/* DS records contain algorithm, key tag and the digest.
@@ -144,7 +144,7 @@ static int sign_ctx_add_self(dnssec_sign_ctx_t *ctx, const uint8_t *rdata)
 	};
 
 	result = dnssec_sign_add(ctx, &header);
-	if (result != DNSSEC_EOK)
+	if (result != KNOT_EOK)
 		return result;
 
 	// signer name

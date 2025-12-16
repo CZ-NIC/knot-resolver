@@ -49,7 +49,7 @@ static int nsec3_parameters(dnssec_nsec3_params_t *params, const knot_rrset_t *n
 		return kr_error(EMSGSIZE);
 
 	int ret = dnssec_nsec3_params_from_rdata(params, &rdata);
-	if (ret != DNSSEC_EOK)
+	if (ret != KNOT_EOK)
 		return kr_error(EINVAL);
 
 	return kr_ok();
@@ -80,7 +80,7 @@ static int hash_name(dnssec_binary_t *hash, const dnssec_nsec3_params_t *params,
 	};
 
 	int ret = dnssec_nsec3_hash(&dname, params, hash);
-	if (ret != DNSSEC_EOK) {
+	if (ret != KNOT_EOK) {
 		return kr_error(EINVAL);
 	}
 

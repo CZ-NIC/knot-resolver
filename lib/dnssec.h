@@ -16,9 +16,6 @@
 #include <libknot/libknot.h>
 // Now some compatibility
 enum {
-	// These should be OK to replace everywhere.
-	DNSSEC_EOK = KNOT_EOK,
-
 	// These might not be OK to simply replace everywhere.
 	DNSSEC_INVALID_KEY_ALGORITHM = KNOT_INVALID_KEY_ALGORITHM,
 	DNSSEC_INVALID_DIGEST_ALGORITHM = KNOT_EALGORITHM,

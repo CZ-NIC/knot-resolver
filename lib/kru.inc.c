@@ -227,7 +227,7 @@ static bool kru_initialize(struct kru *kru, int capacity_log, kru_price_t max_de
 
 	kru->loads_bits = loads_bits;
 
-	if (dnssec_random_buffer((uint8_t *)&kru->hash_key, sizeof(kru->hash_key)) != DNSSEC_EOK) {
+	if (dnssec_random_buffer((uint8_t *)&kru->hash_key, sizeof(kru->hash_key)) != KNOT_EOK) {
 		return false;
 	}
 
