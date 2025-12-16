@@ -3,10 +3,46 @@
  */
 #include <ngtcp2/ngtcp2.h>
 #include "contrib/openbsd/siphash.h"
-#include "quic_common.h"
 #include "libdnssec/random.h"
-#include "session2.h"
+
+#include "quic_common.h"
 #include "quic_conn.h"
+#include "session2.h"
+#include "network.h"
+
+int quic_configuration_set(void)
+{
+	if (kr_fails_assert(the_network)) {
+		return kr_error(EINVAL);
+	}
+
+	if (the_network->quic_params) {
+		return kr_ok();
+	}
+
+	struct net_quic_params *quic_params = calloc(1, sizeof(*quic_params));
+	if (quic_params == NULL) {
+		return kr_error(ENOMEM);
+	}
+
+	the_network->quic_params = quic_params;
+	/* Default values */
+	the_network->quic_params->require_retry = false;
+	the_network->quic_params->max_streams = 1024;
+	the_network->quic_params->max_conns = 1024;
+	return kr_ok();
+}
+
+int quic_configuration_free(struct net_quic_params *quic_params)
+{
+	if (quic_params == NULL){
+		return kr_ok();
+	}
+
+	free(quic_params);
+
+	return kr_ok();
+}
 
 uint64_t quic_timestamp(void)
 {

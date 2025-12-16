@@ -555,7 +555,7 @@ typedef struct {
 	_Bool tls;
 	_Bool http;
 	_Bool xdp;
-	_Bool doq;
+	_Bool quic;
 	_Bool freebind;
 	const char *kind;
 } endpoint_flags_t;
@@ -631,6 +631,7 @@ struct network {
 	} listen_tcp_buflens;
 	_Bool enable_connect_udp;
 	uint16_t min_udp_source_port;
+	struct net_quic_params *quic_params;
 };
 struct args *the_args;
 struct endpoint {

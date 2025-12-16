@@ -13,6 +13,7 @@
 #include <gnutls/crypto.h>
 
 #include "session2.h"
+#include "network.h"
 
 /** RFC 9250 4.3 DoQ Error Codes for use as application protocol error codes */
 typedef enum {
@@ -47,12 +48,6 @@ typedef enum {
 #define QUIC_SEND_CONN_CLOSE             (-2000)
 
 #define BUCKETS_PER_CONNS 8
-
-/* Application is responsible for extending the stream limit.
- * This mainly means that this value limits the number of concurrent streams
- * because only once a stream is closed is this max_streams frame sent to the
- * remote endpoint. */
-#define MAX_STREAMS_BIDI 1024
 
 #define MAX_QUIC_PKT_SIZE 65536
 #define MAX_QUIC_FRAME_SIZE 65536
@@ -110,6 +105,8 @@ struct kr_quic_stream_param {
 	struct comm_info comm_storage;
 };
 
+int quic_configuration_set(void);
+int quic_configuration_free(struct net_quic_params *quic_params);
 bool kr_quic_conn_timeout(struct pl_quic_conn_sess_data *conn, uint64_t *now);
 uint64_t cid2hash(const ngtcp2_cid *cid, kr_quic_table_t *table);
 bool init_unique_cid(ngtcp2_cid *cid, size_t len, kr_quic_table_t *table);

@@ -3,7 +3,7 @@
 .. _config-network-server-tls:
 
 DoT, DoH and DoQ (encrypted DNS)
----------------------------
+--------------------------------
 
 .. warning::
 
@@ -13,7 +13,7 @@ DoT, DoH and DoQ (encrypted DNS)
    See `slides <https://irtf.org/anrw/2019/slides-anrw19-final44.pdf>`_
    or `the article itself <https://dl.acm.org/authorize?N687437>`_.
 
-DoT and DoH encrypt DNS traffic with Transport Layer Security (TLS) protocol
+DoT, DoH and DoQ encrypt DNS traffic with Transport Layer Security (TLS) protocol
 and thus protects DNS traffic from certain types of attacks.
 
 You can learn more about DoT and DoH and their implementation in Knot Resolver
@@ -90,7 +90,7 @@ the following status codes:
 .. _dot-doh-doq-config-options:
 
 Configuration options for DoT, DoH and DoQ
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. note::
 
@@ -210,11 +210,46 @@ policies.
 .. _dns-over-quic:
 
 DNS-over-QUIC (DoQ)
-^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^
+
 .. note::
-   Forwarding over QUIC is not currently supported.
+    DoQ is currently considered an experimental feature. If you encounter any
+    issues or have any questions, please do not hesitate to contact us via the
+    standard communication channels.
+
 
 DNS-over-QUIC server (:rfc:`9250`) can be configured using ``doq`` kind in
 :option:`network/listen <network/listen: <list>>`.
 
 For certificate configuration, refer to :ref:`dot-doh-doq-config-options`.
+
+.. option:: network/quic:
+
+    .. option:: max_conns: <1-4096>
+
+    :default: 1024
+
+    The maximum number of active connections a worker is permitted to accept.
+    Setting this value too low or too high may negatively affect performance.
+    Changing this value requires a worker restart.
+
+    .. option:: max_streams: <1-4096>
+
+    :default: 1024
+
+    The maximum number of concurrent streams a connection can open.
+    Setting this value too low or too high may negatively affect performance.
+    Changing this value requires a worker restart.
+
+    .. option:: require_retry: true|false
+
+    :default: false
+
+    Require address validation from unknown addresses. Retry requests might
+    be sent under certain conditions regardless of this setting.
+    Note that enabling this option imposes a 1-RTT delay for verifying
+    the return routability of the source address of a client.
+
+    For further details see:
+    https://datatracker.ietf.org/doc/html/rfc9000#name-address-validation-using-re
+    and https://datatracker.ietf.org/doc/html/rfc9250#name-address-validation

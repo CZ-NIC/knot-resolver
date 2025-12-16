@@ -70,6 +70,12 @@ struct net_proxy_data {
 	uint8_t netmask;   /**< Number of bits to be matched */
 };
 
+struct net_quic_params {
+	uint16_t max_conns;
+	uint16_t max_streams;
+	bool require_retry;
+};
+
 struct network {
 	uv_loop_t *loop;
 
@@ -116,6 +122,8 @@ struct network {
 
 	/** Low source port (e.g. 53) might be useful for attacks with spoofed source IPs. */
 	uint16_t min_udp_source_port;
+
+	struct net_quic_params *quic_params;
 };
 
 /** Pointer to the singleton network state. NULL if not initialized. */

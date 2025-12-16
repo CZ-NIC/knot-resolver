@@ -12,8 +12,6 @@
 #include "quic_common.h"
 #include "daemon/tls.h"
 
-#define QUIC_MAX_OPEN_CONNS 1024
-
 /** QUIC parameters. */
 typedef struct {
 	/*! Use QUIC indicator. */

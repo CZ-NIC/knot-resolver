@@ -9,8 +9,6 @@
 #include "quic_conn.h"
 #include "session2.h"
 
-#define QUIC_MAX_SEND_PER_RECV	4
-
 struct kr_quic_obuf {
 	struct node node;
 	size_t len;

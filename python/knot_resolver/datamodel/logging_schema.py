@@ -71,6 +71,8 @@ LogGroupsKresdEnum = Literal[
     "rules",
     "prlayr",
     "defer",
+    "doq",
+    "ngtcp2",
     # "reqdbg",... (non-displayed section of the enum)
 ]
 

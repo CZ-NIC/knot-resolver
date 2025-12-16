@@ -3,6 +3,7 @@
  */
 
 #include "quic_conn.h"
+#include "network.h"
 #include "quic_common.h"
 #include "quic_stream.h"
 #include "libdnssec/random.h"
@@ -327,7 +328,12 @@ static int conn_new_handler(ngtcp2_conn **pconn, const ngtcp2_path *path,
 
 	/* We have no use for unidirectional streams */
 	params.initial_max_streams_uni = 0;
-	params.initial_max_streams_bidi = MAX_STREAMS_BIDI;
+
+	if (unlikely(kr_fails_assert(the_network && the_network->quic_params))) {
+		kr_log_debug(DOQ, "Missing network struct or network quic_parameters\n");
+		return kr_error(EINVAL);
+	}
+	params.initial_max_streams_bidi = the_network->quic_params->max_streams;
 	params.initial_max_stream_data_bidi_local = MAX_QUIC_FRAME_SIZE;
 	params.initial_max_stream_data_bidi_remote = MAX_QUIC_FRAME_SIZE;
 	params.initial_max_data = MAX_QUIC_PKT_SIZE;

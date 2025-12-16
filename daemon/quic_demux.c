@@ -7,11 +7,11 @@
 #include "quic_conn.h"
 #include "quic_demux.h"
 #include "libdnssec/random.h"
+#include <stdlib.h>
 
 /* Toggle sending retry for new connections. This is a way to validate the
  * client address, but it adds 1 round trip to the connection establishment
  * potentially hindering performance */
-#define DOQ_REQUIRE_RETRY false
 #define BUCKETS_PER_CONNS 8 // Each connecion has several dCIDs, and each CID takes one hash table bucket.
 
 void kr_quic_table_rem(struct pl_quic_conn_sess_data *conn, kr_quic_table_t *table);
@@ -198,12 +198,14 @@ void kr_quic_table_sweep(struct kr_quic_table *table,
 			int ret = ngtcp2_conn_handle_expiry(c->conn, now);
 			if (ret != NGTCP2_NO_ERROR) {
 				quic_doq_error_t doq_error = DOQ_NO_ERROR;
-				send_special(&c->dec_cids, c->table_ref,
-						ctx, QUIC_SEND_CONN_CLOSE,
-						c, c->h.session, &doq_error);
+				/* see https://nghttp2.org/ngtcp2/ngtcp2_conn_handle_expiry.html */
+				if (ret != NGTCP2_ERR_IDLE_CLOSE) {
+					send_special(&c->dec_cids, c->table_ref,
+							ctx, QUIC_SEND_CONN_CLOSE,
+							c, c->h.session, &doq_error);
+				}
 				session2_event(c->h.session->transport.parent,
-						PROTOLAYER_EVENT_DISCONNECT,
-						c);
+						PROTOLAYER_EVENT_DISCONNECT, c);
 			} else {
 				// quic_conn_mark_used(c, table);
 			}
@@ -279,8 +281,8 @@ static enum protolayer_iter_cb_result pl_quic_demux_unwrap(void *sess_data,
 			return protolayer_break(ctx, kr_ok());
 		}
 
-		/* additional RTT seems quite expensive for all new connections */
-		if (header.tokenlen == 0 && DOQ_REQUIRE_RETRY) {
+		if (header.tokenlen == 0 && the_network->quic_params
+				&& the_network->quic_params->require_retry) {
 			if (send_special(&dec_cids, demux->conn_table, ctx,
 					QUIC_SEND_RETRY, NULL,
 					demux->h.session, NULL) != kr_ok()) {
@@ -458,10 +460,20 @@ static int pl_quic_demux_sess_init(struct session2 *session, void *sess_data, vo
 
 	struct tls_credentials *creds = the_network->tls_credentials;
 
-	if (!quic->conn_table) {
-		quic->conn_table = kr_quic_table_new(QUIC_MAX_OPEN_CONNS,
-				NGTCP2_MAX_UDP_PAYLOAD_SIZE, creds);
+	/* kresd process was run without a manager and no quic configuration
+	 * which would set defaults was provided -> init and set defaults */
+	if (!the_network->quic_params) {
+		int ret = 0;
+		if ((ret = quic_configuration_set()) != kr_ok()) {
+			kr_log_error(DOQ, "Failed to allocate quic defaults\n");
+			return ret;
+		}
+	}
 
+	if (!quic->conn_table) {
+		quic->conn_table = kr_quic_table_new(
+				the_network->quic_params->max_conns,
+				NGTCP2_MAX_UDP_PAYLOAD_SIZE, creds);
 		if (!quic->conn_table) {
 			kr_log_error(DOQ, "Failed to create QUIC connection table\n");
 			return kr_error(ENOMEM);
