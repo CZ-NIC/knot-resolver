@@ -4,15 +4,13 @@
 
 #include <string.h>
 
-#include <libdnssec/binary.h>
-#include <libdnssec/error.h>
-#include <libdnssec/nsec.h>
 #include <libknot/descriptor.h>
 #include <contrib/base32hex.h>
 #include <libknot/rrset.h>
 #include <libknot/rrtype/nsec3.h>
 
 #include "lib/defines.h"
+#include "lib/dnssec.h"
 #include "lib/dnssec/nsec.h"
 #include "lib/dnssec/nsec3.h"
 #include "lib/utils.h"
@@ -51,7 +49,7 @@ static int nsec3_parameters(dnssec_nsec3_params_t *params, const knot_rrset_t *n
 		return kr_error(EMSGSIZE);
 
 	int ret = dnssec_nsec3_params_from_rdata(params, &rdata);
-	if (ret != DNSSEC_EOK)
+	if (ret != KNOT_EOK)
 		return kr_error(EINVAL);
 
 	return kr_ok();
@@ -82,7 +80,7 @@ static int hash_name(dnssec_binary_t *hash, const dnssec_nsec3_params_t *params,
 	};
 
 	int ret = dnssec_nsec3_hash(&dname, params, hash);
-	if (ret != DNSSEC_EOK) {
+	if (ret != KNOT_EOK) {
 		return kr_error(EINVAL);
 	}
 

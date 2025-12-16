@@ -2,11 +2,6 @@
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include <libdnssec/binary.h>
-#include <libdnssec/crypto.h>
-#include <libdnssec/error.h>
-#include <libdnssec/key.h>
-#include <libdnssec/sign.h>
 #include <libknot/descriptor.h>
 #include <libknot/packet/wire.h>
 #include <libknot/rdataset.h>
@@ -549,8 +544,8 @@ int kr_dnssec_key_match(const uint8_t *key_a_rdata, size_t key_a_rdlen,
 	ret = kr_error(ENOENT);
 	dnssec_binary_t pk_a, pk_b;
 	if (dnssec_key_get_algorithm(key_a) == dnssec_key_get_algorithm(key_b) &&
-	    dnssec_key_get_pubkey(key_a, &pk_a) == DNSSEC_EOK &&
-	    dnssec_key_get_pubkey(key_b, &pk_b) == DNSSEC_EOK) {
+	    dnssec_key_get_pubkey(key_a, &pk_a) == KNOT_EOK &&
+	    dnssec_key_get_pubkey(key_b, &pk_b) == KNOT_EOK) {
 		if (pk_a.size == pk_b.size && memcmp(pk_a.data, pk_b.data, pk_a.size) == 0) {
 			ret = 0;
 		}
@@ -573,17 +568,17 @@ int kr_dnssec_key_from_rdata(struct dnssec_key **key, const knot_dname_t *kown, 
 	};
 
 	int ret = dnssec_key_new(&new_key);
-	if (ret != DNSSEC_EOK) {
+	if (ret != KNOT_EOK) {
 		return kr_error(ENOMEM);
 	}
 	ret = dnssec_key_set_rdata(new_key, &binary_key);
-	if (ret != DNSSEC_EOK) {
+	if (ret != KNOT_EOK) {
 		dnssec_key_free(new_key);
 		return kr_error(ret);
 	}
 	if (kown) {
 		ret = dnssec_key_set_dname(new_key, kown);
-		if (ret != DNSSEC_EOK) {
+		if (ret != KNOT_EOK) {
 			dnssec_key_free(new_key);
 			return kr_error(ENOMEM);
 		}

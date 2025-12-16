@@ -45,7 +45,7 @@ static int nsec_p_init(struct nsec_p *nsec_p, knot_db_val_t nsec_p_entry, bool w
 		.data = (uint8_t *)/*const-cast*/nsec_p->raw,
 	};
 	int ret = dnssec_nsec3_params_from_rdata(&nsec_p->libknot, &rdata);
-	return ret == DNSSEC_EOK ? kr_ok() : kr_error(ret);
+	return ret == KNOT_EOK ? kr_ok() : kr_error(ret);
 }
 
 static void nsec_p_cleanup(struct nsec_p *nsec_p)

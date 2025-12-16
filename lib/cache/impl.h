@@ -11,8 +11,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include <libdnssec/error.h>
-#include <libdnssec/nsec.h>
+#include "lib/dnssec.h"
 #include <libknot/consts.h>
 #include <libknot/db/db.h>
 #include <libknot/dname.h>
