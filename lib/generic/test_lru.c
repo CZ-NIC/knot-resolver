@@ -82,30 +82,30 @@ static void test_eviction(void **state)
 	}
 }
 
-static void test_init(void **state)
+static int test_init(void **state)
 {
 	lru_int_t *lru;
 	lru_create(&lru, HASH_SIZE, NULL, NULL);
 	assert_non_null(lru);
 	*state = lru;
+	return 0;
 }
 
-static void test_deinit(void **state)
+static int test_deinit(void **state)
 {
 	lru_int_t *lru = *state;
 	lru_free(lru);
+	return 0;
 }
 
 /* Program entry point */
 int main(int argc, char **argv)
 {
-	const UnitTest tests[] = {
-	        group_test_setup(test_init),
-	        unit_test(test_insert),
-		unit_test(test_missing),
-		unit_test(test_eviction),
-	        group_test_teardown(test_deinit)
+	const struct CMUnitTest tests[] = {
+	        cmocka_unit_test(test_insert),
+		cmocka_unit_test(test_missing),
+		cmocka_unit_test(test_eviction),
 	};
 
-	return run_group_tests(tests);
+	return cmocka_run_group_tests(tests, test_init, test_deinit);
 }

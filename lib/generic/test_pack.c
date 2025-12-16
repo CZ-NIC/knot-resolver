@@ -60,9 +60,9 @@ int main(void)
 {
 	test_mm_ctx_init(&global_mm);
 
-	const UnitTest tests[] = {
-		unit_test(test_pack_std),
+	const struct CMUnitTest tests[] = {
+		cmocka_unit_test(test_pack_std),
 	};
 
-	return run_tests(tests);
+	return cmocka_run_group_tests(tests, NULL, NULL);
 }

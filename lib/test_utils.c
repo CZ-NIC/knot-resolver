@@ -136,12 +136,12 @@ static void test_strptime_diff(void **state)
 
 int main(void)
 {
-	const UnitTest tests[] = {
-		unit_test(test_strcatdup),
-		unit_test(test_straddr),
-		unit_test(test_bitmask),
-		unit_test(test_strptime_diff)
+	const struct CMUnitTest tests[] = {
+		cmocka_unit_test(test_strcatdup),
+		cmocka_unit_test(test_straddr),
+		cmocka_unit_test(test_bitmask),
+		cmocka_unit_test(test_strptime_diff)
 	};
 
-	return run_tests(tests);
+	return cmocka_run_group_tests(tests, NULL, NULL);
 }
