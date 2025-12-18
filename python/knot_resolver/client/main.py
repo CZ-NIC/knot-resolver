@@ -20,8 +20,10 @@ def auto_import_commands() -> None:
 def create_main_argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         KRES_CLIENT_NAME,
-        description="Knot Resolver command-line utility that serves as a client for communicating with the Knot Resolver management API."
-        " The utility also provides tools to work with the resolver's declarative configuration (validate, convert, ...).",
+        description="Knot Resolver command-line utility that serves as a client for"
+        " communicating with the Knot Resolver management API."
+        " The utility also provides tools to work with the resolver's"
+        " declarative configuration (validate, convert, ...).",
     )
     parser.add_argument(
         "-V",
@@ -69,7 +71,8 @@ def main() -> None:
     parser = create_main_argument_parser()
     install_commands_parsers(parser)
 
-    # TODO: This is broken with unpatched versions of poethepoet, because they drop the `--` pseudo-argument.
+    # TODO: This is broken with unpatched versions of poethepoet,  # noqa: TD002
+    # because they drop the `--` pseudo-argument.
     # Patch submitted at <https://github.com/nat-n/poethepoet/pull/163>.
     try:
         pa_index = sys.argv.index("--", 1)

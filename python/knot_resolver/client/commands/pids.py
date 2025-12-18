@@ -1,4 +1,4 @@
-import argparse
+import argparse  # noqa: INP001
 import json
 import sys
 from typing import Iterable, List, Optional, Tuple, Type
@@ -37,7 +37,7 @@ class PidsCommand(Command):
         return pids, PidsCommand
 
     @staticmethod
-    def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
+    def completion(_args: List[str], _parser: argparse.ArgumentParser) -> CompWords:
         return {}
 
     def run(self, args: CommandArgs) -> None:
@@ -54,7 +54,8 @@ class PidsCommand(Command):
 
             else:
                 print(
-                    f"Unexpected response type '{type(processes).__name__}' from manager. Expected '{PROCESSES_TYPE.__name__}'",
+                    f"Unexpected response type '{type(processes).__name__}'"
+                    f" from manager. Expected '{PROCESSES_TYPE.__name__}'",
                     file=sys.stderr,
                 )
                 sys.exit(1)

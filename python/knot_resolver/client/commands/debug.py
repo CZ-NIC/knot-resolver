@@ -1,4 +1,4 @@
-import argparse
+import argparse  # noqa: INP001
 import json
 import os
 import sys
@@ -63,7 +63,7 @@ class DebugCommand(Command):
     def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
         return comp_get_words(args, parser)
 
-    def run(self, args: CommandArgs) -> None:  # noqa: PLR0912, PLR0915
+    def run(self, args: CommandArgs) -> None:  # noqa: C901, PLR0912, PLR0915
         if self.gdb is None:
             try:
                 gdb_cmd = str(which.which("gdb"))

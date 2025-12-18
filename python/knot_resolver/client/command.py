@@ -65,7 +65,7 @@ def comp_get_actions_words(parser_actions: List[argparse.Action]) -> CompWords:
     return words
 
 
-def comp_get_words(args: List[str], parser: argparse.ArgumentParser) -> CompWords:  # noqa: PLR0912
+def comp_get_words(args: List[str], parser: argparse.ArgumentParser) -> CompWords:  # noqa: C901, PLR0912
     words: CompWords = comp_get_actions_words(parser._actions)  # noqa: SLF001
     nargs = len(args)
 
@@ -87,11 +87,11 @@ def comp_get_words(args: List[str], parser: argparse.ArgumentParser) -> CompWord
         for exclusive_args in get_mutually_exclusive_args(parser):
             if arg in exclusive_args:
                 for earg in exclusive_args:
-                    if earg in words.keys():
+                    if earg in words:
                         del words[earg]
         # remove alternative arguments from words
         for opt in action.option_strings:
-            if opt in words.keys():
+            if opt in words:
                 del words[opt]
 
         # if not action or action is HelpAction or VersionAction
@@ -119,13 +119,13 @@ def comp_get_words(args: List[str], parser: argparse.ArgumentParser) -> CompWord
 
         # if action is SubParserAction
         if isinstance(action, argparse._SubParsersAction):  # noqa: SLF001
-            subparser: Optional[argparse.ArgumentParser] = action.choices[arg] if arg in action.choices else None
+            subparser: Optional[argparse.ArgumentParser] = action.choices.get(arg, None)
 
             command = get_subparser_command(subparser) if subparser else None
             if command and subparser:
                 return command.completion(args[i + 1 :], subparser)
             if subparser:
-                return comp_get_words(args[i + 1 :], subparser)  # noqa: SLF001
+                return comp_get_words(args[i + 1 :], subparser)
             return {}
 
     return words
@@ -173,12 +173,13 @@ def get_socket_from_config(config: Path, optional_file: bool) -> Optional[Socket
                     f"http://{ip.addr}:{ip.port}",
                     f'Key "/management/interface" in "{config}" file',
                 )
-        return None
     except ValueError as e:
         raise DataValidationError(*e.args) from e  # pylint: disable=no-value-for-parameter
-    except OSError as e:
+    except OSError:
         if not optional_file:
-            raise e
+            raise
+        return None
+    else:
         return None
 
 
@@ -206,7 +207,7 @@ class CommandArgs:
         self.namespace = namespace
         self.parser = parser
         self.subparser: argparse.ArgumentParser = namespace.subparser
-        self.command: Type["Command"] = namespace.command
+        self.command: Type[Command] = namespace.command
 
         self.socket: SocketDesc = determine_socket(namespace)
 
@@ -217,7 +218,7 @@ class Command(ABC):
     def register_args_subparser(
         subparser: "argparse._SubParsersAction[argparse.ArgumentParser]",
     ) -> Tuple[argparse.ArgumentParser, "Type[Command]"]:
-        raise NotImplementedError()
+        raise NotImplementedError
 
     @abstractmethod
     def __init__(self, namespace: argparse.Namespace) -> None:  # pylint: disable=[unused-argument]
@@ -225,9 +226,9 @@ class Command(ABC):
 
     @abstractmethod
     def run(self, args: CommandArgs) -> None:
-        raise NotImplementedError()
+        raise NotImplementedError
 
     @staticmethod
     @abstractmethod
     def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
-        raise NotImplementedError()
+        raise NotImplementedError

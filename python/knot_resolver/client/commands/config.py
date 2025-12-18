@@ -1,4 +1,4 @@
-import argparse
+import argparse  # noqa: INP001
 import sys
 from enum import Enum
 from typing import List, Literal, Optional, Tuple, Type
@@ -37,8 +37,10 @@ class ConfigCommand(Command):
         subparser: "argparse._SubParsersAction[argparse.ArgumentParser]",
     ) -> Tuple[argparse.ArgumentParser, "Type[Command]"]:
         config = subparser.add_parser("config", help="Performs operations on the running resolver's configuration.")
-        path_help = "Optional, path (JSON pointer, RFC6901) to the configuration resources. By default, the entire configuration is selected."
-
+        path_help = (
+            "Optional, path (JSON pointer, RFC6901) to the configuration resources."
+            " By default, the entire configuration is selected."
+        )
         config_subparsers = config.add_subparsers(help="operation type")
 
         # GET operation
@@ -55,7 +57,10 @@ class ConfigCommand(Command):
         )
         get_op.add_argument(
             "file",
-            help="Optional, path to the file where to save exported configuration data. If not specified, data will be printed.",
+            help=(
+                "Optional, path to the file where to save exported configuration data."
+                " If not specified, data will be printed."
+            ),
             type=str,
             nargs="?",
         )
@@ -154,7 +159,7 @@ class ConfigCommand(Command):
                     prefix += f"/{node}"
                     continue
 
-            for key in properties.keys():
+            for key in properties:
                 words[f"{prefix}/{key}"] = properties[key]["description"]
 
             return words

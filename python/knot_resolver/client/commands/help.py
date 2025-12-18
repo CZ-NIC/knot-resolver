@@ -1,4 +1,4 @@
-import argparse
+import argparse  # noqa: INP001
 from typing import List, Tuple, Type
 
 from knot_resolver.client.command import Command, CommandArgs, CompWords, comp_get_words, register_command

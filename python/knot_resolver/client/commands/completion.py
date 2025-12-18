@@ -1,4 +1,4 @@
-import argparse
+import argparse  # noqa: INP001
 from enum import Enum
 from typing import List, Tuple, Type
 
@@ -47,7 +47,7 @@ class CompletionCommand(Command):
     def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
         return comp_get_words(args, parser)
 
-    def run(self, args: CommandArgs) -> None:  # noqa: PLR0912
+    def run(self, args: CommandArgs) -> None:
         words: CompWords = {}
 
         parser = args.parser
@@ -59,7 +59,7 @@ class CompletionCommand(Command):
         if self.shell == Shells.BASH:
             print(" ".join(words))
         elif self.shell == Shells.FISH:
-            # TODO: FISH completion implementation
+            # TODO: FISH completion implementation  # noqa: TD002
             pass
         else:
             raise ValueError(f"unexpected value of {Shells}: {self.shell}")

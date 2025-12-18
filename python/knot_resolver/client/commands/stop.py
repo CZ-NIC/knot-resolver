@@ -1,4 +1,4 @@
-import argparse
+import argparse  # noqa: INP001
 import sys
 from typing import List, Tuple, Type
 
@@ -28,5 +28,5 @@ class StopCommand(Command):
             sys.exit(1)
 
     @staticmethod
-    def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
+    def completion(_args: List[str], _parser: argparse.ArgumentParser) -> CompWords:
         return {}

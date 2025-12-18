@@ -1,4 +1,4 @@
-import argparse
+import argparse  # noqa: INP001
 import json
 import sys
 from typing import List, Optional, Tuple, Type

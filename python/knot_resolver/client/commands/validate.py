@@ -1,4 +1,4 @@
-import argparse
+import argparse  # noqa: INP001
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Tuple, Type
@@ -45,7 +45,7 @@ class ValidateCommand(Command):
     def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
         return comp_get_words(args, parser)
 
-    def run(self, args: CommandArgs) -> None:
+    def run(self, _args: CommandArgs) -> None:
         data: Dict[str, Any] = {}
         try:
             for file in self.input_file:

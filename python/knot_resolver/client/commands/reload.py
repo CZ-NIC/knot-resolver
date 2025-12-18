@@ -1,4 +1,4 @@
-import argparse
+import argparse  # noqa: INP001
 import sys
 from typing import List, Tuple, Type
 
@@ -31,7 +31,7 @@ class ReloadCommand(Command):
         return reload, ReloadCommand
 
     @staticmethod
-    def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
+    def completion(_args: List[str], _parser: argparse.ArgumentParser) -> CompWords:
         return {}
 
     def run(self, args: CommandArgs) -> None:

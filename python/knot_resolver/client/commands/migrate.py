@@ -1,4 +1,4 @@
-import argparse
+import argparse  # noqa: INP001
 import copy
 import sys
 from typing import Any, Dict, List, Optional, Tuple, Type
@@ -33,9 +33,7 @@ def _add(config: Dict[str, Any], path: str, val: Any, rewrite: bool = False) -> 
 
     current = config
     for key in keys[1:-1]:
-        if key not in current:
-            current[key] = {}
-        elif key in current and not isinstance(current[key], dict):
+        if key not in current or key in current and not isinstance(current[key], dict):
             current[key] = {}
         current = current[key]
 
@@ -90,7 +88,10 @@ class MigrateCommand(Command):
             "output_file",
             type=str,
             nargs="?",
-            help="Optional, output file for migrated configuration in desired output format. If not specified, migrated configuration is printed.",
+            help=(
+                "Optional, output file for migrated configuration in desired output format."
+                " If not specified, migrated configuration is printed."
+            ),
             default=None,
         )
         return migrate, MigrateCommand
@@ -99,7 +100,7 @@ class MigrateCommand(Command):
     def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
         return comp_get_words(args, parser)
 
-    def run(self, args: CommandArgs) -> None:  # noqa: PLR0912, PLR0915
+    def run(self, _args: CommandArgs) -> None:  # noqa: C901, PLR0912, PLR0915
         with open(self.input_file, "r") as f:
             data = f.read()
 
