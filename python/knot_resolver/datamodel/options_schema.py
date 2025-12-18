@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 from typing import Literal
 
 from knot_resolver.utils.modeling import ConfigSchema

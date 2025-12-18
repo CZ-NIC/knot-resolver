@@ -1,16 +1,13 @@
 # ruff: noqa: SLF001
-
 import re
-from typing import Any, Dict, Type, Union
+from typing import Any, ClassVar, Dict, Type, Union
 
 from knot_resolver.utils.compat.typing import Pattern
 from knot_resolver.utils.modeling import BaseValueType
 
 
 class IntBase(BaseValueType):
-    """
-    Base class to work with integer value.
-    """
+    """Base class to work with integer value."""
 
     _orig_value: int
     _value: int
@@ -47,9 +44,7 @@ class IntBase(BaseValueType):
 
 
 class FloatBase(BaseValueType):
-    """
-    Base class to work with float value.
-    """
+    """Base class to work with float value."""
 
     _orig_value: Union[float, int]
     _value: float
@@ -89,9 +84,7 @@ class FloatBase(BaseValueType):
 
 
 class StrBase(BaseValueType):
-    """
-    Base class to work with string value.
-    """
+    """Base class to work with string value."""
 
     _orig_value: str
     _value: str
@@ -133,6 +126,7 @@ class StrBase(BaseValueType):
 class StringLengthBase(StrBase):
     """
     Base class to work with string value length.
+
     Just inherit the class and set the values for '_min_bytes' and '_max_bytes'.
 
     class String32B(StringLengthBase):
@@ -167,6 +161,7 @@ class StringLengthBase(StrBase):
 class IntRangeBase(IntBase):
     """
     Base class to work with integer value in range.
+
     Just inherit the class and set the values for '_min' and '_max'.
 
     class IntNonNegative(IntRangeBase):
@@ -196,6 +191,7 @@ class IntRangeBase(IntBase):
 class FloatRangeBase(FloatBase):
     """
     Base class to work with float value in range.
+
     Just inherit the class and set the values for '_min' and '_max'.
 
     class FloatNonNegative(IntRangeBase):
@@ -225,6 +221,7 @@ class FloatRangeBase(FloatBase):
 class PatternBase(StrBase):
     """
     Base class to work with string value that match regex pattern.
+
     Just inherit the class and set regex pattern for '_re'.
 
     class ABPattern(PatternBase):
@@ -246,6 +243,7 @@ class PatternBase(StrBase):
 class UnitBase(StrBase):
     """
     Base class to work with string value that match regex pattern.
+
     Just inherit the class and set '_units'.
 
     class CustomUnit(PatternBase):
@@ -253,7 +251,7 @@ class UnitBase(StrBase):
     """
 
     _re: Pattern[str]
-    _units: Dict[str, int]
+    _units: ClassVar[Dict[str, int]]
     _base_value: int
 
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
@@ -274,7 +272,7 @@ class UnitBase(StrBase):
             self._base_value = int(val) * type(self)._units[unit]
         else:
             raise ValueError(
-                f"Unexpected value for '{type(self)}'."
+                f"Unexpected value for '{type(self)}'."  # noqa: ISC003
                 " Expected string that matches pattern " + rf"'{type(self)._re.pattern}'."
                 f" Positive integer and one of the units {list(type(self)._units.keys())}, got '{source_value}'.",
                 object_path,
@@ -287,10 +285,7 @@ class UnitBase(StrBase):
         return f"Unit[{type(self).__name__},{self._value}]"
 
     def __eq__(self, o: object) -> bool:
-        """
-        Two instances are equal when they represent the same size
-        regardless of their string representation.
-        """
+        """Two instances are equal when they represent the same size regardless of their string representation."""
         return isinstance(o, UnitBase) and o._value == self._value
 
     def serialize(self) -> Any:

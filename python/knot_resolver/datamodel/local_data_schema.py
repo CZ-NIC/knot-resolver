@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 from typing import Any, Dict, List, Literal, Optional, Union
 
 from knot_resolver.constants import WATCHDOG_LIB
@@ -36,7 +37,7 @@ class RuleSchema(ConfigSchema):
     tags: Optional[List[IDPattern]] = None
     ttl: Optional[TimeUnit] = None
     nodata: Optional[bool] = None
-    # TODO: probably also implement the rule options from RPZSchema (.log + .dry_run)
+    # TODO: probably also implement the rule options from RPZSchema (.log + .dry_run)  # noqa: TD002
 
     def _validate(self) -> None:
         options_sum = sum([bool(self.address), bool(self.subtree), bool(self.file), bool(self.records)])

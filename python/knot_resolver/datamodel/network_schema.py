@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 from typing import Any, List, Literal, Optional, Union
 
 from knot_resolver.constants import WATCHDOG_LIB
@@ -83,7 +84,7 @@ class TLSSchema(ConfigSchema):
             return WATCHDOG_LIB
         return obj.watchdog
 
-    def _validate(self):
+    def _validate(self) -> None:
         if self.sticket_secret and self.sticket_secret_file:
             raise ValueError("'sticket_secret' and 'sticket_secret_file' are both defined, only one can be used")
         if bool(self.cert_file) != bool(self.key_file):
@@ -197,7 +198,7 @@ class NetworkSchema(ConfigSchema):
     address_renumbering: Optional[List[AddressRenumberingSchema]] = None
     tls: TLSSchema = TLSSchema()
     proxy_protocol: ProxyProtocolSchema = ProxyProtocolSchema()
-    listen: List[ListenSchema] = [
+    listen: List[ListenSchema] = [  # noqa: RUF012
         ListenSchema({"interface": "127.0.0.1"}),
         ListenSchema({"interface": "::1", "freebind": True}),
     ]

@@ -1,7 +1,6 @@
 """
 The parsing and validation of the datamodel is dependent on a global state:
-- a file system path used for resolving relative paths
-
+- a file system path used for resolving relative paths.
 
 Commentary from @vsraier:
 =========================
@@ -10,12 +9,13 @@ While this is not ideal, it is the best we can do at the moment. When I created 
 the datamodel was dependent on the global state implicitly. The validation procedures just read
 the current working directory. This module is the first step in removing the global dependency.
 
-At some point in the future, it might be interesting to add something like a "validation context"
+At some point in the future, it might b# ruff: noqa: E501
+e interesting to add something like a "validation context"
 to the modelling tools. It is not technically complicated, but it requires
 massive model changes I am not willing to make at the moment. Ideally, when implementing this,
 the BaseSchema would turn into an empty class without any logic. Not even a constructor. All logic
 would be in the ObjectMapper class. Similar to how Gson works in Java or AutoMapper in C#.
-"""
+"""  # noqa: D205
 
 from pathlib import Path
 from typing import Optional
