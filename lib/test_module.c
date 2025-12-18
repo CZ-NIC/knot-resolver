@@ -29,11 +29,11 @@ static void test_module_c(void **state)
 
 int main(void)
 {
-	const UnitTest tests[] = {
-		unit_test(test_module_params),
-		unit_test(test_module_builtin),
-		unit_test(test_module_c),
+	const struct CMUnitTest tests[] = {
+		cmocka_unit_test(test_module_params),
+		cmocka_unit_test(test_module_builtin),
+		cmocka_unit_test(test_module_c),
 	};
 
-	return run_tests(tests);
+	return cmocka_run_group_tests(tests, NULL, NULL);
 }

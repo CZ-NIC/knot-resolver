@@ -49,10 +49,10 @@ static void test_zonecut_copy(void **state)
 
 int main(void)
 {
-	const UnitTest tests[] = {
-	        unit_test(test_zonecut_params),
-	        unit_test(test_zonecut_copy)
+	const struct CMUnitTest tests[] = {
+	        cmocka_unit_test(test_zonecut_params),
+	        cmocka_unit_test(test_zonecut_copy)
 	};
 
-	return run_tests(tests);
+	return cmocka_run_group_tests(tests, NULL, NULL);
 }

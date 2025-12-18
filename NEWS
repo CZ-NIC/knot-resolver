@@ -4,15 +4,13 @@ Knot Resolver 6.0.18 (2026-mm-dd)
 Improvements:
 -------------
 - logging: improved logging groups (!1768)
+- support libdnssec merged into libknot, as planned for knot >= 3.6 (!1769)
+- support cmocka 2.0.0 (!1772)
 
 Bugfixes
 --------
 - reload did not apply changes to /fallback (!1763)
 - fix config.cache.clear test on apple silicon (!1766)
-
-Improvements
-------------
-- support libdnssec merged into libknot, as planned for knot >= 3.6 (!1769)
 
 
 Knot Resolver 6.0.17 (2025-12-02)
