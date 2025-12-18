@@ -33,7 +33,7 @@ def systemd_notify(**values: str) -> None:
             _socket = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
             _socket.connect(socket_addr)
             _status = _Status.FUNCTIONAL
-        except Exception:
+        except Exception:  # noqa: BLE001
             _socket = None
             _status = _Status.FAILED
             logger.warning(f"Failed to connect to $NOTIFY_SOCKET at '{socket_addr}'", exc_info=True)
@@ -47,7 +47,7 @@ def systemd_notify(**values: str) -> None:
         payload = "\n".join((f"{key}={value}" for key, value in values.items()))
         try:
             _socket.send(payload.encode("utf8"))
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.warning("Failed to send notification to systemd", exc_info=True)
             _status = _Status.FAILED
             _socket.close()

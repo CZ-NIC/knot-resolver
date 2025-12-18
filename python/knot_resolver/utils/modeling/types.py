@@ -22,7 +22,7 @@ def is_optional(tp: Any) -> bool:
     origin = getattr(tp, "__origin__", None)
     args = get_generic_type_arguments(tp)
 
-    return origin == Union and len(args) == 2 and args[1] == NoneType  # type: ignore
+    return origin == Union and len(args) == 2 and args[1] == NoneType
 
 
 def is_dict(tp: Any) -> bool:
@@ -42,8 +42,8 @@ def is_tuple(tp: Any) -> bool:
 
 
 def is_union(tp: Any) -> bool:
-    """Returns true even for optional types, because they are just a Union[T, NoneType]"""
-    return getattr(tp, "__origin__", None) == Union  # type: ignore
+    """Return true even for optional types, because they are just a Union[T, NoneType]."""
+    return getattr(tp, "__origin__", None) == Union
 
 
 def is_literal(tp: Any) -> bool:
@@ -65,8 +65,7 @@ def get_generic_type_arguments(tp: Any) -> List[Any]:
 
 
 def get_generic_type_argument(tp: Any) -> Any:
-    """same as function get_generic_type_arguments, but expects just one type argument"""
-
+    """Same as function get_generic_type_arguments, but expects just one type argument."""  # noqa: D401
     args = get_generic_type_arguments(tp)
     assert len(args) == 1
     return args[0]

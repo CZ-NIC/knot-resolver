@@ -29,10 +29,10 @@ class _RaiseDuplicatesLoader(yaml.SafeLoader):
             raise ConstructorError(None, None, f"expected a mapping node, but found {node.id}", node.start_mark)
         mapping: Dict[Any, Any] = {}
         for key_node, value_node in node.value:
-            key = self.construct_object(key_node, deep=deep)  # type: ignore
+            key = self.construct_object(key_node, deep=deep)
             # we need to check, that the key object can be used in a hash table
             try:
-                _ = hash(key)  # type: ignore
+                _ = hash(key)
             except TypeError as exc:
                 raise ConstructorError(
                     "while constructing a mapping",
@@ -44,7 +44,7 @@ class _RaiseDuplicatesLoader(yaml.SafeLoader):
             # check for duplicate keys
             if key in mapping:
                 raise DataParsingError(f"duplicate key detected: {key_node.start_mark}")
-            value = self.construct_object(value_node, deep=deep)  # type: ignore
+            value = self.construct_object(value_node, deep=deep)
             mapping[key] = value
         return mapping
 
@@ -57,7 +57,7 @@ class DataFormat(Enum):
         if self is DataFormat.YAML:
             # RaiseDuplicatesLoader extends yaml.SafeLoader, so this should be safe
             # https://python.land/data-processing/python-yaml#PyYAML_safe_load_vs_load
-            return renamed(yaml.load(text, Loader=_RaiseDuplicatesLoader))  # type: ignore
+            return renamed(yaml.load(text, Loader=_RaiseDuplicatesLoader))  # noqa: S506
         if self is DataFormat.JSON:
             return renamed(json.loads(text, object_pairs_hook=_json_raise_duplicates))
         raise NotImplementedError(f"Parsing of format '{self}' is not implemented")
@@ -67,7 +67,7 @@ class DataFormat(Enum):
             data = data.original()
 
         if self is DataFormat.YAML:
-            return yaml.safe_dump(data, indent=indent)  # type: ignore
+            return yaml.safe_dump(data, indent=indent)
         if self is DataFormat.JSON:
             return json.dumps(data, indent=indent)
         raise NotImplementedError(f"Exporting to '{self}' format is not implemented")
@@ -83,7 +83,6 @@ def parse_json(data: str) -> Any:
 
 def try_to_parse(data: str) -> Any:
     """Attempt to parse the data as a JSON or YAML string."""
-
     try:
         return parse_json(data)
     except json.JSONDecodeError as je:
@@ -98,7 +97,7 @@ def try_to_parse(data: str) -> Any:
 
 
 def data_combine(data: Dict[Any, Any], additional_data: Dict[Any, Any], object_path: str = "") -> Dict[Any, Any]:
-    """Combine dictionaries data"""
+    """Combine dictionaries data."""
     for key in additional_data:
         if key in data:
             # if both are dictionaries we can try to combine them deeper
