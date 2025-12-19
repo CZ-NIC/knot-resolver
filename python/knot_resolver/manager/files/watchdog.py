@@ -40,18 +40,18 @@ if WATCHDOG_LIB:
 
         def on_created(self, event: FileSystemEvent) -> None:
             src_path = Path(str(event.src_path))
-            if src_path in self._files.keys():
+            if src_path in self._files:
                 logger.info(f"Watched file '{src_path}' has been created")
                 self._trigger(self._files[src_path])
 
         def on_deleted(self, event: FileSystemEvent) -> None:
             src_path = Path(str(event.src_path))
-            if src_path in self._files.keys():
+            if src_path in self._files:
                 logger.warning(f"Watched file '{src_path}' has been deleted")
                 cmd = self._files[src_path]
                 if cmd:
                     cancel_cmd(cmd)
-            for file in self._files.keys():
+            for file in self._files:
                 if file.parent == src_path:
                     logger.warning(f"Watched directory '{src_path}' has been deleted")
                     cmd = self._files[file]
@@ -60,13 +60,13 @@ if WATCHDOG_LIB:
 
         def on_moved(self, event: FileSystemEvent) -> None:
             src_path = Path(str(event.src_path))
-            if src_path in self._files.keys():
+            if src_path in self._files:
                 logger.info(f"Watched file '{src_path}' has been moved")
                 self._trigger(self._files[src_path])
 
         def on_modified(self, event: FileSystemEvent) -> None:
             src_path = Path(str(event.src_path))
-            if src_path in self._files.keys():
+            if src_path in self._files:
                 logger.info(f"Watched file '{src_path}' has been modified")
                 self._trigger(self._files[src_path])
 
@@ -78,7 +78,7 @@ if WATCHDOG_LIB:
 
             event_handler = FilesWatchdogEventHandler(files_to_watch, config)
             dirs_to_watch: List[Path] = []
-            for file in files_to_watch.keys():
+            for file in files_to_watch:
                 if file.parent not in dirs_to_watch:
                     dirs_to_watch.append(file.parent)
 

@@ -1,9 +1,7 @@
-import asyncio
 import logging
-from typing import Any, Dict, Generator, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Generator, List, Optional, Tuple
 
 from knot_resolver.constants import PROMETHEUS_LIB
-from knot_resolver.controller.interface import KresID
 from knot_resolver.controller.registered_workers import get_registered_workers_kresids
 from knot_resolver.datamodel.config_schema import KresConfig
 from knot_resolver.manager.config_store import ConfigStore, only_on_real_changes_update
@@ -12,15 +10,20 @@ from knot_resolver.utils.functional import Result
 
 from .collect import collect_kresd_workers_metrics
 
+if TYPE_CHECKING:
+    import asyncio
+
+    from knot_resolver.controller.interface import KresID
+
 logger = logging.getLogger(__name__)
 
 if PROMETHEUS_LIB:
-    from prometheus_client import exposition  # type: ignore
-    from prometheus_client.bridge.graphite import GraphiteBridge  # type: ignore
+    from prometheus_client import exposition
+    from prometheus_client.bridge.graphite import GraphiteBridge
     from prometheus_client.core import (
         REGISTRY,
         CounterMetricFamily,
-        GaugeMetricFamily,  # type: ignore
+        GaugeMetricFamily,
         HistogramMetricFamily,
         Metric,
     )
@@ -31,19 +34,19 @@ if PROMETHEUS_LIB:
 
     def _counter(name: str, description: str, label: Tuple[str, str], value: float) -> CounterMetricFamily:
         c = CounterMetricFamily(name, description, labels=(label[0],))
-        c.add_metric((label[1],), value)  # type: ignore
+        c.add_metric((label[1],), value)
         return c
 
     def _gauge(name: str, description: str, label: Tuple[str, str], value: float) -> GaugeMetricFamily:
         c = GaugeMetricFamily(name, description, labels=(label[0],))
-        c.add_metric((label[1],), value)  # type: ignore
+        c.add_metric((label[1],), value)
         return c
 
     def _histogram(
         name: str, description: str, label: Tuple[str, str], buckets: List[Tuple[str, int]], sum_value: float
     ) -> HistogramMetricFamily:
         c = HistogramMetricFamily(name, description, labels=(label[0],))
-        c.add_metric((label[1],), buckets, sum_value=sum_value)  # type: ignore
+        c.add_metric((label[1],), buckets, sum_value=sum_value)
         return c
 
     def _parse_resolver_metrics(instance_id: "KresID", metrics: Any) -> Generator[Metric, None, None]:
@@ -323,9 +326,9 @@ if PROMETHEUS_LIB:
 
     class KresPrometheusMetricsCollector:
         def __init__(self, config_store: ConfigStore) -> None:
-            self._stats_raw: "Optional[Dict[KresID, object]]" = None
+            self._stats_raw: Optional[Dict[KresID, object]] = None
             self._config_store: ConfigStore = config_store
-            self._collection_task: "Optional[asyncio.Task[None]]" = None
+            self._collection_task: Optional[asyncio.Task[None]] = None
             self._skip_immediate_collection: bool = False
 
         def collect(self) -> Generator[Metric, None, None]:
@@ -402,9 +405,7 @@ if PROMETHEUS_LIB:
 
     @only_on_real_changes_update(lambda c: c.monitoring.graphite)
     async def _init_graphite_bridge(config: KresConfig, force: bool = False) -> None:
-        """
-        Starts graphite bridge if required
-        """
+        """Start graphite bridge if required."""
         global _graphite_bridge
         if config.monitoring.graphite.enable and _graphite_bridge is None:
             logger.info(
@@ -415,7 +416,7 @@ if PROMETHEUS_LIB:
             _graphite_bridge = GraphiteBridge(
                 (str(config.monitoring.graphite.host), int(config.monitoring.graphite.port))
             )
-            _graphite_bridge.start(  # type: ignore
+            _graphite_bridge.start(
                 interval=config.monitoring.graphite.interval.seconds(), prefix=str(config.monitoring.graphite.prefix)
             )
 
@@ -424,7 +425,8 @@ if PROMETHEUS_LIB:
     ) -> Result[None, str]:
         if old_config.monitoring.graphite.enable and not new_config.monitoring.graphite.enable:
             return Result.err(
-                "You can't turn off graphite monitoring dynamically. If you really want this feature, please let the developers know."
+                "You can't turn off graphite monitoring dynamically."
+                " If you really want this feature, please let the developers know."
             )
 
         if (
@@ -438,14 +440,12 @@ if PROMETHEUS_LIB:
 
 
 async def init_prometheus(config_store: ConfigStore) -> None:
-    """
-    Initialize metrics collection. Must be called before any other function from this module.
-    """
+    """Initialize metrics collection. Must be called before any other function from this module."""
     if PROMETHEUS_LIB:
         # init and register metrics collector
         global _metrics_collector
         _metrics_collector = KresPrometheusMetricsCollector(config_store)
-        REGISTRY.register(_metrics_collector)  # type: ignore
+        REGISTRY.register(_metrics_collector)  # type: ignore[arg-type]
 
         # register graphite bridge
         await config_store.register_verifier(_deny_turning_off_graphite_bridge)
@@ -459,5 +459,5 @@ async def report_prometheus() -> Optional[bytes]:
             await _metrics_collector.collect_kresd_stats()
         else:
             raise RuntimeError("Function invoked before initializing the module!")
-        return exposition.generate_latest()  # type: ignore
+        return exposition.generate_latest()
     return None

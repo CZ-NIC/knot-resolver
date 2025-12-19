@@ -10,6 +10,8 @@ from knot_resolver.utils.modeling.types import get_generic_type_arguments
 
 from .constants import LOGGING_LEVEL_STARTUP
 
+logger = logging.getLogger(__name__)
+
 STDOUT = "stdout"
 SYSLOG = "syslog"
 STDERR = "stderr"
@@ -39,10 +41,7 @@ logger = logging.getLogger(__name__)
 
 
 def get_log_format(config: KresConfig) -> str:
-    """
-    Based on an environment variable $KRES_SUPRESS_LOG_PREFIX, returns the appropriate format string for logger.
-    """
-
+    """Based on an environment variable $KRES_SUPRESS_LOG_PREFIX, returns the appropriate format string for logger."""
     if os.environ.get("KRES_SUPRESS_LOG_PREFIX") == "true":
         # In this case, we are running under supervisord and it's adding prefixes to our output
         return "[%(levelname)s] %(name)s: %(message)s"

@@ -1,5 +1,7 @@
 """
-Effectively the same as normal __main__.py. However, we moved it's content over to this
+Effectively the same as normal __main__.py.
+
+However, we moved it's content over to this
 file to allow us to exclude the __main__.py file from black's autoformatting
 """
 
@@ -26,7 +28,7 @@ def parse_args() -> argparse.Namespace:
         "-c",
         "--config",
         help="One or more configuration files to load."
-        f" Overrides default configuration file location at '{str(CONFIG_FILE)}'"
+        f" Overrides default configuration file location at '{CONFIG_FILE}'"
         " Files must not contain the same options."
         " However, they may extend individual subsections."
         " The location of the first configuration file determines"

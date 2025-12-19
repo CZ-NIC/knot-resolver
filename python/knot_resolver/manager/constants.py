@@ -53,9 +53,7 @@ def supervisord_subprocess_log_dir(_config: "KresConfig") -> Path:
 
 
 class _UserConstants:
-    """
-    Class for accessing constants, which are technically not constants as they are user configurable.
-    """
+    """Class for accessing constants, which are technically not constants as they are user configurable."""
 
     def __init__(self, config_store: "ConfigStore", working_directory_on_startup: str) -> None:
         self._config_store = config_store
