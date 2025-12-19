@@ -33,11 +33,12 @@ static const char *dict[] = {
 #define KEY_LEN(x) (strlen(x) + 1)
 static const int dict_size = sizeof(dict) / sizeof(const char *);
 
-static void test_init(void **state)
+static int test_init(void **state)
 {
 	trie_t *t = trie_create(NULL);
 	assert_non_null(t);
 	*state = t;
+	return 0;
 }
 
 static void test_insert(void **state)
@@ -129,26 +130,25 @@ static void test_leq_bug(void **state)
 	trie_free(t);
 }
 
-static void test_deinit(void **state)
+static int test_deinit(void **state)
 {
 	trie_t *t = *state;
 	trie_free(t);
 	*state = NULL;
+	return 0;
 }
 
 /* Program entry point */
 int main(int argc, char **argv)
 {
-	const UnitTest tests[] = {
-	        group_test_setup(test_init),
-	        unit_test(test_insert),
-		unit_test(test_leq_bug),
-		unit_test(test_missing),
-		unit_test(test_iter),
-		unit_test(test_queue),
-	        group_test_teardown(test_deinit)
+	const struct CMUnitTest tests[] = {
+	        cmocka_unit_test(test_insert),
+		cmocka_unit_test(test_leq_bug),
+		cmocka_unit_test(test_missing),
+		cmocka_unit_test(test_iter),
+		cmocka_unit_test(test_queue),
 	};
 
-	return run_group_tests(tests);
+	return cmocka_run_group_tests(tests, test_init, test_deinit);
 }
 

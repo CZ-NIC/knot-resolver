@@ -1,3 +1,15 @@
+Knot Resolver 5.7.7 (2026-0m-dd)
+================================
+
+Improvements:
+-------------
+- support cmocka 2.0.0
+
+Bugfixes
+--------
+- respect disablement of QNAME case randomization even after TCP issues
+
+
 Knot Resolver 5.7.6 (2025-07-17)
 ================================
 
