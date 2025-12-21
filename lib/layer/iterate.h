@@ -9,11 +9,11 @@
 
 /* Packet classification. */
 enum {
-	PKT_NOERROR   = 1 << 0, /* Positive response */
-	PKT_NODATA    = 1 << 1, /* No data response */
-	PKT_NXDOMAIN  = 1 << 2, /* Negative response */
-	PKT_REFUSED   = 1 << 3, /* Refused response */
-	PKT_ERROR     = 1 << 4  /* Bad message */
+	PKT_NOERROR   = 1 << 0, ///< positive response
+	PKT_NODATA    = 1 << 1, ///< no data response
+	PKT_NXDOMAIN  = 1 << 2, ///< negative response
+	PKT_REFUSED   = 1 << 3, ///< refused response
+	PKT_ERROR     = 1 << 4, ///< bad message
 };
 
 /** Classify response by type. */
