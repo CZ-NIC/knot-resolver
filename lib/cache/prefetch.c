@@ -99,11 +99,12 @@ void kr_cache_prefetch_init(uv_loop_t *loop, kr_cache_prefetch_callback_t callba
 	// + possibly configure k, etc.
 }
 
-void kr_cache_prefetch_sched(knot_db_val_t key, struct entry_h *eh, size_t data_len, uint16_t rrtype) {
+void kr_cache_prefetch_sched(knot_db_val_t key, struct entry_h *eh, size_t eh_len, size_t whole_entry_len, uint16_t rrtype) {
 	if (!loop_handle) return;
 	struct kr_cache *cache = &the_resolver->cache;
 	VERBOSE_LOG("SCHED         %6d  %s", eh->ttl, kr_cache_top_strkey(key.data, key.len));
-	if (key_consistent(key) & ~0xFFFF) {
+	const int ktype = key_consistent(key);
+	if (ktype & ~0xFFFF) {
 		VERBOSE_LOG("    not E-type key");
 		return;
 	}
@@ -111,7 +112,8 @@ void kr_cache_prefetch_sched(knot_db_val_t key, struct entry_h *eh, size_t data_
 	const int32_t time_to_update = eh->ttl - UPDATE_BEFORE_EXP_S;
 	if (time_to_update < 1) return;
 	const uint16_t load = kr_cache_top_load(&cache->top, key.data, key.len);
-	const double accesses = (double)load * (1<<16) / kr_cache_top_entry_price(&cache->top, kr_cache_top_entry_size(key.len, data_len));
+	size_t keydata_len = kr_cache_top_entry_size(key.len, whole_entry_len);
+	const double accesses = (double)load * (1<<16) / kr_cache_top_entry_price(&cache->top, keydata_len);
 		// includes the just occurring write access
 	const double exp_acc_decrease = accesses * (1 - kr_cache_top_decay_mult(&cache->top, time_to_update));
 
@@ -132,7 +134,13 @@ void kr_cache_prefetch_sched(knot_db_val_t key, struct entry_h *eh, size_t data_
 		// accesses distributed in range of 1B for normal-size records (non-zero, capped for larger)
 
 	knot_db_val_t pkey = sched2pkey(sched);
-	knot_db_val_t data = { 0 };
+	if (KNOT_RRTYPE_NS) {
+		keydata_len = (keydata_len - whole_entry_len) / 3 + eh_len;   // we divide size of common data of NS, CNAME, DNAME between them
+	}
+	struct entry_p ep = {
+		.ekeydata_len = (keydata_len > 0xFFFF ? 0xFFFF : keydata_len)
+	};
+	knot_db_val_t data = { .data = &ep, .len = sizeof(ep) };
 	cache_op(cache, write, &pkey, &data, 1);
 
 	eh->prefetch_priority = sched.priority;

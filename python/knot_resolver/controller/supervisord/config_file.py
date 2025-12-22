@@ -71,6 +71,7 @@ def kres_cache_gc_args(config: KresConfig) -> str:
         f" -d {gc_config.interval.millis()}"
         f" -u {gc_config.threshold}"
         f" -f {gc_config.release}"
+        f" -p {gc_config.unschedule}"
         f" -l {gc_config.rw_deletes}"
         f" -L {gc_config.rw_reads}"
         f" -t {gc_config.temp_keys_space.mbytes()}"

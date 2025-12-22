@@ -716,7 +716,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 		return kr_error(EINVAL);
 	if (qry) // it's possible to insert outside a request
 		kr_cache_top_access(qry->request, key.data, key.len, whole_val_len, "stash_rrset");
-	kr_cache_prefetch_sched(key, eh, whole_val_len, rr->type);
+	kr_cache_prefetch_sched(key, eh, val_new_entry.len, whole_val_len, rr->type);
 
 	#if 0 /* Occasionally useful when debugging some kinds of changes. */
 	{
