@@ -29,9 +29,10 @@ KR_EXPORT
 void kr_cache_prefetch_unsched(knot_db_val_t key, struct entry_h *eh, uint16_t rrtype);
 
 
-// Pauses prefetching if deferred packets exist.
+// Pauses prefetching if defer is busy.
 // To be called from defer to announce its state.
-void kr_cache_prefetch_defer_state(bool waiting_packets); // TODO
+KR_EXPORT
+void kr_cache_prefetch_defer_busy(bool busy);
 
 KR_EXPORT
 void kr_cache_prefetch_parse_pkey(knot_db_val_t pkey, knot_db_val_t *ekey, uint32_t *exp_time);

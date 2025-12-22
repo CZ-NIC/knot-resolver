@@ -180,8 +180,17 @@ bool resolve_ekey(knot_db_val_t *ekey, uint16_t rrtype) {
 	return !ret;
 }
 
+bool defer_busy = false;
+bool timer_skipped = false;
+
 void timer_callback(uv_timer_t *handle) {
 	char *log_prefix = "TIMER";
+
+	if (defer_busy) {
+		timer_skipped = true;
+		VERBOSE_LOGp("skipped, defer busy");
+		return;
+	}
 
 	struct timeval tv;
 	if (gettimeofday(&tv, NULL)) return;
@@ -261,4 +270,13 @@ void timer_callback(uv_timer_t *handle) {
 	uv_timer_start(&timer_handle, timer_callback, 0, TIMER_PERIOD_MS);  // continue on next libuv cycle instead of waiting 1s
 done:
 	cache_op(&the_resolver->cache, commit, false, true);
+}
+
+void kr_cache_prefetch_defer_busy(bool busy) {
+	defer_busy = busy;
+
+	if (!defer_busy && timer_skipped) {
+		uv_timer_start(&timer_handle, timer_callback, 0, TIMER_PERIOD_MS);  // continue on next libuv cycle
+		timer_skipped = false;
+	}
 }

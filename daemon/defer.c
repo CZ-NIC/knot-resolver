@@ -11,6 +11,7 @@
 #include "lib/mmapped.h"
 #include "lib/resolve.h"
 #include "lib/utils.h"
+#include "lib/cache/prefetch.h"
 
 #define V4_PREFIXES  (uint8_t[])       {  18,  20, 24, 32 }
 #define V4_RATE_MULT (kru_price_t[])   { 768, 256, 32,  1 }
@@ -553,6 +554,7 @@ static enum protolayer_iter_cb_result pl_defer_unwrap(
 
 	VERBOSE_LOG_PRICY("  %s UNWRAP\n", kr_straddr(ctx->comm->src_addr));
 
+	kr_cache_prefetch_defer_busy(true);
 	uv_idle_start(&idle_handle, defer_queues_idle);
 
 	if (queue_len(sdata->queue) > 0) {  // stream with preceding packet already deferred
@@ -642,6 +644,7 @@ static void defer_queues_idle(uv_idle_t *handle)
 		phase_reset(PHASE_NONE);
 		VERBOSE_LOG("  deactivate idle\n");
 		uv_idle_stop(&idle_handle);
+		kr_cache_prefetch_defer_busy(false);
 	}
 	VERBOSE_LOG("POLL\n");
 }
