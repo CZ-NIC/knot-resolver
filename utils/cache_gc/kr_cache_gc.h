@@ -4,17 +4,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-
-typedef struct {
-	size_t entry_size;	// amount of bytes occupied in cache by this record
-	bool valid;		// fields further down are valid (ignore them if false)
-	int64_t expires_in;	// < 0 => already expired
-	uint32_t rrtype; // RR type or KNOT_CACHE_RTT or KNOT_CACHE_PREFETCH
-	uint8_t no_labels;	// 0 == ., 1 == root zone member, 2 == TLD member ...
-	uint8_t rank;
-	void *prefetch_ekey;
-	size_t prefetch_ekey_len;
-} gc_record_info_t;
+#include <libknot/libknot.h>
 
 typedef struct {
 	const char *cache_path;	// path to the LMDB with resolver cache
@@ -29,6 +19,7 @@ typedef struct {
 
 	uint8_t cache_max_usage;	// maximum cache usage before triggering GC (percent)
 	uint8_t cache_to_be_freed;	// percent of current cache usage to be freed during GC
+	uint8_t cache_to_be_unscheduled; // percent of current cache usage for which prefetch may be cancelled
 
 	bool dry_run;
 } kr_cache_gc_cfg_t;

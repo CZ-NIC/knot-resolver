@@ -67,24 +67,27 @@ class GarbageCollectorSchema(ConfigSchema):
     interval: Time interval how often the garbage collector will be run.
     threshold: Cache usage in percent that triggers the garbage collector.
     release: Percent of used cache to be freed by the garbage collector.
+    unschedule: Percent of used cache to get prefetch cancelled if scheduled.
+    dry_run: Run the garbage collector in dry-run mode.
     temp_keys_space: Maximum amount of temporary memory for copied keys (0 = unlimited).
     rw_deletes: Maximum number of deleted records per read-write transaction (0 = unlimited).
     rw_reads: Maximum number of read records per read-write transaction (0 = unlimited).
     rw_duration: Maximum duration of read-write transaction (0 = unlimited).
     rw_delay: Wait time between two read-write transactions.
-    dry_run: Run the garbage collector in dry-run mode.
     """
 
     enable: bool = True
     interval: TimeUnit = TimeUnit("1s")
     threshold: Percent = Percent(80)
     release: Percent = Percent(10)
+    unschedule: Percent = Percent(20)
+    dry_run: bool = False
+    # the rest are undocumented
     temp_keys_space: SizeUnit = SizeUnit("0M")
     rw_deletes: IntNonNegative = IntNonNegative(100)
     rw_reads: IntNonNegative = IntNonNegative(200)
     rw_duration: TimeUnit = TimeUnit("0us")
     rw_delay: TimeUnit = TimeUnit("0us")
-    dry_run: bool = False
 
 
 class PredictionSchema(ConfigSchema):

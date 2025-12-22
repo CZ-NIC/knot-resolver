@@ -73,38 +73,19 @@ static void entry_array_deep_free(entry_array_t *d)
 }
 
 typedef struct {
-	size_t categories_sizes[CATEGORIES];
-	size_t records;
-	struct kr_cache_top *top;
-} ctx_compute_categories_t;
-
-int cb_compute_categories(const knot_db_val_t * key, gc_record_info_t * info,
-			  void *vctx)
-{
-	ctx_compute_categories_t *ctx = vctx;
-	category_t cat = kr_gc_categorize(ctx->top, info, key->data, key->len);
-	ctx->categories_sizes[cat] += info->entry_size;
-	ctx->records++;
-	return KNOT_EOK;
-}
-
-typedef struct {
-	category_t limit_category;
+	struct kr_gc_cat_summary *summary;
 	entry_array_t to_delete;
 	size_t cfg_temp_keys_space;
 	size_t used_space;
 	size_t oversize_records;
-	struct kr_cache_top *top;
 } ctx_delete_categories_t;
 
-int cb_delete_categories(const knot_db_val_t * key, gc_record_info_t * info,
-			 void *vctx)
+void cb_delete_categories(struct kr_cache_top *top, struct kr_gc_cat_record_info *info, void *vctx)
 {
 	ctx_delete_categories_t *ctx = vctx;
-	category_t cat = kr_gc_categorize(ctx->top, info, key->data, key->len);
-	if (cat >= ctx->limit_category) {
-		knot_db_val_t *todelete = dbval_copy(key);
-		size_t used = ctx->used_space + key->len + sizeof(*key);
+	if (kr_gc_cat_decide(top, info, ctx->summary)) {
+		knot_db_val_t *todelete = dbval_copy(&info->key);
+		size_t used = ctx->used_space + info->key.len + sizeof(info->key);
 		if ((ctx->cfg_temp_keys_space > 0 &&
 		     used > ctx->cfg_temp_keys_space) || todelete == NULL) {
 			ctx->oversize_records++;
@@ -114,7 +95,6 @@ int cb_delete_categories(const knot_db_val_t * key, gc_record_info_t * info,
 			ctx->used_space = used;
 		}
 	}
-	return KNOT_EOK;
 }
 
 struct kr_cache_gc_state {
@@ -175,46 +155,16 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 	    { 0 }, timer_rw_txn = { 0 };
 
 	kr_timer_start(&timer_analyze);
-	ctx_compute_categories_t cats = { { 0 },
-		.top = &(*state)->kres_db.top,
-	};
-	ret = kr_gc_cache_iter(db, cfg, cb_compute_categories, &cats);
+	struct kr_gc_cat_analysis analysis = { 0 };
+	ret = kr_gc_cache_iter(db, &(*state)->kres_db.top, cfg, kr_gc_cat_analyze, &analysis);
 	if (ret != KNOT_EOK) {
 		kr_cache_gc_free_state(state);
 		return ret;
 	}
 
-	//ssize_t amount_tofree = knot_db_lmdb_get_mapsize(db) * cfg->cache_to_be_freed / 100;
-	// Mixing ^^ page usage and entry sizes (key+value lengths) didn't work
-	// too well, probably due to internal fragmentation after some GC cycles.
-	// Therefore let's scale this by the ratio of these two sums.
-	size_t cats_sumsize = 0;
-	for (int i = 0; i < CATEGORIES; ++i) {
-		cats_sumsize += cats.categories_sizes[i];
-	}
-	/* use less precise variant to avoid 32-bit overflow */
-	size_t amount_tofree = cats_sumsize / 100 * cfg->cache_to_be_freed;
-
-	kr_log_debug(CACHE, "tofree: %zd / %zd\n", amount_tofree, cats_sumsize);
-	if (VERBOSE_STATUS) {
-		for (int i = 0; i < CATEGORIES; i++) {
-			if (cats.categories_sizes[i] > 0) {
-				printf("category %.2d size %zu\n", i,
-				       cats.categories_sizes[i]);
-			}
-		}
-	}
-
-	category_t limit_category = CATEGORIES;
-	while (limit_category > 0) {
-		size_t cat_size = cats.categories_sizes[--limit_category];
-		if (cat_size > amount_tofree)
-			break;
-		amount_tofree -= cat_size;
-	}
-
-	printf("Cache analyzed in %.0lf msecs, %zu records, %.2f B avg., limit category is %d.\n",
-	       kr_timer_elapsed(&timer_analyze) * 1000, cats.records, (double)cats_sumsize / cats.records, limit_category);
+	struct kr_gc_cat_summary summary = { 0 };
+	kr_gc_cat_summarize(&analysis, &summary, cfg->cache_to_be_freed, cfg->cache_to_be_unscheduled);
+	printf("Cache analyzed in %.0lf msecs.\n", kr_timer_elapsed(&timer_analyze) * 1000);
 
 	if (cfg->dry_run) {
 		return KNOT_EOK;
@@ -223,11 +173,10 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 	//// 3. pass whole cache again to collect a list of keys that should be deleted.
 	kr_timer_start(&timer_choose);
 	ctx_delete_categories_t to_del = {
-		.top = &(*state)->kres_db.top,
 		.cfg_temp_keys_space = cfg->temp_keys_space,
-		.limit_category = limit_category,
+		.summary = &summary,
 	};
-	ret = kr_gc_cache_iter(db, cfg, cb_delete_categories, &to_del);
+	ret = kr_gc_cache_iter(db, &(*state)->kres_db.top, cfg, cb_delete_categories, &to_del);
 	if (ret != KNOT_EOK) {
 		entry_array_deep_free(&to_del.to_delete);
 		kr_cache_gc_free_state(state);
