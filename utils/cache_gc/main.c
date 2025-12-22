@@ -39,6 +39,7 @@ static void print_help(void)
 	printf(" -m <rw_txn_duration(usecs)>\n");
 	printf(" -u <cache_max_usage(percent)>\n");
 	printf(" -f <cache_to_be_freed(percent-of-current-usage)>\n");
+	printf(" -p <cache_not_to_be_prefetched(percent-of-current-usage)>\n");
 	printf(" -w <wait_next_rw_txn(usecs)>\n");
 	printf(" -t <temporary_memory(MBytes)>\n");
 	printf(" -n (= dry run)\n");
@@ -78,11 +79,12 @@ int main(int argc, char *argv[])
 		.ro_txn_items = 200,
 		.rw_txn_items = 100,
 		.cache_max_usage = 80,
-		.cache_to_be_freed = 10
+		.cache_to_be_freed = 10,
+		.cache_to_be_unscheduled = 20
 	};
 
 	int o;
-	while ((o = getopt(argc, argv, "hnvc:d:l:L:m:u:f:w:t:")) != -1) {
+	while ((o = getopt(argc, argv, "hnvc:d:l:L:m:u:f:w:t:p:")) != -1) {
 		switch (o) {
 		case 'c':
 			cfg.cache_path = optarg;
@@ -105,6 +107,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'f':
 			cfg.cache_to_be_freed = get_nonneg_optarg();
+			break;
+		case 'p':
+			cfg.cache_to_be_unscheduled = get_nonneg_optarg();
 			break;
 		case 'w':
 			cfg.rw_txn_delay = get_nonneg_optarg();

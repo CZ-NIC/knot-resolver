@@ -5,6 +5,7 @@
 #include "lib/cache/cdb_lmdb.h"
 #include "lib/cache/impl.h"
 #include "lib/cache/prefetch.h"
+#include "utils/cache_gc/categories.h"
 
 #include <ctype.h>
 #include <time.h>
@@ -124,7 +125,7 @@ static const struct entry_h *val2entry(const knot_db_val_t val, uint16_t ktype)
 	return NULL;
 }
 
-int kr_gc_cache_iter(knot_db_t * knot_db, const  kr_cache_gc_cfg_t *cfg,
+int kr_gc_cache_iter(knot_db_t * knot_db, struct kr_cache_top *top, const kr_cache_gc_cfg_t *cfg,
 			kr_gc_iter_callback callback, void *ctx)
 {
 	unsigned int counter_iter = 0;
@@ -167,7 +168,7 @@ int kr_gc_cache_iter(knot_db_t * knot_db, const  kr_cache_gc_cfg_t *cfg,
 			goto error;
 		}
 
-		gc_record_info_t info = { 0 };
+		struct kr_gc_cat_record_info info = { .key = key };
 		info.entry_size = kr_cache_top_entry_size(key.len, val.len);
 		info.valid = false;
 		const int entry_type = key_consistent(key);
@@ -177,11 +178,11 @@ int kr_gc_cache_iter(knot_db_t * knot_db, const  kr_cache_gc_cfg_t *cfg,
 			switch (entry_type) {
 				case KNOT_CACHE_PREFETCH:
 					uint32_t exp_time;
-					knot_db_val_t ekey = { 0 };
-					kr_cache_prefetch_parse_pkey(key, &ekey, &exp_time);
+					kr_cache_prefetch_parse_pkey(key, &info.prefetch_ekey, &exp_time);
 					info.expires_in = exp_time - now;
-					info.prefetch_ekey = ekey.data;
-					info.prefetch_ekey_len = ekey.len;
+					if (val.len == sizeof(struct entry_p)) {
+						info.prefetch_ekeydata_len = ((struct entry_p *)val.data)->ekeydata_len;
+					}
 					// fall through
 				case KNOT_CACHE_RTT:
 					info.valid = true;
@@ -198,7 +199,7 @@ int kr_gc_cache_iter(knot_db_t * knot_db, const  kr_cache_gc_cfg_t *cfg,
 					info.valid = true;
 					info.rrtype = entry_type;
 					info.expires_in = entry->time + entry->ttl - now;
-					info.no_labels = entry_labels(&key, entry_type);
+					info.no_labels = entry_labels(&key, entry_type);  // TODO remove, not used
 					break;
 			}
 		}
@@ -214,16 +215,7 @@ int kr_gc_cache_iter(knot_db_t * knot_db, const  kr_cache_gc_cfg_t *cfg,
 				printf("\n");
 			}
 		}
-		ret = callback(&key, &info, ctx);
-
-		if (ret != KNOT_EOK) {
-		error:
-			printf("Error iterating database (%s).\n",
-			       knot_strerror(ret));
-			api->iter_finish(it);
-			api->txn_abort(&txn);
-			return ret;
-		}
+		callback(top, &info, ctx);
 
 	skip:	// Advance to the next GC item.
 		if (++txn_steps < cfg->ro_txn_items || !cfg->ro_txn_items/*unlimited*/) {
@@ -260,4 +252,11 @@ int kr_gc_cache_iter(knot_db_t * knot_db, const  kr_cache_gc_cfg_t *cfg,
 	kr_log_debug(CACHE, "iterated %u items, gc consistent %u, kr consistent %u\n",
 		counter_iter, counter_gc_consistent, counter_kr_consistent);
 	return KNOT_EOK;
+
+error:
+	printf("Error iterating database (%s).\n",
+				 knot_strerror(ret));
+	api->iter_finish(it);
+	api->txn_abort(&txn);
+	return ret;
 }
