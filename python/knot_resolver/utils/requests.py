@@ -36,7 +36,7 @@ def _print_conn_error(error_desc: str, url: str, socket_source: str) -> None:
     try:
         parsed_url = urlparse(url)
         host = unquote(parsed_url.hostname or "(Unknown)")
-    except Exception as e:
+    except ValueError as e:
         host = f"(Invalid URL: {e})"
     msg = f"""
 {error_desc}
@@ -60,13 +60,13 @@ def request(
     while path.startswith("/"):
         path = path[1:]
     url = f"{socket_desc.uri}/{path}"
+
     req = Request(
         url,
         method=method,
         data=body.encode("utf8") if body is not None else None,
         headers={"Content-Type": content_type},
     )
-    # req.add_header("Authorization", _authorization_header)
 
     timeout_m = 5  # minutes
     try:
@@ -100,9 +100,11 @@ class UnixHTTPConnection(HTTPConnection):
         """
         Create an HTTP connection to a unix domain socket.
 
-        :param unix_socket_url: A URL with a scheme of 'http+unix' and the
-        netloc is a percent-encoded path to a unix domain socket. E.g.:
-        'http+unix://%2Ftmp%2Fprofilesvc.sock/status/pid'
+        Args:
+            unix_socket_url (str): A URL with a scheme of 'http+unix' and the netloc is a percent-encoded path
+                to a unix domain socket. E.g.: 'http+unix://%2Ftmp%2Fprofilesvc.sock/status/pid'
+            timeout (float): Connection timeout.
+
         """
         super().__init__("localhost", timeout=timeout)
         self.unix_socket_path = unix_socket_url
