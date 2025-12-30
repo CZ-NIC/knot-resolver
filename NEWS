@@ -6,6 +6,7 @@ Improvements:
 - logging: improved logging groups (!1768)
 - support libdnssec merged into libknot, as planned for knot >= 3.6 (!1769)
 - support cmocka 2.0.0 (!1772)
+- avoid AD=1 in reply if ANSWER+AUTHORITY are empty (#914, !1779)
 
 Bugfixes
 --------
