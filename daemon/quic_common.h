@@ -4,6 +4,11 @@
 
 #pragma once
 
+#include "kresconfig.h"
+
+#if !ENABLE_QUIC
+#else
+
 #include <ngtcp2/ngtcp2.h>
 #include <ngtcp2/ngtcp2_crypto.h>
 #include <ngtcp2/ngtcp2_crypto_gnutls.h>
@@ -120,3 +125,5 @@ int write_retry_packet(struct wire_buf *dest, kr_quic_table_t *table,
 		ngtcp2_version_cid *dec_cids,
 		const struct sockaddr *src_addr,
 		uint8_t *secret, size_t secret_len);
+
+#endif

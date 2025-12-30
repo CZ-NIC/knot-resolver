@@ -23,11 +23,16 @@ kresd_src = files([
   'udp_queue.c',
   'worker.c',
   'zimport.c',
-  'quic_common.c',
-  'quic_demux.c',
-  'quic_conn.c',
-  'quic_stream.c',
 ])
+
+if enable_quic
+  kresd_src += files([
+    'quic_common.c',
+    'quic_demux.c',
+    'quic_conn.c',
+    'quic_stream.c',
+  ])
+endif
 
 if nghttp2.found()
   kresd_src += files(['http.c'])
@@ -67,9 +72,11 @@ kresd_deps = [
   nghttp2,
   malloc,
   libm,
-  libngtcp2,
-  libngtcp2_crypto,
 ]
+
+if enable_quic
+  kresd_deps += libngtcp2_deps
+endif
 
 
 subdir('lua')

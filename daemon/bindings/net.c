@@ -623,6 +623,7 @@ static int net_doh_headers(lua_State *L)
 
 static int net_quic_max_conns(lua_State *L)
 {
+#if ENABLE_QUIC
 	if (kr_fails_assert(the_network)) {
 		return 0;
 	}
@@ -651,12 +652,14 @@ static int net_quic_max_conns(lua_State *L)
 		lua_error_p(L, "net.quic_max_conns must be within <1,  4096>");
 
 	the_network->quic_params->max_conns = (uint16_t)v;
+#endif // otherwise we just ignore the setting
 	lua_pushboolean(L, true);
 	return 1;
 }
 
 static int net_quic_max_streams(lua_State *L)
 {
+#if ENABLE_QUIC
 	if (kr_fails_assert(the_network)) {
 		return 0;
 	}
@@ -685,12 +688,14 @@ static int net_quic_max_streams(lua_State *L)
 		lua_error_p(L, "net.quic_max_streams must be within <1,  4096>");
 
 	the_network->quic_params->max_streams = (uint16_t)v;
+#endif // otherwise we just ignore the setting
 	lua_pushboolean(L, true);
 	return 1;
 }
 
 static int net_quic_reqire_retry(lua_State *L)
 {
+#if ENABLE_QUIC
 	if (kr_fails_assert(the_network)) {
 		return 0;
 	}
@@ -717,6 +722,7 @@ static int net_quic_reqire_retry(lua_State *L)
 	}
 
 	the_network->quic_params->require_retry = v;
+#endif // otherwise we just ignore the setting
 	lua_pushboolean(L, true);
 	return 1;
 }

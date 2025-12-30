@@ -162,6 +162,18 @@ option(
 )
 
 option(
+  'quic',
+  type: 'combo',
+  choices: [
+    'auto',
+    'external',
+    'disabled',
+  ],
+  value: 'auto',
+  description: 'build DNS-over-QUIC support, requiring compatible libngtcp2',
+)
+
+option(
   'doc',
   type: 'combo',
   choices: [

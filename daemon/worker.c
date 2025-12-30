@@ -5,11 +5,9 @@
 #include "kresconfig.h"
 #include "lib/proto.h"
 #include "mempattern.h"
-#include "quic_conn.h"
 #include "daemon/worker.h"
 
 #include <libknot/wire.h>
-#include <ngtcp2/ngtcp2.h>
 #include <string.h>
 #include <uv.h>
 #include <lua.h>

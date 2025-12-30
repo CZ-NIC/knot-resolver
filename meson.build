@@ -35,8 +35,6 @@ gnutls = dependency('gnutls', version: '>=3.4', required: true)
 luajit = dependency('luajit')
 # https://mesonbuild.com/howtox.html#add-math-library-lm-portably
 libm = meson.get_compiler('c').find_library('m', required : false)
-libngtcp2 = dependency('libngtcp2', version: '>=1.11.0')
-libngtcp2_crypto = dependency('libngtcp2_crypto_gnutls')
 message('------------------------------')
 
 
@@ -139,6 +137,14 @@ message('--- optional dependencies ---')
 nghttp2 = dependency('libnghttp2', required: false)
 openssl = dependency('openssl', required: false)
 
+libngtcp2 = dependency('libngtcp2', version: '>=1.11.0', required: get_option('quic') == 'external')
+libngtcp2_crypto = dependency('libngtcp2_crypto_gnutls', required: get_option('quic') == 'external')
+enable_quic = libngtcp2.found() and libngtcp2_crypto.found()
+if enable_quic
+  libngtcp2_deps = [libngtcp2, libngtcp2_crypto]
+endif
+quic_summary = [enable_quic, 'with external libngtcp2*']
+
 have_asprintf = meson.get_compiler('c').has_function('asprintf',
   prefix: '#define _GNU_SOURCE\n#include <stdio.h>')
 
@@ -179,6 +185,7 @@ malloc = meson.get_compiler('c').find_library(
 summary({'sendmmsg': sendmmsg,
          'XDP (in libknot)': xdp,
          'doh2 (serving)': nghttp2.found(),
+         'DoQ': quic_summary,
          'capabilities': capng.found(),
          'malloc': malloc.found() ? malloc_name : 'libc default',
         }, section: 'Features', bool_yn: true)
@@ -265,6 +272,7 @@ conf_data.set('ENABLE_XDP', xdp.to_int())
 conf_data.set('ENABLE_CAP_NG', capng.found().to_int())
 conf_data.set('ENABLE_JEMALLOC', malloc.found().to_int())
 conf_data.set('ENABLE_DOH2', nghttp2.found().to_int())
+conf_data.set('ENABLE_QUIC', enable_quic.to_int())
 conf_data.set('DBG_ASSERTION_ABORT', get_option('debug').to_int())
 if get_option('debug')
   conf_data.set('DBG_ASSERTION_FORK', '0')

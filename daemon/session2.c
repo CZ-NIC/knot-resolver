@@ -22,8 +22,6 @@
 
 #include "daemon/session2.h"
 
-#include "ngtcp2/ngtcp2.h"
-
 
 #define VERBOSE_LOG(session, fmt, ...) do {\
 	if (kr_log_is_debug(PROTOLAYER, NULL)) {\

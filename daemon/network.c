@@ -312,7 +312,9 @@ void network_deinit(void)
 	trie_free(the_network->proxy_addrs6);
 
 	tls_credentials_free(the_network->tls_credentials);
+#if HAS_QUIC
 	quic_configuration_free(the_network->quic_params);
+#endif
 	tls_client_params_free(the_network->tls_client_params);
 	tls_session_ticket_ctx_destroy(the_network->tls_session_ticket_ctx);
 #ifndef NDEBUG
