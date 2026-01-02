@@ -23,6 +23,11 @@ uint32_t packet_ttl(const knot_pkt_t *pkt)
 		const knot_pktsection_t *sec = knot_pkt_section(pkt, i);
 		for (unsigned k = 0; k < sec->count; ++k) {
 			const knot_rrset_t *rr = knot_pkt_rr(sec, k);
+			if (rr->type == KNOT_RRTYPE_OPT) {
+				// Various nonsensical RRs might happen,
+				// but for OPT the TTL means something different.
+				continue;
+			}
 			ttl = MIN(ttl, rr->ttl);
 			has_ttl = true;
 		}
