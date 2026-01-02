@@ -4,10 +4,12 @@ Knot Resolver 5.7.7 (2026-0m-dd)
 Improvements:
 -------------
 - support cmocka 2.0.0
+- avoid AD=1 in reply if ANSWER+AUTHORITY are empty (#914)
 
 Bugfixes
 --------
 - respect disablement of QNAME case randomization even after TCP issues
+- cache: fix wrong TTL in some cases, typically 32768
 
 
 Knot Resolver 5.7.6 (2025-07-17)
