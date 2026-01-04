@@ -318,6 +318,6 @@ getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysc
 %endif
 
 %changelog
-* {{ now }} Jakub Ružička <jakub.ruzicka@nic.cz> - {{ version }}-{{ release }}
+* {{ now }} Knot Resolver team <knot-resolver@labs.nic.cz> - {{ version }}-{{ release }}
 - upstream package
 - see NEWS or https://www.knot-resolver.cz/
