@@ -179,7 +179,7 @@ static inline void update_time(struct load_cl *l, const uint32_t time_now,
 	}
 }
 
-static double decay_mult(struct kru *kru, uint32_t ticks) {
+static double kru_decay_mult(struct kru *kru, uint32_t ticks) {
 	return exp2(-kru->decay.shift_bits * ticks);
 }
 
@@ -682,5 +682,5 @@ static bool kru_limited(struct kru *kru, uint32_t time_now, uint8_t key[static 1
 	.load_multi_prefix_max = kru_load_multi_prefix_max, \
 	.load_hash = kru_load_hash, \
 	.hash_bytes = kru_hash_bytes, \
-	.decay_mult = decay_mult, \
+	.decay_mult = kru_decay_mult, \
 }

@@ -12,6 +12,7 @@
 #define VERBOSE_LOGp(fmt, ...) { VERBOSE_LOG("%-7s" fmt, log_prefix, ## __VA_ARGS__); log_prefix = ""; }
 
 #define MIN_ACCESSES_PER_UPDATE    4     // the k-parameter from slides (real)
+#define MAX_ACCESS_PERIOD       3600     // s
 #define UPDATE_BEFORE_EXP_S        5     // s
 #define FIRST_TIMEOUT_MS           1000  // ms, no prefetch during this time after init; increase?
 #define TIMER_PERIOD_MS            1000  // ms
@@ -26,6 +27,8 @@ struct sched {
 uv_timer_t timer_handle;
 uv_loop_t *loop_handle = NULL;  // prefetch initialized iff non-NULL
 kr_cache_prefetch_callback_t update_callback = NULL;
+float min_accesses_per_update;
+float min_accesses_by_period;
 
 void timer_callback(uv_timer_t *handle);
 
@@ -96,7 +99,8 @@ void kr_cache_prefetch_init(uv_loop_t *loop, kr_cache_prefetch_callback_t callba
 	update_callback = callback;
 	uv_timer_start(&timer_handle, timer_callback, FIRST_TIMEOUT_MS, TIMER_PERIOD_MS);
 
-	// + possibly configure k, etc.
+	min_accesses_per_update = MIN_ACCESSES_PER_UPDATE; // TODO use config
+	min_accesses_by_period = 1 / (1 - kr_cache_top_decay_mult(&the_resolver->cache.top, MAX_ACCESS_PERIOD));
 }
 
 void kr_cache_prefetch_sched(knot_db_val_t key, struct entry_h *eh, size_t eh_len, size_t whole_entry_len, uint16_t rrtype) {
@@ -111,20 +115,49 @@ void kr_cache_prefetch_sched(knot_db_val_t key, struct entry_h *eh, size_t eh_le
 
 	const int32_t time_to_update = eh->ttl - UPDATE_BEFORE_EXP_S;
 	if (time_to_update < 1) return;
+
 	const uint16_t load = kr_cache_top_load(&cache->top, key.data, key.len);
 	size_t keydata_len = kr_cache_top_entry_size(key.len, whole_entry_len);
-	const double accesses = (double)load * (1<<16) / kr_cache_top_entry_price(&cache->top, keydata_len);
-		// includes the just occurring write access
-	const double exp_acc_decrease = accesses * (1 - kr_cache_top_decay_mult(&cache->top, time_to_update));
+	const float price16 = 0x1p-16 * kr_cache_top_entry_price(&cache->top, keydata_len);
 
-	VERBOSE_LOG("    load: %d, acc.: %0.1f, acc. dec.: %f, decay_mult: %f, period: %d", load, accesses, exp_acc_decrease,
-		kr_cache_top_decay_mult(&cache->top, time_to_update),
-		eh->ttl - UPDATE_BEFORE_EXP_S);
+	/*
+	 * Condition on minimal accesses per update:
+	 *   accesses * (1 - decay_mult(time_to_update))     >  MIN_ACCESSES_PER_UPDATE
+	 * Condition on maximal period:
+	 *   accesses * (1 - decay_mult(MAX_ACCESS_PERIOD))  >  1
+	 *
+	 * Accesses to load:
+	 *   load = accesses * price(keydata_len) / (1 << 16)
+	 *
+	 * Load to accesses (but avoid rounding):
+	 *   accesses = load / (price(keydata_len) >> 16)
+	 *
+	 * Conditions rewritten as load bound:
+	 *   load > (price(keydata_len >> 16) / (1 - decay_mult(time_to_update)) * MIN_ACCESSES_PER_UPDATE
+	 *   load > (price(keydata_len >> 16) / (1 - decay_mult(MAX_ACCESS_PERIOD))
+	 *
+	 * Defining config-dependent constant and rewriting:
+	 *   MIN_ACCESSES_BY_PERIOD = 1 / (1 - decay_mult(MAX_ACCESS_PERIOD))
+	 *   load > (price(keydata_len) >> 16) * max(MIN_ACCESSES_BY_PERIOD, MIN_ACCESSES_PER_UPDATE / (1 - decay_mult(time_to_update)))
+	 *
+	 */
 
-	if (exp_acc_decrease < MIN_ACCESSES_PER_UPDATE) {
+	const float min_accesses_by_per_update = min_accesses_per_update / (1 - kr_cache_top_decay_mult(&cache->top, time_to_update));
+	const float min_loadf = price16 * MAX(min_accesses_by_period, min_accesses_by_per_update);
+	const uint16_t min_load = MIN(min_loadf, 0xFFFF);
+
+	VERBOSE_LOG("    load: %u (%0.2f acc.), min_load: %u (%0.2f acc.), to_update: %d, size: %zu",
+		load, load / price16,
+		min_load, min_load / price16,
+		eh->ttl - UPDATE_BEFORE_EXP_S,
+		keydata_len);
+
+	if (load < min_load) {
 		VERBOSE_LOG("    under threshold");
 		return;
 	}
+
+	const double accesses = (double)load / price16; // includes the just occurring write access
 
 	struct sched sched = { 0 };
 	sched.ekey = key;
@@ -138,7 +171,8 @@ void kr_cache_prefetch_sched(knot_db_val_t key, struct entry_h *eh, size_t eh_le
 		keydata_len = (keydata_len - whole_entry_len) / 3 + eh_len;   // we divide size of common data of NS, CNAME, DNAME between them
 	}
 	struct entry_p ep = {
-		.ekeydata_len = (keydata_len > 0xFFFF ? 0xFFFF : keydata_len)
+		.ekeydata_len = (keydata_len > 0xFFFF ? 0xFFFF : keydata_len),
+		.min_load = min_load
 	};
 	knot_db_val_t data = { .data = &ep, .len = sizeof(ep) };
 	cache_op(cache, write, &pkey, &data, 1);
@@ -148,7 +182,7 @@ void kr_cache_prefetch_sched(knot_db_val_t key, struct entry_h *eh, size_t eh_le
 	// to be called during another write transaction, so we are not committing here
 }
 
-void kr_cache_prefetch_unsched(knot_db_val_t key, struct entry_h *eh, uint16_t rrtype) {
+void kr_cache_prefetch_unsched(knot_db_val_t key, const struct entry_h *eh, uint16_t rrtype) {
 	if (!eh || !eh->prefetch_priority) return;
 	VERBOSE_LOG("UNSCHED               %s", kr_cache_top_strkey(key.data, key.len));
 	struct sched sched = {
@@ -217,6 +251,11 @@ void timer_callback(uv_timer_t *handle) {
 		}
 		VERBOSE_LOGp("found: %6d %s", ttl, kr_cache_top_strkey(pkey.data, pkey.len));
 
+		uint16_t min_load = 0xFFFF;
+		if (val.len == sizeof(struct entry_p)) {
+			min_load = ((struct entry_p *)val.data)->min_load;
+		} else VERBOSE_LOGp("invalid data size");
+
 		int ret = cache_op(&the_resolver->cache, remove, &pkey, 1);
 		if (ret == 0) {
 			VERBOSE_LOGp("already removed");
@@ -233,6 +272,12 @@ void timer_callback(uv_timer_t *handle) {
 
 		if (ttl < 0) {
 			VERBOSE_LOGp("skipping expired");
+			continue;
+		}
+
+		const uint16_t load = kr_cache_top_load(&the_resolver->cache.top, sched.ekey.data, sched.ekey.len);
+		if (load < min_load) {
+			VERBOSE_LOGp("skipping, no longer eligible for prefetch (%d < %d)", load, min_load);
 			continue;
 		}
 
