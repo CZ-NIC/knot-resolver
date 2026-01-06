@@ -5,6 +5,7 @@
 #pragma once
 
 #include <ngtcp2/ngtcp2.h>
+#include "quic_common.h"
 #include "session2.h"
 
 typedef struct pl_quic_demux_sess_data {

@@ -63,6 +63,10 @@ struct pl_quic_conn_sess_data {
 	queue_t(struct pl_quic_stream_sess_data *) pending_unwrap;
 	bool is_server;
 	bool retry_sent;
+	/* defer can keep the session alive even if the connection timed out or
+	 * terminated. To avoid decreasing the refcount more than once in
+	 * quic_conn:pl_quic_event_unwrap this boolean value is used. */
+	bool disconnected;
 	ngtcp2_cid dcid;
 	ngtcp2_cid scid;
 	ngtcp2_cid odcid;

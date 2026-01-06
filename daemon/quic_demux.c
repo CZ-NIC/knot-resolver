@@ -119,20 +119,22 @@ void kr_quic_table_rem(struct pl_quic_conn_sess_data *conn,
 				continue;
 			}
 			kr_quic_table_rem2(pcid, table);
+			conn->cid_pointers--;
 		}
 
-		conn->cid_pointers--;
 		free(scids);
-	} else {
-		kr_quic_cid_t **pcid = kr_quic_table_lookup2(&conn->dcid, table);
-		if (pcid != NULL) {
-			kr_quic_table_rem2(pcid, table);
-		}
 	}
-
+	
 	int pos = heap_find(table->expiry_heap, (heap_val_t *)conn);
-	heap_delete(table->expiry_heap, pos);
-	table->usage--;
+	/* Since deferred iteration context increases the session ref_count
+	 * it is possible that the session will exist after being removed
+	 * from the expiry heap. In such case no cid is found and the
+	 * the heap_find function returns 0, which is not a valid value
+	 * because the heap index starts at 1. */
+	if (pos != 0) {
+		heap_delete(table->expiry_heap, pos);
+		table->usage--;
+	}
 }
 
 void kr_quic_table_free(kr_quic_table_t *table)

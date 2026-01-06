@@ -795,6 +795,7 @@ static int pl_quic_conn_sess_init(struct session2 *session, void *sess_data, voi
 {
 	struct pl_quic_conn_sess_data *conn = sess_data;
 	conn->state = 0;
+	conn->disconnected = false;
 	conn->path = calloc(1, sizeof(ngtcp2_path));
 	if (!conn->path) {
 		return kr_error(ENOMEM);
@@ -856,6 +857,7 @@ static int pl_quic_conn_sess_deinit(struct session2 *session, void *sess_data)
 	struct pl_quic_conn_sess_data *conn = sess_data;
 	while (session2_tasklist_del_first(session, false) != NULL);
 
+	session2_timer_stop(session);
 	struct pl_quic_stream_sess_data *s_node;
 	WALK_LIST_FIRST(s_node, conn->streams) {
 		struct pl_quic_stream_sess_data *s =
@@ -897,7 +899,6 @@ static int pl_quic_conn_sess_deinit(struct session2 *session, void *sess_data)
 	ngtcp2_conn_del(conn->conn);
 	conn->conn = NULL;
 
-	session2_timer_stop(session);
 	return kr_ok();
 }
 
@@ -914,7 +915,10 @@ static enum protolayer_event_cb_result pl_quic_conn_event_unwrap(
 	if (event == PROTOLAYER_EVENT_DISCONNECT ||
 			event == PROTOLAYER_EVENT_CLOSE ||
 			event == PROTOLAYER_EVENT_FORCE_CLOSE) {
-		session2_dec_refs(session);
+		if (!conn->disconnected) {
+			conn->disconnected = true;
+			session2_dec_refs(session);
+		}
 		return PROTOLAYER_EVENT_CONSUME;
 	}
 
