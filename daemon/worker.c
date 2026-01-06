@@ -2349,9 +2349,8 @@ static enum protolayer_iter_cb_result pl_dns_stream_wrap(
 		ctx->payload = protolayer_payload_iovec(siov->iovs, iovcnt, false);
 		return protolayer_continue(ctx);
 	} else {
-		// kr_assert(false && "Invalid payload");
-		return protolayer_continue(ctx);
-		// return protolayer_break(ctx, kr_error(EINVAL));
+		kr_assert(false && "Invalid payload");
+		return protolayer_break(ctx, kr_error(EINVAL));
 	}
 }
 

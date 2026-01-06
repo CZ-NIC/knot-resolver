@@ -870,7 +870,7 @@ static int pl_quic_conn_sess_deinit(struct session2 *session, void *sess_data)
 		++conn->finished_streams;
 	}
 
-	kr_log_info(DOQ, "Closing connection, %s useful, served %zu streams\n",
+	kr_log_debug(DOQ, "Closing connection, %s useful, served %zu streams\n",
 			conn->finished_streams ? "was" : "wasn't",
 			conn->finished_streams);
 
