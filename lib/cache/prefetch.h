@@ -16,6 +16,7 @@ struct entry_h;
 
 struct entry_p {
 	uint16_t ekeydata_len;
+	uint16_t min_load;
 } __attribute__ ((packed,aligned(1))); // needed by LMDB
 
 // Try scheduling prefetching.
@@ -26,7 +27,7 @@ void kr_cache_prefetch_sched(knot_db_val_t key, struct entry_h *eh, size_t eh_le
 
 // Cancel scheduled prefetching if set. Void if eh is NULL.
 KR_EXPORT
-void kr_cache_prefetch_unsched(knot_db_val_t key, struct entry_h *eh, uint16_t rrtype);
+void kr_cache_prefetch_unsched(knot_db_val_t key, const struct entry_h *eh, uint16_t rrtype);
 
 
 // Pauses prefetching if defer is busy.
