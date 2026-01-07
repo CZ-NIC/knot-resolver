@@ -324,36 +324,6 @@
                         "padding": true
                     }
                 },
-                "quic": {
-                    "description": "DNS over QUIC configuration.",
-                    "type": "object",
-                    "properties": {
-                        "max-conns": {
-                            "type": "integer",
-                            "minimum": 1,
-                            "maximum": 4096,
-                            "description": "Maximum number of active connections a single worker is allowed to accept.",
-                            "default": 1024
-                        },
-                        "max-streams": {
-                            "type": "integer",
-                            "minimum": 1,
-                            "maximum": 4096,
-                            "description": "Maximum number of concurrent streams a connection is allowed to open.",
-                            "default": 1024
-                        },
-                        "require-retry": {
-                            "type": "boolean",
-                            "description": "Require address validation for unknown source addresses. Adds a 1-RTT delay to connection establishment.",
-                            "default": false
-                        }
-                    },
-                    "default": {
-                        "max_conns": 1024,
-                        "max_streams": 1024,
-                        "require_retry": false
-                    }
-                },
                 "proxy-protocol": {
                     "description": "PROXYv2 protocol configuration.",
                     "type": "object",
@@ -388,6 +358,36 @@
                     "default": {
                         "enable": false,
                         "allow": null
+                    }
+                },
+                "quic": {
+                    "description": "DNS over QUIC configuration.",
+                    "type": "object",
+                    "properties": {
+                        "max-conns": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 4096,
+                            "description": "Maximum number of active connections a single worker is allowed to accept.",
+                            "default": 1024
+                        },
+                        "max-streams": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 4096,
+                            "description": "Maximum number of concurrent streams a connection is allowed to open.",
+                            "default": 1024
+                        },
+                        "require-retry": {
+                            "type": "boolean",
+                            "description": "Require address validation for unknown source addresses. Adds a 1-RTT delay to connection establishment.",
+                            "default": false
+                        }
+                    },
+                    "default": {
+                        "max_conns": 1024,
+                        "max_streams": 1024,
+                        "require_retry": false
                     }
                 },
                 "listen": {
@@ -513,14 +513,14 @@
                     "sticket_secret_file": null,
                     "padding": true
                 },
+                "proxy_protocol": {
+                    "enable": false,
+                    "allow": null
+                },
                 "quic": {
                     "max_conns": 1024,
                     "max_streams": 1024,
                     "require_retry": false
-                },
-                "proxy_protocol": {
-                    "enable": false,
-                    "allow": null
                 },
                 "listen": [
                     {
