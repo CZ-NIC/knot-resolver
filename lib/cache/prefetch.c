@@ -11,8 +11,6 @@
 #define VERBOSE_LOG(fmt, ...) kr_log_notice(CACHE, "PREFETCH  " fmt "\n", ## __VA_ARGS__)
 #define VERBOSE_LOGp(fmt, ...) { VERBOSE_LOG("%-7s" fmt, log_prefix, ## __VA_ARGS__); log_prefix = ""; }
 
-#define MIN_ACCESSES_PER_UPDATE    4     // the k-parameter from slides (real)
-#define MAX_ACCESS_PERIOD       3600     // s
 #define UPDATE_BEFORE_EXP_S        5     // s
 #define FIRST_TIMEOUT_MS           1000  // ms, no prefetch during this time after init; increase?
 #define TIMER_PERIOD_MS            1000  // ms
@@ -27,8 +25,9 @@ struct sched {
 uv_timer_t timer_handle;
 uv_loop_t *loop_handle = NULL;  // prefetch initialized iff non-NULL
 kr_cache_prefetch_callback_t update_callback = NULL;
-float min_accesses_per_update;
-float min_accesses_by_period;
+float conf_min_accesses_per_update;
+float conf_min_accesses_by_period;
+bool conf_enabled = false;
 
 void timer_callback(uv_timer_t *handle);
 
@@ -92,19 +91,26 @@ void kr_cache_prefetch_parse_pkey(knot_db_val_t pkey, knot_db_val_t *ekey, uint3
 	// TODO  efficiency?
 }
 
-void kr_cache_prefetch_init(uv_loop_t *loop, kr_cache_prefetch_callback_t callback) {
-	VERBOSE_LOG("INIT");
+
+void kr_cache_prefetch_callback_init(uv_loop_t *loop, kr_cache_prefetch_callback_t callback) {
+	VERBOSE_LOG("INIT callback");
 	uv_timer_init(loop, &timer_handle);
 	loop_handle = loop;
 	update_callback = callback;
-	uv_timer_start(&timer_handle, timer_callback, FIRST_TIMEOUT_MS, TIMER_PERIOD_MS);
+}
 
-	min_accesses_per_update = MIN_ACCESSES_PER_UPDATE; // TODO use config
-	min_accesses_by_period = 1 / (1 - kr_cache_top_decay_mult(&the_resolver->cache.top, MAX_ACCESS_PERIOD));
+void kr_cache_prefetch_init(uint32_t max_access_period_sec, float min_accesses_per_update) {
+	if (!loop_handle) return;
+	VERBOSE_LOG("INIT settings (min_accesses_per_update = %f, max_access_period = %u s)",
+			min_accesses_per_update, max_access_period_sec);
+	uv_timer_start(&timer_handle, timer_callback, FIRST_TIMEOUT_MS, TIMER_PERIOD_MS);
+	conf_min_accesses_per_update = min_accesses_per_update; // TODO use config
+	conf_min_accesses_by_period = 1 / (1 - kr_cache_top_decay_mult(&the_resolver->cache.top, max_access_period_sec));
+	conf_enabled = true;
 }
 
 void kr_cache_prefetch_sched(knot_db_val_t key, struct entry_h *eh, size_t eh_len, size_t whole_entry_len, uint16_t rrtype) {
-	if (!loop_handle) return;
+	if (!conf_enabled) return;
 	struct kr_cache *cache = &the_resolver->cache;
 	VERBOSE_LOG("SCHED         %6d  %s", eh->ttl, kr_cache_top_strkey(key.data, key.len));
 	const int ktype = key_consistent(key);
@@ -142,8 +148,8 @@ void kr_cache_prefetch_sched(knot_db_val_t key, struct entry_h *eh, size_t eh_le
 	 *
 	 */
 
-	const float min_accesses_by_per_update = min_accesses_per_update / (1 - kr_cache_top_decay_mult(&cache->top, time_to_update));
-	const float min_loadf = price16 * MAX(min_accesses_by_period, min_accesses_by_per_update);
+	const float min_accesses_by_per_update = conf_min_accesses_per_update / (1 - kr_cache_top_decay_mult(&cache->top, time_to_update));
+	const float min_loadf = price16 * MAX(conf_min_accesses_by_period, min_accesses_by_per_update);
 	const uint16_t min_load = MIN(min_loadf, 0xFFFF);
 
 	VERBOSE_LOG("    load: %u (%0.2f acc.), min_load: %u (%0.2f acc.), to_update: %d, size: %zu",
@@ -183,7 +189,7 @@ void kr_cache_prefetch_sched(knot_db_val_t key, struct entry_h *eh, size_t eh_le
 }
 
 void kr_cache_prefetch_unsched(knot_db_val_t key, const struct entry_h *eh, uint16_t rrtype) {
-	if (!eh || !eh->prefetch_priority) return;
+	if (!conf_enabled || !eh || !eh->prefetch_priority) return;
 	VERBOSE_LOG("UNSCHED               %s", kr_cache_top_strkey(key.data, key.len));
 	struct sched sched = {
 		.ekey = key,

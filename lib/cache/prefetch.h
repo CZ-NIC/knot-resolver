@@ -9,8 +9,14 @@
 
 typedef int (*kr_cache_prefetch_callback_t)(knot_dname_t *qname, uint16_t qtype);
 
+// Initialize update callback and timer handle.
+// To be called before initialization from Lua.
 KR_EXPORT
-void kr_cache_prefetch_init(uv_loop_t *loop, kr_cache_prefetch_callback_t callback);
+void kr_cache_prefetch_callback_init(uv_loop_t *loop, kr_cache_prefetch_callback_t callback);
+
+// Initialize the rest and activate prefetch, to be called from Lua.
+KR_EXPORT
+void kr_cache_prefetch_init(uint32_t max_access_period_sec, float min_accesses_per_update);
 
 struct entry_h;
 
