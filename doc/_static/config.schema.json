@@ -1785,7 +1785,7 @@
                 "enable": {
                     "type": "boolean",
                     "description": "Use request prioritization.",
-                    "default": false
+                    "default": true
                 },
                 "log-period": {
                     "type": "string",
@@ -1795,7 +1795,7 @@
                 }
             },
             "default": {
-                "enable": false,
+                "enable": true,
                 "log_period": "0s"
             }
         },
