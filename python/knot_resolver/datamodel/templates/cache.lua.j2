@@ -18,15 +18,7 @@ prefill.config({
 {% endif %}
 
 {% if cfg.cache.prefetch.expiring %}
--- cache.prefetch.expiring
-modules.load('prefetch')
-{% endif %}
-
-{% if cfg.cache.prefetch.prediction.enable %}
--- cache.prefetch.prediction
-modules.load('predict')
-predict.config({
-    window = {{ cfg.cache.prefetch.prediction.window.minutes() }},
-    period = {{ cfg.cache.prefetch.prediction.period }},
-})
+C.kr_cache_prefetch_init(
+    {{ cfg.cache.prefetch.max_access_period.seconds() }},
+    {{ cfg.cache.prefetch.min_accesses_per_update }})
 {% endif %}

@@ -607,6 +607,8 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
+	kr_cache_prefetch_callback_init(loop, worker_prefetch);
+
 	/* Start the scripting engine */
 	if (engine_load_sandbox() != 0) {
 		ret = EXIT_FAILURE;
@@ -635,8 +637,6 @@ int main(int argc, char **argv)
 		ret = EXIT_FAILURE;
 		goto cleanup;
 	}
-
-	kr_cache_prefetch_init(loop, worker_prefetch);
 
 	ret = kr_rules_init_ensure();
 	if (ret) {

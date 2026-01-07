@@ -7,6 +7,7 @@ from knot_resolver.datamodel.types import (
     DNSRecordTypeEnum,
     DomainName,
     EscapedStr,
+    FloatNonNegative,
     IntNonNegative,
     IntPositive,
     Percent,
@@ -91,7 +92,7 @@ class GarbageCollectorSchema(ConfigSchema):
 
 class PredictionSchema(ConfigSchema):
     """
-    Helps keep the cache hot by prefetching expiring records and learning usage patterns and repetitive queries.
+    Obsolete, does not affect anything now.
 
     ---
     enable: Enable/disable prediction.
@@ -106,15 +107,19 @@ class PredictionSchema(ConfigSchema):
 
 class PrefetchSchema(ConfigSchema):
     """
-    These options help keep the cache hot by prefetching expiring records or learning usage patterns and repetitive queries.
+    Refreshing frequently used records before their expiration.
 
     ---
-    expiring: Prefetch expiring records.
-    prediction: Prefetch record by predicting based on usage patterns and repetitive queries.
+    expiring: Use prefetching.
+    max_access_period: How often the record has to be accessed to be eligible for prefetch.
+    min_accesses_per_update: How many accesses to the record are required to occur before each prefetch.
+    prediction: Obsolete, does not affect anything now.
     """
 
     expiring: bool = False
-    prediction: PredictionSchema = PredictionSchema()
+    max_access_period: TimeUnit = TimeUnit("1h")
+    min_accesses_per_update: FloatNonNegative = FloatNonNegative(4)
+    prediction: PredictionSchema = PredictionSchema()  # void, TODO add warning if used
 
 
 class CacheSchema(ConfigSchema):
@@ -129,7 +134,7 @@ class CacheSchema(ConfigSchema):
     ttl_max: Maximum time-to-live for the cache entries.
     ns_timeout: Time interval for which a nameserver address will be ignored after determining that it does not return (useful) answers.
     prefill: Prefill the cache periodically by importing zone data obtained over HTTP.
-    prefetch: These options help keep the cache hot by prefetching expiring records or learning usage patterns and repetitive queries.
+    prefetch: Refreshing frequently used records before their expiration.
     """
 
     storage: WritableDir = lazy_default(WritableDir, str(CACHE_DIR))
