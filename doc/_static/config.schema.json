@@ -316,7 +316,7 @@
                         }
                     },
                     "default": {
-                        "watchdog": true,
+                        "watchdog": false,
                         "cert_file": null,
                         "key_file": null,
                         "sticket_secret": null,
@@ -507,7 +507,7 @@
                 },
                 "address_renumbering": null,
                 "tls": {
-                    "watchdog": true,
+                    "watchdog": false,
                     "cert_file": null,
                     "key_file": null,
                     "sticket_secret": null,
@@ -1211,6 +1211,13 @@
                             "description": "Percent of used cache to be freed by the garbage collector.",
                             "default": 10
                         },
+                        "unschedule": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 100,
+                            "description": "Percent of used cache to get prefetch cancelled if scheduled.",
+                            "default": 20
+                        },
                         "temp-keys-space": {
                             "type": "string",
                             "pattern": "^(\\d+)(B|K|M|G)$",
@@ -1252,6 +1259,7 @@
                         "interval": "1s",
                         "threshold": 80,
                         "release": 10,
+                        "unschedule": 20,
                         "temp_keys_space": "0M",
                         "rw_deletes": 100,
                         "rw_reads": 200,
@@ -1316,16 +1324,28 @@
                     "default": null
                 },
                 "prefetch": {
-                    "description": "These options help keep the cache hot by prefetching expiring records or learning usage patterns and repetitive queries.",
+                    "description": "Refreshing frequently used records before their expiration.",
                     "type": "object",
                     "properties": {
                         "expiring": {
                             "type": "boolean",
-                            "description": "Prefetch expiring records.",
+                            "description": "Use prefetching.",
                             "default": false
                         },
+                        "max-access-period": {
+                            "type": "string",
+                            "pattern": "^(\\d+)(us|ms|s|m|h|d)$",
+                            "description": "How often the record has to be accessed to be eligible for prefetch.",
+                            "default": "1h"
+                        },
+                        "min-accesses-per-update": {
+                            "type": "number",
+                            "minimum": 0.0,
+                            "description": "How many accesses to the record are required to occur before each prefetch.",
+                            "default": 4
+                        },
                         "prediction": {
-                            "description": "Prefetch record by predicting based on usage patterns and repetitive queries.",
+                            "description": "Obsolete, does not affect anything now.",
                             "type": "object",
                             "properties": {
                                 "enable": {
@@ -1355,6 +1375,8 @@
                     },
                     "default": {
                         "expiring": false,
+                        "max_access_period": "1h",
+                        "min_accesses_per_update": 4,
                         "prediction": {
                             "enable": false,
                             "window": "15m",
@@ -1371,6 +1393,7 @@
                     "interval": "1s",
                     "threshold": 80,
                     "release": 10,
+                    "unschedule": 20,
                     "temp_keys_space": "0M",
                     "rw_deletes": 100,
                     "rw_reads": 200,
@@ -1384,6 +1407,8 @@
                 "prefill": null,
                 "prefetch": {
                     "expiring": false,
+                    "max_access_period": "1h",
+                    "min_accesses_per_update": 4,
                     "prediction": {
                         "enable": false,
                         "window": "15m",

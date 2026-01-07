@@ -367,6 +367,7 @@ ${CDEFS} ${KRESD} functions <<-EOF
 	ratelimiting_init
 	defer_init
 	defer_set_price_factor16
+	kr_cache_prefetch_init
 EOF
 
 echo "struct engine" | ${CDEFS} ${KRESD} types | sed '/module_array_t/,$ d'
