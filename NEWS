@@ -10,6 +10,7 @@ Improvements:
 - defer: enabled by default in declarative configuration (!1785)
 
   - /defer/enable: false -> true
+- datamodel: lua: added Lua scripts for policy-loader (!1771)
 
 Bugfixes
 --------
