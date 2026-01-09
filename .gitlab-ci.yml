@@ -280,7 +280,7 @@ docker:test:cross-platform:
     - docker
     - ${PLATFORM}
 
-dockerhub:deploy:
+docker:dockerhub:
   <<: *docker
   stage: deploy
   when: manual
@@ -294,7 +294,7 @@ dockerhub:deploy:
     - >
       docker buildx imagetools create
       -t ${DOCKER_HUB_REGISTRY}:${CI_COMMIT_REF_NAME}
-      -t ${DOCKER_HUB_REGISTRY}:latest
+      -t ${DOCKER_HUB_REGISTRY}:latest5
       ${GITLAB_REGISTRY}:${CI_COMMIT_REF_NAME}
 # }}}
 
