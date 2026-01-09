@@ -28,7 +28,9 @@ Please, follow the instructions for your packaging system:
 
         .. code:: bash
 
-            sudo docker run -ti --net=host docker.io/cznic/knot-resolver:6
+            sudo docker run --rm -ti --network host docker.io/cznic/knot-resolver
+
+        More about Docker deployments can be found in :ref:`deployment-docker` section.
 
 If for some reason you need to install Knot Resolver **from sources**,
 check out `building from sources <./dev/build.html>`_ section in developer documentation.
