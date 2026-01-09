@@ -803,10 +803,10 @@ docs:environment:
     name: docs/$CI_COMMIT_REF_NAME
     url: https://www.knot-resolver.cz/documentation/artifacts/$CI_JOB_ID/index.html
 
-# Automatically deploys the latest documentation from the master branch.
-# The latest doc is available at https://www.knot-resolver.cz/documentation/latest/,
+# Automatically deploys the documentation from the master branch.
+# The master docs is available at https://www.knot-resolver.cz/documentation/master/,
 # which redirects to the GitLab pages at https://knot.pages.nic.cz/knot-resolver.
-docs:latest:
+docs:master:
   stage: deploy
   needs:
     - docs:build
