@@ -380,7 +380,7 @@ class ObjectMapper:
 
     def _create_default(self, obj: Any) -> Any:
         if isinstance(obj, _LazyDefault):
-            return obj.instantiate()  # type: ignore
+            return obj.instantiate()
         return obj
 
     def map_object(  # noqa: PLR0911, PLR0912
@@ -482,7 +482,7 @@ class ObjectMapper:
         if is_generic_type_wrapper(tp):
             inner_type = get_generic_type_wrapper_argument(tp)
             obj_valid = self.map_object(inner_type, obj, object_path)
-            return tp(obj_valid, object_path=object_path)  # type: ignore
+            return tp(obj_valid, object_path=object_path)
 
         # nested BaseSchema subclasses
         if inspect.isclass(tp) and issubclass(tp, BaseSchema):
@@ -606,7 +606,7 @@ class ObjectMapper:
         # As this is a delegated constructor, we must ignore protected access warnings
 
         # sanity check
-        if not isinstance(source, (BaseSchema, dict)):  # type: ignore
+        if not isinstance(source, (BaseSchema, dict)):
             raise DataValidationError(f"expected dict-like object, found '{type(source)}'", object_path)
 
         # construct lower level schema first if configured to do so

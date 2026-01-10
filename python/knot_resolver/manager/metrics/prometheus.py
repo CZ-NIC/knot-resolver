@@ -15,12 +15,12 @@ from .collect import collect_kresd_workers_metrics
 logger = logging.getLogger(__name__)
 
 if PROMETHEUS_LIB:
-    from prometheus_client import exposition  # type: ignore
-    from prometheus_client.bridge.graphite import GraphiteBridge  # type: ignore
+    from prometheus_client import exposition
+    from prometheus_client.bridge.graphite import GraphiteBridge
     from prometheus_client.core import (
         REGISTRY,
         CounterMetricFamily,
-        GaugeMetricFamily,  # type: ignore
+        GaugeMetricFamily,
         HistogramMetricFamily,
         Metric,
     )
@@ -31,19 +31,19 @@ if PROMETHEUS_LIB:
 
     def _counter(name: str, description: str, label: Tuple[str, str], value: float) -> CounterMetricFamily:
         c = CounterMetricFamily(name, description, labels=(label[0],))
-        c.add_metric((label[1],), value)  # type: ignore
+        c.add_metric((label[1],), value)
         return c
 
     def _gauge(name: str, description: str, label: Tuple[str, str], value: float) -> GaugeMetricFamily:
         c = GaugeMetricFamily(name, description, labels=(label[0],))
-        c.add_metric((label[1],), value)  # type: ignore
+        c.add_metric((label[1],), value)
         return c
 
     def _histogram(
         name: str, description: str, label: Tuple[str, str], buckets: List[Tuple[str, int]], sum_value: float
     ) -> HistogramMetricFamily:
         c = HistogramMetricFamily(name, description, labels=(label[0],))
-        c.add_metric((label[1],), buckets, sum_value=sum_value)  # type: ignore
+        c.add_metric((label[1],), buckets, sum_value=sum_value)
         return c
 
     def _parse_resolver_metrics(instance_id: "KresID", metrics: Any) -> Generator[Metric, None, None]:
@@ -413,7 +413,7 @@ if PROMETHEUS_LIB:
             _graphite_bridge = GraphiteBridge(
                 (str(config.monitoring.graphite.host), int(config.monitoring.graphite.port))
             )
-            _graphite_bridge.start(  # type: ignore
+            _graphite_bridge.start(
                 interval=config.monitoring.graphite.interval.seconds(), prefix=str(config.monitoring.graphite.prefix)
             )
 
@@ -441,7 +441,7 @@ async def init_prometheus(config_store: ConfigStore) -> None:
         # init and register metrics collector
         global _metrics_collector
         _metrics_collector = KresPrometheusMetricsCollector(config_store)
-        REGISTRY.register(_metrics_collector)  # type: ignore
+        REGISTRY.register(_metrics_collector)  # type: ignore[arg-type]
 
         # register graphite bridge
         await config_store.register_verifier(_deny_turning_off_graphite_bridge)
@@ -455,5 +455,5 @@ async def report_prometheus() -> Optional[bytes]:
             await _metrics_collector.collect_kresd_stats()
         else:
             raise RuntimeError("Function invoked before initializing the module!")
-        return exposition.generate_latest()  # type: ignore
+        return exposition.generate_latest()
     return None

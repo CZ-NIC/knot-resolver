@@ -68,7 +68,7 @@ class RenamedDict(Dict[K, V], Renamed):
         return dict(super().items())
 
 
-class RenamedList(List[V], Renamed):  # type: ignore
+class RenamedList(List[V], Renamed):
     def __getitem__(self, key: Any) -> Any:
         res = super().__getitem__(key)
         return renamed(res)

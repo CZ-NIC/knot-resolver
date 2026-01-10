@@ -14,7 +14,7 @@ from knot_resolver.utils.compat.asyncio import to_thread
 
 def unblock_signals() -> None:
     if sys.version_info >= (3, 8):
-        signal.pthread_sigmask(signal.SIG_UNBLOCK, signal.valid_signals())  # type: ignore
+        signal.pthread_sigmask(signal.SIG_UNBLOCK, signal.valid_signals())
     else:
         # the list of signals is not exhaustive, but it should cover all signals we might ever want to block
         signal.pthread_sigmask(

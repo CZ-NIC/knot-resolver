@@ -54,7 +54,7 @@ class KresID:
             # Ignoring typing here, because I can't find a way how to make the _used dict
             # typed based on subclass. I am not even sure that it's different between subclasses,
             # it's probably still the same dict. But we don't really care about it
-            return cls._used[typ][n]  # type: ignore
+            return cls._used[typ][n]  # type: ignore[return-value]
         val = cls(typ, n, _i_know_what_i_am_doing=True)
         cls._used[typ][n] = val
         return val
@@ -232,7 +232,7 @@ class Subprocess(ABC):
 
                 # proper closing of the socket is only implemented in later versions of python
                 if sys.version_info >= (3, 7):
-                    await writer.wait_closed()  # type: ignore
+                    await writer.wait_closed()
 
 
 class SubprocessController(ABC):
