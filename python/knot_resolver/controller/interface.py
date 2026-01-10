@@ -231,7 +231,7 @@ class Subprocess(ABC):
                 writer.close()
 
                 # proper closing of the socket is only implemented in later versions of python
-                if sys.version_info.minor >= 7:
+                if sys.version_info >= (3, 7):
                     await writer.wait_closed()  # type: ignore
 
 
