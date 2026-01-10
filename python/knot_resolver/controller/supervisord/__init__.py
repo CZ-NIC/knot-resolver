@@ -103,9 +103,10 @@ def _is_process_runinng(pid: int) -> bool:
     try:
         # kill with signal 0 is a safe way to test that a process exists
         kill(pid, 0)
-        return True
     except ProcessLookupError:
         return False
+    else:
+        return True
 
 
 async def _is_supervisord_running(config: KresConfig) -> bool:

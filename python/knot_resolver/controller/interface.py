@@ -136,9 +136,9 @@ class Subprocess(ABC):
             if self.type is SubprocessType.KRESD:
                 register_worker(self)
                 self._registered_worker = True
-        except KresSubprocessControllerError as e:
+        except KresSubprocessControllerError:
             self._unlink_config()
-            raise e
+            raise
 
     async def apply_new_config(self, new_config: KresConfig) -> None:
         self._config = new_config

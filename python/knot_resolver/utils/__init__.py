@@ -23,7 +23,7 @@ def ignore_exceptions_optional(
             except BaseException as e:
                 if isinstance(e, exceptions):
                     return default
-                raise e
+                raise
 
         return f
 

@@ -278,11 +278,12 @@ class ObjectMapper:
                 raise errs[0]
             if len(errs) > 1:
                 raise AggregateDataValidationError(object_path, child_exceptions=errs)
-            return res
         except AttributeError as e:
             raise DataValidationError(
                 f"Expected dict-like object, but failed to access its .items() method. Value was {obj}", object_path
             ) from e
+        else:
+            return res
 
     def _create_list(self, tp: Type[Any], obj: List[Any], object_path: str) -> List[Any]:
         if isinstance(obj, str):
@@ -502,9 +503,10 @@ class ObjectMapper:
         """Runtime type checking. Validate, that a given object is of a given type."""
         try:
             self.map_object(tp, obj)
-            return True
         except (DataValidationError, ValueError):
             return False
+        else:
+            return True
 
     def _assign_default(self, obj: Any, name: str, python_type: Any, object_path: str) -> None:
         cls = obj.__class__

@@ -173,12 +173,13 @@ def get_socket_from_config(config: Path, optional_file: bool) -> Optional[Socket
                     f"http://{ip.addr}:{ip.port}",
                     f'Key "/management/interface" in "{config}" file',
                 )
-        return None
     except ValueError as e:
         raise DataValidationError(*e.args) from e  # pylint: disable=no-value-for-parameter
-    except OSError as e:
+    except OSError:
         if not optional_file:
-            raise e
+            raise
+        return None
+    else:
         return None
 
 
