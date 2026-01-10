@@ -1,3 +1,4 @@
+# noqa: INP001
 import argparse
 import sys
 from enum import Enum
