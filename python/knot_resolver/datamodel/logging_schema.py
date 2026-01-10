@@ -132,7 +132,7 @@ class LoggingSchema(ConfigSchema):
             return cast(LogTargetEnum, target)
         return raw.target
 
-    def _validate(self):
+    def _validate(self) -> None:
         if self.groups is None:
             return
 

@@ -12,7 +12,7 @@ from typing import Any, Dict, Generic, List, Optional, TypeVar, Union
 from knot_resolver.utils.compat.asyncio import to_thread
 
 
-def unblock_signals():
+def unblock_signals() -> None:
     if sys.version_info.major >= 3 and sys.version_info.minor >= 8:
         signal.pthread_sigmask(signal.SIG_UNBLOCK, signal.valid_signals())  # type: ignore
     else:
@@ -120,7 +120,7 @@ class BlockingEventDispatcher(Thread, Generic[T]):
         Method to dispatch events from the blocking thread
         """
 
-        async def add_to_queue():
+        async def add_to_queue() -> None:
             await self._removed_unit_names.put(event)
 
         self._main_event_loop.call_soon_threadsafe(add_to_queue)

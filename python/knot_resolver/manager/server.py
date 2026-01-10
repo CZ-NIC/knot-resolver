@@ -88,7 +88,7 @@ class Server:
     # This is top-level class containing pretty much everything. Instead of global
     # variables, we use instance attributes. That's why there are so many and it's
     # ok.
-    def __init__(self, store: ConfigStore, config_path: Optional[List[Path]], manager: KresManager):
+    def __init__(self, store: ConfigStore, config_path: Optional[List[Path]], manager: KresManager) -> None:
         # config store & server dynamic reconfiguration
         self.config_store = store
 
@@ -180,12 +180,12 @@ class Server:
     def all_handled_signals() -> Set[signal.Signals]:
         return {signal.SIGHUP, signal.SIGINT, signal.SIGTERM}
 
-    def bind_signal_handlers(self):
+    def bind_signal_handlers(self) -> None:
         asyncio_compat.add_async_signal_handler(signal.SIGTERM, self.sigterm_handler)
         asyncio_compat.add_async_signal_handler(signal.SIGINT, self.sigint_handler)
         asyncio_compat.add_async_signal_handler(signal.SIGHUP, self.sighup_handler)
 
-    def unbind_signal_handlers(self):
+    def unbind_signal_handlers(self) -> None:
         asyncio_compat.remove_signal_handler(signal.SIGTERM)
         asyncio_compat.remove_signal_handler(signal.SIGINT)
         asyncio_compat.remove_signal_handler(signal.SIGHUP)
@@ -546,14 +546,14 @@ def _lock_working_directory(attempt: int = 0) -> None:
     atexit.register(lambda: os.unlink(PID_FILE_NAME))
 
 
-async def _sigint_while_shutting_down():
+async def _sigint_while_shutting_down() -> None:
     logger.warning(
         "Received SIGINT while already shutting down. Ignoring."
         " If you want to forcefully stop the manager right now, use SIGTERM."
     )
 
 
-async def _sigterm_while_shutting_down():
+async def _sigterm_while_shutting_down() -> None:
     logger.warning("Received SIGTERM. Invoking dirty shutdown!")
     sys.exit(128 + signal.SIGTERM)
 

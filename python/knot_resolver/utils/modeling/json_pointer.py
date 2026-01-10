@@ -24,7 +24,7 @@ class _JSONPtr:
     def _encode_token(token: str) -> str:
         return token.replace("~", "~0").replace("/", "~1")
 
-    def __init__(self, ptr: str):
+    def __init__(self, ptr: str) -> None:
         if ptr == "":
             # pointer to the root
             self.tokens = []

@@ -61,7 +61,7 @@ class KresID:
         cls._used[typ][n] = val
         return val
 
-    def __init__(self, typ: SubprocessType, n: int, _i_know_what_i_am_doing: bool = False):
+    def __init__(self, typ: SubprocessType, n: int, _i_know_what_i_am_doing: bool = False) -> None:
         if not _i_know_what_i_am_doing:
             raise RuntimeError("Don't do this. You seem to have no idea what it does")
 

@@ -17,7 +17,7 @@ class KresClient:
         self.namespace = namespace
         self.parser = parser
 
-    def execute(self):
+    def execute(self) -> None:
         if hasattr(self.namespace, "command"):
             args = CommandArgs(self.namespace, self.parser)
             command = args.command(self.namespace)
@@ -36,7 +36,7 @@ class KresClient:
             prompt = f"{bolt}{self.prompt}"
         return f"{prompt}> {reset}"
 
-    def interactive(self):
+    def interactive(self) -> None:
         try:
             while True:
                 pass

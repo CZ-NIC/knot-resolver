@@ -24,7 +24,7 @@ It is filled dynamically based on available modules that do not fail to import.
 _registered_controllers: List[SubprocessController] = []
 
 
-def try_supervisord():
+def try_supervisord() -> None:
     """
     Attempt to load supervisord controllers.
     """

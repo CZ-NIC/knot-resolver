@@ -14,7 +14,7 @@ UpdateCallback = Callable[[KresConfig, bool], Awaitable[None]]
 
 
 class ConfigStore:
-    def __init__(self, initial_config: KresConfig):
+    def __init__(self, initial_config: KresConfig) -> None:
         self._config = initial_config
         self._verifiers: List[VerifyCallback] = []
         self._callbacks: List[UpdateCallback] = []

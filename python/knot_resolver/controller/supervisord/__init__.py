@@ -181,7 +181,7 @@ class SupervisordSubprocess(Subprocess):
         config: KresConfig,
         controller: "SupervisordSubprocessController",
         base_id: Union[SubprocessType, SupervisordKresID],
-    ):
+    ) -> None:
         if isinstance(base_id, SubprocessType):
             super().__init__(config, SupervisordKresID.alloc(base_id))
         else:
@@ -189,7 +189,7 @@ class SupervisordSubprocess(Subprocess):
         self._controller: "SupervisordSubprocessController" = controller
 
     @property
-    def name(self):
+    def name(self) -> str:
         return str(self.id)
 
     def status(self) -> SubprocessStatus:
@@ -235,10 +235,10 @@ class SupervisordSubprocess(Subprocess):
 
 
 class SupervisordSubprocessController(SubprocessController):
-    def __init__(self):  # pylint: disable=super-init-not-called
+    def __init__(self) -> None:  # pylint: disable=super-init-not-called
         self._controller_config: Optional[KresConfig] = None
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "supervisord"
 
     async def is_controller_available(self, config: KresConfig) -> bool:

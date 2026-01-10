@@ -83,7 +83,7 @@ class TLSSchema(ConfigSchema):
             return WATCHDOG_LIB
         return obj.watchdog
 
-    def _validate(self):
+    def _validate(self) -> None:
         if self.sticket_secret and self.sticket_secret_file:
             raise ValueError("'sticket_secret' and 'sticket_secret_file' are both defined, only one can be used")
         if bool(self.cert_file) != bool(self.key_file):

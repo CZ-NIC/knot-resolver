@@ -708,7 +708,7 @@ class BaseSchema(Serializable):
     _LAYER: Optional[Type["BaseSchema"]] = None
     _MAPPER: ObjectMapper = ObjectMapper()
 
-    def __init__(self, source: TSource = None, object_path: str = ""):  # pylint: disable=[super-init-not-called]
+    def __init__(self, source: TSource = None, object_path: str = "") -> None:  # pylint: disable=[super-init-not-called]
         # save source data (and drop information about nullness)
         source = source or {}
         self.__source: Union[Dict[str, Any], BaseSchema] = source

@@ -68,7 +68,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
     Instantiate with `KresManager.create()`, not with the usual constructor!
     """
 
-    def __init__(self, _i_know_what_i_am_doing: bool = False):
+    def __init__(self, _i_know_what_i_am_doing: bool = False) -> None:
         if not _i_know_what_i_am_doing:
             logger.error(
                 "Trying to create an instance of KresManager using normal constructor. Please use "
@@ -361,7 +361,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
         logger.debug("Loading policy rules has been successfully completed")
         return Result.ok(None)
 
-    async def stop(self):
+    async def stop(self) -> None:
         if self._processes_watchdog_task is not None:
             try:
                 self._processes_watchdog_task.cancel()  # cancel it
