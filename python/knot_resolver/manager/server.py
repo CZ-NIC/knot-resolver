@@ -53,12 +53,11 @@ logger = logging.getLogger(__name__)
 @middleware
 async def error_handler(request: web.Request, handler: Any) -> web.Response:
     """
-    Generic error handler for route handlers.
+    Handle errors in route handlers.
 
     If an exception is thrown during request processing, this middleware catches it
     and responds accordingly.
     """
-
     try:
         return await handler(request)
     except (AggregateDataValidationError, DataValidationError) as e:
@@ -205,9 +204,7 @@ class Server:
         self._exit_code = exit_code
 
     async def _handler_index(self, _request: web.Request) -> web.Response:
-        """
-        Dummy index handler to indicate that the server is indeed running...
-        """
+        """Indicate that the server is indeed running (dummy index handler)."""
         return json_response(
             {
                 "msg": "Knot Resolver Manager is running! The configuration endpoint is at /config",
@@ -216,9 +213,7 @@ class Server:
         )
 
     async def _handler_config_query(self, request: web.Request) -> web.Response:
-        """
-        Route handler for changing resolver configuration
-        """
+        """Route handler for changing resolver configuration."""
         # There are a lot of local variables in here, but they are usually immutable (almost SSA form :) )
         # pylint: disable=too-many-locals
 
@@ -305,7 +300,7 @@ class Server:
 
     async def _handle_view_schema(self, _request: web.Request) -> web.Response:
         """
-        Provides a UI for visuallising and understanding JSON schema.
+        Provide a UI for visuallising and understanding JSON schema.
 
         The feature in the Knot Resolver Manager to render schemas is unwanted, as it's completely
         out of scope. However, it can be convinient. We therefore rely on a public web-based viewers
@@ -333,37 +328,25 @@ class Server:
         )
 
     async def _handler_stop(self, _request: web.Request) -> web.Response:
-        """
-        Route handler for shutting down the server (and whole manager)
-        """
-
+        """Route handler for shutting down the server (and whole manager)."""
         self._shutdown_event.set()
         logger.info("Shutdown event triggered...")
         return web.Response(text="Shutting down...")
 
     async def _handler_reload(self, request: web.Request) -> web.Response:
-        """
-        Route handler for reloading the configuration
-        """
-
+        """Route handler for reloading the configuration."""
         logger.info("Reloading event triggered...")
         await self._reload_config(force=bool(request.path.endswith("/force")))
         return web.Response(text="Reloading...")
 
     async def _handler_renew(self, request: web.Request) -> web.Response:
-        """
-        Route handler for renewing the configuration
-        """
-
+        """Route handler for renewing the configuration."""
         logger.info("Renewing configuration event triggered...")
         await self._renew_config(force=bool(request.path.endswith("/force")))
         return web.Response(text="Renewing configuration...")
 
     async def _handler_processes(self, request: web.Request) -> web.Response:
-        """
-        Route handler for listing PIDs of subprocesses
-        """
-
+        """Route handler for listing PIDs of subprocesses."""
         proc_type: Optional[SubprocessType] = None
 
         if "path" in request.match_info and len(request.match_info["path"]) > 0:
@@ -475,10 +458,7 @@ async def _init_config_store(config: Dict[str, Any]) -> ConfigStore:
 
 
 async def _init_manager(config_store: ConfigStore) -> KresManager:
-    """
-    Called asynchronously when the application initializes.
-    """
-
+    """Call asynchronously when the application initializes."""
     # Instantiate subprocess controller (if we wanted to, we could switch it at this point)
     controller = await get_best_controller_implementation(config_store.get())
 

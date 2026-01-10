@@ -83,7 +83,6 @@ def parse_json(data: str) -> Any:
 
 def try_to_parse(data: str) -> Any:
     """Attempt to parse the data as a JSON or YAML string."""
-
     try:
         return parse_json(data)
     except json.JSONDecodeError as je:
@@ -98,7 +97,7 @@ def try_to_parse(data: str) -> Any:
 
 
 def data_combine(data: Dict[Any, Any], additional_data: Dict[Any, Any], object_path: str = "") -> Dict[Any, Any]:
-    """Combine dictionaries data"""
+    """Combine dictionaries data."""
     for key in additional_data:
         if key in data:
             # if both are dictionaries we can try to combine them deeper

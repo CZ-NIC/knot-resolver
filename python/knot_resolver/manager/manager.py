@@ -62,8 +62,7 @@ async def _subprocess_desc(subprocess: Subprocess) -> object:
 
 class KresManager:  # pylint: disable=too-many-instance-attributes
     """
-    Core of the whole operation. Orchestrates individual instances under some
-    service manager like systemd.
+    Core of the whole operation. Orchestrates individual instances under some service manager like systemd.
 
     Instantiate with `KresManager.create()`, not with the usual constructor!
     """
@@ -92,10 +91,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
         subprocess_controller: SubprocessController,
         config_store: ConfigStore,
     ) -> "KresManager":
-        """
-        Creates new instance of KresManager.
-        """
-
+        """Create new instance of KresManager."""
         inst = KresManager(_i_know_what_i_am_doing=True)
         await inst._async_init(subprocess_controller, config_store)  # noqa: SLF001
         return inst

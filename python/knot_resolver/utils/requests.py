@@ -97,7 +97,9 @@ def request(
 # https://github.com/msabramo/requests-unixsocket/blob/master/requests_unixsocket/adapters.py
 class UnixHTTPConnection(HTTPConnection):
     def __init__(self, unix_socket_url: str, timeout: Union[int, float] = 60) -> None:
-        """Create an HTTP connection to a unix domain socket
+        """
+        Create an HTTP connection to a unix domain socket.
+
         :param unix_socket_url: A URL with a scheme of 'http+unix' and the
         netloc is a percent-encoded path to a unix domain socket. E.g.:
         'http+unix://%2Ftmp%2Fprofilesvc.sock/status/pid'

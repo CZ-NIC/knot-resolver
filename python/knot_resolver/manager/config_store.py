@@ -48,10 +48,7 @@ class ConfigStore:
             raise DataParsingError(f"Initial config verification failed with error: {res.unwrap_err()}")
 
     async def register_on_change_callback(self, callback: UpdateCallback) -> None:
-        """
-        Registers new callback and immediatelly calls it with current config
-        """
-
+        """Register new callback and immediately call it with current config."""
         self._callbacks.append(callback)
         await callback(self.get(), False)
 

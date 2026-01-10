@@ -15,7 +15,7 @@ class LuaSchema(ConfigSchema):
     policy_script_only: Ignore declarative configuration intended for policy-loader and use only Lua script or script file configured in this section.
     policy_script: Custom Lua configuration script intended for policy-loader.
     policy_script_file: Path to file that contains Lua configuration script for policy-loader.
-    """
+    """  # noqa: E501
 
     script_only: bool = False
     script: Optional[str] = None

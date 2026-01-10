@@ -36,14 +36,10 @@ async def command_registered_workers(cmd: str) -> "Dict[KresID, object]":
 
 
 def unregister_worker(subprocess: "Subprocess") -> None:
-    """
-    Unregister kresd worker "Subprocess" from the list.
-    """
+    """Unregister kresd worker "Subprocess" from the list."""
     del _REGISTERED_WORKERS[subprocess.id]
 
 
 def register_worker(subprocess: "Subprocess") -> None:
-    """
-    Register kresd worker "Subprocess" on the list.
-    """
+    """Register kresd worker "Subprocess" on the list."""
     _REGISTERED_WORKERS[subprocess.id] = subprocess

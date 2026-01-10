@@ -7,12 +7,11 @@ def ignore_exceptions_optional(
     _tp: Type[T], default: Optional[T], *exceptions: Type[BaseException]
 ) -> Callable[[Callable[..., Optional[T]]], Callable[..., Optional[T]]]:
     """
-    Decorator, that wraps around a function preventing it from raising exceptions
-    and instead returning the configured default value.
+    Wrap function preventing it from raising exceptions and instead returning the configured default value.
 
-    :param Type[T] _tp: Return type of the function. Essentialy only a template argument for type-checking
+    :param type[T] _tp: Return type of the function. Essentialy only a template argument for type-checking
     :param T default: The value to return as a default
-    :param List[Type[BaseException]] exceptions: The list of exceptions to catch
+    :param list[Type[BaseException]] exceptions: The list of exceptions to catch
     :return: value of the decorated function, or default if exception raised
     :rtype: T
     """
@@ -39,6 +38,7 @@ def ignore_exceptions(
 
 def phantom_use(var: Any) -> None:  # pylint: disable=unused-argument
     """
-    Function, which consumes its argument doing absolutely nothing with it. Useful
-    for convincing pylint, that we need the variable even when its unused.
+    Consumes argument doing absolutely nothing with it.
+
+    Useful for convincing pylint, that we need the variable even when its unused.
     """

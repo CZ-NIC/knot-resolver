@@ -13,9 +13,7 @@ class PatchError(Exception):
 class Op(BaseSchema, ABC):
     @abstractmethod
     def eval(self, fakeroot: Any) -> Any:
-        """
-        modifies the given fakeroot, returns a new one
-        """
+        """Modify the given fakeroot, returns a new one."""
 
     def _resolve_ptr(self, fakeroot: Any, ptr: str) -> Tuple[Any, Any, Union[str, int, None]]:
         # Lookup tree part based on the given JSON pointer

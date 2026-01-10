@@ -402,9 +402,7 @@ if PROMETHEUS_LIB:
 
     @only_on_real_changes_update(lambda c: c.monitoring.graphite)
     async def _init_graphite_bridge(config: KresConfig, force: bool = False) -> None:
-        """
-        Starts graphite bridge if required
-        """
+        """Start graphite bridge if required."""
         global _graphite_bridge
         if config.monitoring.graphite.enable and _graphite_bridge is None:
             logger.info(
@@ -438,9 +436,7 @@ if PROMETHEUS_LIB:
 
 
 async def init_prometheus(config_store: ConfigStore) -> None:
-    """
-    Initialize metrics collection. Must be called before any other function from this module.
-    """
+    """Initialize metrics collection. Must be called before any other function from this module."""
     if PROMETHEUS_LIB:
         # init and register metrics collector
         global _metrics_collector

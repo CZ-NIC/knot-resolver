@@ -35,9 +35,7 @@ T = TypeVar("T", bound="KresID")
 
 
 class KresID:
-    """
-    ID object used for identifying subprocesses.
-    """
+    """ID object used for identifying subprocesses."""
 
     _used: "Dict[SubprocessType, WeakValueDictionary[int, KresID]]" = {k: WeakValueDictionary() for k in SubprocessType}
 
@@ -84,16 +82,12 @@ class KresID:
         return False
 
     def __str__(self) -> str:
-        """
-        Returns string representation of the ID usable directly in the underlying service manager
-        """
+        """Return string representation of the ID usable directly in the underlying service supervisor."""
         raise NotImplementedError()
 
     @staticmethod
     def from_string(val: str) -> "KresID":
-        """
-        Inverse of __str__
-        """
+        """Inverse of __str__."""
         raise NotImplementedError()
 
     def __int__(self) -> int:
@@ -101,9 +95,7 @@ class KresID:
 
 
 class Subprocess(ABC):
-    """
-    One SubprocessInstance corresponds to one manager's subprocess
-    """
+    """One SubprocessInstance corresponds to one manager's subprocess."""
 
     def __init__(self, config: KresConfig, kresid: KresID) -> None:
         self._id = kresid
@@ -167,8 +159,10 @@ class Subprocess(ABC):
 
     async def cleanup(self) -> None:
         """
-        Remove temporary files and all traces of this instance running. It is NOT SAFE to call this while
-        the kresd is running, because it will break automatic restarts (at the very least).
+        Remove temporary files and all traces of this instance running.
+
+        It is NOT SAFE to call this while the kresd is running,
+        because it will break automatic restarts (at the very least).
         """
         self._unlink_config()
 
@@ -243,35 +237,34 @@ class Subprocess(ABC):
 
 class SubprocessController(ABC):
     """
-    The common Subprocess Controller interface. This is what KresManager requires and what has to be implemented by all
-    controllers.
+    The common Subprocess Controller interface.
+
+    This is what KresManager requires and what has to be implemented by all controllers.
     """
 
     @abstractmethod
     async def is_controller_available(self, config: KresConfig) -> bool:
-        """
-        Returns bool, whether the controller is available with the given config
-        """
+        """Return bool, whether the controller is available with the given config."""
 
     @abstractmethod
     async def initialize_controller(self, config: KresConfig) -> None:
         """
-        Should be called when we want to really start using the controller with a specific configuration
+        Initialize the Subprocess Controller.
+
+        Should be called when we want to really start using the controller with a specific configuration.
         """
 
     @abstractmethod
     async def get_all_running_instances(self) -> Iterable[Subprocess]:
-        """
-
-        Must NOT be called before initialize_controller()
-        """
+        """Must NOT be called before initialize_controller()."""
 
     @abstractmethod
     async def shutdown_controller(self) -> None:
         """
-        Called when the manager is gracefully shutting down. Allows us to stop
-        the service manager process or simply cleanup, so that we don't reuse
-        the same resources in a new run.
+        Shutting the Process Cntroller.
+
+        Allows us to stop the service manager process or simply cleanup,
+        so that we don't reuse the same resources in a new run.
 
         Must NOT be called before initialize_controller()
         """
@@ -279,9 +272,10 @@ class SubprocessController(ABC):
     @abstractmethod
     async def create_subprocess(self, subprocess_config: KresConfig, subprocess_type: SubprocessType) -> Subprocess:
         """
-        Return a Subprocess object which can be operated on. The subprocess is not
-        started or in any way active after this call. That has to be performaed manually
-        using the returned object itself.
+        Return a Subprocess object which can be operated on.
+
+        The subprocess is not started or in any way active after this call.
+        That has to be performaed manually using the returned object itself.
 
         Must NOT be called before initialize_controller()
         """
@@ -289,8 +283,9 @@ class SubprocessController(ABC):
     @abstractmethod
     async def get_subprocess_status(self) -> Dict[KresID, SubprocessStatus]:
         """
-        Get a status of running subprocesses as seen by the controller. This method  actively polls
-        for information.
+        Get a status of running subprocesses as seen by the controller.
+
+        This method  actively polls for information.
 
         Must NOT be called before initialize_controller()
         """

@@ -42,9 +42,7 @@ def is_obj_type(obj: Any, types: Union[type, Tuple[Any, ...], Tuple[type, ...]])
 
 
 class Serializable(ABC):
-    """
-    An interface for making classes serializable to a dictionary (and in turn into a JSON).
-    """
+    """An interface for making classes serializable to a dictionary (and in turn into a JSON)."""
 
     @abstractmethod
     def to_dict(self) -> Dict[Any, Any]:
@@ -86,7 +84,9 @@ class Serializable(ABC):
 
 class _LazyDefault(Generic[T], Serializable):
     """
-    Wrapper for default values BaseSchema classes which deffers their instantiation until the schema
+    Wrapper for default values BaseSchema classes.
+
+    Defers the default instantiation until the schema
     itself is being instantiated
     """
 
@@ -104,15 +104,12 @@ class _LazyDefault(Generic[T], Serializable):
 
 
 def lazy_default(constructor: Callable[..., T], *args: Any, **kwargs: Any) -> T:
-    """We use a factory function because you can't lie about the return type in `__new__`"""
-    return _LazyDefault(constructor, *args, **kwargs)  # type: ignore
+    """We use a factory function because you can't lie about the return type in `__new__`."""
+    return _LazyDefault(constructor, *args, **kwargs)  # type: ignore[return-value]
 
 
 def _split_docstring(docstring: str) -> Tuple[str, Optional[str]]:
-    """
-    Splits docstring into description of the class and description of attributes
-    """
-
+    """Split docstring into description of the class and description of attributes."""
     if "---" not in docstring:
         return ("\n".join([s.strip() for s in docstring.splitlines()]).strip(), None)
 
@@ -124,10 +121,7 @@ def _split_docstring(docstring: str) -> Tuple[str, Optional[str]]:
 
 
 def _parse_attrs_docstrings(docstring: str) -> Optional[Dict[str, str]]:
-    """
-    Given a docstring of a BaseSchema, return a dict with descriptions of individual attributes.
-    """
-
+    """Given a docstring of a BaseSchema, return a dict with descriptions of individual attributes."""
     _, attrs_doc = _split_docstring(docstring)
     if attrs_doc is None:
         return None
@@ -397,10 +391,11 @@ class ObjectMapper:
         object_path: str = "/",
     ) -> Any:
         """
-        Given an expected type `cls` and a value object `obj`, return a new object of the given type and map fields of `obj` into it. During the mapping procedure,
-        runtime type checking is performed.
-        """
+        Given an expected type `cls` and a value object `obj`.
 
+        Return a new object of the given type and map fields of `obj` into it.
+        During the mapping procedure, runtime type checking is performed.
+        """
         # Disabling these checks, because I think it's much more readable as a single function
         # and it's not that large at this point. If it got larger, then we should definitely split it
         # pylint: disable=too-many-branches,too-many-locals,too-many-statements
@@ -504,10 +499,7 @@ class ObjectMapper:
         )
 
     def is_obj_type_valid(self, obj: Any, tp: Type[Any]) -> bool:
-        """
-        Runtime type checking. Validate, that a given object is of a given type.
-        """
-
+        """Runtime type checking. Validate, that a given object is of a given type."""
         try:
             self.map_object(tp, obj)
             return True
@@ -531,6 +523,8 @@ class ObjectMapper:
 
     def _assign_fields(self, obj: Any, source: Union[Dict[str, Any], "BaseSchema", None], object_path: str) -> Set[str]:
         """
+        Assign fields and values.
+
         Order of assignment:
           1. all direct assignments
           2. assignments with conversion method
@@ -585,9 +579,7 @@ class ObjectMapper:
         return used_keys
 
     def _get_converted_value(self, obj: Any, key: str, source: TSource, object_path: str) -> Any:
-        """
-        Get a value of a field by invoking appropriate transformation function.
-        """
+        """Get a value of a field by invoking appropriate transformation function."""
         try:
             func = getattr(obj.__class__, f"_{key}")
             argc = len(inspect.signature(func).parameters)
@@ -607,7 +599,7 @@ class ObjectMapper:
 
     def object_constructor(self, obj: Any, source: Union["BaseSchema", Dict[Any, Any]], object_path: str) -> None:
         """
-        Delegated constructor for the NoRenameBaseSchema class.
+        Construct object. Delegated constructor for the NoRenameBaseSchema class.
 
         The reason this method is delegated to the mapper is due to renaming. Like this, we don't have to
         worry about a different BaseSchema class, when we want to have dynamically renamed fields.
@@ -644,8 +636,9 @@ class ObjectMapper:
 
 class BaseSchema(Serializable):
     """
-    Base class for modeling configuration schema. It somewhat resembles standard dataclasses with additional
-    functionality:
+    Base class for modeling configuration schema.
+
+    It somewhat resembles standard dataclasses with additional functionality:
 
     * type validation
     * data conversion
@@ -679,8 +672,8 @@ class BaseSchema(Serializable):
 
     Using this, you can convert any input values into any type and field you want. To make the conversion easier
     to write, you could also specify a special class variable called `_LAYER` pointing to another
-    BaseSchema class. This causes the source object to be first parsed as the specified additional layer of BaseSchema and after that
-    used a source for this class. This therefore allows nesting of transformation functions.
+    BaseSchema class. This causes the source object to be first parsed as the specified additional layer of BaseSchema
+    and after that used a source for this class. This therefore allows nesting of transformation functions.
 
     Validation
     ==========
@@ -699,10 +692,11 @@ class BaseSchema(Serializable):
     are not present. As a special case, default value for Optional type is None if not specified otherwise. You
     are not allowed to have a field with a default value and a transformation function at once.
 
-    Example
+    Example:
     =======
 
     See tests/utils/test_modelling.py for example usage.
+
     """
 
     _LAYER: Optional[Type["BaseSchema"]] = None
@@ -733,7 +727,9 @@ class BaseSchema(Serializable):
 
     def _validate(self) -> None:
         """
-        Validation procedure called after all field are assigned. Should throw a ValueError in case of failure.
+        Additional validation procedure called after all field are assigned.
+
+        Should throw a ValueError in case of failure.
         """
 
     def __eq__(self, o: object) -> bool:
@@ -821,8 +817,6 @@ map_object = ObjectMapper().map_object
 
 
 class ConfigSchema(BaseSchema):
-    """
-    Same as BaseSchema, but maps with RenamingObjectMapper
-    """
+    """Same as BaseSchema, but maps with RenamingObjectMapper."""
 
     _MAPPER: ObjectMapper = RenamingObjectMapper()

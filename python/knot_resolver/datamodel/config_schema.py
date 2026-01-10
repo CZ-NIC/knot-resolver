@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 import logging
 import os
 import socket
@@ -187,7 +188,7 @@ class KresConfig(ConfigSchema):
 
         return obj.workers
 
-    def _validate(self) -> None:
+    def _validate(self) -> None:  # noqa: C901
         # warn about '/management/unix-socket' not located in '/rundir'
         if self.management.unix_socket and self.management.unix_socket.to_path().parent != self.rundir.to_path():
             logger.warning(
@@ -242,7 +243,7 @@ class KresConfig(ConfigSchema):
             raise AggregateDataValidationError("/", errs)
 
     def render_kresd_lua(self) -> str:
-        # FIXME the `cwd` argument is used only for configuring control socket path
+        # FIXME the `cwd` argument is used only for configuring control socket path  # noqa: FIX001, TD001, TD002, TD004
         # it should be removed and relative path used instead as soon as issue
         # https://gitlab.nic.cz/knot/knot-resolver/-/issues/720 is fixed
         return KRESD_CONFIG_TEMPLATE.render(cfg=self, cwd=os.getcwd())
@@ -254,22 +255,21 @@ class KresConfig(ConfigSchema):
 def get_rundir_without_validation(data: Dict[str, Any]) -> WritableDir:
     """
     Without fully parsing, try to get a rundir from a raw config data, otherwise use default.
-    Attempts a dir validation to produce a good error message.
 
+    Attempts a dir validation to produce a good error message.
     Used for initial manager startup.
     """
-
     return WritableDir(data["rundir"] if "rundir" in data else str(RUN_DIR), object_path="/rundir")
 
 
 def kres_config_json_schema() -> Dict[str, Any]:
     """
     At this moment, to create any instance of 'ConfigSchema' even with default values, it is necessary to set the global context.
+
     In the case of generating a JSON schema, strict validation must be turned off, otherwise it may happen that the creation of the JSON schema fails,
     It may fail due to non-existence of the directory/file or their rights.
     This should be fixed in the future. For more info, see 'datamodel.globals.py' module.
     """
-
     context = get_global_validation_context()
     set_global_validation_context(Context(None, False))
 

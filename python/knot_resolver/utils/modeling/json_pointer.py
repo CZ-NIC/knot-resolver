@@ -1,7 +1,4 @@
-"""
-Implements JSON pointer resolution based on RFC 6901:
-https://www.rfc-editor.org/rfc/rfc6901
-"""
+"""Implements JSON pointer resolution based on RFC 6901: https://www.rfc-editor.org/rfc/rfc6901."""
 
 from typing import Any, Optional, Tuple, Union
 
@@ -12,10 +9,7 @@ JSONPtrAddressable = Any  # the recursive definition above is not valid :(
 class _JSONPtr:
     @staticmethod
     def _decode_token(token: str) -> str:
-        """
-        Resolves escaped characters ~ and /
-        """
-
+        """Resolve escaped characters ~ and /."""
         # the order of the replace statements is important, do not change without
         # consulting the RFC
         return token.replace("~1", "/").replace("~0", "~")
@@ -41,10 +35,6 @@ class _JSONPtr:
     def resolve(
         self, obj: JSONPtrAddressable
     ) -> Tuple[Optional[JSONPtrAddressable], JSONPtrAddressable, Union[str, int, None]]:
-        """
-        Returns (Optional[parent], Optional[direct value], key of value in the parent object)
-        """
-
         parent: Optional[JSONPtrAddressable] = None
         current = obj
         current_ptr = ""
