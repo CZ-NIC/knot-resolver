@@ -591,10 +591,7 @@ class ObjectMapper:
                 return func(_create_untouchable("obj"), source)
             raise RuntimeError("Transformation function has wrong number of arguments")
         except ValueError as e:
-            if len(e.args) > 0 and isinstance(e.args[0], str):
-                msg = e.args[0]
-            else:
-                msg = "Failed to validate value type"
+            msg = e.args[0] if len(e.args) > 0 and isinstance(e.args[0], str) else "Failed to validate value type"
             raise DataValidationError(msg, object_path) from e
 
     def object_constructor(self, obj: Any, source: Union["BaseSchema", Dict[Any, Any]], object_path: str) -> None:
@@ -738,11 +735,7 @@ class BaseSchema(Serializable):
             return False
 
         annot = get_annotations(cls)
-        for name in annot.keys():
-            if getattr(self, name) != getattr(o, name):
-                return False
-
-        return True
+        return all(getattr(self, name) == getattr(o, name) for name in annot)
 
     @classmethod
     def json_schema(

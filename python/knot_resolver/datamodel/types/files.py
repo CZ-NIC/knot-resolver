@@ -34,10 +34,7 @@ class UncheckedPath(BaseValueType):
         if isinstance(source_value, str):
             # we do not load global validation context if the path is absolute
             # this prevents errors when constructing defaults in the schema
-            if source_value.startswith("/"):
-                resolve_root = Path("/")
-            else:
-                resolve_root = get_resolve_root()
+            resolve_root = Path("/") if source_value.startswith("/") else get_resolve_root()
 
             self._raw_value: str = source_value
             if self._parents:
@@ -197,11 +194,7 @@ def _check_permission(dest_path: Path, perm_mode: _PermissionMode) -> bool:
 
     # __iter__ for class enum.Flag added in python3.11
     # 'for perm in perm_mode:' fails for <=python3.11
-    for perm in _PermissionMode:
-        if perm in perm_mode:
-            if not accessible(perm):
-                return False
-    return True
+    return all(not (perm in perm_mode and not accessible(perm)) for perm in _PermissionMode)
 
 
 class ReadableFile(File):

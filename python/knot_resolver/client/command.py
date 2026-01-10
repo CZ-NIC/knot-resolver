@@ -119,7 +119,7 @@ def comp_get_words(args: List[str], parser: argparse.ArgumentParser) -> CompWord
 
         # if action is SubParserAction
         if isinstance(action, argparse._SubParsersAction):  # noqa: SLF001
-            subparser: Optional[argparse.ArgumentParser] = action.choices[arg] if arg in action.choices else None
+            subparser: Optional[argparse.ArgumentParser] = action.choices.get(arg, None)
 
             command = get_subparser_command(subparser) if subparser else None
             if command and subparser:

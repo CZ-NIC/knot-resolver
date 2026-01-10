@@ -33,9 +33,7 @@ def _add(config: Dict[str, Any], path: str, val: Any, rewrite: bool = False) -> 
 
     current = config
     for key in keys[1:-1]:
-        if key not in current:
-            current[key] = {}
-        elif key in current and not isinstance(current[key], dict):
+        if key not in current or key in current and not isinstance(current[key], dict):
             current[key] = {}
         current = current[key]
 

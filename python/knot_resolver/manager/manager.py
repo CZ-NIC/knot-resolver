@@ -37,13 +37,12 @@ class _FixCounter:
         self._timestamp = time.time()
 
     def try_decrease(self) -> None:
-        if time.time() - self._timestamp > FIX_COUNTER_DECREASE_INTERVAL_SEC:
-            if self._counter > 0:
-                logger.info(
-                    f"Enough time has passed since last detected instability, decreasing fix attempt counter to {self._counter}"
-                )
-                self._counter -= 1
-                self._timestamp = time.time()
+        if time.time() - self._timestamp > FIX_COUNTER_DECREASE_INTERVAL_SEC and self._counter > 0:
+            logger.info(
+                f"Enough time has passed since last detected instability, decreasing fix attempt counter to {self._counter}"
+            )
+            self._counter -= 1
+            self._timestamp = time.time()
 
     def __str__(self) -> str:
         return str(self._counter)

@@ -66,9 +66,7 @@ def only_on_no_changes_update(selector: Callable[[KresConfig], Any]) -> Callable
             nonlocal original_value
             if not original_value_set:
                 original_value_set = True
-            elif original_value == selector(config):
-                await orig_func(config, force)
-            elif force:
+            elif original_value == selector(config) or force:
                 await orig_func(config, force)
             original_value = selector(config)
 
@@ -88,9 +86,7 @@ def only_on_real_changes_update(selector: Callable[[KresConfig], Any]) -> Callab
             if not original_value_set:
                 original_value_set = True
                 await orig_func(config, force)
-            elif original_value != selector(config):
-                await orig_func(config, force)
-            elif force:
+            elif original_value != selector(config) or force:
                 await orig_func(config, force)
             original_value = selector(config)
 
