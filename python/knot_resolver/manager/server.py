@@ -20,7 +20,7 @@ from aiohttp.web_runner import AppRunner, TCPSite, UnixSite
 
 from knot_resolver.constants import USER
 from knot_resolver.controller import get_best_controller_implementation
-from knot_resolver.controller.exceptions import SubprocessControllerError, SubprocessControllerExecError
+from knot_resolver.controller.exceptions import KresSubprocessControllerError, KresSubprocessControllerExec
 from knot_resolver.controller.interface import SubprocessType
 from knot_resolver.controller.registered_workers import command_single_registered_worker
 from knot_resolver.datamodel import kres_config_json_schema
@@ -43,7 +43,7 @@ from knot_resolver.utils.systemd_notify import systemd_notify
 
 from .config_store import ConfigStore
 from .constants import PID_FILE_NAME, init_user_constants
-from .exceptions import KresManagerException
+from .exceptions import KresManagerBaseError
 from .logger import logger_init
 from .manager import KresManager
 
@@ -65,7 +65,7 @@ async def error_handler(request: web.Request, handler: Any) -> web.Response:
         return web.Response(text=str(e), status=HTTPStatus.BAD_REQUEST)
     except DataParsingError as e:
         return web.Response(text=f"request processing error:\n{e}", status=HTTPStatus.BAD_REQUEST)
-    except KresManagerException as e:
+    except KresManagerBaseError as e:
         return web.Response(text=f"request processing failed:\n{e}", status=HTTPStatus.INTERNAL_SERVER_ERROR)
 
 
@@ -150,7 +150,7 @@ class Server:
             except (DataParsingError, DataValidationError) as e:
                 logger.error(f"Failed to parse the updated configuration file: {e}")
                 logger.error("Configuration has NOT been changed.")
-            except KresManagerException as e:
+            except KresManagerBaseError as e:
                 logger.error(f"Reloading of the configuration file failed: {e}")
                 logger.error("Configuration has NOT been changed.")
 
@@ -158,7 +158,7 @@ class Server:
         try:
             await self.config_store.renew(force)
             logger.info("Configuration successfully renewed")
-        except KresManagerException as e:
+        except KresManagerBaseError as e:
             logger.error(f"Renewing the configuration failed: {e}")
             logger.error("Configuration has NOT been renewed.")
 
@@ -423,7 +423,7 @@ class Server:
                 nsite = web.TCPSite(self.runner, str(mgn.interface.addr), int(mgn.interface.port))
                 logger.info(f"Starting API HTTP server on http://{mgn.interface.addr}:{mgn.interface.port}")
             else:
-                raise KresManagerException("Requested API on unsupported configuration format.")
+                raise KresManagerBaseError("Requested API on unsupported configuration format.")
             await nsite.start()
 
             # stop the old listen
@@ -454,7 +454,7 @@ async def _load_raw_config(config: Union[Path, Dict[str, Any]]) -> Dict[str, Any
     # Initial configuration of the manager
     if isinstance(config, Path):
         if not config.exists():
-            raise KresManagerException(
+            raise KresManagerBaseError(
                 f"Manager is configured to load config file at {config} on startup, but the file does not exist."
             )
         logger.info(f"Loading configuration from '{config}' file.")
@@ -525,11 +525,11 @@ def _lock_working_directory(attempt: int = 0) -> None:
                     os.unlink(PID_FILE_NAME)
                     _lock_working_directory(attempt=attempt + 1)
                     return
-            raise KresManagerException(
+            raise KresManagerBaseError(
                 "Another manager is running in the same working directory."
                 f" PID file is located at {os.getcwd()}/{PID_FILE_NAME}"
             ) from e
-        raise KresManagerException(
+        raise KresManagerBaseError(
             "Another manager is running in the same working directory."
             f" PID file is located at {os.getcwd()}/{PID_FILE_NAME}"
         ) from e
@@ -650,7 +650,7 @@ async def start_server(config: List[str]) -> int:  # noqa: PLR0915
         # add Server's shutdown trigger to the manager
         manager.add_shutdown_trigger(server.trigger_shutdown)
 
-    except SubprocessControllerExecError as e:
+    except KresSubprocessControllerExec as e:
         # if we caught this exception, some component wants to perform a reexec during startup. Most likely, it would
         # be a subprocess manager like supervisord, which wants to make sure the manager runs under supervisord in
         # the process tree. So now we stop everything, and exec what we are told to. We are assuming, that the thing
@@ -666,11 +666,11 @@ async def start_server(config: List[str]) -> int:  # noqa: PLR0915
         # and finally exec what we were told to exec
         os.execl(*e.exec_args)
 
-    except SubprocessControllerError as e:
+    except KresSubprocessControllerError as e:
         logger.error(f"Server initialization failed: {e}")
         return 1
 
-    except KresManagerException as e:
+    except KresManagerBaseError as e:
         # We caught an error with a pretty error message. Just print it and exit.
         logger.error(e)
         return 1

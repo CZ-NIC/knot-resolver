@@ -2,7 +2,7 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING, Dict, List, Tuple
 
-from .exceptions import SubprocessControllerError
+from .exceptions import KresSubprocessControllerError
 
 if TYPE_CHECKING:
     from knot_resolver.controller.interface import KresID, Subprocess
@@ -21,7 +21,7 @@ def get_registered_workers_kresids() -> "List[KresID]":
 async def command_single_registered_worker(cmd: str) -> "Tuple[KresID, object]":
     for sub in _REGISTERED_WORKERS.values():
         return sub.id, await sub.command(cmd)
-    raise SubprocessControllerError(
+    raise KresSubprocessControllerError(
         "Unable to execute the command. There is no kresd worker running to execute the command."
         "Try start/restart the resolver.",
     )

@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Dict, Iterable, Optional, Type, TypeVar
 from weakref import WeakValueDictionary
 
-from knot_resolver.controller.exceptions import SubprocessControllerError
+from knot_resolver.controller.exceptions import KresSubprocessControllerError
 from knot_resolver.controller.registered_workers import register_worker, unregister_worker
 from knot_resolver.datamodel.config_schema import KresConfig
 from knot_resolver.manager.constants import kresd_config_file, policy_loader_config_file
@@ -144,7 +144,7 @@ class Subprocess(ABC):
             if self.type is SubprocessType.KRESD:
                 register_worker(self)
                 self._registered_worker = True
-        except SubprocessControllerError as e:
+        except KresSubprocessControllerError as e:
             self._unlink_config()
             raise e
 

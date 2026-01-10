@@ -7,7 +7,7 @@ from secrets import token_hex
 from subprocess import SubprocessError
 from typing import Any, Callable, List, Optional
 
-from knot_resolver.controller.exceptions import SubprocessControllerError
+from knot_resolver.controller.exceptions import KresSubprocessControllerError
 from knot_resolver.controller.interface import Subprocess, SubprocessController, SubprocessStatus, SubprocessType
 from knot_resolver.controller.registered_workers import command_registered_workers, get_registered_workers_kresids
 from knot_resolver.datamodel import KresConfig
@@ -243,7 +243,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                 #   if it keeps running, the config is valid and others will soon join as well
                 #   if it crashes and the startup fails, then well, it's not running anymore... :)
                 await self._spawn_new_worker(new)
-            except (SubprocessError, SubprocessControllerError):
+            except (SubprocessError, KresSubprocessControllerError):
                 logger.error("Kresd with the new config failed to start, rejecting config")
                 return Result.err("canary kresd process failed to start. Config might be invalid.")
 
@@ -310,7 +310,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                     else:
                         logger.debug("Stopping cache GC")
                         await self._stop_gc()
-        except SubprocessControllerError as e:
+        except KresSubprocessControllerError as e:
             if _noretry:
                 raise
             if self._fix_counter.is_too_high():
@@ -353,7 +353,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                 if self._policy_loader:
                     await self._policy_loader.cleanup()
 
-        except (SubprocessError, SubprocessControllerError) as e:
+        except (SubprocessError, KresSubprocessControllerError) as e:
             logger.error(f"Failed to load policy rules: {e}")
             return Result.err("kresd 'policy-loader' process failed to start. Config might be invalid.")
 
@@ -449,7 +449,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                     )
                     invoke_callback = True
 
-            except SubprocessControllerError as e:
+            except KresSubprocessControllerError as e:
                 # wait few seconds and see if 'processes_watchdog' task is cancelled (during shutdown)
                 # otherwise it is an error
                 await asyncio.sleep(3)

@@ -6,7 +6,7 @@ from xmlrpc.client import Fault, ServerProxy
 
 import supervisor.xmlrpc  # type: ignore[import]
 
-from knot_resolver.controller.exceptions import SubprocessControllerError, SubprocessControllerExecError
+from knot_resolver.controller.exceptions import KresSubprocessControllerError, KresSubprocessControllerExec
 from knot_resolver.controller.interface import (
     KresID,
     Subprocess,
@@ -30,14 +30,14 @@ async def _start_supervisord(config: KresConfig) -> None:
     logger.debug("Starting supervisord")
     res = await call(["supervisord", "--configuration", str(supervisord_config_file(config).absolute())])
     if res != 0:
-        raise SubprocessControllerError(f"Supervisord exited with exit code {res}")
+        raise KresSubprocessControllerError(f"Supervisord exited with exit code {res}")
 
 
 async def _exec_supervisord(config: KresConfig) -> NoReturn:
     logger.debug("Writing supervisord config")
     await write_config_file(config)
     logger.debug("Execing supervisord")
-    raise SubprocessControllerExecError(
+    raise KresSubprocessControllerExec(
         [
             str(which.which("supervisord")),
             "supervisord",
@@ -53,7 +53,7 @@ async def _reload_supervisord(config: KresConfig) -> None:
         supervisord = _create_supervisord_proxy(config)
         supervisord.reloadConfig()
     except Fault as e:
-        raise SubprocessControllerError(f"supervisord reload failed: {e}") from e
+        raise KresSubprocessControllerError(f"supervisord reload failed: {e}") from e
 
 
 @async_in_a_thread
@@ -162,7 +162,7 @@ def _list_running_subprocesses(config: KresConfig) -> Dict[SupervisordKresID, Su
         supervisord = _create_supervisord_proxy(config)
         processes: Any = supervisord.getAllProcessInfo()
     except Fault as e:
-        raise SubprocessControllerError(f"failed to get info from all running processes: {e}") from e
+        raise KresSubprocessControllerError(f"failed to get info from all running processes: {e}") from e
 
     # there will be a manager process as well, but we don't want to report anything on ourselves
     processes = [pr for pr in processes if pr["name"] != "manager"]
@@ -197,7 +197,7 @@ class SupervisordSubprocess(Subprocess):
             supervisord = _create_supervisord_proxy(self._config)
             status = supervisord.getProcessInfo(self.name)
         except Fault as e:
-            raise SubprocessControllerError(f"failed to get status from '{self.id}' process: {e}") from e
+            raise KresSubprocessControllerError(f"failed to get status from '{self.id}' process: {e}") from e
         return _convert_subprocess_status(status)
 
     @async_in_a_thread
@@ -208,7 +208,7 @@ class SupervisordSubprocess(Subprocess):
             supervisord = _create_fast_proxy(self._config)
             supervisord.startProcess(self.name)
         except Fault as e:
-            raise SubprocessControllerError(f"failed to start '{self.id}'") from e
+            raise KresSubprocessControllerError(f"failed to start '{self.id}'") from e
 
     @async_in_a_thread
     def _stop(self) -> None:
