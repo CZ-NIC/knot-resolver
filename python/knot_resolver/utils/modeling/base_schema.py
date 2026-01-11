@@ -165,7 +165,7 @@ def _get_properties_schema(typ: Type[Any]) -> Dict[Any, Any]:
     return schema
 
 
-def _describe_type(typ: Type[Any]) -> Dict[Any, Any]:  # noqa: PLR0911, PLR0912
+def _describe_type(typ: Type[Any]) -> Dict[Any, Any]:  # noqa: C901, PLR0911, PLR0912
     # pylint: disable=too-many-branches
 
     if inspect.isclass(typ) and issubclass(typ, BaseSchema):
@@ -383,7 +383,7 @@ class ObjectMapper:
             return obj.instantiate()
         return obj
 
-    def map_object(  # noqa: PLR0911, PLR0912
+    def map_object(  # noqa: C901, PLR0911, PLR0912
         self,
         tp: Type[Any],
         obj: Any,
@@ -523,7 +523,7 @@ class ObjectMapper:
         value = self.map_object(python_type, value, object_path=f"{object_path}/{name}")
         setattr(obj, name, value)
 
-    def _assign_fields(self, obj: Any, source: Union[Dict[str, Any], "BaseSchema", None], object_path: str) -> Set[str]:
+    def _assign_fields(self, obj: Any, source: Union[Dict[str, Any], "BaseSchema", None], object_path: str) -> Set[str]:  # noqa: C901
         """
         Assign fields and values.
 
@@ -620,7 +620,7 @@ class ObjectMapper:
         if source and not isinstance(source, BaseSchema):
             unused = source.keys() - used_keys
             if len(unused) > 0:
-                keys = ", ".join((f"'{u}'" for u in unused))
+                keys = ", ".join(f"'{u}'" for u in unused)
                 raise DataValidationError(
                     f"unexpected extra key(s) {keys}",
                     object_path,

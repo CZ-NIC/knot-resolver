@@ -243,7 +243,7 @@ class KresConfig(ConfigSchema):
             raise AggregateDataValidationError("/", errs)
 
     def render_kresd_lua(self) -> str:
-        # FIXME the `cwd` argument is used only for configuring control socket path  # noqa: FIX001, TD001, TD002, TD004
+        # FIXME the `cwd` argument is used only for configuring control socket path
         # it should be removed and relative path used instead as soon as issue
         # https://gitlab.nic.cz/knot/knot-resolver/-/issues/720 is fixed
         return KRESD_CONFIG_TEMPLATE.render(cfg=self, cwd=os.getcwd())

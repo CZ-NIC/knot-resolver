@@ -538,7 +538,7 @@ async def _sigterm_while_shutting_down() -> None:
     sys.exit(128 + signal.SIGTERM)
 
 
-async def start_server(config: List[str]) -> int:  # noqa: PLR0915
+async def start_server(config: List[str]) -> int:  # noqa: C901, PLR0915
     # This function is quite long, but it describes how manager runs. So let's silence pylint
     # pylint: disable=too-many-statements
 

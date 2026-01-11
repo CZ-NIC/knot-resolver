@@ -340,7 +340,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
 
                 # wait for 'policy-loader' to finish
                 logger.debug("Waiting for 'policy-loader' to finish loading policy rules")
-                while not self._is_policy_loader_exited():
+                while not self._is_policy_loader_exited():  # noqa: ASYNC110
                     await asyncio.sleep(1)
 
                 # Clean up policy-loader configuration.
@@ -398,7 +398,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
             logger.error("Failed attempting to fix an error. Forcefully shutting down.", exc_info=True)
             await self.forced_shutdown()
 
-    async def _processes_watchdog(self) -> None:  # pylint: disable=too-many-branches  # noqa: PLR0912
+    async def _processes_watchdog(self) -> None:  # noqa: C901, PLR0912
         while True:
             await asyncio.sleep(PROCESSES_WATCHDOG_INTERVAL_SEC)
 

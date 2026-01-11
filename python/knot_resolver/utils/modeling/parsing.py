@@ -57,7 +57,7 @@ class DataFormat(Enum):
         if self is DataFormat.YAML:
             # RaiseDuplicatesLoader extends yaml.SafeLoader, so this should be safe
             # https://python.land/data-processing/python-yaml#PyYAML_safe_load_vs_load
-            return renamed(yaml.load(text, Loader=_RaiseDuplicatesLoader))
+            return renamed(yaml.load(text, Loader=_RaiseDuplicatesLoader))  # noqa: S506
         if self is DataFormat.JSON:
             return renamed(json.loads(text, object_pairs_hook=_json_raise_duplicates))
         raise NotImplementedError(f"Parsing of format '{self}' is not implemented")

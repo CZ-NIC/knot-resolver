@@ -2,7 +2,7 @@ import errno
 import socket
 import sys
 from http.client import HTTPConnection
-from typing import Any, Literal, Optional, Union
+from typing import Any, Literal, Optional
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, unquote, urlparse
 from urllib.request import AbstractHTTPHandler, Request, build_opener, install_opener, urlopen
@@ -96,7 +96,7 @@ def request(
 # Code heavily inspired by requests-unixsocket
 # https://github.com/msabramo/requests-unixsocket/blob/master/requests_unixsocket/adapters.py
 class UnixHTTPConnection(HTTPConnection):
-    def __init__(self, unix_socket_url: str, timeout: Union[int, float] = 60) -> None:
+    def __init__(self, unix_socket_url: str, timeout: float = 60) -> None:
         """
         Create an HTTP connection to a unix domain socket.
 

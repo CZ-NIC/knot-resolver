@@ -65,7 +65,7 @@ def comp_get_actions_words(parser_actions: List[argparse.Action]) -> CompWords:
     return words
 
 
-def comp_get_words(args: List[str], parser: argparse.ArgumentParser) -> CompWords:  # noqa: PLR0912
+def comp_get_words(args: List[str], parser: argparse.ArgumentParser) -> CompWords:  # noqa: C901, PLR0912
     words: CompWords = comp_get_actions_words(parser._actions)  # noqa: SLF001
     nargs = len(args)
 
@@ -125,7 +125,7 @@ def comp_get_words(args: List[str], parser: argparse.ArgumentParser) -> CompWord
             if command and subparser:
                 return command.completion(args[i + 1 :], subparser)
             if subparser:
-                return comp_get_words(args[i + 1 :], subparser)  # noqa: SLF001
+                return comp_get_words(args[i + 1 :], subparser)
             return {}
 
     return words
