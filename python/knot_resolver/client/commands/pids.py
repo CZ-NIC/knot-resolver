@@ -55,7 +55,8 @@ class PidsCommand(Command):
 
             else:
                 print(
-                    f"Unexpected response type '{type(processes).__name__}' from manager. Expected '{PROCESSES_TYPE.__name__}'",
+                    f"Unexpected response type '{type(processes).__name__}'"
+                    f" from manager. Expected '{PROCESSES_TYPE.__name__}'",
                     file=sys.stderr,
                 )
                 sys.exit(1)

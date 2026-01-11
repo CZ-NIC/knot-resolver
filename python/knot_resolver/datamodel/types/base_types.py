@@ -274,7 +274,8 @@ class UnitBase(StrBase):
         else:
             raise ValueError(
                 f"Unexpected value for '{type(self)}'."
-                " Expected string that matches pattern " + rf"'{type(self)._re.pattern}'."
+                " Expected string that matches pattern "
+                rf"'{type(self)._re.pattern}'."
                 f" Positive integer and one of the units {list(type(self)._units.keys())}, got '{source_value}'.",
                 object_path,
             )

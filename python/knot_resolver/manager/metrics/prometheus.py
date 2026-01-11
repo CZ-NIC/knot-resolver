@@ -422,7 +422,8 @@ if PROMETHEUS_LIB:
     ) -> Result[None, str]:
         if old_config.monitoring.graphite.enable and not new_config.monitoring.graphite.enable:
             return Result.err(
-                "You can't turn off graphite monitoring dynamically. If you really want this feature, please let the developers know."
+                "You can't turn off graphite monitoring dynamically."
+                " If you really want this feature, please let the developers know."
             )
 
         if (

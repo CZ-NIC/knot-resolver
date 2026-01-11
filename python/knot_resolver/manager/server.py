@@ -110,7 +110,7 @@ class Server:
     ) -> Result[None, str]:
         if config_old.management != config_new.management:
             return Result.err(
-                "/server/management: Changing management API address/unix-socket dynamically is not allowed as it's really dangerous."
+                "/management: Changing the management API configuration dynamically is not allowed."
                 " If you really need this feature, please contact the developers and explain why. Technically,"
                 " there are no problems in supporting it. We are only blocking the dynamic changes because"
                 " we think the consequences of leaving this footgun unprotected are worse than its usefulness."
@@ -603,7 +603,8 @@ async def start_server(config: List[str]) -> int:  # noqa: PLR0915
         # After the working directory is set, we can initialize proper config store with a newly parsed configuration.
         config_store = await _init_config_store(config_data)
 
-        # Some "constants" need to be loaded from the initial config, some need to be stored from the initial run conditions
+        # Some "constants" need to be loaded from the initial config,
+        # some need to be stored from the initial run conditions
         await init_user_constants(config_store, working_directory_on_startup)
 
         # This behaviour described above with paths means, that we MUST NOT allow `rundir` change after initialization.

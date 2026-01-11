@@ -39,7 +39,8 @@ class _FixCounter:
     def try_decrease(self) -> None:
         if time.time() - self._timestamp > FIX_COUNTER_DECREASE_INTERVAL_SEC and self._counter > 0:
             logger.info(
-                f"Enough time has passed since last detected instability, decreasing fix attempt counter to {self._counter}"
+                "Enough time has passed since last detected instability,"
+                f" decreasing fix attempt counter to {self._counter}"
             )
             self._counter -= 1
             self._timestamp = time.time()
@@ -425,7 +426,8 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                     if detected_subprocesses[eid] is SubprocessStatus.FATAL:
                         if self._policy_loader and self._policy_loader.id == eid:
                             logger.info(
-                                "Subprocess '%s' is skipped by WatchDog because its status is monitored in a different way.",
+                                "Subprocess '%s' is skipped by WatchDog"
+                                " because its status is monitored in a different way.",
                                 eid,
                             )
                             continue

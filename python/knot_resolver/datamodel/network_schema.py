@@ -185,7 +185,7 @@ class NetworkSchema(ConfigSchema):
     tls: TLS configuration, also affects DNS over TLS and DNS over HTTPS.
     proxy_protocol: PROXYv2 protocol configuration.
     listen: List of interfaces to listen to and its configuration.
-    """
+    """  # noqa: E501
 
     do_ipv4: bool = True
     do_ipv6: bool = True

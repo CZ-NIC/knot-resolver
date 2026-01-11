@@ -2,8 +2,7 @@
 
 from typing import Any, Optional, Tuple, Union
 
-# JSONPtrAddressable = Optional[Union[Dict[str, "JSONPtrAddressable"], List["JSONPtrAddressable"], int, float, bool, str, None]]
-JSONPtrAddressable = Any  # the recursive definition above is not valid :(
+JSONPtrAddressable = Any
 
 
 class _JSONPtr:
@@ -43,7 +42,8 @@ class _JSONPtr:
         for token in self.tokens:
             if current is None:
                 raise ValueError(
-                    f"JSON pointer cannot reference nested non-existent object: object at ptr '{current_ptr}' already points to None, cannot nest deeper with token '{token}'"
+                    f"JSON pointer cannot reference nested non-existent object: object at ptr '{current_ptr}'"
+                    f" already points to None, cannot nest deeper with token '{token}'"
                 )
 
             if isinstance(current, (bool, int, float, str)):
