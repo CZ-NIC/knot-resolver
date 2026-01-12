@@ -392,13 +392,13 @@ if PROMETHEUS_LIB:
                 if self._collection_task is not None and not self._collection_task.done():
                     logger.warning("Statistics collection task is still running. Skipping scheduling of a new one!")
                 else:
-                    self._collection_task = compat.asyncio.create_task(
+                    self._collection_task = asyncio.create_task(
                         self.collect_kresd_stats(_triggered_from_prometheus_library=True)
                     )
 
             else:
                 # when not running, we can start a new loop (we are not in the manager's main thread)
-                compat.asyncio.run(self.collect_kresd_stats(_triggered_from_prometheus_library=True))
+                asyncio.run(self.collect_kresd_stats(_triggered_from_prometheus_library=True))
 
     @only_on_real_changes_update(lambda c: c.monitoring.graphite)
     async def _init_graphite_bridge(config: KresConfig, force: bool = False) -> None:

@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from threading import Timer
 from typing import Dict, Optional
@@ -38,9 +39,9 @@ class Triggers:
     def trigger_cmd(self, cmd: str) -> None:
         def _cmd() -> None:
             if compat.asyncio.is_event_loop_running():
-                compat.asyncio.create_task(command_registered_workers(cmd))
+                asyncio.create_task(command_registered_workers(cmd))  # noqa: RUF006
             else:
-                compat.asyncio.run(command_registered_workers(cmd))
+                asyncio.run(command_registered_workers(cmd))
             logger.info(f"Sending '{cmd}' command to reload watched files has finished")
 
         # skipping if command was already triggered
