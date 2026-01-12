@@ -223,7 +223,7 @@ class Server:
         else:
             update_with = parse_from_mime_type(await request.text(), request.content_type)
         document_path = request.match_info["path"]
-        getheaders = ignore_exceptions_optional(List[str], None, KeyError)(request.headers.getall)
+        getheaders = ignore_exceptions_optional(KeyError, None)(request.headers.getall)
         etags = getheaders("if-match")
         not_etags = getheaders("if-none-match")
         current_config: Dict[str, Any] = self.config_store.get().get_unparsed_data()
