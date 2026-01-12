@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from threading import Timer
 from typing import Dict, Optional
@@ -5,7 +6,7 @@ from urllib.parse import quote
 
 from knot_resolver.controller.registered_workers import command_registered_workers
 from knot_resolver.datamodel import KresConfig
-from knot_resolver.utils import compat
+from knot_resolver.utils.compat import asyncio as asyncio_compat
 from knot_resolver.utils.requests import SocketDesc, request
 
 logger = logging.getLogger(__name__)
@@ -37,10 +38,10 @@ class Triggers:
 
     def trigger_cmd(self, cmd: str) -> None:
         def _cmd() -> None:
-            if compat.asyncio.is_event_loop_running():
-                compat.asyncio.create_task(command_registered_workers(cmd))
+            if asyncio_compat.is_event_loop_running():
+                asyncio.create_task(command_registered_workers(cmd))  # noqa: RUF006
             else:
-                compat.asyncio.run(command_registered_workers(cmd))
+                asyncio.run(command_registered_workers(cmd))
             logger.info(f"Sending '{cmd}' command to reload watched files has finished")
 
         # skipping if command was already triggered

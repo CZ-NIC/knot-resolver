@@ -18,7 +18,6 @@ from knot_resolver.manager.config_store import (
     only_on_real_changes_verifier,
 )
 from knot_resolver.manager.files import files_reload
-from knot_resolver.utils.compat.asyncio import create_task
 from knot_resolver.utils.functional import Result
 from knot_resolver.utils.modeling.types import NoneType
 
@@ -103,7 +102,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
         # initialize subprocess controller
         logger.debug("Starting controller")
         await self._controller.initialize_controller(config_store.get())
-        self._processes_watchdog_task = create_task(self._processes_watchdog())
+        self._processes_watchdog_task = asyncio.create_task(self._processes_watchdog())
         logger.debug("Looking for already running workers")
         await self._collect_already_running_workers()
 

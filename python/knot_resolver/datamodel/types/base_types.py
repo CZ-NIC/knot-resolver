@@ -1,9 +1,8 @@
 # ruff: noqa: SLF001
 
 import re
-from typing import Any, Dict, Type, Union
+from typing import Any, Dict, Pattern, Type, Union
 
-from knot_resolver.utils.compat.typing import Pattern
 from knot_resolver.utils.modeling import BaseValueType
 
 
