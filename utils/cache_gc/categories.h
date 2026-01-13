@@ -32,6 +32,7 @@ struct kr_gc_cat_record_info {
 	uint8_t rank;
 	knot_db_val_t prefetch_ekey;   // key of the corresponding E-entry
 	size_t prefetch_ekeydata_len;  // size of the E-entry (eh + 1/3 of common parts for NS)
+	uint16_t prefetch_min_load;    // minimal load to stay prefetchable
 };
 
 // Data accumulated during calls to _analyze and used in _summarize;
@@ -42,6 +43,7 @@ struct kr_gc_cat_analysis {
 	size_t categories_sizes_S[CATEGORIES];
 	size_t categories_sizes_other[CATEGORIES];       // (E,1,3)-entries
 	size_t categories_sizes_P_ekeydata[CATEGORIES];  // sum of sizes of E-entries corresponding to found P-entries
+	size_t categories_sizes_P_ekeydata_eligible[CATEGORIES];  // as previous but only still eligible for prefetch considered
 	size_t records;
 };
 

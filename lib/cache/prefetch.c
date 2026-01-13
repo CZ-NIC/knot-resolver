@@ -104,7 +104,7 @@ void kr_cache_prefetch_init(uint32_t max_access_period_sec, float min_accesses_p
 	VERBOSE_LOG("INIT settings (min_accesses_per_update = %f, max_access_period = %u s)",
 			min_accesses_per_update, max_access_period_sec);
 	uv_timer_start(&timer_handle, timer_callback, FIRST_TIMEOUT_MS, TIMER_PERIOD_MS);
-	conf_min_accesses_per_update = min_accesses_per_update; // TODO use config
+	conf_min_accesses_per_update = min_accesses_per_update;
 	conf_min_accesses_by_period = 1 / (1 - kr_cache_top_decay_mult(&the_resolver->cache.top, max_access_period_sec));
 	conf_enabled = true;
 }
