@@ -181,7 +181,9 @@ int kr_gc_cache_iter(knot_db_t * knot_db, struct kr_cache_top *top, const kr_cac
 					kr_cache_prefetch_parse_pkey(key, &info.prefetch_ekey, &exp_time);
 					info.expires_in = exp_time - now;
 					if (val.len == sizeof(struct entry_p)) {
-						info.prefetch_ekeydata_len = ((struct entry_p *)val.data)->ekeydata_len;
+						struct entry_p *ep = val.data;
+						info.prefetch_ekeydata_len = ep->ekeydata_len;
+						info.prefetch_min_load = ep->min_load;
 					}
 					// fall through
 				case KNOT_CACHE_RTT:
