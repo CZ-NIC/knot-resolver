@@ -1,0 +1,20 @@
+{% if not cfg.lua.script_only %}
+
+ffi = require('ffi')
+local C = ffi.C
+
+
+
+{% endif %}
+
+-- LUA section --------------------------------------
+-- Custom Lua code cannot be validated
+
+{% if cfg.lua.script_file %}
+{% import cfg.lua.script_file as script_file %}
+{{ script_file }}
+{% endif %}
+
+{% if cfg.lua.script %}
+{{ cfg.lua.script }}
+{% endif %}
