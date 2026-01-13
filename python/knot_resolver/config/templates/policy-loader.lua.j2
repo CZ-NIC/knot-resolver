@@ -1,0 +1,23 @@
+{% if not cfg.lua.policy_script_only %}
+
+ffi = require('ffi')
+local C = ffi.C
+
+
+
+{% endif %}
+
+-- LUA section --------------------------------------
+-- Custom Lua code cannot be validated
+
+{% if cfg.lua.policy_script_file %}
+{% import cfg.lua.policy_script_file as policy_script_file %}
+{{ policy_script_file }}
+{% endif %}
+
+{% if cfg.lua.policy_script %}
+{{ cfg.lua.policy_script }}
+{% endif %}
+
+-- exit properly
+quit()
