@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-from typing import Optional
 
-
-class DataModelingBaseError(Exception):
+class DataModelingBaseError(BaseException):
     """Base exception class that is used for all data modeling errors."""
 
 
@@ -18,7 +16,7 @@ class DataParsingError(DataModelingBaseError):
 class DataValidationError(DataModelingBaseError):
     """Exception class that is used for data validation errors."""
 
-    def __init__(self, msg: str, error_path: str, child_errors: Optional[list[DataValidationError]] = None) -> None:
+    def __init__(self, msg: str, error_path: str, child_errors: list[DataValidationError] | None = None) -> None:
         if child_errors is None:
             child_errors = []
         if child_errors is None:
