@@ -776,10 +776,10 @@ pkg:arch:
 docs:build:
   stage: build
   needs: []
+  image: $IMAGE_PREFIX/debian13-knot_3_5:$IMAGE_TAG
   script:
     - git submodule update --init --recursive
-    - pip3 install -U -r doc/requirements.txt
-    - pip3 install -U sphinx_rtd_theme
+    - pip3 install -r doc/requirements.txt
     - meson build_doc -Ddoc=enabled
     - ninja -C build_doc doc
   artifacts:
