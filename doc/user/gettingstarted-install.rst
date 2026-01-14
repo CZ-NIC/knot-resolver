@@ -12,25 +12,29 @@ Therefore we recommend to use upstream repositories which have the **latest stab
 
 Please, follow the instructions for your packaging system:
 
-.. tabs::
+--------------------
+.deb (Debian/Ubuntu)
+--------------------
 
-    .. tab:: Debian/Ubuntu
+Please follow https://pkg.labs.nic.cz/doc/?project=knot-resolver
 
-        Please follow https://pkg.labs.nic.cz/doc/?project=knot-resolver
+---------------------------
+.rpm (Fedora/EPEL/openSUSE)
+---------------------------
 
-    .. tab:: .rpm
+Please follow https://copr.fedorainfracloud.org/coprs/g/cznic/knot-resolver/
 
-        Please follow https://copr.fedorainfracloud.org/coprs/g/cznic/knot-resolver/
+------
+Docker
+------
 
-    .. tab:: Docker
+DockerHub page: https://hub.docker.com/r/cznic/knot-resolver
 
-        DockerHub page: https://hub.docker.com/r/cznic/knot-resolver
+.. code:: bash
 
-        .. code:: bash
+    sudo docker run --rm -ti --network host docker.io/cznic/knot-resolver
 
-            sudo docker run --rm -ti --network host docker.io/cznic/knot-resolver
-
-        More about Docker deployments can be found in :ref:`deployment-docker` section.
+More about Docker deployments can be found in :ref:`deployment-docker` section.
 
 If for some reason you need to install Knot Resolver **from sources**,
 check out `building from sources <./dev/build.html>`_ section in developer documentation.
