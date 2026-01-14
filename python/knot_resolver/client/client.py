@@ -17,7 +17,7 @@ class KresClient:
         self.namespace = namespace
         self.parser = parser
 
-    def execute(self):
+    def execute(self) -> None:
         if hasattr(self.namespace, "command"):
             args = CommandArgs(self.namespace, self.parser)
             command = args.command(self.namespace)
@@ -30,13 +30,10 @@ class KresClient:
         white = "\033[38;5;255m"
         reset = "\033[0;0m"
 
-        if self.path:
-            prompt = f"{bolt}[{self.prompt} {white}{self.path}{reset}{bolt}]"
-        else:
-            prompt = f"{bolt}{self.prompt}"
+        prompt = f"{bolt}[{self.prompt} {white}{self.path}{reset}{bolt}]" if self.path else f"{bolt}{self.prompt}"
         return f"{prompt}> {reset}"
 
-    def interactive(self):
+    def interactive(self) -> None:
         try:
             while True:
                 pass

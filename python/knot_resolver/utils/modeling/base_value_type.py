@@ -18,7 +18,9 @@ class BaseTypeABC(ABC):
     @abstractmethod
     def serialize(self) -> Any:
         """
-        Used for dumping configuration. Returns a JSON-serializable object from which the object
+        Dump configuration to JSON-serializable object.
+
+        Returns a JSON-serializable object from which the object
         can be recreated again using the constructor.
 
         It's not necessary to return the same structure that was given as an input. It only has
@@ -29,10 +31,11 @@ class BaseTypeABC(ABC):
 
 class BaseValueType(BaseTypeABC):
     """
-    Subclasses of this class can be used as type annotations in 'DataParser'. When a value
-    is being parsed from a serialized format (e.g. JSON/YAML), an object will be created by
-    calling the constructor of the appropriate type on the field value. The only limitation
-    is that the value MUST NOT be `None`.
+    Subclasses of this class can be used as type annotations in 'DataParser'.
+
+    When a value is being parsed from a serialized format (e.g. JSON/YAML),
+    an object will be created by calling the constructor of the appropriate
+    type on the field value. The only limitation is that the value MUST NOT be `None`.
 
     There is no validation done on the wrapped value. The only condition is that
     it can't be `None`. If you want to perform any validation during creation,

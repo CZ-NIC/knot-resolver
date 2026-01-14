@@ -1,12 +1,10 @@
 """
-This file contains autodetection logic for available subprocess controllers. Because we have to catch errors
-from imports, they are located in functions which are invoked at the end of this file.
+The module contains autodetection logic for available controllers.
 
+Because we have to catch errors from imports, they are located in functions which are invoked at the end of this file.
 We supported multiple subprocess controllers while developing it. It now all converged onto just supervisord.
 The interface however remains so that different controllers can be added in the future.
 """
-
-# pylint: disable=import-outside-toplevel
 
 import asyncio
 import logging
@@ -24,10 +22,8 @@ It is filled dynamically based on available modules that do not fail to import.
 _registered_controllers: List[SubprocessController] = []
 
 
-def try_supervisord():
-    """
-    Attempt to load supervisord controllers.
-    """
+def try_supervisord() -> None:
+    """Attempt to load supervisord controllers."""
     try:
         from knot_resolver.controller.supervisord import SupervisordSubprocessController
 
@@ -62,9 +58,10 @@ async def get_best_controller_implementation(config: KresConfig) -> SubprocessCo
 
 def list_controller_names() -> List[str]:
     """
-    Returns a list of names of registered controllers. The listed controllers are not necessarly functional.
-    """
+    Return a list of names of registered controllers.
 
+    The listed controllers are not necessary functional.
+    """
     return [str(controller) for controller in sorted(_registered_controllers, key=str)]
 
 

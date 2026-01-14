@@ -65,7 +65,7 @@ def comp_get_actions_words(parser_actions: List[argparse.Action]) -> CompWords:
     return words
 
 
-def comp_get_words(args: List[str], parser: argparse.ArgumentParser) -> CompWords:  # noqa: PLR0912
+def comp_get_words(args: List[str], parser: argparse.ArgumentParser) -> CompWords:  # noqa: C901, PLR0912
     words: CompWords = comp_get_actions_words(parser._actions)  # noqa: SLF001
     nargs = len(args)
 
@@ -119,13 +119,13 @@ def comp_get_words(args: List[str], parser: argparse.ArgumentParser) -> CompWord
 
         # if action is SubParserAction
         if isinstance(action, argparse._SubParsersAction):  # noqa: SLF001
-            subparser: Optional[argparse.ArgumentParser] = action.choices[arg] if arg in action.choices else None
+            subparser: Optional[argparse.ArgumentParser] = action.choices.get(arg, None)
 
             command = get_subparser_command(subparser) if subparser else None
             if command and subparser:
                 return command.completion(args[i + 1 :], subparser)
             if subparser:
-                return comp_get_words(args[i + 1 :], subparser)  # noqa: SLF001
+                return comp_get_words(args[i + 1 :], subparser)
             return {}
 
     return words
@@ -173,12 +173,13 @@ def get_socket_from_config(config: Path, optional_file: bool) -> Optional[Socket
                     f"http://{ip.addr}:{ip.port}",
                     f'Key "/management/interface" in "{config}" file',
                 )
-        return None
     except ValueError as e:
         raise DataValidationError(*e.args) from e  # pylint: disable=no-value-for-parameter
-    except OSError as e:
+    except OSError:
         if not optional_file:
-            raise e
+            raise
+        return None
+    else:
         return None
 
 

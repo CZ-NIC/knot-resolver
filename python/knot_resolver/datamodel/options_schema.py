@@ -21,7 +21,7 @@ class OptionsSchema(ConfigSchema):
     time_jump_detection: Detection of difference between local system time and expiration time bounds in DNSSEC signatures for '. NS' records.
     violators_workarounds: Workarounds for known DNS protocol violators.
     serve_stale: Allows using timed-out records in case DNS resolver is unable to contact upstream servers.
-    """
+    """  # noqa: E501
 
     glue_checking: GlueCheckingEnum = "normal"
     minimize: bool = True

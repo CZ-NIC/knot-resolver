@@ -7,14 +7,14 @@ from knot_resolver.utils.functional import Result
 from knot_resolver.utils.modeling.exceptions import DataParsingError
 from knot_resolver.utils.modeling.types import NoneType
 
-from .exceptions import KresManagerException
+from .exceptions import KresManagerBaseError
 
 VerifyCallback = Callable[[KresConfig, KresConfig, bool], Awaitable[Result[None, str]]]
 UpdateCallback = Callable[[KresConfig, bool], Awaitable[None]]
 
 
 class ConfigStore:
-    def __init__(self, initial_config: KresConfig):
+    def __init__(self, initial_config: KresConfig) -> None:
         self._config = initial_config
         self._verifiers: List[VerifyCallback] = []
         self._callbacks: List[UpdateCallback] = []
@@ -28,7 +28,7 @@ class ConfigStore:
         err_res = filter(lambda r: r.is_err(), results)
         errs = list(map(lambda r: r.unwrap_err(), err_res))
         if len(errs) > 0:
-            raise KresManagerException("Configuration validation failed. The reasons are:\n - " + "\n - ".join(errs))
+            raise KresManagerBaseError("Configuration validation failed. The reasons are:\n - " + "\n - ".join(errs))
 
         async with self._update_lock:
             # update the stored config with the new version
@@ -48,10 +48,7 @@ class ConfigStore:
             raise DataParsingError(f"Initial config verification failed with error: {res.unwrap_err()}")
 
     async def register_on_change_callback(self, callback: UpdateCallback) -> None:
-        """
-        Registers new callback and immediatelly calls it with current config
-        """
-
+        """Register new callback and immediately call it with current config."""
         self._callbacks.append(callback)
         await callback(self.get(), False)
 
@@ -69,9 +66,7 @@ def only_on_no_changes_update(selector: Callable[[KresConfig], Any]) -> Callable
             nonlocal original_value
             if not original_value_set:
                 original_value_set = True
-            elif original_value == selector(config):
-                await orig_func(config, force)
-            elif force:
+            elif original_value == selector(config) or force:
                 await orig_func(config, force)
             original_value = selector(config)
 
@@ -91,9 +86,7 @@ def only_on_real_changes_update(selector: Callable[[KresConfig], Any]) -> Callab
             if not original_value_set:
                 original_value_set = True
                 await orig_func(config, force)
-            elif original_value != selector(config):
-                await orig_func(config, force)
-            elif force:
+            elif original_value != selector(config) or force:
                 await orig_func(config, force)
             original_value = selector(config)
 

@@ -5,7 +5,7 @@ from typing import List, Optional
 import pytest
 from pytest import raises
 
-from knot_resolver import KresBaseException
+from knot_resolver import KresBaseError
 from knot_resolver.datamodel.types.base_types import FloatRangeBase, IntRangeBase, StringLengthBase
 
 
@@ -34,7 +34,7 @@ def test_int_range_base(min: Optional[int], max: Optional[int]):
     invals.extend([random.randint(-sys.maxsize - 1, rmin - 1) for _ in range(n % 2)] if max else [])
 
     for inval in invals:
-        with raises(KresBaseException):
+        with raises(KresBaseError):
             Test(inval)
 
 
@@ -63,7 +63,7 @@ def test_float_range_base(min: Optional[float], max: Optional[float]):
     invals.extend([random.uniform(sys.float_info.min - 1.0, rmin - 1.0) for _ in range(n % 2)] if max else [])
 
     for inval in invals:
-        with raises(KresBaseException):
+        with raises(KresBaseError):
             Test(inval)
 
 
@@ -91,5 +91,5 @@ def test_str_bytes_length_base(min: Optional[int], max: Optional[int]):
     invals.extend(["x" * random.randint(1, rmin - 1) for _ in range(n % 2)] if max else [])
 
     for inval in invals:
-        with raises(KresBaseException):
+        with raises(KresBaseError):
             Test(inval)

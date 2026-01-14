@@ -99,25 +99,126 @@ target-version = "py38"
 exclude = ["setup.py"]
 
 [tool.ruff.lint]
-# extend default config
-# https://docs.astral.sh/ruff/rules
-extend-select = [
-    "W",   # pycodestyle warnings
-    "A",   # flake8-builtins
-    "B",   # flake8-bugbearp
-    "PL",  # pylint
-    "N",   # pep8-naming
-    "SLF", # flake8-self
-    "RET", # flake8-return
-]
+select = ["ALL"]
 ignore = [
-    "B009",     # https://docs.astral.sh/ruff/rules/get-attr-with-constant/
-    "PLR2004",  # https://docs.astral.sh/ruff/rules/magic-value-comparison/
-    "PLW0603",  # https://docs.astral.sh/ruff/rules/global-statement/
+    # * candidate for remove in the future
+
+    # Annotations
+    "ANN401",     # Dynamically typed expressions (typing.Any) are disallowed
+
+    # Arguments
+    "ARG001",     # Unused function argument
+    "ARG002",     # Unused method argument
+    "ARG004",     # Unused static method argument
+
+    "B009",       # *Replace `getattr` with attribute access
+    "BLE001",     # *Do not catch blind exception
+    "C408",       # *Unnecessary `tuple` call (rewrite as a literal)
+    "C417",       # *Unnecessary `map` usage (rewrite using a `list` comprehension)
+    "COM812",     # Trailing comma missing
+
+    # docstring
+    "D100",       # Missing docstring in public module
+    "D101",       # Missing docstring in public class
+    "D102",       # Missing docstring in public method
+    "D103",       # Missing docstring in public function
+    "D104",       # Missing docstring in public package
+    "D105",       # Missing docstring in magic method (__int__, __str__, ...)
+    "D106",       # Missing docstring in public nested class
+    "D107",       # Missing docstring in `__init__`
+    # docstring: lines
+    "D202",       # *No blank lines allowed after function docstring
+    # docstring: incompatible
+    "D203",       # No blank lines allowed before class docstring; incompatible with D211
+    "D212",       # Multi-line docstring summary should start at the first line; incompatible with D213
+
+    # exceptions
+    "EM101",      # *Exception must not use a string literal, assign to variable first
+    "EM102",      # *Exception must not use an f-string literal, assign to variable first
+    "TRY003",     # Avoid specifying long messages outside the exception class
+    "TRY004",     # *Prefer `TypeError` exception for invalid type
+    "TRY301",     # *Abstract `raise` to an inner function
+    "TRY400",     # *Use `logging.exception` instead of `logging.error`
+
+    "ERA001",     # *Found commented-out code
+    "FA100",      # (remove in py3.10) Add `from __future__ import annotations` to simplify typing
+
+    # FIXME and TODO
+    "FIX001",
+    "FIX002",     # Missing issue link on the line following this TODO
+    "TD001",
+    "TD002",
+    "TD004",
+
+    # boolean
+    "FBT001",     # Boolean-typed positional argument in function definition
+    "FBT002",     # Boolean default positional argument in function definition
+    "FBT003",     # Boolean positional value in function call
+
+    # logging
+    "G004",       # *Logging statement uses f-string
+    "G201",       # *Logging `.exception(...)` should be used instead of `.error(..., exc_info=True)`
+
+    "ISC001",     # *Single-line implicit string concatenation
+    "PERF203",    # `try`-`except` within a loop incurs performance overhead
+    "PLR2004",    # *Magic value used in comparison
+    "PLW0603",    # Using the global statement to update `_value` is discouraged
+
+    # path
+    "PTH104",     # `os.rename()` should be replaced by `Path.rename()`
+    "PTH108",     # `os.unlink()` should be replaced by `Path.unlink()`
+    "PTH109",     # `os.getcwd()` should be replaced by `Path.cwd()`
+    "PTH112",     # `os.path.isdir()` should be replaced by `Path.is_dir()`
+    "PTH116",     # `os.stat()` should be replaced by `Path.stat()`, `Path.owner()`, or `Path.group()`
+    "PTH118",     # `os.path.join()` should be replaced by `Path` with `/` operator
+    "PTH120",     # `os.path.dirname()` should be replaced by `Path.parent`
+    "PTH123",     # `open()` should be replaced by `Path.open()`
+    "PTH201",     # *Do not pass the current directory explicitly to `Path`
+
+    "RSE102",     # *Unnecessary parentheses on raised exception
+    "RUF005",     # *Consider `[sys.executable, *sys.argv]` instead of concatenation
+    "RUF010",     # *Use explicit conversion flag
+    "RUF012",     # *Mutable class attributes should be annotated with `typing.ClassVar`
+    "S101",       # Use of `assert` detected
+    "S105",       # Possible hardcoded password assigned
+    "S310",       # Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+    "S606",       # Starting a process without a shell
+    "S701",       # Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS.
+                  # Ensure `autoescape=True` or use the `select_autoescape` function.
+    "SIM105",     # Use `contextlib.suppress(FileNotFoundError)` instead of `try`-`except`-`pass`
+    "SIM118",     # *Use `key in dict` instead of `key in dict.keys()
+    "T201",       # `print` found
+    "TD003",      # Missing issue link on the line following this TODO
+
+    "UP012",      # Unnecessary call to `encode` as UTF-8
+    "UP015",      # Unnecessary open mode parameters
+    "UP036",      # *Version block is outdated for minimum Python version
+    "UP037",      # *Remove quotes from type annotation
+
+    # type-checking
+    "TCH001",     # *Move application import into a type-checking block
+    "TCH003",     # *Move standard library import into a type-checking block
+]
+exclude = [
+    "tests/pytests/*",
+    "python/knot_resolver/controller/supervisord/plugin/*",
+
+    # submodules
+    # "python/knot_resolver/client/*",
+    # "python/knot_resolver/client/*",
+    # "python/knot_resolver/controller/*",
+    # "python/knot_resolver/manager/*",
+    # "python/knot_resolver/utils/*",
 ]
 
 [tool.ruff.lint.isort]
 known-first-party=["knot_resolver"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
 
 [tool.mypy]
 python_version = "3.8"
