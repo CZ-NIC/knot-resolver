@@ -1,3 +1,4 @@
 Sphinx>=3.0.0
 breathe
 sphinx_rtd_theme
+standard-imghdr
