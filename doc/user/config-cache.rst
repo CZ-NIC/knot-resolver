@@ -47,6 +47,9 @@ Now you can configure cache size to be 90% of the free memory 14 928 MB, i.e. 13
    cache:
      size-max: 13453M
 
+See about :ref:`recognizing small cache <config-cache-gc-prefetch-clashes>`
+for more details on setting the cache size.
+
 
 .. _config-cache-clear:
 
