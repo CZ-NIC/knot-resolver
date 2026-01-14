@@ -26,7 +26,7 @@ impact than cache settings and number of workers.
 
    config-cache
    config-multiple-workers
-   config-cache-predict
+   config-cache-gc-prefetch
    config-cache-prefill
    config-serve-stale
    config-fallback
