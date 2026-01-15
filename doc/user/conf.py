@@ -21,7 +21,6 @@ release = version
 extensions = [
     'sphinx.ext.todo',
     'sphinx.ext.viewcode',
-    'sphinx_tabs.tabs',
 ]
 
 theme_major = sphinx_rtd_theme.__version__.partition('.')[0]

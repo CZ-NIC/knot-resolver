@@ -63,10 +63,8 @@ types-pyyaml = "^6.0.12.20241230"
 
 [tool.poetry.group.docs.dependencies]
 sphinx = "^5.3.0"
-sphinx-tabs = "^3.4.7"
 sphinx-rtd-theme = "^2.0.0"
 breathe = "^4.35.0"
-json-schema-for-humans = "^0.47.5"
 
 [tool.poetry.scripts]
 kresctl = 'knot_resolver.client.main:main'

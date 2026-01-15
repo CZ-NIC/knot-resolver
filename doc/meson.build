@@ -51,16 +51,6 @@ if get_option('doc') == 'enabled'
     error('missing doc dependency: python sphinx_rtd_theme')
   endif
 
-  python_sphinx_tabs = run_command(python, '-c', 'import sphinx_tabs', check: false)
-  if python_sphinx_tabs.returncode() != 0
-    error('missing doc dependency: python python-sphinx-tabs')
-  endif
-
-  jsonschemaforhumans = run_command(python, '-c', 'import json_schema_for_humans', check: false)
-  if jsonschemaforhumans.returncode() != 0
-    error('missing doc dependency: python json-schema-for-humans')
-  endif
-
   message('------------------------')
 
   # install html docs

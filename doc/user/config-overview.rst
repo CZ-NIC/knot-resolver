@@ -59,15 +59,4 @@ Getting the JSON Schema
 
 .. tip::
 
-    For the schema readability, some graphical visualizer can be used, for example `this one <https://json-schema.app/>`_.
-
-
-Interactive visualization
--------------------------
-
-The following visualization is interactive and offers good overview of the configuration structure.
-
-.. raw:: html
-
-    <a href="_static/schema_doc.html" target="_blank">Open in a new tab.</a>
-    <iframe src="_static/schema_doc.html" width="100%" style="height: 30vh;"></iframe>
+    For the schema readability, some graphical visualizer can be used, for example `json-schema.app <https://json-schema.app/view/%23?url=https%3A%2F%2Fwww.knot-resolver.cz%2Fdocumentation%2Flatest%2F_static%2Fconfig.schema.json>_`.
