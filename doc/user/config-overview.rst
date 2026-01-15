@@ -59,4 +59,5 @@ Getting the JSON Schema
 
 .. tip::
 
-    For the schema readability, some graphical visualizer can be used, for example `json-schema.app <https://json-schema.app/view/%23?url=https%3A%2F%2Fwww.knot-resolver.cz%2Fdocumentation%2Flatest%2F_static%2Fconfig.schema.json>_`.
+    For the schema readability, some graphical visualizer can be used, for example `json-schema.app <https://json-schema.app>`_.
+    Simply pass `JSON schema URL <_static/config.schema.json>`_ to the app.
