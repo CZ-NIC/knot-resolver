@@ -1,0 +1,10 @@
+workers: 1
+network:
+  listen:
+    - interface: 127.0.0.1@53
+tunnel-filter:
+  enable: true
+  file: /home/blcnn.pt # Edit path to NN model
+logging:
+  level: info
+  groups: [tunnel]

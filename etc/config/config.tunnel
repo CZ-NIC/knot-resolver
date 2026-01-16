@@ -1,0 +1,26 @@
+-- SPDX-License-Identifier: CC0-1.0
+-- vim:syntax=lua:set ts=4 sw=4:
+-- Config file with split-view for internal zone
+-- Refer to manual: https://www.knot-resolver.cz/documentation/latest/
+
+-- Network interface configuration
+net.listen('127.0.0.1', 53, { kind = 'dns' })
+net.listen('127.0.0.1', 853, { kind = 'tls' })
+
+
+modules.load('dns_tunnel_filter')
+
+local ffi = require('ffi')
+ffi.cdef([[
+int dns_tunnel_filter_setup(const char *nn_file, const char *mmap_file, kr_rule_tags_t tags,
+		size_t capacity, uint32_t instant_limit, uint32_t rate_limit);
+]])
+assert(ffi.C.dns_tunnel_filter_setup(
+	'/home/blcnn.pt', -- Edit path to NN model
+	'dns_tunnel_filter',
+	0,
+	2^20, 2^8, 2^17
+) == 0);
+
+-- Cache size
+cache.size = 100 * MB
