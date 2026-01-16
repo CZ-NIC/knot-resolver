@@ -7,15 +7,6 @@
 #include "lib/kru.h"
 #include "lib/utils.h"
 
-/// Return whether we're using optimized variant right now
-static inline bool using_avx2(void)
-{
-	bool result = (KRU.initialize == KRU_AVX2.initialize);
-	kr_require(result || KRU.initialize == KRU_GENERIC.initialize);
-	return result;
-}
-
-
 // In various applications we classify IP addresses by prefix lengths
 // and associate multiplicative coefficients with them.
 #define V4_PREFIXES  (uint8_t[])       {  18,  20, 24, 32 }

@@ -61,7 +61,7 @@ int dns_tunnel_filter_setup(const char *nn_file, const char *mmap_file, kr_rule_
 		.capacity = capacity,
 		.instant_limit = instant_limit,
 		.rate_limit = rate_limit,
-		.using_avx2 = using_avx2()
+		.using_avx2 = kru_using_avx2()
 	};
 
 	size_t header_size = offsetof(struct dns_tunnel_filter, using_avx2) + sizeof(header.using_avx2);
@@ -72,8 +72,8 @@ int dns_tunnel_filter_setup(const char *nn_file, const char *mmap_file, kr_rule_
 			sizeof(header.rate_limit),
 		"detected padding with undefined data inside mmapped header");
 
-	ret = mmapped_init(&dns_tunnel_filter_mmapped, mmap_file, size, &header, header_size);
-	if (ret == MMAPPED_WAS_FIRST) {
+	ret = mmapped_init(&dns_tunnel_filter_mmapped, mmap_file, size, &header, header_size, false);
+	if (ret == MMAPPED_PENDING) {
 		kr_log_info(TUNNEL, "Initializing DNS tunnel filter...\n");
 
 		dns_tunnel_filter = dns_tunnel_filter_mmapped.mem;
@@ -97,12 +97,12 @@ int dns_tunnel_filter_setup(const char *nn_file, const char *mmap_file, kr_rule_
 			dns_tunnel_filter->v6_prices[i] = base_price / V6_RATE_MULT[i];
 		}
 
-		ret = mmapped_init_continue(&dns_tunnel_filter_mmapped);
+		ret = mmapped_init_finish(&dns_tunnel_filter_mmapped);
 		if (ret != 0) goto fail;
 
 		kr_log_info(TUNNEL, "DNS tunnel filter initialized (%s).\n", (dns_tunnel_filter->using_avx2 ? "AVX2" : "generic"));
 		return 0;
-	} else if (ret == 0) {
+	} else if (ret == MMAPPED_EXISTING) {
 		dns_tunnel_filter = dns_tunnel_filter_mmapped.mem;
 		kr_log_info(TUNNEL, "Using existing DNS tunnel filter data (%s).\n", (dns_tunnel_filter->using_avx2 ? "AVX2" : "generic"));
 		return 0;
