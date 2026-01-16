@@ -240,6 +240,9 @@ struct kr_request_rule {
 	kr_rule_tags_t tags;
 	kr_rule_tags_t tags_pass;
 };
+struct kr_cache_top_context {
+	uint32_t bloom[32];
+};
 struct kr_request {
 	struct kr_context *ctx;
 	knot_pkt_t *answer;
@@ -292,6 +295,7 @@ struct kr_request {
 	kr_rule_tags_t rule_tags_apply;
 	kr_rule_tags_t rule_tags_audit;
 	struct kr_extended_error extended_error;
+	struct kr_cache_top_context cache_top_context;
 };
 enum kr_rank {KR_RANK_INITIAL, KR_RANK_OMIT, KR_RANK_TRY, KR_RANK_INDET = 4, KR_RANK_BOGUS, KR_RANK_MISMATCH, KR_RANK_MISSING, KR_RANK_INSECURE, KR_RANK_AUTH = 16, KR_RANK_SECURE = 32};
 typedef struct kr_cdb * kr_cdb_pt;
@@ -315,12 +319,24 @@ struct kr_cdb_stats {
 	double usage_percent;
 };
 typedef struct uv_timer_s uv_timer_t;
+struct mmapped {
+	void *mem;
+	size_t size;
+	int fd;
+	_Bool write_lock;
+	_Bool persistent;
+};
+struct kr_cache_top {
+	struct mmapped mmapped;
+	struct top_data *data;
+};
 struct kr_cache {
 	kr_cdb_pt db;
 	const struct kr_cdb_api *api;
 	struct kr_cdb_stats stats;
 	uint32_t ttl_min;
 	uint32_t ttl_max;
+	struct kr_cache_top top;
 	struct timeval checkpoint_walltime;
 	uint64_t checkpoint_monotime;
 	uv_timer_t *health_timer;
@@ -540,6 +556,7 @@ int kr_rule_forward(const knot_dname_t *, kr_rule_fwd_flags_t, const struct sock
 int kr_rule_local_address(const char *, const char *, _Bool, uint32_t, kr_rule_tags_t, kr_rule_opts_t);
 int kr_rule_local_hosts(const char *, _Bool, uint32_t, kr_rule_tags_t, kr_rule_opts_t);
 void kr_rule_coalesce_targets(const struct sockaddr **, void *);
+int kr_rule_local_data_ins(const knot_rrset_t *, const knot_rdataset_t *, kr_rule_tags_t, kr_rule_opts_t);
 struct tls_credentials;
 typedef struct {
 	int sock_type;

@@ -76,4 +76,9 @@ if systemd_files == 'enabled'
     install_dir: systemd_sysusers_dir,
   )
 
+  summary({'work_dir': systemd_work_dir,
+           'cache_dir': systemd_cache_dir,
+           'user': user,
+           'group': group,
+          }, section: 'Systemd')
 endif

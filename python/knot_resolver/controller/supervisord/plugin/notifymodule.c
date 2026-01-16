@@ -20,6 +20,8 @@
 #define MODULE_NAME "notify"
 #define RECEIVE_BUFFER_SIZE 2048
 
+#if __linux__
+
 static PyObject *NotifySocketError;
 
 static PyObject *init_control_socket(PyObject *self, PyObject *args)
@@ -167,3 +169,5 @@ PyMODINIT_FUNC PyInit_notify(void)
 
 	return m;
 }
+
+#endif

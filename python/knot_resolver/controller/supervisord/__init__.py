@@ -1,5 +1,5 @@
 import logging
-from os import kill  # pylint: disable=[no-name-in-module]
+from os import getppid, kill  # pylint: disable=[no-name-in-module]
 from pathlib import Path
 from typing import Any, Dict, Iterable, NoReturn, Optional, Union, cast
 from xmlrpc.client import Fault, ServerProxy
@@ -112,7 +112,7 @@ async def _is_supervisord_running(config: KresConfig) -> bool:
     pid = await _get_supervisord_pid(config)
     if pid is None:
         return False
-    if not _is_process_runinng(pid):
+    if not _is_process_runinng(pid) or getppid() != pid:
         supervisord_pid_file(config).unlink()
         return False
     return True

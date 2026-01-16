@@ -2235,6 +2235,7 @@ static enum protolayer_iter_cb_result pl_dns_stream_unwrap(
 	const uint32_t max_iters = (wire_buf_data_length(wb) /
 		(KNOT_WIRE_HEADER_SIZE + KNOT_WIRE_QUESTION_MIN_SIZE)) + 1;
 	int iters = 0;
+	bool first_submit = true;
 
 	bool pkt_error = false;
 	knot_pkt_t *pkt = NULL;
@@ -2252,8 +2253,15 @@ static enum protolayer_iter_cb_result pl_dns_stream_unwrap(
 			goto exit;
 		}
 
+		if (session->outgoing && !first_submit) {
+			/* We received another DNS answer in the same TCP packet
+			 * and it may belong to a different client than the previous one,
+			 * so we restart sampling here. */
+			defer_sample_restart();
+		}
 		stream_sess->produced = true;
 		int ret = worker_submit(session, ctx->comm, pkt);
+		first_submit = false;
 
 		/* Errors from worker_submit() are intentionally *not* handled
 		 * in order to ensure the entire wire buffer is processed. */

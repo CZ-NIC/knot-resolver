@@ -81,10 +81,9 @@ int kr_gc_key_consistent(knot_db_val_t key)
 		i = 1;
 	} else {
 		/* find the first double zero in the key */
-		for (i = 2; kd[i - 1] || kd[i - 2]; ++i) {
-			if (kr_fails_assert(i < key.len))
-				return kr_error(EINVAL);
-		}
+		for (i = 2; (i < key.len) && (kd[i - 1] || kd[i - 2]); ++i);
+		if (kr_fails_assert(i < key.len))
+			return kr_error(EINVAL);
 	}
 	// the next character can be used for classification
 	switch (kd[i]) {
@@ -99,8 +98,8 @@ int kr_gc_key_consistent(knot_db_val_t key)
 		return KNOT_RRTYPE_NSEC;
 	case '3':
 		return KNOT_RRTYPE_NSEC3;
-	case 'S': // the rtt_state entries are considered inconsistent, at least for now
-		return -1;
+	case 'S':
+		return KNOT_CACHE_RTT;
 	default:
 		kr_assert(!EINVAL);
 		return kr_error(EINVAL);
@@ -170,7 +169,6 @@ int kr_gc_cache_iter(knot_db_t * knot_db, const  kr_cache_gc_cfg_t *cfg,
 	knot_db_txn_t txn = { 0 };
 	knot_db_iter_t *it = NULL;
 	const knot_db_api_t *api = knot_db_lmdb_api();
-	gc_record_info_t info = { 0 };
 	int64_t now = time(NULL);
 
 	int ret = api->txn_begin(knot_db, &txn, KNOT_DB_RDONLY);
@@ -204,17 +202,20 @@ int kr_gc_cache_iter(knot_db_t * knot_db, const  kr_cache_gc_cfg_t *cfg,
 			goto error;
 		}
 
-		info.entry_size = key.len + val.len;
+		gc_record_info_t info = { 0 };
+		info.entry_size = kr_cache_top_entry_size(key.len, val.len);
 		info.valid = false;
 		const int entry_type = kr_gc_key_consistent(key);
 		const struct entry_h *entry = NULL;
-		if (entry_type >= 0) {
+		if (entry_type == KNOT_CACHE_RTT) {
+			counter_gc_consistent++;
+			info.valid = true;
+			info.rrtype = entry_type;
+		} else if (entry_type >= 0) {
 			counter_gc_consistent++;
 			entry = val2entry(val, entry_type);
 		}
 		/* TODO: perhaps improve some details around here:
-		 *  - rtt_state entries are considered gc_inconsistent;
-		 *    therefore they'll be the first to get freed (see kr_gc_categorize())
 		 *  - xNAME have .rrtype NS
 		 *  - DNAME hidden on NS name will not be considered here
 		 *  - if zone has NSEC* meta-data but no NS, it will be seen
@@ -228,7 +229,7 @@ int kr_gc_cache_iter(knot_db_t * knot_db, const  kr_cache_gc_cfg_t *cfg,
 		counter_iter++;
 		counter_kr_consistent += info.valid;
 		if (VERBOSE_STATUS) {
-			if (!entry_type || !entry) {	// don't log fully consistent entries
+			if (!entry_type || ((entry_type != KNOT_CACHE_RTT) && !entry)) {  // don't log fully consistent entries
 				printf
 				    ("GC %sconsistent, KR %sconsistent, size %zu, key len %zu: ",
 				     entry_type ? "" : "in", entry ? "" : "IN",

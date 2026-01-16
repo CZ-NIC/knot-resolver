@@ -35,7 +35,7 @@ def _rand_domain(label_chars: int, levels: int = 1) -> str:
     )
 
 
-@pytest.mark.parametrize("val", [1, 65_535, 5353, 5000])
+@pytest.mark.parametrize("val", [1, 65_535, 5335, 5000])
 def test_port_number_valid(val: int):
     assert int(PortNumber(val)) == val
 
@@ -200,7 +200,7 @@ def test_interface_name_invalid(val: Any):
         InterfaceName(val)
 
 
-@pytest.mark.parametrize("val", ["lo@5353", "2001:db8::1000@5001"])
+@pytest.mark.parametrize("val", ["lo@5335", "2001:db8::1000@5001"])
 def test_interface_port_valid(val: str):
     o = InterfacePort(val)
     assert str(o) == val
@@ -215,7 +215,7 @@ def test_interface_port_invalid(val: Any):
         InterfacePort(val)
 
 
-@pytest.mark.parametrize("val", ["lo", "123.4.5.6", "lo@5353", "2001:db8::1000@5001"])
+@pytest.mark.parametrize("val", ["lo", "123.4.5.6", "lo@5335", "2001:db8::1000@5001"])
 def test_interface_optional_port_valid(val: str):
     o = InterfaceOptionalPort(val)
     assert str(o) == val
@@ -230,7 +230,7 @@ def test_interface_optional_port_invalid(val: Any):
         InterfaceOptionalPort(val)
 
 
-@pytest.mark.parametrize("val", ["123.4.5.6@5353", "2001:db8::1000@53"])
+@pytest.mark.parametrize("val", ["123.4.5.6@5335", "2001:db8::1000@53"])
 def test_ip_address_port_valid(val: str):
     o = IPAddressPort(val)
     assert str(o) == val
@@ -247,7 +247,7 @@ def test_ip_address_port_invalid(val: Any):
         IPAddressPort(val)
 
 
-@pytest.mark.parametrize("val", ["123.4.5.6", "123.4.5.6@5353", "2001:db8::1000", "2001:db8::1000@53"])
+@pytest.mark.parametrize("val", ["123.4.5.6", "123.4.5.6@5335", "2001:db8::1000", "2001:db8::1000@53"])
 def test_ip_address_optional_port_valid(val: str):
     o = IPAddressOptionalPort(val)
     assert str(o) == val

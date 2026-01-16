@@ -3,7 +3,7 @@ import os
 import socket
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
-from knot_resolver.constants import API_SOCK_FILE, RUN_DIR, VERSION
+from knot_resolver.constants import API_SOCK_FILE, RUN_DIR, VERSION, WORKERS_SUPPORT
 from knot_resolver.datamodel.cache_schema import CacheSchema
 from knot_resolver.datamodel.defer_schema import DeferSchema
 from knot_resolver.datamodel.dns64_schema import Dns64Schema
@@ -34,12 +34,14 @@ logger = logging.getLogger(__name__)
 
 def _cpu_count() -> Optional[int]:
     try:
-        return len(os.sched_getaffinity(0))
-    except (NotImplementedError, AttributeError):
-        logger.warning("The number of usable CPUs could not be determined using 'os.sched_getaffinity()'.")
+        return len(os.sched_getaffinity(0))  # type: ignore[attr-defined]
+    except (NotImplementedError, AttributeError) as e:
         cpus = os.cpu_count()
         if cpus is None:
-            logger.warning("The number of usable CPUs could not be determined using 'os.cpu_count()'.")
+            logger.warning(
+                "The number of usable CPUs could not be determined using"
+                f" 'os.sched_getaffinity()' or 'os.cpu_count()':\n{e}"
+            )
         return cpus
 
 
@@ -141,6 +143,7 @@ class KresConfig(ConfigSchema):
 
     _LAYER = Raw
 
+    #### When ADDING options, please also update config_nodes() in ../manager/manager.py
     nsid: Optional[EscapedStr]
     hostname: EscapedStr
     rundir: WritableDir
@@ -169,7 +172,21 @@ class KresConfig(ConfigSchema):
         return obj.hostname
 
     def _workers(self, obj: Raw) -> Any:
+        no_workers_support_msg = (
+            "On this system, you cannot run more than one worker because "
+            "SO_REUSEPORT (Linux) or SO_REUSEPORT_LB (FreeBSD) socket option is not supported."
+        )
+        if not WORKERS_SUPPORT and (int(obj.workers) > 1):
+            raise ValueError(no_workers_support_msg)
+
         if obj.workers == "auto":
+            if not WORKERS_SUPPORT:
+                logger.info(
+                    "Running on system without support for multiple workers,"
+                    f"' workers' configuration automatically set to 1. {no_workers_support_msg}"
+                )
+                return IntPositive(1)
+
             count = _cpu_count()
             if count:
                 return IntPositive(count)
@@ -177,6 +194,7 @@ class KresConfig(ConfigSchema):
                 "The number of available CPUs to automatically set the number of running 'kresd' workers could not be determined."
                 "The number of workers can be configured manually in 'workers' option."
             )
+
         return obj.workers
 
     def _validate(self) -> None:

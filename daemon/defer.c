@@ -446,7 +446,7 @@ static inline void process_single_deferred(void)
 			}
 		}
 
-		break_query(ctx, ETIME);
+		break_query(ctx, ETIMEDOUT);
 		return;
 	}
 
@@ -513,7 +513,7 @@ static inline void cleanup_queues(void)
 			uint64_t age_ns = defer_sample_state.stamp - idata->req_stamp;
 			if (age_ns < REQ_TIMEOUT) break;
 			pop_query_queue(i);
-			break_query(ctx, ETIME);
+			break_query(ctx, ETIMEDOUT);
 			cnt++;
 		}
 		if (cnt > 0) {
@@ -652,7 +652,7 @@ int defer_init(const char *mmap_file, uint32_t log_period, int cpus)  // TODO po
 		.max_decay = MAX_DECAY,
 		.log_period = log_period,
 		.cpus = cpus,
-		.using_avx2 = using_avx2(),
+		.using_avx2 = kru_using_avx2(),
 	};
 
 	size_t capacity_log = 0;
@@ -668,8 +668,8 @@ int defer_init(const char *mmap_file, uint32_t log_period, int cpus)  // TODO po
 			sizeof(header.cpus),
 		"detected padding with undefined data inside mmapped header");
 
-	ret = mmapped_init(&defer_mmapped, mmap_file, size, &header, header_size);
-	if (ret == MMAPPED_WAS_FIRST) {
+	ret = mmapped_init(&defer_mmapped, mmap_file, size, &header, header_size, false);
+	if (ret == MMAPPED_PENDING) {
 		kr_log_info(DEFER, "Initializing defer...\n");
 
 		defer = defer_mmapped.mem;
@@ -683,7 +683,7 @@ int defer_init(const char *mmap_file, uint32_t log_period, int cpus)  // TODO po
 
 		defer->log_time = kr_now() - log_period;
 
-		ret = mmapped_init_continue(&defer_mmapped);
+		ret = mmapped_init_finish(&defer_mmapped);
 		if (ret != 0) goto fail;
 
 		kr_log_info(DEFER, "Defer initialized (%s).\n", (defer->using_avx2 ? "AVX2" : "generic"));
@@ -694,10 +694,13 @@ int defer_init(const char *mmap_file, uint32_t log_period, int cpus)  // TODO po
 			defer_str_conf(desc, sizeof(desc));
 			kr_log_info(DEFER, "Defer configuration:\n%s", desc);
 		}
-	} else if (ret == 0) {
+	} else if (ret == MMAPPED_EXISTING) {
 		defer = defer_mmapped.mem;
 		kr_log_info(DEFER, "Using existing defer data (%s).\n", (defer->using_avx2 ? "AVX2" : "generic"));
-	} else goto fail;
+	} else {
+		kr_assert(ret < 0);  // no other combinations of mmapped state flags are allowed in non-persistent case
+		goto fail;
+	}
 
 	for (size_t i = 0; i < QUEUES_CNT; i++)
 		queue_init(queues[i]);

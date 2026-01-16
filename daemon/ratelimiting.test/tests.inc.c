@@ -20,8 +20,7 @@
 #include <stdatomic.h>
 
 #include "tests/unit/test.h"
-#include "libdnssec/crypto.h"
-#include "libdnssec/random.h"
+#include "lib/dnssec.h"
 #include "libknot/libknot.h"
 #include "contrib/openbsd/siphash.h"
 #include "lib/resolve.h"
@@ -128,15 +127,15 @@ int main(int argc, char *argv[])
 {
 	assert(KRU_GENERIC.initialize != KRU_AVX2.initialize);
 	if (KRU.initialize == KRU_AVX2.initialize) {
-		const UnitTest tests[] = {
-			unit_test(test_rrl_generic),
-			unit_test(test_rrl_avx2)
+		const struct CMUnitTest tests[] = {
+			cmocka_unit_test(test_rrl_generic),
+			cmocka_unit_test(test_rrl_avx2)
 		};
-		return run_tests(tests);
+		return cmocka_run_group_tests(tests, NULL, NULL);
 	} else {
-		const UnitTest tests[] = {
-			unit_test(test_rrl_generic)
+		const struct CMUnitTest tests[] = {
+			cmocka_unit_test(test_rrl_generic)
 		};
-		return run_tests(tests);
+		return cmocka_run_group_tests(tests, NULL, NULL);
 	}
 }

@@ -529,7 +529,7 @@ static int cdb_check_health(kr_cdb_pt db, struct kr_cdb_stats *stats)
 
 /** Obtain exclusive (advisory) lock by creating a file, returning FD or negative kr_error().
  * The lock is auto-released by OS in case the process finishes in any way (file remains). */
-static int lockfile_get(const char *path)
+static int lockfile_get(const char *path, bool wait)
 {
 	if (kr_fails_assert(path))
 		return kr_error(EINVAL);
@@ -545,7 +545,7 @@ static int lockfile_get(const char *path)
 	lock_info.l_len = 1; // it's OK for locks to extend beyond the end of the file
 	int err;
 	do {
-		err = fcntl(fd, F_SETLK, &lock_info);
+		err = fcntl(fd, (wait ? F_SETLKW : F_SETLK), &lock_info);
 	} while (err == -1 && errno == EINTR);
 	if (err) {
 		close(fd);
@@ -566,12 +566,12 @@ static int lockfile_release(int fd)
 	}
 }
 
-static int cdb_clear(kr_cdb_pt db, struct kr_cdb_stats *stats)
+static int cdb_clear(kr_cdb_pt db, struct kr_cdb_stats *stats, const size_t mapsize)
 {
 	struct lmdb_env *env = db2env(db);
 	stats->clear++;
-	/* First try mdb_drop() to clear the DB; this may fail with ENOSPC. */
-	{
+	/* First try mdb_drop() to clear the DB unless size change is requested; this may fail with ENOSPC. */
+	if (mapsize == 0) {
 		MDB_txn *txn = NULL;
 		int ret = txn_get(env, &txn, false);
 		if (ret == kr_ok()) {
@@ -605,7 +605,7 @@ static int cdb_clear(kr_cdb_pt db, struct kr_cdb_stats *stats)
 	}
 
 	/* Find if we get a lock on lockfile. */
-	const int lockfile_fd = lockfile_get(lockfile);
+	const int lockfile_fd = lockfile_get(lockfile, mapsize != 0);
 	if (lockfile_fd < 0) {
 		kr_log_error(MDB, "clearing failed to get ./krcachelock (%s); retry later\n",
 				kr_strerror(lockfile_fd));
@@ -627,7 +627,7 @@ static int cdb_clear(kr_cdb_pt db, struct kr_cdb_stats *stats)
 		// coverity[toctou]
 		unlink(env->mdb_data_path);
 		unlink(mdb_lockfile);
-		ret = reopen_env(env, stats, env->mapsize);
+		ret = reopen_env(env, stats, mapsize ? mapsize : env->mapsize);
 	}
 
 	/* Environment updated, release lockfile. */

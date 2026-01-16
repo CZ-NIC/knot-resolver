@@ -30,7 +30,7 @@ def test_parsing_bool_invalid(val: str):
         _TestBool(parse_yaml(f"v: {val}"))
 
 
-@pytest.mark.parametrize("val,exp", [("0", 0), ("5353", 5353), ("-5001", -5001)])
+@pytest.mark.parametrize("val,exp", [("0", 0), ("5335", 5335), ("-5001", -5001)])
 def test_parsing_int_valid(val: str, exp: int):
     assert _TestInt(parse_yaml(f"v: {val}")).v == exp
 

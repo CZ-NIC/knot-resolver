@@ -15,4 +15,4 @@ forward:
   - subtree: 1.168.192.in-addr.arpa
     options:
       dnssec: false
-    servers: [ 192.0.2.1@5353 ]
+    servers: [ 192.0.2.1@5335 ]

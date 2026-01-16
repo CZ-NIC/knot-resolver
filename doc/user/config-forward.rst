@@ -60,7 +60,7 @@ The :option:`forward <forward: <list>>` list of rules overrides which servers ge
 
    .. option:: servers: <list of addresses>|<list of servers>
 
-      Optionaly you can set port after address by ``@`` separator (``193.17.47.1@5353``).
+      Optionaly you can set port after address by ``@`` separator (``193.17.47.1@5335``).
 
       .. option:: address: <address>|<list of addresses>
 

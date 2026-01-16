@@ -143,7 +143,7 @@ with static configuration. For example parts of configuration can depend on
 .. code-block:: lua
 
 	if hostname() == 'hidden' then
-		net.listen(net.eth0, 5353)
+		net.listen(net.eth0, 5335)
 	else
 		net.listen('127.0.0.1')
                 net.listen(net.eth1.addr[1])

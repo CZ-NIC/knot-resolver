@@ -236,7 +236,7 @@ int kr_rules_init(const char *path, size_t maxsize, bool overwrite)
 	};
 	int ret = the_rules->api->open(&the_rules->db, &the_rules->stats, &opts, NULL);
 
-	if (ret == 0 && overwrite) ret = ruledb_op(clear);
+	if (ret == 0 && overwrite) ret = ruledb_op(clear, 0);
 	if (ret != 0) goto failure;
 	kr_require(the_rules->db);
 
@@ -692,7 +692,7 @@ static int answer_exact_match(struct kr_query *qry, knot_pkt_t *pkt, uint16_t ty
 	knot_rrset_t *rr = arrset.set.rr;
 	const int is_nodata = rr->rrs.count == 0;
 	if (is_nodata) {
-		if (kr_fails_assert(type == KNOT_RRTYPE_CNAME && arrset.sig_rds.count == 0))
+		if (kr_fails_assert(arrset.sig_rds.count == 0))
 			return kr_error(EILSEQ);
 		rr->type = KNOT_RRTYPE_SOA;
 		ret = knot_rrset_add_rdata(rr, soa_rdata, sizeof(soa_rdata) - 1, &pkt->mm);

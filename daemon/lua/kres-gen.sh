@@ -144,11 +144,14 @@ ${CDEFS} ${LIBKRES} types <<-EOF
 	typedef kr_rule_fwd_flags_t
 	struct kr_extended_error
 	struct kr_request_rule
+	struct kr_cache_top_context
 	struct kr_request
 	enum kr_rank
 	typedef kr_cdb_pt
 	struct kr_cdb_stats
 	typedef uv_timer_t
+	struct mmapped
+	struct kr_cache_top
 	struct kr_cache
 	# lib/layer.h
 	kr_layer_t
@@ -323,6 +326,8 @@ ${CDEFS} ${LIBKRES} functions <<-EOF
 	kr_rule_local_address
 	kr_rule_local_hosts
 	kr_rule_coalesce_targets
+#   not used directly, but can be useful for advanced "scripting"
+	kr_rule_local_data_ins
 EOF
 
 

@@ -164,7 +164,7 @@ Configuration reference
 
    Example output:
 
-   .. code-block:: lua
+   .. code-block:: text
 
    	[lmdb://] => true
 
@@ -313,6 +313,7 @@ Configuration reference
   Examples:
 
   .. code-block:: lua
+     :force:
 
      -- Clear whole cache
      > cache.clear()

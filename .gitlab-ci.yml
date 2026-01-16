@@ -85,12 +85,6 @@ stages:
     reports:
       junit: build_ci*/meson-logs/integration.deckard.junit.xml
 
-.after_build_arch: &after_build_arch
-  <<: *after_build
-  image: $IMAGE_PREFIX/arch:$IMAGE_TAG
-  needs:
-    - build-arch
-
 .nodep: &nodep
   <<: *common
   needs: []
@@ -350,7 +344,9 @@ lint:pedantic:
     - ninja -C build_pedantic_clang
 
 lint:tidy:
-  <<: *after_build_arch
+  <<: *after_build
+  image: $IMAGE_PREFIX/debian13-knot_3_5:$IMAGE_TAG
+  # TODO: when we add a resolver build using the same image, we probably add a `needs:`
   stage: sanity
   script:
     - ninja -C build_ci* tidy
@@ -715,6 +711,10 @@ pkg:debian-11:
   <<: *enable_repo_build
   image: $CI_REGISTRY/packaging/apkg/full/debian-11
 
+pkg:ubuntu-25.10:
+  <<: *pkg_test_deb
+  image: $CI_REGISTRY/packaging/apkg/full/ubuntu-25.10
+
 pkg:ubuntu-25.04:
   <<: *pkg_test_deb
   image: $CI_REGISTRY/packaging/apkg/full/ubuntu-25.04
@@ -849,37 +849,33 @@ docs:website:
     - poetry env use python${PYTHON_VERSION}
     - poetry env info
 
-python:examples:
+python:check:files:
   <<: *python
   script:
-    - poetry install --all-extras --only main,dev
-    - poe examples
+    - poetry install --all-extras --only main,build,dev,lint
+    - poe check-files
 
-python:migrate:
+python:check:code:
   <<: *python
+  script:
+    - poetry install --all-extras --only main,dev,lint
+    - poe check-code
+
+python:test:examples:
+  <<: *python
+  stage: test
+  script:
+    - poetry install --all-extras --only main,dev
+    - poe test-examples
+
+python:test:migrate:
+  <<: *python
+  stage: test
   script:
     - poetry install --all-extras --only main,dev
     - poe test-migrate
 
-python:check:
-  <<: *python
-  script:
-    - poetry install --all-extras --only main,build,dev,lint
-    - poe check
-
-python:format:
-  <<: *python
-  script:
-    - poetry install --all-extras --only main,dev,lint
-    - poe format
-
-python:lint:
-  <<: *python
-  script:
-    - poetry install --all-extras --only main,dev,lint
-    - poe lint
-
-python:run:
+python:test:run:
   <<: *python
   stage: test
   parallel:
@@ -919,7 +915,7 @@ python:kafka:
   after_script:
     - cat knot-resolver.log
 
-python:unit:
+python:test:unit:
   <<: *python
   stage: test
   parallel:
@@ -931,9 +927,10 @@ python:unit:
           - '3.11'
           - '3.12'
           - '3.13'
+          - '3.14'
   script:
     - poetry install --all-extras --only main,dev,test
-    - poe test
+    - poe test-unit
     # the following command makes sure that the source root of the coverage file is at $gitroot
     - poetry run bash -c "coverage combine .coverage; coverage xml"
   artifacts:

@@ -19,6 +19,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <assert.h>
 
 #define ALIGNED_CPU_CACHE _Alignas(64)
 
@@ -26,6 +27,8 @@
 // Greater than 16-bit type enables randomized fractional incrementing as the internal counters are still 16-bit.
 // Exponential decay always uses randomized rounding on 32 bits.
 typedef uint32_t kru_price_t;
+
+typedef uint64_t kru_hash_t;
 
 #define KRU_PRICE_BITS (8 * sizeof(kru_price_t))
 
@@ -60,6 +63,11 @@ struct kru_api {
 
 	/// Calculate size of the KRU structure.
 	size_t (*get_size)(int capacity_log);
+
+	/// Verify that given KRU structure expects just memory of the given size;
+	/// it accesses just the first size bytes of kru.
+	/// If false is returned, the memory is corrupted and calling other methods may cause SIGSEGV.
+	bool (*check_size)(struct kru *kru, ptrdiff_t size);
 
 	/// Determine if a key should get limited (and update the KRU).
 	/// key needs to be aligned to a multiple of 16 bytes.
@@ -98,9 +106,26 @@ struct kru_api {
 	/// The key of i-th query consists of prefixes[i] bits of key, prefixes[i], and namespace; as above.
 	void (*load_multi_prefix)(struct kru *kru, uint32_t time_now,
 			uint8_t namespace, uint8_t key[static 16], uint8_t *prefixes, kru_price_t *prices, size_t queries_cnt, uint16_t *loads_out);
+
+	/// Compute 64-bit hash of an arbitrary-size byte array to be used in load_hash function.
+	/// The key need not to be aligned as we use always unoptimized variant here.
+	kru_hash_t (*hash_bytes)(struct kru *kru, uint8_t *key, size_t key_size);
+
+	/// Single query based on the hash computed by the previous function.
+	/// Returns the final value of the counter normalized to the limit 2^16.
+	/// Set price to zero to skip updating; otherwise, KRU is always updated, using maximal allowed value on overflow.
+	uint16_t (*load_hash)(struct kru *kru, uint32_t time_now, kru_hash_t hash, kru_price_t price);
 };
 
 // The functions are stored this way to make it easier to switch
 // implementation based on detected CPU.
 extern struct kru_api KRU;
 extern const struct kru_api KRU_GENERIC, KRU_AVX2;
+
+/// Return whether we're using optimized variant right now.
+static inline bool kru_using_avx2(void)
+{
+	bool result = (KRU.initialize == KRU_AVX2.initialize);
+	assert(result || KRU.initialize == KRU_GENERIC.initialize);
+	return result;
+}

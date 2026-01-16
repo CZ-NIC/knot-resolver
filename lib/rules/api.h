@@ -148,7 +148,10 @@ const uint32_t KR_RULE_TTL_DEFAULT;
 /** Add a local data rule.
  *
  * Into the default rule-set ATM.
- * Special NODATA case: use a CNAME type with zero records (TTL matters). */
+ * Special NODATA case: use a type with zero records (TTL matters).
+ *   You can do that either for particular types or for CNAME
+ *   (meaning all types unspecified by other exact rule matches).
+ */
 KR_EXPORT
 int kr_rule_local_data_ins(const knot_rrset_t *rrs, const knot_rdataset_t *sig_rds,
 				kr_rule_tags_t tags, kr_rule_opts_t opts);

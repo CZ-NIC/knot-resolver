@@ -7,6 +7,7 @@
  */
 
 #include "lib/cache/impl.h"
+#include "lib/cache/top.h"
 #include "lib/dnssec/nsec.h"
 #include "lib/layer/iterate.h"
 
@@ -175,7 +176,7 @@ static const char * find_leq_NSEC1(struct kr_cache *cache, const struct kr_query
 	}
 	if (is_exact) {
 		/* Nothing else to do. */
-		return NULL;
+		goto success;
 	}
 	/* The NSEC starts strictly before our target name;
 	 * now check that it still belongs into that zone. */
@@ -246,6 +247,10 @@ static const char * find_leq_NSEC1(struct kr_cache *cache, const struct kr_query
 	if (kwz_high) {
 		*kwz_high = kwz_hi;
 	}
+
+success:
+
+	kr_cache_top_access(qry->request, key_nsec.data, key_nsec.len, val.len, "leq_nsec1");  // hits only
 	return NULL;
 }
 

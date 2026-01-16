@@ -6,7 +6,7 @@ Views and ACLs
 ==============
 
 The :ref:`policy <mod-policy>` module implements policies for global query matching, e.g. solves "how to react to certain query".
-This module combines it with query source matching, e.g. "who asked the query". This allows you to create personalized blacklists, filters and ACLs.
+This module combines it with query source matching, e.g. "who asked the query". This allows you to create personalized blocklists, filters and ACLs.
 
 There are two identification mechanisms:
 
@@ -65,6 +65,7 @@ For each request the rules in these chains get tried one by one until a :ref:`no
 By default :ref:`policy module <mod-policy>` acts before ``view`` module due to ``policy`` being loaded by default. If you want to intermingle universal rules with ``view:addr``, you may simply wrap the universal policy rules in view closure like this:
 
 .. code-block:: lua
+    :force:
 
     view:addr('0.0.0.0/0', policy.<rule>) -- and
     view:addr('::0/0',     policy.<rule>)

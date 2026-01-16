@@ -49,6 +49,7 @@
 /daemon/lua/*.inc
 /daemon/lua/trust_anchors.lua
 /depcomp
+/defer
 /dist
 /distro/tests/*/.vagrant
 /doc/**/.doctrees
@@ -83,6 +84,7 @@
 /tests/test_set
 /tests/test_utils
 /tests/test_zonecut
+/top
 /ylwrap
 _obj
 kresd.amalg.c

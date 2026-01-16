@@ -65,11 +65,11 @@ static void test_rplan_flags(void **state)
 
 int main(void)
 {
-	const UnitTest tests[] = {
-	        unit_test(test_rplan_params),
-	        unit_test(test_rplan_push),
-	        unit_test(test_rplan_flags)
+	const struct CMUnitTest tests[] = {
+	        cmocka_unit_test(test_rplan_params),
+	        cmocka_unit_test(test_rplan_push),
+	        cmocka_unit_test(test_rplan_flags)
 	};
 
-	return run_tests(tests);
+	return cmocka_run_group_tests(tests, NULL, NULL);
 }

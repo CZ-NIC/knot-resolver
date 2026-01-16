@@ -36,6 +36,7 @@ If you update the configuration file while Knot Resolver is running, you can for
 
    **Reloading configuration** may fail, even when your configuration is valid, because some options cannot be changed while running.
    You can always find an explanation of the error in the log accesed by the ``journalctl -eu knot-resolver`` command.
+.. for these cases see: git grep '\<_deny_' python/
 
 ===============================
 Listening on network interfaces
@@ -125,7 +126,7 @@ The following example allows only queries from clients on the subnet ``192.0.2.0
      # refuse everything that hasn't matched
      - subnets: [ 0.0.0.0/0, "::/0" ]
        answer: refused
-     # whitelist queries identified by subnet
+     # allow queries identified by subnet
      - subnets: [ 192.0.2.0/24 ]
        answer: allow
 

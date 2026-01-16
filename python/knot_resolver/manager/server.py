@@ -44,7 +44,7 @@ from knot_resolver.utils.systemd_notify import systemd_notify
 from .config_store import ConfigStore
 from .constants import PID_FILE_NAME, init_user_constants
 from .exceptions import KresManagerException
-from .logging import logger_init
+from .logger import logger_init
 from .manager import KresManager
 
 logger = logging.getLogger(__name__)
@@ -111,7 +111,7 @@ class Server:
     ) -> Result[None, str]:
         if config_old.management != config_new.management:
             return Result.err(
-                "/server/management: Changing management API address/uTruenix-socket dynamically is not allowed as it's really dangerous."
+                "/server/management: Changing management API address/unix-socket dynamically is not allowed as it's really dangerous."
                 " If you really need this feature, please contact the developers and explain why. Technically,"
                 " there are no problems in supporting it. We are only blocking the dynamic changes because"
                 " we think the consequences of leaving this footgun unprotected are worse than its usefulness."

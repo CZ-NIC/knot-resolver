@@ -7,6 +7,7 @@
  */
 
 #include "lib/cache/impl.h"
+#include "lib/cache/top.h"
 
 #include "contrib/base32hex.h"
 #include "lib/dnssec/nsec.h"
@@ -94,14 +95,14 @@ static knot_db_val_t key_NSEC3_name(struct key *k, const knot_dname_t *name,
 		.data = val.data + val.len,
 	};
 	int ret = dnssec_nsec3_hash(&dname, &nsec_p->libknot, &hash);
-	if (ret != DNSSEC_EOK) return VAL_EMPTY;
+	if (ret != KNOT_EOK) return VAL_EMPTY;
 	if (kr_fails_assert(hash.size == NSEC3_HASH_LEN))
 		return VAL_EMPTY;
 
 	#else
 	dnssec_binary_t hash = { .size = 0, .data = NULL };
 	int ret = dnssec_nsec3_hash(&dname, &nsec_p->libknot, &hash);
-	if (ret != DNSSEC_EOK) return VAL_EMPTY;
+	if (ret != KNOT_EOK) return VAL_EMPTY;
 	if (kr_fails_assert(hash.size == NSEC3_HASH_LEN && hash.data))
 		return VAL_EMPTY;
 	memcpy(knot_db_val_bound(val), hash.data, NSEC3_HASH_LEN);
@@ -181,7 +182,7 @@ static const char * find_leq_NSEC3(struct kr_cache *cache, const struct kr_query
 	}
 	if (is_exact) {
 		/* Nothing else to do. */
-		return NULL;
+		goto success;
 	}
 	/* The NSEC3 starts strictly before our target name;
 	 * now check that it still belongs into that zone and chain. */
@@ -215,6 +216,10 @@ static const char * find_leq_NSEC3(struct kr_cache *cache, const struct kr_query
 	if (!covers) {
 		return "range search miss (!covers)";
 	}
+
+success:
+
+	kr_cache_top_access(qry->request, key_found.data, key_found.len, val.len, "leq_nsec3");  // hits only
 	return NULL;
 }
 

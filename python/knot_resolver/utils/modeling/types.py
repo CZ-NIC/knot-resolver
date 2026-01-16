@@ -11,6 +11,13 @@ from .base_generic_type_wrapper import BaseGenericTypeWrapper
 NoneType = type(None)
 
 
+def get_annotations(obj: Any) -> Dict[str, Any]:
+    if hasattr(inspect, "get_annotations"):
+        return inspect.get_annotations(obj)
+    # TODO(bump to py3.10): Safe to remove. This fallback exists for older versions
+    return obj.__dict__.get("__annotations__", {})
+
+
 def is_optional(tp: Any) -> bool:
     origin = getattr(tp, "__origin__", None)
     args = get_generic_type_arguments(tp)
@@ -83,7 +90,7 @@ def is_none_type(tp: Any) -> bool:
 def get_attr_type(obj: Any, attr_name: str) -> Any:
     assert hasattr(obj, attr_name)
     assert hasattr(obj, "__annotations__")
-    annot = getattr(type(obj), "__annotations__")
+    annot = get_annotations(type(obj))
     assert attr_name in annot
     return annot[attr_name]
 

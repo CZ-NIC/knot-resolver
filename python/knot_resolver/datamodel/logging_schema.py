@@ -7,10 +7,22 @@ from knot_resolver.utils.modeling.base_schema import is_obj_type_valid
 
 LogLevelEnum = Literal["crit", "err", "warning", "notice", "info", "debug"]
 LogTargetEnum = Literal["syslog", "stderr", "stdout"]
-LogGroupsEnum = Literal[
+
+LogGroupsProcessesEnum = Literal[
     "manager",
     "supervisord",
+    "policy-loader",
+    "kresd",
     "cache-gc",
+]
+
+LogGroupsManagerEnum = Literal[
+    "files",
+    "metrics",
+    "server",
+]
+
+LogGroupsKresdEnum = Literal[
     ## Now the LOG_GRP_*_TAG defines, exactly from ../../../lib/log.h
     "system",
     "cache",
@@ -62,6 +74,8 @@ LogGroupsEnum = Literal[
     "tunnel",
     # "reqdbg",... (non-displayed section of the enum)
 ]
+
+LogGroupsEnum = Literal[LogGroupsProcessesEnum, LogGroupsManagerEnum, LogGroupsKresdEnum]
 
 
 class DnstapSchema(ConfigSchema):

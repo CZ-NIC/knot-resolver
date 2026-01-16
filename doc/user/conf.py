@@ -44,7 +44,6 @@ html_static_path = ['../_static']
 
 # Theme
 html_theme = 'sphinx_rtd_theme'
-html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 
 html_theme_options = {
     'logo_only': True,  # if we have a html_logo below, this shows only the logo with no title text

@@ -119,18 +119,23 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
             return [
                 config.nsid,
                 config.hostname,
+                # config.rundir not allowed to change
                 config.workers,
+                # config.management not allowed to change and not affecting workers anyway
                 config.options,
                 config.network,
+                # config.views fully handled by policy-loader
+                # config.local_data fully handled by policy-loader
                 config.forward,
+                config.fallback,
                 config.cache,
                 config.dnssec,
                 config.dns64,
                 config.logging,
                 config.monitoring,
-                config.lua,
                 config.rate_limiting,
                 config.defer,
+                config.lua,
             ]
 
         # register and immediately call a verifier that validates config with 'canary' kresd process
@@ -272,8 +277,15 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
             )
 
     async def set_new_tls_sticket_secret(self, config: KresConfig, force: bool = False) -> None:
+        if int(config.workers) == 1:
+            logger.info(
+                "There is no need to synchronize the TLS session secret across all workers"
+                " because only one kresd worker is configured - skipping auto-generation"
+            )
+            return
+
         if config.network.tls.sticket_secret or config.network.tls.sticket_secret_file:
-            logger.debug("User-configured TLS resumption secret found - skipping auto-generation.")
+            logger.debug("User-configured TLS resumption secret found - skipping auto-generation")
             return
 
         logger.debug("Creating TLS session ticket secret")
@@ -320,6 +332,13 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
     async def load_policy_rules(self, _old: KresConfig, new: KresConfig, force: bool = False) -> Result[NoneType, str]:
         try:
             async with self._manager_lock:
+                if _old.cache.size_max != new.cache.size_max:
+                    logger.debug("Unlinking shared cache top memory")
+                    try:
+                        os.unlink(str(_old.cache.storage) + "/top")
+                    except FileNotFoundError:
+                        pass
+
                 logger.debug("Running kresd 'policy-loader'")
                 await self._run_policy_loader(new)
 

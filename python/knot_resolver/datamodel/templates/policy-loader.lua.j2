@@ -1,11 +1,15 @@
-{% if not cfg.lua.script_only %}
+{% if not cfg.lua.policy_script_only %}
 
 -- FFI library
 ffi = require('ffi')
 local C = ffi.C
 
 -- logging.level
+{% if cfg.logging.groups and "policy-loader" in cfg.logging.groups %}
+log_level('debug')
+{% else %}
 log_level('{{ cfg.logging.level }}')
+{% endif %}
 
 {% if cfg.logging.target -%}
 -- logging.target
@@ -16,7 +20,10 @@ log_target('{{ cfg.logging.target }}')
 -- logging.groups
 log_groups({
 {% for g in cfg.logging.groups %}
-{% if g != "manager" and g != "supervisord" and g != "cache-gc" %}
+{% if g not in [
+    "manager", "supervisord", "policy-loader", "kresd", "cache-gc",
+    "files", "metrics", "server",
+] %}
     '{{ g }}',
 {% endif %}
 {% endfor %}
@@ -41,6 +48,19 @@ cache.open({{ cfg.cache.size_max.bytes() }}, 'lmdb://{{ cfg.cache.storage }}')
 {% include "defer.lua.j2" %}
 
 {% endif %}
+
+-- LUA section --------------------------------------
+-- Custom Lua code cannot be validated
+
+{% if cfg.lua.policy_script_file %}
+{% import cfg.lua.policy_script_file as policy_script_file %}
+{{ policy_script_file }}
+{% endif %}
+
+{% if cfg.lua.policy_script %}
+{{ cfg.lua.policy_script }}
+{% endif %}
+
 
 -- exit policy-loader properly
 quit()

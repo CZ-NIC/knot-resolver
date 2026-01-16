@@ -31,7 +31,7 @@ nsid.name('{{ cfg.nsid }}' .. worker.id)
 -- DNSSEC section -----------------------------------
 {% include "dnssec.lua.j2" %}
 
--- FORWARD section ----------------------------------
+-- FORWARD and FALLBACK section ----------------------------------
 {% include "forward.lua.j2" %}
 
 -- CACHE section ------------------------------------

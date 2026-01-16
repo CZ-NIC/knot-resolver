@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "knot-resolver"
-version = "6.0.16"
+version = "6.1.0"
 description = "Knot Resolver Manager - a Python program that automatically manages the other components of the resolver"
 license = "GPL-3.0-or-later"
 authors = [
@@ -43,54 +43,57 @@ watchdog = ["watchdog"]
 kafka = ["kafka-python"]
 
 [tool.poetry.group.build.dependencies]
-poetry-core = ">=1.0.0"
-setuptools = ">=67.8.0"
+poetry-core = ">=1.9.1"
+setuptools = ">=75.3.2"
 
 [tool.poetry.group.dev.dependencies]
-poetry = "^1.8.3"
-pyparsing = "^3.1.1"
+poetry = "^1.8.5"
+pyparsing = "^3.1.4"
 poethepoet = "^0.24.4"
-debugpy = "^1.8.1"
+debugpy = "^1.8.18"
 
 [tool.poetry.group.test.dependencies]
-pytest = "^8.0.1"
+pytest = "^8.3.5"
 pytest-cov = "^4.1.0"
-pytest-asyncio = "^0.23.5"
+pytest-asyncio = "^0.23.8"
 toml = "^0.10.2"
 
 [tool.poetry.group.lint.dependencies]
 ruff = "^0.6.9"
-mypy = "^1.8.0"
-types-pyyaml = "^6.0.12.12"
+mypy = "^1.14.1"
+types-pyyaml = "^6.0.12.20241230"
 
 [tool.poetry.group.docs.dependencies]
 sphinx = "^5.3.0"
-sphinx-tabs = "^3.4.5"
+sphinx-tabs = "^3.4.7"
 sphinx-rtd-theme = "^2.0.0"
 breathe = "^4.35.0"
-json-schema-for-humans = "^0.47"
+json-schema-for-humans = "^0.47.5"
 
 [tool.poetry.scripts]
 kresctl = 'knot_resolver.client.main:main'
 knot-resolver = 'knot_resolver.manager.main:main'
 
 [tool.poe.tasks]
-# tasks runed through scripts located in 'scripts/poe-tasks/'
-configure = { cmd = "scripts/poe-tasks/configure", help = "(Re)configure Meson build directory" }
-run = { cmd = "scripts/poe-tasks/run", help = "Run Knot Resolver" }
-run-debug = { cmd = "scripts/poe-tasks/run-debug", help = "Debug Knot Resolver with debugpy" }
-doc = { cmd = "scripts/poe-tasks/doc", help = "Create Knot Resolver HTML documentation" }
-schema = { cmd = "scripts/poe-tasks/schema", help = "Generate a JSON schema of the Knot Resolver configuration"}
-test = { cmd = "scripts/poe-tasks/test", help = "Run pytest unit tests" }
-lint = { cmd = "scripts/poe-tasks/lint", help = "Run static code analysis (Ruff) and check typing (Mypy)" }
-check = { cmd = "scripts/poe-tasks/check", help = "Check that all dependencies are properly installed and generated files are not behind project." }
-examples = { cmd = "scripts/poe-tasks/examples", help = "Validate all configuration examples using 'kresctl validate' utility" }
-gen-constantspy = { cmd = "scripts/poe-tasks/gen-constantspy", help = "Generate 'constants.py' module using Meson configured options" }
-gen-setuppy = { cmd = "scripts/poe-tasks/gen-setuppy", help = "Generate 'setup.py' file for backwards compatibility" }
-format = { cmd = "scripts/poe-tasks/format", help = "Check and fix code formatting using Ruff." }
+# Tasks to configure, build and run
+configure = { cmd = "scripts/poe-tasks/configure", help = "(Re)configure Meson build directory." }
+run = { cmd = "scripts/poe-tasks/run", help = "Run Knot Resolver." }
+run-debug = { cmd = "scripts/poe-tasks/run-debug", help = "Debug Knot Resolver with debugpy." }
 kresctl = { cmd = "scripts/poe-tasks/kresctl", help="Run kresctl utility" }
-clean = { cmd = "scripts/poe-tasks/clean", help="Cleanup build directories and files" }
-test-migrate = { cmd = "scripts/poe-tasks/test-migrate", help = "Migrate testing configuration using 'kresctl migrate' utility and validate it" }
+docs = { cmd = "scripts/poe-tasks/docs", help = "Build Knot Resolver's HTML documentation." }
+# Tasks to generate files
+gen-constantspy = { cmd = "scripts/poe-tasks/gen-constantspy", help = "Generate 'constants.py' module using Meson configured options." }
+gen-schema = { cmd = "scripts/poe-tasks/gen-schema", help = "Generate a JSON schema of Knot Resolver's declarative configuration."}
+gen-setuppy = { cmd = "scripts/poe-tasks/gen-setuppy", help = "Generate 'setup.py' file for backwards compatibility." }
+# Tasks to fix, check and test
+fix-format = { cmd = "scripts/poe-tasks/fix-format", help = "Check and fix code formatting using Ruff." }
+check-code = { cmd = "scripts/poe-tasks/check-code", help = "Check code format, run static code analysis (Ruff) and typing checker (Mypy)." }
+check-files = { cmd = "scripts/poe-tasks/check-files", help = "Check that all dependencies are properly installed and generated files are not behind project." }
+test-unit = { cmd = "scripts/poe-tasks/test-unit", help = "Run pytest unit tests." }
+test-examples = { cmd = "scripts/poe-tasks/test-examples", help = "Validate all configuration examples using 'kresctl validate' utility." }
+test-migrate = { cmd = "scripts/poe-tasks/test-migrate", help = "Migrate testing configuration using 'kresctl migrate' utility and validate it." }
+# Other tasks
+clean = { cmd = "scripts/poe-tasks/clean", help="Cleanup build directories and files." }
 
 [tool.ruff]
 line-length = 120

@@ -28,11 +28,9 @@ address + port combination.
    ":ref:`dns-over-https`","``doh2``"
    "`Legacy DNS-over-HTTPS (DoH) <./dev/modules-http.html#mod-http-doh>`_","``doh-legacy``"
 
-.. note::
-
-   By default, **unencrypted DNS and DNS-over-TLS** are configured to **listen on localhost**.
-
 .. option:: network/listen: <list>
+
+   If you specify no ``listen:`` config, unencrypted DNS is configured for ``127.0.0.1`` and ``::1``.
 
    .. option:: unix-socket: <path>
 
@@ -42,7 +40,7 @@ address + port combination.
 
       IP address or interface name to listen on. May also be a list of addresses
       and interface names. Optionally, the port number may be specified using
-      ``@`` as a separator, e.g. ``127.0.0.1@3535`` or ``eth0@5353``.
+      ``@`` as a separator, e.g. ``127.0.0.1@3535`` or ``eth0@5335``.
 
       .. warning::
 
@@ -76,7 +74,7 @@ address + port combination.
        - interface: '::1'
          port: 3535
        - interface: eth0
-         port: 5353  # custom port number, default is 53 for XDP
+         port: 5335  # custom port number, default is 53 for XDP
          kind: xdp
        - unix-socket: /tmp/kres-socket  # bind to unix domain socked
 

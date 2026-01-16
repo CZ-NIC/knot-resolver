@@ -11,6 +11,7 @@
 #include "lib/utils.h"
 #include "lib/layer/iterate.h" /* kr_response_classify */
 #include "lib/cache/impl.h"
+#include "lib/cache/top.h"
 
 
 /** Compute TTL for a packet.  It's minimum TTL or zero.  (You can apply limits.) */
@@ -23,6 +24,11 @@ uint32_t packet_ttl(const knot_pkt_t *pkt)
 		const knot_pktsection_t *sec = knot_pkt_section(pkt, i);
 		for (unsigned k = 0; k < sec->count; ++k) {
 			const knot_rrset_t *rr = knot_pkt_rr(sec, k);
+			if (rr->type == KNOT_RRTYPE_OPT) {
+				// Various nonsensical RRs might happen,
+				// but for OPT the TTL means something different.
+				continue;
+			}
 			ttl = MIN(ttl, rr->ttl);
 			has_ttl = true;
 		}
@@ -32,7 +38,7 @@ uint32_t packet_ttl(const knot_pkt_t *pkt)
 
 
 void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
-		const struct kr_request *req, const bool needs_pkt)
+		struct kr_request *req, const bool needs_pkt)
 {
 	/* In some cases, stash also the packet. */
 	const bool is_negative = kr_response_classify(pkt)
@@ -101,8 +107,9 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 	};
 	/* Prepare raw memory for the new entry and fill it. */
 	struct kr_cache *cache = &req->ctx->cache;
+	size_t whole_val_len = 0;
 	ret = entry_h_splice(&val_new_entry, rank, key, k->type, pkt_type,
-				owner, qry, cache, qry->timestamp.tv_sec);
+				owner, qry, cache, qry->timestamp.tv_sec, &whole_val_len);
 	if (ret || kr_fails_assert(val_new_entry.data)) return; /* some aren't really errors */
 	struct entry_h *eh = val_new_entry.data;
 	memset(eh, 0, offsetof(struct entry_h, data));
@@ -113,6 +120,7 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 	eh->has_optout = qf->DNSSEC_OPTOUT;
 	memcpy(eh->data, &pkt_size, sizeof(pkt_size));
 	memcpy(eh->data + sizeof(pkt_size), pkt->wire, pkt_size);
+	kr_cache_top_access(req, key.data, key.len, whole_val_len, "stash_pkt");
 
 	WITH_VERBOSE(qry) {
 		auto_free char *type_str = kr_rrtype_text(pkt_type),
