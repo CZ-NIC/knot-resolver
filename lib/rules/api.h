@@ -219,6 +219,9 @@ enum kr_rule_sub_t {
  * - into the default rule-set
  * - SOA and NS for generated answers aren't overridable.
  * - type: you can't use _DNAME via this function; insert it by kr_rule_local_data_ins()
+ *
+ * You can call it multiple times with different tags if the rest is the same;
+ * the rules will then combine correctly.
  */
 KR_EXPORT
 int kr_rule_local_subtree(const knot_dname_t *apex, enum kr_rule_sub_t type,

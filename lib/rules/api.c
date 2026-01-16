@@ -1099,6 +1099,27 @@ static int rule_local_subtree(const knot_dname_t *apex, enum kr_rule_sub_t type,
 	uint8_t key_data[KEY_MAXLEN];
 	knot_db_val_t key = zla_key(apex, key_data, RULESET_DEFAULT);
 
+	// Maybe the name is there already?  Read it and combine the tags.
+	// LATER: more precise logic after subtree_search() can iterate
+	//   over multiple rules on the same key
+	knot_db_val_t val = { 0 };
+	int ret = ruledb_op(read, &key, &val, 1);
+	kr_assert(ret == 0 || ret == kr_error(ENOENT));
+	if (ret == 0) {
+		val_zla_type_t ztype_old;
+		memcpy(&ztype_old, val.data, sizeof(ztype_old));
+		kr_rule_tags_t tags_old;
+		uint8_t *data = val.data + sizeof(ztype_old);
+		memcpy(&tags_old, data, sizeof(tags_old));
+		tags = kr_rule_tags_combine(tags, tags_old);
+		// ATM ruledb does not overwrite, so we `remove` before `write`,
+		// but combining wouldn't make much sense if the types don't match.
+		if (ztype == ztype_old) {
+			ret = ruledb_op(remove, &key, 1);
+			kr_assert(ret == 1);
+		}
+	}
+
 	// Prepare the data into a temporary buffer.
 	const int target_len = has_target ? knot_dname_size(target) : 0;
 	const bool has_ttl = ttl != KR_RULE_TTL_DEFAULT || has_target;
@@ -1121,8 +1142,9 @@ static int rule_local_subtree(const knot_dname_t *apex, enum kr_rule_sub_t type,
 	}
 	kr_require(data == buf + val_len);
 
-	knot_db_val_t val = { .data = buf, .len = val_len };
-	int ret = ruledb_op(write, &key, &val, 1); // TODO: overwriting on ==tags?
+	val.data = buf;
+	val.len = val_len;
+	ret = ruledb_op(write, &key, &val, 1);
 	// ENOSPC seems to be the only expectable error.
 	kr_assert(ret == 0 || ret == kr_error(ENOSPC));
 	return ret;
