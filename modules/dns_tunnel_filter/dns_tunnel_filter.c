@@ -2,6 +2,7 @@
 *  SPDX-License-Identifier: GPL-3.0-or-later
 */
 
+#include <sys/file.h>
 #include <stdatomic.h>
 #include "libblcnn.h"
 #include "lib/kru.h"
@@ -11,6 +12,9 @@
 #include "lib/resolve.h"
 
 enum { DNAME_SCALE_MULT = 2622 };
+enum { STATS_DI = 0, STATS_M = 1, STATS_B = 2, STATS_CNT = 3};
+
+#define STAT_FILE "/tmp/knot-resolver-tunnel_stat_file.txt"
 
 #define VERBOSE_LOG(...) kr_log_debug(TUNNEL, " | " __VA_ARGS__)
 
@@ -130,10 +134,86 @@ static bool ensure_loaded(void)
 	kr_rule_tags_t tags = 0;
 	int ret = kr_rule_tag_add("tunnel", &tags);
 	if (ret) return ret;
-	ret = dns_tunnel_filter_setup("/home/vcunat/dev/nic-notes/vysocina/blcnn.pt", // FIXME TMP
+	ret = dns_tunnel_filter_setup("/home/blcnn.pt", // FIXME TMP
 					"dns_tunnel_filter", tags,
 					(1 << 20), (1 << 8), (1 << 17));
 	return ret == kr_ok();
+}
+
+static void write_stats_line(FILE *f, uint64_t *stats_counts, struct kr_query *qry)
+{
+	struct tm *tm_info = localtime(&qry->timestamp.tv_sec);
+
+	fprintf(f, "|%04d-%02d-%02d %02d:%02d:%02d",
+		tm_info->tm_year + 1900,
+		tm_info->tm_mon + 1,
+		tm_info->tm_mday,
+		tm_info->tm_hour,
+		tm_info->tm_min,
+		tm_info->tm_sec);
+
+	for (int i = 0; i < STATS_CNT; i++)
+		fprintf(f, "|%lu", stats_counts[i]);
+
+	char buf[KNOT_DNAME_MAXLEN];
+	if (knot_dname_to_str(buf, qry->sname, sizeof(buf)))
+		fprintf(f, "|%s|\n", buf);
+}
+
+static bool read_last_counters(FILE *f, unsigned long out[STATS_CNT])
+{
+	char line[1024] = {0};
+	long pos;
+
+	if (fseek(f, 0, SEEK_END) != 0 || (pos = ftell(f)) <= 0)
+		return false;
+
+	int bar_count = 0;
+	for (long i = pos - 1; i > 0; i--) {
+		fseek(f, i, SEEK_SET);
+		int ch = fgetc(f);
+		if (ch == '|') {
+			if (++bar_count > 4)
+				break;
+		}
+	}
+
+	if (!fgets(line, sizeof(line), f))
+		return false;
+
+	char sname[256];
+	return sscanf(line,
+		"%lu|%lu|%lu|%s|\n",
+		&out[0], &out[1], &out[2], sname) == 4;
+}
+
+static void update_stats(uint8_t stat_index, struct kr_query *qry)
+{
+	uint64_t stats_counts[STATS_CNT] = {0};
+	FILE *f = fopen(STAT_FILE, "a+");
+	if (!f)
+		return;
+
+	int fd = fileno(f);
+	if (flock(fd, LOCK_EX) == -1) {
+		fclose(f);
+		return;
+	}
+
+	unsigned long last[STATS_CNT] = {0};
+	if (read_last_counters(f, last)) {
+		for (int i = 0; i < STATS_CNT; i++)
+			stats_counts[i] = last[i];
+	}
+
+	stats_counts[stat_index]++;
+
+	fseek(f, 0, SEEK_END);
+	write_stats_line(f, stats_counts, qry);
+
+	fflush(f);
+	flock(fd, LOCK_UN);
+	fclose(f);
 }
 
 static void do_filter(kr_layer_t *ctx, knot_pkt_t *pkt)
@@ -193,15 +273,23 @@ static void do_filter(kr_layer_t *ctx, knot_pkt_t *pkt)
 		limited_prefix = KRU.limited_multi_prefix_or((struct kru *)dns_tunnel_filter->kru, time_now,
 				0, key, V4_PREFIXES, prices, V4_PREFIXES_CNT, NULL);
 	}
-	if (!limited_prefix) return;  // not limited
+	if (!limited_prefix) {
+		update_stats(STATS_B, qry);
+		return;  // not limited
+	}
+	update_stats(STATS_DI, qry);
 
 	uint8_t *packet = req->qsource.packet->wire;
 	size_t packet_size = req->qsource.size;
 
 	float tunnel_prob = predict_packet(config.net, packet, packet_size);
-	
-	if (tunnel_prob <= 0.95)
+
+	if (tunnel_prob <= 0.95) {
+		update_stats(STATS_B, qry);
 		return;
+	}
+	update_stats(STATS_M, qry);
+
 	kr_log_debug(TUNNEL, "Malicious packet detected! (%f %%) %s\n",
 			(tunnel_prob - 0.95) * 100 * 20,
 	      		(do_apply ? "Blocking." : "Auditing.")
