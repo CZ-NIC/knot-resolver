@@ -1892,6 +1892,14 @@
                         "string",
                         "null"
                     ],
+                    "description": "Optional, Kafka consumer group identifier.",
+                    "default": null
+                },
+                "message-key": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
                     "description": "Optional, identifier for determining the recipient(s) using a key in the Kafka message.",
                     "default": null
                 },
@@ -1941,6 +1949,7 @@
                     "localhost@9092"
                 ],
                 "group_id": null,
+                "message_key": null,
                 "files_dir": "/var/lib/knot-resolver",
                 "security_protocol": "plaintext",
                 "cert_file": null,

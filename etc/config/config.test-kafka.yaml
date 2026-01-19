@@ -1,5 +1,6 @@
 kafka:
   enable: true
-  group-id: dns-group1
+  # group-id: dns-group1
+  message-key: dns-group1
   topic: knot-resolver
   server: localhost@9092
