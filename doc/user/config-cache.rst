@@ -12,6 +12,10 @@ To improve performance even further the resolver implements so-called aggressive
 for DNSSEC-validated data (:rfc:`8198`), which improves performance and also protects
 against some types of Random Subdomain Attacks.
 
+You can also enable automatic :ref:`prefetching <config-cache-prefetch>`
+of frequently-used records shortly before their expiration
+to avoid higher latencies in such cases.
+
 
 .. _config-cache-sizing:
 
@@ -174,3 +178,13 @@ but keeps the actual data.
 
    Time interval for which a nameserver address will be ignored after determining that it doesn't return (useful) answers.
    The intention is to avoid waiting if there's little hope; instead, kresd can immediately SERVFAIL or immediately use stale records (with :ref:`serve-stale <config-serve-stale>`).
+
+.. option:: cache/prefetch/...
+
+   Configuration of automatic prefetching of expiring records.
+   See :ref:`prefetching <config-cache-prefetch>`.
+
+.. option:: cache/garbage-collector/...
+
+   Fine-tunning of garbage collector; not recommended to be changed.
+   See :ref:`garbage collector <config-cache-gc>`.
