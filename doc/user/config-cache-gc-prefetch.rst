@@ -2,8 +2,8 @@
 
 .. _config-cache-gc-prefetch:
 
-Cache garbage collector and prefetch
-====================================
+Cache GC and prefetch
+=====================
 
 These two components help maintaining the cache utilization.
 While garbage collector evicts old and less useful records,
@@ -29,13 +29,109 @@ The exponential decay makes the value halve in 5 hours.
 Garbage collector
 -----------------
 
-TODO configuration, etc.
+Garbage collector keeps free space in cache for new records
+by evicting existing ones.
+
+The garbage collection process is spawned in a regular time intervals,
+each time checking whether the occupied space exceeded a threshold.
+If the threshold is exceeded, the content of the cache is analysed
+and a set percentage of the occupied space is released.
+Furthermore, if prefetch is enabled, a higher percentage of the occupied space is considered
+and scheduled updates are cancelled in this area.
+In both cases, the records with the lowest frequency of accesses per byte are chosen.
+
+The analysis is performed by two linear scans of the whole cache.
+We assign an integer category number (0--99) to each record
+according to its access frequency per byte stored in the KRU table;
+the higher the frequency the lower the category number.
+In the first pass, the space occupied by individual categories is calculated.
+In the second pass, we remove all from a computed limit category to higher numbers
+and cancel prefetch from another limit category to higher ones.
+Different statistics are computed and logged during the analysis
+as described in the :ref:`last section <config-cache-gc-prefetch-clashes>` of this page.
+
+If you experience issues with GC analysis being run too often or similar,
+you probably need to increase the :ref:`cache size <config-cache-sizing>`.
+The options below allow fine-tuning of GC in non-standard cases;
+usually, it is not needed and not recommended to change them.
+
+.. warning::
+
+   Misconfiguration of these options may lead to loosing all the cached data periodically.
+
+   If it happens that the cache is filled up completely,
+   kresd will remove all its data as an emergency way how to continue using it.
+   This may be caused by too high time interval,
+   too high utilization threshold, too low release percentage,
+   using dry-run mode or disabling the GC completely.
+
+
+.. option:: cache/garbage-collector/enable: true|false
+
+   :default: true
+
+   This allows disabling the GC completely;
+   nothing will ever be removed from cache until it is filled up and cleared.
+
+
+.. option:: cache/garbage-collector/interval: <time ms|s|m|h|d>
+
+   :default: 1s
+
+   Time interval how often GC is spawned.
+
+   Usually, GC just checks percentual cache utilization and immediatelly exits,
+   so it is recommended to keep the value small.
+   Using a large interval may lead to not freeing space in time.
+
+
+.. option:: cache/garbage-collector/threshold: <0-100>
+
+   :default: 80
+
+   The threshold on the percentual cache utilization;
+   if exceeded, cache analysis and follow-up freeing is initiated.
+   You have to keep there some margin so that some free space is kept until the next GC cycle.
+
+
+.. option:: cache/garbage-collector/release: <0-100>
+
+   :default: 10
+
+   Percents of used cache to be released if the analysis is spawned.
+
+
+.. option:: cache/garbage-collector/unschedule: <0-100>
+
+   :default: 20
+
+   Percents of used cache (incl. the released) for which prefetch is cancelled.
+
+
+.. option:: cache/garbage-collector/dry-run: true|false
+
+   :default: false
+
+   Perform the analysis if needed, but don't remove anything.
+
+   This may lead to running the potentially expensive cache analysis each time interval
+   as nothing is ever removed until filling up.
+
+   If you need to run the analysis only once in this mode,
+   you can also spawn the garbage collector binary ``kres-cache-gc`` by yourself;
+   execute it with ``-h`` to see the options.
+
+
+Other options are recognized,
+but they only affect some implementation details
+and they are generally not useful;
+we may also remove/change them anytime.
 
 
 .. _config-cache-prefetch:
 
-Prefetching cache records
--------------------------
+Prefetching expiring records
+----------------------------
 
 Prefetching cache records helps to keep the cache hot
 by refreshing the records shortly before their expiration.
@@ -97,7 +193,7 @@ Prefetch can benefit from activated defer,
 in which case it will better recognize when no work is waiting to be processed
 and so automatic updates may be invoked.
 
-.. option:: cache/prefetch/prediction/*
+.. option:: cache/prefetch/prediction/...
 
    Obsolete, this settings is not used anymore.
 
@@ -157,9 +253,9 @@ This means that resolver had not enough cpu time
 to initiate update of those RRs within 5s time period before their expiration.
 If this happens, resolver normally removes those prefetch entries by itself
 immediately after entering the prefetch stage when idle, which also wasn't the case.
-If you are under DoS attack, this is correct behavior;
+If you are under DoS attack, this is correct behavior:
 defer (if activated) will prioritize client's requests and prefetch will not be used at all.
 If this happens repeatedly under normal load,
 make prefetch conditions more strict.
 These prefetch entries may also be a relict after disabling prefetch,
-in which case resolver just ignores them, or after some period of not using the resolver at all.
+in which case resolver just ignores them, or after some period of not running the resolver at all.
