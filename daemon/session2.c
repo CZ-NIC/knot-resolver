@@ -1756,10 +1756,8 @@ static int session2_transport_event(struct session2 *s,
 	bool is_close_event = (event == PROTOLAYER_EVENT_CLOSE ||
 			event == PROTOLAYER_EVENT_FORCE_CLOSE);
 	if (is_close_event) {
-		if (kr_fails_assert(session2_is_empty(s))) {
-			session2_waitinglist_finalize(s, KR_STATE_FAIL);
-			session2_tasklist_finalize(s, KR_STATE_FAIL);
-		}
+		session2_waitinglist_finalize(s, KR_STATE_FAIL);
+		session2_tasklist_finalize(s, KR_STATE_FAIL);
 		session2_timer_stop(s);
 		s->closing = true;
 	}
