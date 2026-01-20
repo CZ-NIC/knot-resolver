@@ -873,7 +873,8 @@ struct session2 *session2_new(enum session2_transport_type transport_type,
 	session2_inc_refs(s); /* Session owns the timer */
 
 	/* Initialize the layer's session data */
-	for (size_t i = 0; i < grp->num_layers; i++) {
+	size_t i;
+	for (i = 0; i < grp->num_layers; i++) {
 		struct protolayer_globals *globals = &protolayer_globals[grp->layers[i]];
 		struct protolayer_data *sess_data = protolayer_sess_data_get(s, i);
 		if (sess_data) {
@@ -882,13 +883,31 @@ struct session2 *session2_new(enum session2_transport_type transport_type,
 		}
 
 		void *param = get_init_param(grp->layers[i], layer_param, layer_param_count);
-		if (globals->sess_init)
-			globals->sess_init(s, sess_data, param);
+		if (globals->sess_init && globals->sess_init(s, sess_data, param) != 0) {
+			/* Init failed, terminate session */
+			goto failed_init;
+		}
 	}
 
 	session2_touch(s);
 
 	return s;
+
+failed_init:
+	while (i --> 0) {
+		struct protolayer_globals *globals = &protolayer_globals[grp->layers[i]];
+		struct protolayer_data *sess_data = protolayer_sess_data_get(s, i);
+		if (globals->sess_deinit) {
+			globals->sess_deinit(s, sess_data);
+		}
+
+		if (sess_data) {
+			memset(sess_data, 0, globals->sess_size);
+			sess_data->session = NULL;
+		}
+	}
+
+	return NULL;
 }
 
 /** De-allocates the session. Must only be called once the underlying IO handle

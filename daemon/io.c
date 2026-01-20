@@ -381,20 +381,29 @@ static void tcp_accept_internal(uv_stream_t *master, int status, enum kr_proto g
 		return;
 	}
 
-	struct session2 *s;
-	int res = io_create(master->loop, &s, SOCK_STREAM, AF_UNSPEC, grp,
+	union session_or_handle out = { 0 };
+	int res = io_create(master->loop, &out, SOCK_STREAM, AF_UNSPEC, grp,
 			NULL, 0, false);
 	if (res) {
 		if (res == UV_EMFILE) {
 			the_worker->too_many_open = true;
 			the_worker->rconcurrent_highwatermark = the_worker->stats.rconcurrent;
 		}
-		/* Since res isn't OK struct session wasn't allocated \ borrowed.
-		 * We must release client handle only.
-		 */
+		if (out.handle != NULL) {
+			/* Since res isn't OK struct session wasn't
+			 * allocated \ borrowed. We must release client handle
+			 * only. But first accept the connection, as it has
+			 * already been established by the kernel and
+			 * it is required for proper termination.
+			 */
+			if (uv_accept(master, (uv_stream_t *)out.handle) == 0) {
+				uv_close(out.handle, (uv_close_cb)free);
+			}
+		}
 		return;
 	}
 
+	struct session2 *s = out.session;
 	kr_require(s->outgoing == false);
 
 	uv_tcp_t *client = (uv_tcp_t *)session2_get_handle(s);
@@ -916,12 +925,12 @@ int io_listen_xdp(uv_loop_t *loop, struct endpoint *ep, const char *ifname)
 }
 #endif
 
-int io_create(uv_loop_t *loop, struct session2 **out_session, int type,
-              unsigned family, enum kr_proto grp,
+int io_create(uv_loop_t *loop, union session_or_handle *out,
+              int type, unsigned family, enum kr_proto grp,
               struct protolayer_data_param *layer_param,
               size_t layer_param_count, bool outgoing)
 {
-	*out_session = NULL;
+	out->session = NULL;
 	int ret = -1;
 	uv_handle_t *handle;
 	if (type == SOCK_DGRAM) {
@@ -945,11 +954,12 @@ int io_create(uv_loop_t *loop, struct session2 **out_session, int type,
 	}
 	struct session2 *s = session2_new_io(handle, grp, layer_param,
 			layer_param_count, outgoing);
-	if (s == NULL) {
-		ret = -1;
+	if (unlikely(s == NULL)) {
+		out->handle = handle;
+		return -1;
 	}
 
-	*out_session = s;
+	out->session = s;
 	return ret;
 }
 

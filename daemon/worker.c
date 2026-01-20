@@ -157,8 +157,8 @@ static struct session2 *ioreq_spawn(int socktype, sa_family_t family,
 	}
 
 	/* Create connection for iterative query */
-	struct session2 *s;
-	int ret = io_create(the_worker->loop, &s, socktype, family, grp,
+	union session_or_handle out;
+	int ret = io_create(the_worker->loop, &out, socktype, family, grp,
 			layer_param, layer_param_count, true);
 	if (ret) {
 		if (ret == UV_EMFILE) {
@@ -167,6 +167,7 @@ static struct session2 *ioreq_spawn(int socktype, sa_family_t family,
 		}
 		return NULL;
 	}
+	struct session2 *s = out.session;
 
 	/* Bind to outgoing address, according to IP v4/v6. */
 	union kr_sockaddr *addr;
