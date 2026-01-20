@@ -1521,8 +1521,9 @@ static int session2_transport_pushv(struct session2 *s,
 						ctx);
 				return kr_ok();
 			} else {
+				bool conn = s->outgoing && the_network->enable_connect_udp;
 				int ret = uv_udp_try_send((uv_udp_t*)handle, (uv_buf_t *)iov, iovcnt,
-					the_network->enable_connect_udp ? NULL : comm->comm_addr);
+								conn ? NULL : comm->comm_addr);
 				if (ret > 0) // equals buffer size, only confuses us
 					ret = 0;
 				if (ret == UV_EAGAIN) {
