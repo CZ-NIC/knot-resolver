@@ -131,11 +131,8 @@ static bool ensure_loaded(void)
 		return false;
 
 	kr_log_warning(TUNNEL, "Tunneling filter not initialized from Lua, using hardcoded default.\n");
-	kr_rule_tags_t tags = 0;
-	int ret = kr_rule_tag_add("tunnel", &tags);
-	if (ret) return ret;
-	ret = dns_tunnel_filter_setup("/home/blcnn.pt", // FIXME TMP
-					"dns_tunnel_filter", tags,
+	int ret = dns_tunnel_filter_setup("/home/blcnn.pt", // FIXME TMP
+					"dns_tunnel_filter", KR_RULE_TAGS_ALL,
 					(1 << 20), (1 << 8), (1 << 17));
 	return ret == kr_ok();
 }
