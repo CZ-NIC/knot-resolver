@@ -16,12 +16,6 @@
 struct tls_ctx;
 struct tls_client_ctx;
 struct io_stream_data;
-/* union used for io_create. handle will be used only if session init fails,
- * allowing us to terminated the uv_handle gracefully */
-union session_or_handle {
-	struct session2 *session;
-	uv_handle_t *handle;
-};
 
 /** Bind address into a file-descriptor (only, no libuv).  type is e.g. SOCK_DGRAM */
 int io_bind(const struct sockaddr *addr, int type, const endpoint_flags_t *flags);
@@ -43,14 +37,11 @@ struct io_stream_data *io_tty_alloc_data(void);
 
 void tcp_timeout_trigger(uv_timer_t *timer);
 
-/** Initialize the handle, incl. ->data = struct session * instance.
+/** Initialize the handle
  * \param type = SOCK_*
  * \param family = AF_*
  * \param has_tls has meanings only when type is SOCK_STREAM */
-int io_create(uv_loop_t *loop, union session_or_handle *out, int type,
-              unsigned family, enum kr_proto grp,
-              struct protolayer_data_param *layer_param,
-              size_t layer_param_count, bool outgoing);
+int io_create(uv_loop_t *loop, uv_handle_t **handle, int type, unsigned family);
 void io_free(uv_handle_t *handle);
 
 int io_start_read(uv_handle_t *handle);

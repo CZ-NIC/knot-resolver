@@ -381,36 +381,26 @@ static void tcp_accept_internal(uv_stream_t *master, int status, enum kr_proto g
 		return;
 	}
 
-	union session_or_handle out = { 0 };
-	int res = io_create(master->loop, &out, SOCK_STREAM, AF_UNSPEC, grp,
-			NULL, 0, false);
-	if (res) {
-		if (res == UV_EMFILE) {
-			the_worker->too_many_open = true;
-			the_worker->rconcurrent_highwatermark = the_worker->stats.rconcurrent;
-		}
-		if (out.handle != NULL) {
+	uv_handle_t *client = { 0 };
+	if (io_create(master->loop, &client, SOCK_STREAM, AF_UNSPEC)) {
+		return;
+	}
+
+	struct session2 *s = session2_new_io(client, grp, NULL, 0, false);
+	int res = uv_accept(master, (uv_stream_t *)client);
+	if (s == NULL || res) {
+		if (s == NULL) {
 			/* Since res isn't OK struct session wasn't
 			 * allocated \ borrowed. We must release client handle
 			 * only. But first accept the connection, as it has
 			 * already been established by the kernel and
-			 * it is required for proper termination.
-			 */
-			if (uv_accept(master, (uv_stream_t *)out.handle) == 0) {
-				uv_close(out.handle, (uv_close_cb)free);
-			}
+			 * it is required for proper termination. */
+			uv_close(client, (uv_close_cb)free);
+		} else {
+			/* close session, close underlying uv handles and
+			 * deallocate (or return to memory pool) memory. */
+			session2_close(s);
 		}
-		return;
-	}
-
-	struct session2 *s = out.session;
-	kr_require(s->outgoing == false);
-
-	uv_tcp_t *client = (uv_tcp_t *)session2_get_handle(s);
-	if (uv_accept(master, (uv_stream_t *)client) != 0) {
-		/* close session, close underlying uv handles and
-		 * deallocate (or return to memory pool) memory. */
-		session2_close(s);
 		return;
 	}
 
@@ -418,14 +408,14 @@ static void tcp_accept_internal(uv_stream_t *master, int status, enum kr_proto g
 	 * even if we listened on a wildcard address. */
 	struct sockaddr *sa = session2_get_peer(s);
 	int sa_len = sizeof(struct sockaddr_in6);
-	int ret = uv_tcp_getpeername(client, sa, &sa_len);
+	int ret = uv_tcp_getpeername((uv_tcp_t *)client, sa, &sa_len);
 	if (ret || sa->sa_family == AF_UNSPEC) {
 		session2_close(s);
 		return;
 	}
 	sa = session2_get_sockname(s);
 	sa_len = sizeof(struct sockaddr_in6);
-	ret = uv_tcp_getsockname(client, sa, &sa_len);
+	ret = uv_tcp_getsockname((uv_tcp_t *)client, sa, &sa_len);
 	if (ret || sa->sa_family == AF_UNSPEC) {
 		session2_close(s);
 		return;
@@ -440,7 +430,7 @@ static void tcp_accept_internal(uv_stream_t *master, int status, enum kr_proto g
 	session2_event(s, PROTOLAYER_EVENT_CONNECT, NULL);
 	session2_timer_start(s, PROTOLAYER_EVENT_GENERAL_TIMEOUT,
 			timeout, idle_in_timeout);
-	io_start_read((uv_handle_t *)client);
+	io_start_read(client);
 }
 
 static void tcp_accept(uv_stream_t *master, int status)
@@ -925,41 +915,35 @@ int io_listen_xdp(uv_loop_t *loop, struct endpoint *ep, const char *ifname)
 }
 #endif
 
-int io_create(uv_loop_t *loop, union session_or_handle *out,
-              int type, unsigned family, enum kr_proto grp,
-              struct protolayer_data_param *layer_param,
-              size_t layer_param_count, bool outgoing)
+int io_create(uv_loop_t *loop, uv_handle_t **handle,
+              int type, unsigned family)
 {
-	out->session = NULL;
+	*handle = NULL;
 	int ret = -1;
-	uv_handle_t *handle;
 	if (type == SOCK_DGRAM) {
 		uv_udp_t *udp = malloc(sizeof(uv_udp_t));
 		kr_require(udp);
 		ret = uv_udp_init(loop, udp);
 
-		handle = (uv_handle_t *)udp;
+		*handle = (uv_handle_t *)udp;
 	} else if (type == SOCK_STREAM) {
 		uv_tcp_t *tcp = malloc(sizeof(uv_tcp_t));
 		kr_require(tcp);
 		ret = uv_tcp_init_ex(loop, tcp, family);
 		uv_tcp_nodelay(tcp, 1);
 
-		handle = (uv_handle_t *)tcp;
+		*handle = (uv_handle_t *)tcp;
 	} else {
 		kr_require(false && "io_create: invalid socket type");
 	}
-	if (ret != 0) {
-		return ret;
+	if (ret != 0 && *handle) {
+		free(*handle);
 	}
-	struct session2 *s = session2_new_io(handle, grp, layer_param,
-			layer_param_count, outgoing);
-	if (unlikely(s == NULL)) {
-		out->handle = handle;
-		return -1;
+	if (ret == UV_EMFILE) {
+		the_worker->too_many_open = true;
+		the_worker->rconcurrent_highwatermark = the_worker->stats.rconcurrent;
 	}
 
-	out->session = s;
 	return ret;
 }
 
