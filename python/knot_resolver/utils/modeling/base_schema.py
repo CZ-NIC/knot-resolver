@@ -1,5 +1,6 @@
 import enum
 import inspect
+import sys
 from abc import ABC, abstractmethod  # pylint: disable=[no-name-in-module]
 from typing import Any, Callable, Dict, Generic, List, Optional, Set, Tuple, Type, TypeVar, Union, cast
 
@@ -354,7 +355,18 @@ class ObjectMapper:
         raise DataValidationError(f"expected bool, found {type(obj)}", object_path)
 
     def _create_literal(self, tp: Type[Any], obj: Any, object_path: str) -> Any:
-        expected = get_generic_type_arguments(tp)
+        args = get_generic_type_arguments(tp)
+
+        expected = []
+        if sys.version_info < (3, 9):
+            for arg in args:
+                if is_literal(arg):
+                    expected += get_generic_type_arguments(arg)
+                else:
+                    expected.append(arg)
+        else:
+            expected = args
+
         if obj in expected:
             return obj
         raise DataValidationError(f"'{obj}' does not match any of the expected values {expected}", object_path)
