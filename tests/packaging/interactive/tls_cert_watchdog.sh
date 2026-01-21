@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
 
-# Skip these tests for now because they are failing randomly in CI.
-exit 0
-
 set -e
 
 gitroot=$(git rev-parse --show-toplevel)
