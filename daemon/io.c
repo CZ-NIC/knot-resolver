@@ -381,7 +381,7 @@ static void tcp_accept_internal(uv_stream_t *master, int status, enum kr_proto g
 		return;
 	}
 
-	uv_handle_t *client = { 0 };
+	uv_handle_t *client;
 	if (io_create(master->loop, &client, SOCK_STREAM, AF_UNSPEC)) {
 		return;
 	}
@@ -930,8 +930,9 @@ int io_create(uv_loop_t *loop, uv_handle_t **handle,
 		uv_tcp_t *tcp = malloc(sizeof(uv_tcp_t));
 		kr_require(tcp);
 		ret = uv_tcp_init_ex(loop, tcp, family);
-		uv_tcp_nodelay(tcp, 1);
-
+		if (ret != 0) {
+			uv_tcp_nodelay(tcp, 1);
+		}
 		*handle = (uv_handle_t *)tcp;
 	} else {
 		kr_require(false && "io_create: invalid socket type");

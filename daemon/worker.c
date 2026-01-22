@@ -157,7 +157,7 @@ static struct session2 *ioreq_spawn(int socktype, sa_family_t family,
 	}
 
 	/* Create connection for iterative query */
-	uv_handle_t *handle = { 0 };
+	uv_handle_t *handle;
 	if (io_create(the_worker->loop, &handle, socktype, family)) {
 		return NULL;
 	}
