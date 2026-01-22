@@ -137,7 +137,11 @@ Prefetching expiring records
 Prefetching cache records helps to keep the cache hot
 by refreshing records shortly before their expiration.
 
-The current mechanism uses access frequencies for individual records stored in KRU
+.. note::
+
+   If you use resolver in :ref:`forwarding mode <config-forward>`, prefetching will probably *not* work well,
+   because updating records before expiration might not increase their TTL due to upstream caching.
+
 to determine which records are useful enough to be updated.
 The old mechanisms provided by Lua modules ``prefetch`` and ``predict`` are now considered obsolete
 and cannot be activated from YAML.
