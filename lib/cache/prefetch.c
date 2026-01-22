@@ -8,12 +8,15 @@
 #include "lib/resolve.h"
 #include "daemon/worker.h"
 
+#include <math.h>
+
 #define VERBOSE_LOG(fmt, ...) kr_log_notice(CACHE, "PREFETCH  " fmt "\n", ## __VA_ARGS__)
 #define VERBOSE_LOGp(fmt, ...) { VERBOSE_LOG("%-7s" fmt, log_prefix, ## __VA_ARGS__); log_prefix = ""; }
 
+#define FIRST_TIMEOUT_MS           2000  // ms, no prefetch during this time after init
 #define UPDATE_BEFORE_EXP_S        5     // s
-#define FIRST_TIMEOUT_MS           1000  // ms, no prefetch during this time after init; increase?
-#define TIMER_PERIOD_MS            1000  // ms
+#define STRICTER_BEFORE_EXP_MS     2000  // ms, start increasing the bounds this time before expiration
+#define MIN_ACCESSES_AT_EXP       13107  // max counter value for normal-sized records, by settings in lib/cache/top.c
 
 struct sched {
 	knot_db_val_t ekey; // RRSet record key (E type)
@@ -103,7 +106,7 @@ void kr_cache_prefetch_init(uint32_t max_access_period_sec, float min_accesses_p
 	if (!loop_handle) return;
 	VERBOSE_LOG("INIT settings (min_accesses_per_update = %f, max_access_period = %u s)",
 			min_accesses_per_update, max_access_period_sec);
-	uv_timer_start(&timer_handle, timer_callback, FIRST_TIMEOUT_MS, TIMER_PERIOD_MS);
+	uv_timer_start(&timer_handle, timer_callback, FIRST_TIMEOUT_MS, 0);
 	conf_min_accesses_per_update = min_accesses_per_update;
 	conf_min_accesses_by_period = 1 / (1 - kr_cache_top_decay_mult(&the_resolver->cache.top, max_access_period_sec));
 	conf_enabled = true;
@@ -222,9 +225,11 @@ bool resolve_ekey(knot_db_val_t *ekey, uint16_t rrtype) {
 
 bool defer_busy = false;
 bool timer_skipped = false;
+bool timer_first_in_sec = false;
 
 void timer_callback(uv_timer_t *handle) {
 	char *log_prefix = "TIMER";
+	static int race_delay = 0;  // timer delay arising from detected race conditions on P entry removals
 
 	if (defer_busy) {
 		timer_skipped = true;
@@ -235,11 +240,13 @@ void timer_callback(uv_timer_t *handle) {
 	struct timeval tv;
 	if (gettimeofday(&tv, NULL)) return;
 	uint32_t time_now = tv.tv_sec;
+	uint64_t time_now_msec = tv.tv_usec / 1000;
 
 	for (int i = 0; i < 100; i++) {
 		knot_db_val_t pkey = { .data = "\0Q", .len = 2 };  // a key just after last P-record
 		knot_db_val_t val = { 0 };
 
+		// find the next P-entry for update
 		if (cache_op(&the_resolver->cache, read_leq, &pkey, &val) <= 0) {   // read_less seems not to work
 			VERBOSE_LOGp("nothing found");
 			goto done;
@@ -262,17 +269,21 @@ void timer_callback(uv_timer_t *handle) {
 			min_load = ((struct entry_p *)val.data)->min_load;
 		} else VERBOSE_LOGp("invalid data size");
 
+		// remove the found P-entry; it might fail due to a race but only in the 1st iteration
 		int ret = cache_op(&the_resolver->cache, remove, &pkey, 1);
 		if (ret == 0) {
 			VERBOSE_LOGp("already removed");
+			if (timer_first_in_sec) {
+				// mitigate race probability with the same process again
+				race_delay = (race_delay + 37) % 100;
+				timer_first_in_sec = false;
+			}
+			// write transaction is now kept open for all following iterations,
+			// so remove will not fail here again
 			continue;
 		}
 		if (ret < 0) {
 			VERBOSE_LOGp("cannot remove");
-			goto done; // some error?
-		}
-		if (cache_op(&the_resolver->cache, commit, true, true) != 0) {
-			VERBOSE_LOGp("cannot commit");
 			goto done; // some error?
 		}
 
@@ -281,18 +292,35 @@ void timer_callback(uv_timer_t *handle) {
 			continue;
 		}
 
-		const uint16_t load = kr_cache_top_load(&the_resolver->cache.top, sched.ekey.data, sched.ekey.len);
-		if (load < min_load) {
-			VERBOSE_LOGp("skipping, no longer eligible for prefetch (%d < %d)", load, min_load);
-			continue;
-		}
-
+		// check E-key existence
 		ret = cache_op(&the_resolver->cache, read, &sched.ekey, &val, 1);
 		if (ret != 0) {
 			VERBOSE_LOGp("ekey not found in cache");
 			continue;
 		}
 
+		// make min_load more strict closer to expiration
+		const int64_t ttl_msec = 1000 * ttl + (1000 - time_now_msec);
+			// with zero TTL, the record is considered valid till the end of the current second
+		if (ttl_msec < STRICTER_BEFORE_EXP_MS) {
+			const size_t keydata_len = kr_cache_top_entry_size(sched.ekey.len, val.len);
+			const float price16 = 0x1p-16 * kr_cache_top_entry_price(&the_resolver->cache.top, keydata_len);
+			const float stricter_min_load =
+				(MIN_ACCESSES_AT_EXP -
+					(MIN_ACCESSES_AT_EXP - conf_min_accesses_by_period) * ttl_msec / STRICTER_BEFORE_EXP_MS
+				) * price16;
+			VERBOSE_LOGp("orig min_load: %d, new min_load: %f, remaining ttl: %ld ms, size: %zu", min_load, stricter_min_load, ttl_msec, keydata_len);
+			min_load = MAX(min_load, MIN(stricter_min_load, 0xFFFF));
+		}
+
+		// check whether still eligible for prefetch by current load
+		const uint16_t load = kr_cache_top_load(&the_resolver->cache.top, sched.ekey.data, sched.ekey.len);
+		if (load < min_load) {
+			VERBOSE_LOGp("skipping, no longer eligible for prefetch (%d < %d)", load, min_load);
+			continue;
+		}
+
+		// check that E-key data matches P-entry (no update occurred in meantime)
 		ret = entry_h_seek(&val, sched.rrtype);
 		if (ret != 0) {
 			VERBOSE_LOGp("invalid data for ekey");
@@ -314,20 +342,36 @@ void timer_callback(uv_timer_t *handle) {
 			continue;
 		}
 
+		// close write transaction and initiate update
+		if (cache_op(&the_resolver->cache, commit, true, true) != 0) {
+			VERBOSE_LOGp("cannot commit");
+			goto done; // some error?
+		}
 		resolve_ekey(&sched.ekey, sched.rrtype);
 		break;
 	}
 
-	uv_timer_start(&timer_handle, timer_callback, 0, TIMER_PERIOD_MS);  // continue on next libuv cycle instead of waiting 1s
+	// other P-entries for update in this sec might exist, continue in next libuv cycle
+	cache_op(&the_resolver->cache, commit, true, true);
+	uv_timer_start(&timer_handle, timer_callback, 0, 0);
+	timer_first_in_sec = false;
+	return;
+
 done:
-	cache_op(&the_resolver->cache, commit, false, true);
+	// no other P-entries for update in this sec exist, continue sometime in the first 100 ms of the next sec
+	cache_op(&the_resolver->cache, commit, true, true);
+	uint64_t timeout = 1000 - time_now_msec + (race_delay + time_now * 13) % 100;
+	uv_timer_start(&timer_handle, timer_callback, timeout, 0);
+	timer_first_in_sec = true;
 }
 
 void kr_cache_prefetch_defer_busy(bool busy) {
 	defer_busy = busy;
 
 	if (!defer_busy && timer_skipped) {
-		uv_timer_start(&timer_handle, timer_callback, 0, TIMER_PERIOD_MS);  // continue on next libuv cycle
+		// continue with updates in next libuv cycle
+		uv_timer_start(&timer_handle, timer_callback, 0, 0);
+		timer_first_in_sec = false;
 		timer_skipped = false;
 	}
 }
