@@ -41,7 +41,7 @@ category_t categorize(struct kr_cache_top *top, struct kr_gc_cat_record_info *in
 
 	*P_eligible_out = (info->rrtype == KNOT_CACHE_PREFETCH) && (load >= info->prefetch_min_load);
 
-	if ((info->rrtype != KNOT_CACHE_RTT) && (info->expires_in <= 0)) {
+	if ((info->rrtype != KNOT_CACHE_RTT) && (info->expires_in < 0)) {
 		// evict all expired before any non-expired (incl. RTT)
 		res = res / 2 + 65;  // 65..97
 	}
