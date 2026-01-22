@@ -11,7 +11,7 @@
 #include <math.h>
 
 #define VERBOSE_LOG(fmt, ...) kr_log_notice(CACHE, "PREFETCH  " fmt "\n", ## __VA_ARGS__)
-#define VERBOSE_LOGp(fmt, ...) { VERBOSE_LOG("%-7s" fmt, log_prefix, ## __VA_ARGS__); log_prefix = ""; }
+#define VERBOSE_LOG_pkey(fmt, ...) VERBOSE_LOG(fmt " %6d %s", ## __VA_ARGS__, ttl, kr_cache_top_strkey(pkey.data, pkey.len))
 
 #define FIRST_TIMEOUT_MS           2000  // ms, no prefetch during this time after init
 #define UPDATE_BEFORE_EXP_S        5     // s
@@ -104,8 +104,6 @@ void kr_cache_prefetch_callback_init(uv_loop_t *loop, kr_cache_prefetch_callback
 
 void kr_cache_prefetch_init(uint32_t max_access_period_sec, float min_accesses_per_update) {
 	if (!loop_handle) return;
-	VERBOSE_LOG("INIT settings (min_accesses_per_update = %f, max_access_period = %u s)",
-			min_accesses_per_update, max_access_period_sec);
 	uv_timer_start(&timer_handle, timer_callback, FIRST_TIMEOUT_MS, 0);
 	conf_min_accesses_per_update = min_accesses_per_update;
 	conf_min_accesses_by_period = 1 / (1 - kr_cache_top_decay_mult(&the_resolver->cache.top, max_access_period_sec));
@@ -115,15 +113,11 @@ void kr_cache_prefetch_init(uint32_t max_access_period_sec, float min_accesses_p
 void kr_cache_prefetch_sched(knot_db_val_t key, struct entry_h *eh, size_t eh_len, size_t whole_entry_len, uint16_t rrtype) {
 	if (!conf_enabled) return;
 	struct kr_cache *cache = &the_resolver->cache;
-	VERBOSE_LOG("SCHED         %6d  %s", eh->ttl, kr_cache_top_strkey(key.data, key.len));
 	const int ktype = key_consistent(key);
-	if (ktype & ~0xFFFF) {
-		VERBOSE_LOG("    not E-type key");
-		return;
-	}
+	if (ktype & ~0xFFFF) return;  // not E-type key
 
 	const int32_t time_to_update = eh->ttl - UPDATE_BEFORE_EXP_S;
-	if (time_to_update < 1) return;
+	if (time_to_update < 1) return;  // too small TTL
 
 	const uint16_t load = kr_cache_top_load(&cache->top, key.data, key.len);
 	size_t keydata_len = kr_cache_top_entry_size(key.len, whole_entry_len);
@@ -155,16 +149,7 @@ void kr_cache_prefetch_sched(knot_db_val_t key, struct entry_h *eh, size_t eh_le
 	const float min_loadf = price16 * MAX(conf_min_accesses_by_period, min_accesses_by_per_update);
 	const uint16_t min_load = MIN(min_loadf, 0xFFFF);
 
-	VERBOSE_LOG("    load: %u (%0.2f acc.), min_load: %u (%0.2f acc.), to_update: %d, size: %zu",
-		load, load / price16,
-		min_load, min_load / price16,
-		eh->ttl - UPDATE_BEFORE_EXP_S,
-		keydata_len);
-
-	if (load < min_load) {
-		VERBOSE_LOG("    under threshold");
-		return;
-	}
+	if (load < min_load) return;  // under threshold
 
 	const double accesses = (double)load / price16; // includes the just occurring write access
 
@@ -172,10 +157,15 @@ void kr_cache_prefetch_sched(knot_db_val_t key, struct entry_h *eh, size_t eh_le
 	sched.ekey = key;
 	sched.rrtype = rrtype;
 	sched.exp_time = eh->time + eh->ttl;
-	sched.priority = MIN(sqrt(accesses * /* top base price */ 5) + 1, 255);  // TODO  consider this vs lin-log gc categories
+	sched.priority = MIN(sqrt(accesses * /* top base price */ 5) + 1, 255);
 		// accesses distributed in range of 1B for normal-size records (non-zero, capped for larger)
 
 	knot_db_val_t pkey = sched2pkey(sched);
+
+	const int32_t ttl = eh->ttl;
+	VERBOSE_LOG_pkey("scheduling      %7.1f > %-7.1f",
+		load / price16, min_load / price16);
+
 	if (KNOT_RRTYPE_NS) {
 		keydata_len = (keydata_len - whole_entry_len) / 3 + eh_len;   // we divide size of common data of NS, CNAME, DNAME between them
 	}
@@ -193,7 +183,6 @@ void kr_cache_prefetch_sched(knot_db_val_t key, struct entry_h *eh, size_t eh_le
 
 void kr_cache_prefetch_unsched(knot_db_val_t key, const struct entry_h *eh, uint16_t rrtype) {
 	if (!conf_enabled || !eh || !eh->prefetch_priority) return;
-	VERBOSE_LOG("UNSCHED               %s", kr_cache_top_strkey(key.data, key.len));
 	struct sched sched = {
 		.ekey = key,
 		.rrtype = rrtype,
@@ -218,7 +207,6 @@ bool resolve_ekey(knot_db_val_t *ekey, uint16_t rrtype) {
 		return false;
 	}
 
-	VERBOSE_LOG("UPDATE  %s %d", kr_cache_top_strkey(qname, qname_len), rrtype);
 	int ret = update_callback(qname, rrtype);
 	return !ret;
 }
@@ -228,12 +216,11 @@ bool timer_skipped = false;
 bool timer_first_in_sec = false;
 
 void timer_callback(uv_timer_t *handle) {
-	char *log_prefix = "TIMER";
 	static int race_delay = 0;  // timer delay arising from detected race conditions on P entry removals
 
 	if (defer_busy) {
 		timer_skipped = true;
-		VERBOSE_LOGp("skipped, defer busy");
+		VERBOSE_LOG("skipped, defer busy");
 		return;
 	}
 
@@ -247,106 +234,110 @@ void timer_callback(uv_timer_t *handle) {
 		knot_db_val_t val = { 0 };
 
 		// find the next P-entry for update
-		if (cache_op(&the_resolver->cache, read_leq, &pkey, &val) <= 0) {   // read_less seems not to work
-			VERBOSE_LOGp("nothing found");
-			goto done;
-		}
+		if (cache_op(&the_resolver->cache, read_leq, &pkey, &val) <= 0) goto done;  // nothing found
 
 		struct sched sched = { 0 };
-		if (!pkey2sched(pkey, &sched)) {
-			VERBOSE_LOGp("found but not relevant: %s", kr_cache_top_strkey(pkey.data, pkey.len));
-			goto done;
-		}
-		int32_t ttl = sched.exp_time - time_now;
+		if (!pkey2sched(pkey, &sched)) goto done;  // not a P-entry
+
+		const int32_t ttl = sched.exp_time - time_now;
 		if (ttl > UPDATE_BEFORE_EXP_S) {
-			VERBOSE_LOGp("next:  %6d %s", sched.exp_time - time_now, kr_cache_top_strkey(pkey.data, pkey.len));
-			goto done;
+			static int32_t next_time_logged = 0;
+			if (next_time_logged != sched.exp_time) {
+				VERBOSE_LOG_pkey("next                             ");
+				next_time_logged = sched.exp_time;
+			}
+			goto done;  // found but for later update
 		}
-		VERBOSE_LOGp("found: %6d %s", ttl, kr_cache_top_strkey(pkey.data, pkey.len));
 
 		uint16_t min_load = 0xFFFF;
 		if (val.len == sizeof(struct entry_p)) {
 			min_load = ((struct entry_p *)val.data)->min_load;
-		} else VERBOSE_LOGp("invalid data size");
+		}
 
 		// remove the found P-entry; it might fail due to a race but only in the 1st iteration
 		int ret = cache_op(&the_resolver->cache, remove, &pkey, 1);
 		if (ret == 0) {
-			VERBOSE_LOGp("already removed");
 			if (timer_first_in_sec) {
 				// mitigate race probability with the same process again
 				race_delay = (race_delay + 37) % 100;
 				timer_first_in_sec = false;
+				VERBOSE_LOG_pkey("found but race detected, delaying");
+			} else {
+				VERBOSE_LOG_pkey("found but race detected          ");
 			}
 			// write transaction is now kept open for all following iterations,
 			// so remove will not fail here again
 			continue;
 		}
 		if (ret < 0) {
-			VERBOSE_LOGp("cannot remove");
+			VERBOSE_LOG_pkey("found but cannot remove          ");
 			goto done; // some error?
 		}
 
+		if (min_load == 0xFFFF) {
+			VERBOSE_LOG_pkey("found but invalid data           ");
+			continue;
+		}
+
 		if (ttl < 0) {
-			VERBOSE_LOGp("skipping expired");
+			VERBOSE_LOG_pkey("found expired                    ");
 			continue;
 		}
 
 		// check E-key existence
 		ret = cache_op(&the_resolver->cache, read, &sched.ekey, &val, 1);
 		if (ret != 0) {
-			VERBOSE_LOGp("ekey not found in cache");
+			VERBOSE_LOG_pkey("found but no E-key               ");
 			continue;
 		}
 
 		// make min_load more strict closer to expiration
 		const int64_t ttl_msec = 1000 * ttl + (1000 - time_now_msec);
 			// with zero TTL, the record is considered valid till the end of the current second
+		const size_t keydata_len = kr_cache_top_entry_size(sched.ekey.len, val.len);
+		const float price16 = 0x1p-16 * kr_cache_top_entry_price(&the_resolver->cache.top, keydata_len);
 		if (ttl_msec < STRICTER_BEFORE_EXP_MS) {
-			const size_t keydata_len = kr_cache_top_entry_size(sched.ekey.len, val.len);
-			const float price16 = 0x1p-16 * kr_cache_top_entry_price(&the_resolver->cache.top, keydata_len);
 			const float stricter_min_load =
 				(MIN_ACCESSES_AT_EXP -
 					(MIN_ACCESSES_AT_EXP - conf_min_accesses_by_period) * ttl_msec / STRICTER_BEFORE_EXP_MS
 				) * price16;
-			VERBOSE_LOGp("orig min_load: %d, new min_load: %f, remaining ttl: %ld ms, size: %zu", min_load, stricter_min_load, ttl_msec, keydata_len);
 			min_load = MAX(min_load, MIN(stricter_min_load, 0xFFFF));
 		}
 
 		// check whether still eligible for prefetch by current load
 		const uint16_t load = kr_cache_top_load(&the_resolver->cache.top, sched.ekey.data, sched.ekey.len);
 		if (load < min_load) {
-			VERBOSE_LOGp("skipping, no longer eligible for prefetch (%d < %d)", load, min_load);
+			VERBOSE_LOG_pkey("found non-elig. %7.1f < %-7.1f",
+					load / price16, min_load / price16);
 			continue;
 		}
 
 		// check that E-key data matches P-entry (no update occurred in meantime)
 		ret = entry_h_seek(&val, sched.rrtype);
 		if (ret != 0) {
-			VERBOSE_LOGp("invalid data for ekey");
+			VERBOSE_LOG_pkey("found but invalid E-key data     ");
 			continue;
 		}
 
 		struct entry_h *eh = entry_h_consistent_E(val, sched.rrtype);
 		if (!eh) {
-			VERBOSE_LOGp("invalid data for ekey");
+			VERBOSE_LOG_pkey("found but invalid E-key eh data  ");
 			continue;
 		}
 
 		if ((eh->time + eh->ttl != sched.exp_time) || (eh->prefetch_priority != sched.priority)) {
-			VERBOSE_LOGp("ttl/priority mismatch, maybe already updated (ttl %d -> %d, prio. %d -> %d", 
-					sched.exp_time - time_now,
-					eh->time + eh->ttl - time_now,
-					sched.priority,
-					eh->prefetch_priority);
+			VERBOSE_LOG_pkey("found but already updated        ");
 			continue;
 		}
 
 		// close write transaction and initiate update
 		if (cache_op(&the_resolver->cache, commit, true, true) != 0) {
-			VERBOSE_LOGp("cannot commit");
+			VERBOSE_LOG_pkey("found but cannot commit removal  ");
 			goto done; // some error?
 		}
+
+		VERBOSE_LOG_pkey("updating        %7.1f > %-7.1f",
+				load / price16, min_load / price16);
 		resolve_ekey(&sched.ekey, sched.rrtype);
 		break;
 	}
