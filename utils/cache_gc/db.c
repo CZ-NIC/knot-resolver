@@ -178,13 +178,12 @@ int kr_gc_cache_iter(knot_db_t * knot_db, struct kr_cache_top *top, const kr_cac
 			switch (entry_type) {
 				case KNOT_CACHE_PREFETCH:
 					uint32_t exp_time;
-					kr_cache_prefetch_parse_pkey(key, &info.prefetch_ekey, &exp_time);
+					if (!kr_cache_prefetch_parse_pkey(key, &info.prefetch_ekey, &exp_time)) break;
 					info.expires_in = exp_time - now;
-					if (val.len == sizeof(struct entry_p)) {
-						struct entry_p *ep = val.data;
-						info.prefetch_ekeydata_len = ep->ekeydata_len;
-						info.prefetch_min_load = ep->min_load;
-					}
+					if (val.len != sizeof(struct entry_p)) break;
+					struct entry_p *ep = val.data;
+					info.prefetch_ekeydata_len = ep->ekeydata_len;
+					info.prefetch_min_load = ep->min_load;
 					// fall through
 				case KNOT_CACHE_RTT:
 					info.valid = true;

@@ -16,7 +16,7 @@
 #define FIRST_TIMEOUT_MS           2000  // ms, no prefetch during this time after init
 #define UPDATE_BEFORE_EXP_S        5     // s
 #define STRICTER_BEFORE_EXP_MS     2000  // ms, start increasing the bounds this time before expiration
-#define MIN_ACCESSES_AT_EXP       13107  // max counter value for normal-sized records, by settings in lib/cache/top.c
+#define MIN_ACCESSES_AT_EXP        5243  // acc., 5s access period
 
 struct sched {
 	knot_db_val_t ekey; // RRSet record key (E type)
@@ -34,9 +34,10 @@ bool conf_enabled = false;
 
 void timer_callback(uv_timer_t *handle);
 
-knot_db_val_t sched2pkey(struct sched sched) {
+knot_db_val_t sched2pkey(struct sched sched)
+{
 	// CACHE_KEY_DEF:  type 'P', -(time of expiration), priority, original E-type key with type replaced by original rrtype
-	static uint8_t buf[KR_CACHE_KEY_MAXLEN] = "\0P";  // maybe use a little more than KR_CACHE_KEY_MAXLEN
+	static uint8_t buf[KR_CACHE_KEY_MAXLEN + 7] = "\0P";
 	knot_db_val_t pkey = { 0 };
 
 	uint8_t *s = buf + 2;
@@ -59,7 +60,8 @@ knot_db_val_t sched2pkey(struct sched sched) {
 	return pkey;
 }
 
-bool pkey2sched(knot_db_val_t pkey, struct sched *sched) {
+bool pkey2sched(knot_db_val_t pkey, struct sched *sched)
+{
 	static uint8_t buf[KR_CACHE_KEY_MAXLEN];
 	uint8_t *s = pkey.data;
 	if ((pkey.len < 4 + sizeof(sched->exp_time)) || (*s++ != '\0') || (*s++ != 'P')) return false;
@@ -86,23 +88,25 @@ bool pkey2sched(knot_db_val_t pkey, struct sched *sched) {
 	return true;
 }
 
-void kr_cache_prefetch_parse_pkey(knot_db_val_t pkey, knot_db_val_t *ekey, uint32_t *exp_time) {
+bool kr_cache_prefetch_parse_pkey(knot_db_val_t pkey, knot_db_val_t *ekey, uint32_t *exp_time)
+{
 	struct sched sched = { 0 };
-	pkey2sched(pkey, &sched);  // XXX false?
+	bool ret = pkey2sched(pkey, &sched);
 	*ekey = sched.ekey;
 	*exp_time = sched.exp_time;
-	// TODO  efficiency?
+	return ret;
 }
 
 
-void kr_cache_prefetch_callback_init(uv_loop_t *loop, kr_cache_prefetch_callback_t callback) {
-	VERBOSE_LOG("INIT callback");
+void kr_cache_prefetch_callback_init(uv_loop_t *loop, kr_cache_prefetch_callback_t callback)
+{
 	uv_timer_init(loop, &timer_handle);
 	loop_handle = loop;
 	update_callback = callback;
 }
 
-void kr_cache_prefetch_init(uint32_t max_access_period_sec, float min_accesses_per_update) {
+void kr_cache_prefetch_init(uint32_t max_access_period_sec, float min_accesses_per_update)
+{
 	if (!loop_handle) return;
 	uv_timer_start(&timer_handle, timer_callback, FIRST_TIMEOUT_MS, 0);
 	conf_min_accesses_per_update = min_accesses_per_update;
@@ -110,7 +114,8 @@ void kr_cache_prefetch_init(uint32_t max_access_period_sec, float min_accesses_p
 	conf_enabled = true;
 }
 
-void kr_cache_prefetch_sched(knot_db_val_t key, struct entry_h *eh, size_t eh_len, size_t whole_entry_len, uint16_t rrtype) {
+void kr_cache_prefetch_sched(knot_db_val_t key, struct entry_h *eh, size_t eh_len, size_t whole_entry_len, uint16_t rrtype)
+{
 	if (!conf_enabled) return;
 	struct kr_cache *cache = &the_resolver->cache;
 	const int ktype = key_consistent(key);
@@ -181,7 +186,8 @@ void kr_cache_prefetch_sched(knot_db_val_t key, struct entry_h *eh, size_t eh_le
 	// to be called during another write transaction, so we are not committing here
 }
 
-void kr_cache_prefetch_unsched(knot_db_val_t key, const struct entry_h *eh, uint16_t rrtype) {
+void kr_cache_prefetch_unsched(knot_db_val_t key, const struct entry_h *eh, uint16_t rrtype)
+{
 	if (!conf_enabled || !eh || !eh->prefetch_priority) return;
 	struct sched sched = {
 		.ekey = key,
@@ -193,7 +199,8 @@ void kr_cache_prefetch_unsched(knot_db_val_t key, const struct entry_h *eh, uint
 	cache_op(&the_resolver->cache, remove, &pkey, 1);
 }
 
-bool resolve_ekey(knot_db_val_t *ekey, uint16_t rrtype) {
+bool resolve_ekey(knot_db_val_t *ekey, uint16_t rrtype)
+{
 	if (!update_callback) return false;
 	if (key_consistent(*ekey) & ~0xFFFF) {  // E-type key
 		VERBOSE_LOG("    invalid ekey: %s", kr_cache_top_strkey(ekey->data, ekey->len));
@@ -215,7 +222,8 @@ bool defer_busy = false;
 bool timer_skipped = false;
 bool timer_first_in_sec = false;
 
-void timer_callback(uv_timer_t *handle) {
+void timer_callback(uv_timer_t *handle)
+{
 	static int race_delay = 0;  // timer delay arising from detected race conditions on P entry removals
 
 	if (defer_busy) {
@@ -356,7 +364,8 @@ done:
 	timer_first_in_sec = true;
 }
 
-void kr_cache_prefetch_defer_busy(bool busy) {
+void kr_cache_prefetch_defer_busy(bool busy)
+{
 	defer_busy = busy;
 
 	if (!defer_busy && timer_skipped) {
