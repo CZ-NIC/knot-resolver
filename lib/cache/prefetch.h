@@ -7,6 +7,16 @@
 #include "lib/cache/api.h"
 #include <uv.h>
 
+struct entry_h;
+
+// Data of P-entry in cache.
+struct entry_p {
+	uint16_t ekeydata_len;
+	uint16_t min_load;
+} __attribute__ ((packed,aligned(1))); // needed by LMDB
+
+
+// Callback function invoking RR update.
 typedef int (*kr_cache_prefetch_callback_t)(knot_dname_t *qname, uint16_t qtype);
 
 // Initialize update callback and timer handle.
@@ -18,28 +28,23 @@ void kr_cache_prefetch_callback_init(uv_loop_t *loop, kr_cache_prefetch_callback
 KR_EXPORT
 void kr_cache_prefetch_init(uint32_t max_access_period_sec, float min_accesses_per_update);
 
-struct entry_h;
-
-struct entry_p {
-	uint16_t ekeydata_len;
-	uint16_t min_load;
-} __attribute__ ((packed,aligned(1))); // needed by LMDB
 
 // Try scheduling prefetching.
 // To be called during write transaction of (key, eh); eh may be modified inside.
 KR_EXPORT
 void kr_cache_prefetch_sched(knot_db_val_t key, struct entry_h *eh, size_t eh_len, size_t whole_entry_len, uint16_t rrtype);
-	// XXX call either directly or from top_access to compute hash just once
 
 // Cancel scheduled prefetching if set. Void if eh is NULL.
 KR_EXPORT
 void kr_cache_prefetch_unsched(knot_db_val_t key, const struct entry_h *eh, uint16_t rrtype);
 
 
-// Pauses prefetching if defer is busy.
+// Pause prefetching if defer is busy.
 // To be called from defer to announce its state.
 KR_EXPORT
 void kr_cache_prefetch_defer_busy(bool busy);
 
+// Parse E-key and expiration time from P-key;
+// returns true on success.
 KR_EXPORT
-void kr_cache_prefetch_parse_pkey(knot_db_val_t pkey, knot_db_val_t *ekey, uint32_t *exp_time);
+bool kr_cache_prefetch_parse_pkey(knot_db_val_t pkey, knot_db_val_t *ekey, uint32_t *exp_time);
