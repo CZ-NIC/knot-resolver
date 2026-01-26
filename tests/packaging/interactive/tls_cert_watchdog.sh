@@ -98,6 +98,8 @@ fi
 # test recovery from deletion and creation
 # {{
 
+sleep 6
+
 rel_count=$(count_reloads)
 
 # backup cert files
