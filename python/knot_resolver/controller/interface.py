@@ -224,7 +224,11 @@ class Subprocess(ABC):
             # read result
             (msg_len,) = struct.unpack(">I", await reader.read(4))
             result_bytes = await reader.readexactly(msg_len)
-            return json.loads(result_bytes.decode("utf8"))
+
+            try:
+                return json.loads(result_bytes.decode("utf8"))
+            except json.JSONDecodeError:
+                return result_bytes.decode("utf8")
 
         finally:
             if writer is not None:
