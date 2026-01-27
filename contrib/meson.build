@@ -1,6 +1,10 @@
 # contrib
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+if embed_ngtcp2 
+  subdir('./libngtcp2')
+endif
+
 contrib_src = files([
   'ccan/asprintf/asprintf.c',
   'ccan/json/json.c',
