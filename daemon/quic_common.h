@@ -41,7 +41,7 @@ typedef enum {
 	     error code. */
 	DOQ_UNSPECIFIED_ERROR = 0x5,
 	/*! Alternative error code, can be used for tests. */
-	DOQ_ERROR_RESERVED = 0xd098ea5e
+	//DOQ_ERROR_RESERVED = 0xd098ea5e
 } quic_doq_error_t;
 
 // Macros from knot quic impl

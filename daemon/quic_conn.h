@@ -39,8 +39,8 @@ typedef enum {
 	((conn)->state < QUIC_STATE_DRAINING)
 
 typedef struct {
-	void *get_conn;
-	void *user_data;
+	struct ngtcp2_conn *(*get_conn)(ngtcp2_crypto_conn_ref *conn_ref);
+	struct pl_quic_conn_sess_data *user_data;
 } nc_conn_ref_placeholder_t;
 
 struct kr_quic_stream_list {

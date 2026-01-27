@@ -315,7 +315,7 @@ static int conn_new_handler(ngtcp2_conn **pconn, const ngtcp2_path *path,
 	if (limit != 0) {
 		settings.max_tx_udp_payload_size = limit;
 	}
-	
+
 	settings.handshake_timeout = QUIC_HS_IDLE_TIMEOUT;
 	settings.no_pmtud = true;
 
@@ -360,8 +360,10 @@ static int conn_new_handler(ngtcp2_conn **pconn, const ngtcp2_path *path,
 	}
 
 	if (server) {
-		return ngtcp2_conn_server_new(pconn, scid, dcid, path, version,
-				&callbacks, &settings, &params, NULL, conn);
+		const ngtcp2_cid *client_dcid = scid;
+		const ngtcp2_cid *client_scid = dcid;
+		return ngtcp2_conn_server_new(pconn, client_dcid, client_scid, path,
+				version, &callbacks, &settings, &params, NULL, conn);
 	} else {
 		kr_log_warning(DOQ, "Client side is not implemented\n");
 		return kr_error(EINVAL);
@@ -474,7 +476,7 @@ int kr_tls_server_session(struct pl_quic_conn_sess_data *conn)
 	return ret;
 }
 
-static ngtcp2_conn *get_conn(ngtcp2_crypto_conn_ref *conn_ref)
+ngtcp2_conn *get_conn(ngtcp2_crypto_conn_ref *conn_ref)
 {
 	return ((struct pl_quic_conn_sess_data *)conn_ref->user_data)->conn;
 }
