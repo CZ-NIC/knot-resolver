@@ -137,13 +137,31 @@ message('--- optional dependencies ---')
 nghttp2 = dependency('libnghttp2', required: false)
 openssl = dependency('openssl', required: false)
 
-libngtcp2 = dependency('libngtcp2', version: '>=1.11.0', required: get_option('quic') == 'external')
-libngtcp2_crypto = dependency('libngtcp2_crypto_gnutls', required: get_option('quic') == 'external')
-enable_quic = libngtcp2.found() and libngtcp2_crypto.found()
-if enable_quic
-  libngtcp2_deps = [libngtcp2, libngtcp2_crypto]
+embed_ngtcp2 = false
+if get_option('quic') == 'disabled'
+  quic_sumstr = 'disabled explicitly'
+  enable_quic = false
+  libngtcp2_deps = []
+else
+  libngtcp2 = dependency('libngtcp2', version: '>=1.11.0', required: get_option('quic') == 'external')
+  libngtcp2_crypto = dependency('libngtcp2_crypto_gnutls', required: get_option('quic') == 'external')
+  if libngtcp2.found() and libngtcp2_crypto.found()
+    quic_sumstr = 'with external libngtcp2*'
+    enable_quic = true
+    libngtcp2_deps = [libngtcp2, libngtcp2_crypto]
+  elif gnutls.version() >= '3.7.5' # https://github.com/ngtcp2/ngtcp2?tab=readme-ov-file#requirements
+    quic_sumstr = 'with embedded libngtcp2*'
+    enable_quic = true
+    embed_ngtcp2 = true
+    #libngtcp2_deps gets set later, as it's not possible at this point yet
+  elif get_option('quic') == 'auto'
+    quic_sumstr = 'disabled because missing dependencies'
+    enable_quic = false
+    libngtcp2_deps = []
+  else
+    error('failed to satisfy -Dquic=embedded')
+  endif
 endif
-quic_summary = [enable_quic, 'with external libngtcp2*']
 
 have_asprintf = meson.get_compiler('c').has_function('asprintf',
   prefix: '#define _GNU_SOURCE\n#include <stdio.h>')
@@ -185,7 +203,7 @@ malloc = meson.get_compiler('c').find_library(
 summary({'sendmmsg': sendmmsg,
          'XDP (in libknot)': xdp,
          'doh2 (serving)': nghttp2.found(),
-         'DoQ': quic_summary,
+         'DoQ': [enable_quic, quic_sumstr],
          'capabilities': capng.found(),
          'malloc': malloc.found() ? malloc_name : 'libc default',
         }, section: 'Features', bool_yn: true)

@@ -167,10 +167,11 @@ option(
   choices: [
     'auto',
     'external',
+    'embedded',
     'disabled',
   ],
   value: 'auto',
-  description: 'build DNS-over-QUIC support, requiring compatible libngtcp2',
+  description: 'build DNS-over-QUIC support',
 )
 
 option(
