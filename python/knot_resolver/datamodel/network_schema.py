@@ -4,8 +4,8 @@ from knot_resolver.constants import WATCHDOG_LIB
 from knot_resolver.datamodel.types import (
     EscapedStr32B,
     Int0_512,
-    Int1_4096,
     Int0_65535,
+    Int1_4096,
     InterfaceOptionalPort,
     IPAddress,
     IPAddressEM,
@@ -52,23 +52,25 @@ class AddressRenumberingSchema(ConfigSchema):
 class QUICSchema(ConfigSchema):
     class Raw(ConfigSchema):
         """
-        Optional DoQ configuration
+        Optional DoQ configuration.
 
         ---
         max_conns: Maximum number of active connections a single worker is allowed to accept.
         max_streams: Maximum number of concurrent streams a connection is allowed to open.
-        require_retry: Require address validation for unknown source addresses. Adds a 1-RTT delay to connection establishment.
+        require_retry: Require address validation for unknown source addresses.
+                        This adds a 1-RTT delay to connection establishment.
         """
 
         max_conns: Int1_4096 = Int1_4096(1024)
         max_streams: Int1_4096 = Int1_4096(1024)
-        require_retry: bool = False;
+        require_retry: bool = False
 
     _LAYER = Raw
 
     max_conns: Int1_4096 = Int1_4096(1024)
     max_streams: Int1_4096 = Int1_4096(1024)
-    require_retry: bool = False;
+    require_retry: bool = False
+
 
 class TLSSchema(ConfigSchema):
     class Raw(ConfigSchema):
@@ -161,7 +163,7 @@ class ListenSchema(ConfigSchema):
             return origin.port
         # default port number based on kind
         if origin.interface:
-            if origin.kind == "dot" or origin.kind == "doq":
+            if origin.kind in ["dot", "doq"]:
                 return PortNumber(853)
             if origin.kind in ["doh-legacy", "doh2"]:
                 return PortNumber(443)

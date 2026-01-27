@@ -380,7 +380,7 @@
                         },
                         "require-retry": {
                             "type": "boolean",
-                            "description": "Require address validation for unknown source addresses. Adds a 1-RTT delay to connection establishment.",
+                            "description": "Require address validation for unknown source addresses. This adds a 1-RTT delay to connection establishment.",
                             "default": false
                         }
                     },
