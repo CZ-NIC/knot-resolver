@@ -19,6 +19,21 @@ class _TestStr(ConfigSchema):
     v: str
 
 
+class _TestLiteral(ConfigSchema):
+    v: Literal[Literal["lit1"], Literal["lit2"]]
+
+
+@pytest.mark.parametrize("val", ["lit1", "lit2"])
+def test_parsing_literal_valid(val: str):
+    assert _TestLiteral(parse_yaml(f"v: {val}")).v == val
+
+
+@pytest.mark.parametrize("val", ["invalid", "false", 1, "null"])
+def test_parsing_literal_invalid(val: str):
+    with raises(DataValidationError):
+        _TestLiteral(parse_yaml(f"v: {val}"))
+
+
 @pytest.mark.parametrize("val,exp", [("false", False), ("true", True), ("False", False), ("True", True)])
 def test_parsing_bool_valid(val: str, exp: bool):
     assert _TestBool(parse_yaml(f"v: {val}")).v == exp
