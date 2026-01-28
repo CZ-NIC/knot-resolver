@@ -2,14 +2,13 @@ import asyncio
 import logging
 import shutil
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, List, Mapping, Optional, Tuple
 
 from knot_resolver.constants import KAFKA_LIB
 from knot_resolver.datamodel import KresConfig
 from knot_resolver.manager.config_store import ConfigStore
 from knot_resolver.manager.exceptions import KresKafkaClientError
 from knot_resolver.manager.triggers import trigger_reload
-from knot_resolver.utils import compat
 from knot_resolver.utils.functional import Result
 from knot_resolver.utils.modeling import try_to_parse
 from knot_resolver.utils.modeling.exceptions import DataParsingError, DataValidationError
@@ -245,7 +244,13 @@ if KAFKA_LIB:
 
     logger.info("Successfully processed message")
 
-    def process_messages(messages: Dict[TopicPartition, List[ConsumerRecord]], config: KresConfig) -> None:
+    def process_messages(
+        messages: Mapping[
+            TopicPartition,
+            List[ConsumerRecord[Any, Any]],
+        ],
+        config: KresConfig,
+    ) -> None:
         error_msg_prefix = "Processing message failed with"
 
         for _partition, records in messages.items():
@@ -264,8 +269,11 @@ if KAFKA_LIB:
     class KresKafkaClient:
         def __init__(self, config: KresConfig) -> None:
             self._config = config
+            self._loop = asyncio.get_running_loop()
+            self._stop_event = asyncio.Event()
+
             self._consumer: Optional[KafkaConsumer] = None
-            self._consumer_task: Optional["asyncio.Task[None]"] = None
+            self._consume_task: Optional["asyncio.Task[None]"] = None
 
             # reduce the verbosity of kafka module logger
             kafka_logger = logging.getLogger("kafka")
@@ -277,10 +285,7 @@ if KAFKA_LIB:
                 brokers.append(broker.replace("@", ":") if server.port else f"{broker}:9092")
             self._brokers: List[str] = brokers
 
-            if compat.asyncio.is_event_loop_running():
-                self._consumer_task = compat.asyncio.create_task(self._consumer_run())
-            else:
-                self._consumer_task = compat.asyncio.run(self._consumer_run())
+            self._consume_task = asyncio.create_task(self._consume())
 
         def _consumer_connect(self) -> None:
             error_msg_prefix = f"Connecting consumer to Kafka broker(s) '{self._brokers}' has failed with"
@@ -310,36 +315,48 @@ if KAFKA_LIB:
             except Exception as e:
                 logger.error(f"{error_msg_prefix} unknown error:\n{e}")
 
-        def deinit(self) -> None:
-            if self._consumer_task:
-                self._consumer_task.cancel()
-            if self._consumer:
-                self._consumer.close()
-                self._consumer = None
+        async def _stop(self):
+            self._stop_event.set()
 
-        async def _consumer_run(self) -> None:
+        def deinit(self) -> None:
+            asyncio.create_task(self._stop())
+            self._consumer = None
+
+        async def _consume(self) -> None:
             error_msg_prefix = "Consuming messages failed with"
 
-            while True:
-                if not self._consumer:
-                    # connect to brokers
-                    self._consumer_connect()
-                    logger.info("Starting to consume messages every 10 seconds")
-                else:
-                    # ready to consume messages
-                    try:
-                        messages: Dict[TopicPartition, List[ConsumerRecord]] = self._consumer.poll(timeout_ms=1000)
-                        if messages:
-                            # ready to process messages
-                            process_messages(messages, self._config)
-                        else:
-                            await asyncio.sleep(5)
-                    except KafkaError as e:
-                        logger.error(f"{error_msg_prefix} Kafka error:\n{e}")
+            try:
+                while not self._stop_event.is_set():
+                    if not self._consumer:
+                        # connect to brokers
                         self._consumer_connect()
-                    except Exception as e:
-                        logger.error(f"{error_msg_prefix} unknown error:\n{e}")
-                        self._consumer_connect()
+                        logger.info("Starting to consume messages every 10 seconds")
+                    else:
+                        # ready to consume messages
+                        try:
+                            messages: Mapping[
+                                TopicPartition,
+                                List[ConsumerRecord[Any, Any]],
+                            ] = await self._loop.run_in_executor(
+                                None,
+                                self._consumer.poll,
+                                1000,
+                            )
+                            if messages:
+                                # ready to process messages
+                                process_messages(messages, self._config)
+                            else:
+                                await asyncio.sleep(5)
+                        except KafkaError as e:
+                            logger.error(f"{error_msg_prefix} Kafka error:\n{e}")
+                            self._consumer_connect()
+                        except Exception as e:
+                            logger.error(f"{error_msg_prefix} unknown error:\n{e}")
+                            self._consumer_connect()
+
+            finally:
+                if self._consumer:
+                    self._consumer.close()
 
 
 async def _deny_kafka_change(old_config: KresConfig, new_config: KresConfig, _force: bool = False) -> Result[None, str]:
