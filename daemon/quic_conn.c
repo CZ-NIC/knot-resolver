@@ -6,8 +6,7 @@
 #include "network.h"
 #include "quic_common.h"
 #include "quic_stream.h"
-#include "libdnssec/random.h"
-#include "libdnssec/error.h"
+#include "lib/dnssec.h"
 #include "worker.h"
 
 #define EPHEMERAL_CERT_EXPIRATION_SECONDS_RENEW_BEFORE ((time_t)60*60*24*7)
@@ -354,9 +353,10 @@ static int conn_new_handler(ngtcp2_conn **pconn, const ngtcp2_path *path,
 		params.retry_scid_present = 1;
 	}
 
-	if (dnssec_random_buffer(params.stateless_reset_token,
-				NGTCP2_STATELESS_RESET_TOKENLEN) != DNSSEC_EOK) {
-		return kr_error(DNSSEC_ERROR);
+	int ret = dnssec_random_buffer(params.stateless_reset_token,
+					NGTCP2_STATELESS_RESET_TOKENLEN);
+	if (ret != KNOT_EOK) {
+		return kr_error(ret);
 	}
 
 	if (server) {
@@ -779,7 +779,7 @@ int quic_generate_secret(uint8_t *buf, size_t buflen)
 	}
 	uint8_t rand[16], hash[32];
 	int ret = dnssec_random_buffer(rand, sizeof(rand));
-	if (ret != DNSSEC_EOK) {
+	if (ret != KNOT_EOK) {
 		kr_log_error(DOQ, "Failed to init dnssec random buffer");
 		return kr_error(EINVAL);
 	}

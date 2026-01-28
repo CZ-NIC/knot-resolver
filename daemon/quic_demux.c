@@ -6,7 +6,7 @@
 #include "quic_common.h"
 #include "quic_conn.h"
 #include "quic_demux.h"
-#include "libdnssec/random.h"
+#include "lib/dnssec.h"
 #include <stdlib.h>
 
 /* Toggle sending retry for new connections. This is a way to validate the

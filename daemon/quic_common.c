@@ -3,7 +3,7 @@
  */
 #include <ngtcp2/ngtcp2.h>
 #include "contrib/openbsd/siphash.h"
-#include "libdnssec/random.h"
+#include "lib/dnssec.h"
 
 #include "quic_common.h"
 #include "quic_conn.h"
