@@ -113,7 +113,10 @@ libembngtcp2_headers = files([
 libembngtcp2_lib = static_library(
   'embngtcp2',
   libembngtcp2_src,
-  include_directories: include_directories('./ngtcp2/lib'),
+  include_directories: include_directories(
+    './ngtcp2/lib',
+    gnutls.get_variable('includedir'),
+  ),
 )
 
 libngtcp2_deps = [declare_dependency(
