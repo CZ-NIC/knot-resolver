@@ -3,7 +3,7 @@ import platform
 import re
 from pathlib import Path
 
-VERSION = "6.0.17"
+VERSION = "6.1.0"
 USER = "knot-resolver"
 GROUP = "knot-resolver"
 
@@ -33,7 +33,8 @@ def _freebsd_workers_support() -> bool:
         release = platform.release()
         match = re.match(r"(\d+)", release)
         if match:
-            return int(match.group(1)) >= 12
+            freebsd_min_version = 12
+            return int(match.group(1)) >= freebsd_min_version
     return False
 
 

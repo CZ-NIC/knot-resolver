@@ -20,8 +20,10 @@ def auto_import_commands() -> None:
 def create_main_argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         KRES_CLIENT_NAME,
-        description="Knot Resolver command-line utility that serves as a client for communicating with the Knot Resolver management API."
-        " The utility also provides tools to work with the resolver's declarative configuration (validate, convert, ...).",
+        description="Knot Resolver command-line utility that serves as a client for"
+        " communicating with the Knot Resolver management API."
+        " The utility also provides tools to work with the resolver's"
+        " declarative configuration (validate, convert, ...).",
     )
     parser.add_argument(
         "-V",

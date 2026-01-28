@@ -1,5 +1,7 @@
 """
-Effectively the same as normal __main__.py. However, we moved it's content over to this
+Effectively the same as normal __main__.py.
+
+However, we moved it's content over to this
 file to allow us to exclude the __main__.py file from black's autoformatting
 """
 

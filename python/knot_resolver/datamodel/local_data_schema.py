@@ -26,7 +26,7 @@ class RuleSchema(ConfigSchema):
     tags: Tags to link with other policy rules.
     ttl: Optional, TTL value used for these answers.
     nodata: Optional, use NODATA synthesis. NODATA will be synthesized for matching name, but mismatching type(e.g. AAAA query when only A exists).
-    """
+    """  # noqa: E501
 
     name: Optional[ListOrItem[DomainName]] = None
     subtree: Optional[Literal["empty", "nxdomain", "redirect"]] = None
@@ -105,7 +105,7 @@ class LocalDataSchema(ConfigSchema):
     records: Direct addition of records in DNS zone file format.
     rules: Local data rules.
     rpz: List of Response Policy Zones and its configuration.
-    """
+    """  # noqa: E501
 
     ttl: Optional[TimeUnit] = None
     nodata: bool = True

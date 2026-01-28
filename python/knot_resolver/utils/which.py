@@ -6,13 +6,12 @@ from pathlib import Path
 @functools.lru_cache(maxsize=16)
 def which(binary_name: str) -> Path:
     """
-    Given a name of an executable, search $PATH and return
-    the absolute path of that executable. The results of this function
-    are LRU cached.
+    Search $PATH and return the absolute path of that executable.
+
+    The results of this function are LRU cached.
 
     If not found, throws an RuntimeError.
     """
-
     possible_directories = os.get_exec_path()
     for dr in possible_directories:
         p = Path(dr, binary_name)

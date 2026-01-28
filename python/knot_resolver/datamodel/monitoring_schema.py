@@ -22,7 +22,7 @@ class MonitoringSchema(ConfigSchema):
     ---
     metrics: configures, whether metrics/statistics will be collected by the resolver
     graphite: optionally configures where should graphite metrics be sent to
-    """
+    """  # noqa: D205, D400, D415
 
     metrics: Literal["manager-only", "lazy", "always"] = "lazy"
     graphite: GraphiteSchema = GraphiteSchema()

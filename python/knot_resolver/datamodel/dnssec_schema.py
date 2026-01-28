@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 from typing import List, Optional
 
 from knot_resolver.datamodel.types import DomainName, EscapedStr, ReadableFile

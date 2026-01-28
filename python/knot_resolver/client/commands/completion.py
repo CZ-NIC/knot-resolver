@@ -1,3 +1,4 @@
+# noqa: INP001
 import argparse
 from enum import Enum
 from typing import List, Tuple, Type
@@ -47,7 +48,7 @@ class CompletionCommand(Command):
     def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
         return comp_get_words(args, parser)
 
-    def run(self, args: CommandArgs) -> None:  # noqa: PLR0912
+    def run(self, args: CommandArgs) -> None:
         words: CompWords = {}
 
         parser = args.parser

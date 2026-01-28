@@ -1,8 +1,8 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$id": "https://www.knot-resolver.cz/documentation/v6.0.17/_static/config.schema.json",
+    "$id": "https://www.knot-resolver.cz/documentation/v6.1.0/_static/config.schema.json",
     "title": "Knot Resolver configuration JSON schema",
-    "description": "Version Knot Resolver 6.0.17",
+    "description": "Version Knot Resolver 6.1.0",
     "type": "object",
     "properties": {
         "version": {
@@ -1823,7 +1823,7 @@
                 "enable": {
                     "type": "boolean",
                     "description": "Use request prioritization.",
-                    "default": false
+                    "default": true
                 },
                 "log-period": {
                     "type": "string",
@@ -1833,7 +1833,7 @@
                 }
             },
             "default": {
-                "enable": false,
+                "enable": true,
                 "log_period": "0s"
             }
         },
@@ -1843,7 +1843,7 @@
             "properties": {
                 "script-only": {
                     "type": "boolean",
-                    "description": "Ignore declarative configuration and use only Lua script or file defined in this section.",
+                    "description": "Ignore declarative configuration intended for workers and use only Lua script or script file configured in this section.",
                     "default": false
                 },
                 "script": {
@@ -1851,7 +1851,7 @@
                         "string",
                         "null"
                     ],
-                    "description": "Custom Lua configuration script.",
+                    "description": "Custom Lua configuration script intended for workers.",
                     "default": null
                 },
                 "script-file": {
@@ -1859,14 +1859,38 @@
                         "string",
                         "null"
                     ],
-                    "description": "Path to file that contains Lua configuration script.",
+                    "description": "Path to file that contains Lua configuration script for workers.",
+                    "default": null
+                },
+                "policy-script-only": {
+                    "type": "boolean",
+                    "description": "Ignore declarative configuration intended for policy-loader and use only Lua script or script file configured in this section.",
+                    "default": false
+                },
+                "policy-script": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "description": "Custom Lua configuration script intended for policy-loader.",
+                    "default": null
+                },
+                "policy-script-file": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "description": "Path to file that contains Lua configuration script for policy-loader.",
                     "default": null
                 }
             },
             "default": {
                 "script_only": false,
                 "script": null,
-                "script_file": null
+                "script_file": null,
+                "policy_script_only": false,
+                "policy_script": null,
+                "policy_script_file": null
             }
         }
     }

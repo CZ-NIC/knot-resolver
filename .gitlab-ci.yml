@@ -291,11 +291,9 @@ docker:dockerhub:
     - echo "$DOCKER_HUB_TOKEN" | docker login -u $DOCKER_HUB_USER --password-stdin
     - >
       docker buildx imagetools create
-      -t ${DOCKER_HUB_REGISTRY}:6
-      ${GITLAB_REGISTRY}:${CI_COMMIT_REF_NAME}
-    - >
-      docker buildx imagetools create
       -t ${DOCKER_HUB_REGISTRY}:${CI_COMMIT_REF_NAME}
+      -t ${DOCKER_HUB_REGISTRY}:latest6
+      -t ${DOCKER_HUB_REGISTRY}:latest
       ${GITLAB_REGISTRY}:${CI_COMMIT_REF_NAME}
 # }}}
 
@@ -504,7 +502,8 @@ pytests:
   <<: *condor
   stage: respdiff
   script:
-    - git diff-index --name-only origin/master | grep -qEv '^(AUTHORS|ci/|config.mk|COPYING|distro/|doc/|etc/|NEWS|README.md|scripts/|tests/|\.gitignore|\.gitlab-ci\.yml|\.travis\.yml)' || test $RESPDIFF_FORCE -gt 0 || exit 77
+    # since the test are now only being run manually, there is no longer a need for the condition on the next line
+    # - git diff-index --name-only origin/master | grep -qEv '^(AUTHORS|ci/|config.mk|COPYING|distro/|doc/|etc/|NEWS|README.md|scripts/|tests/|\.gitignore|\.gitlab-ci\.yml|\.travis\.yml)' || test $RESPDIFF_FORCE -gt 0 || exit 77
     - test ! -f /var/tmp/respdiff-jobs/buffer/buffer_$RESPDIFF_TEST_stats.json || test $RESPDIFF_FORCE -gt 0 || ( echo "Reference unstable, try again in ~3h or use RESPDIFF_FORCE=1."; exit 1 )
     - export LABEL=gl$(date +%s)
     - export COMMITDIR="/var/tmp/respdiff-jobs/$(git rev-parse --short HEAD)-$LABEL"
@@ -534,37 +533,37 @@ pytests:
 fwd-tls6-kresd.udp6:
   <<: *respdiff
   variables:
-    RESPDIFF_TEST: shortlist.fwd-tls6-kresd.udp6
+    RESPDIFF_TEST: odvr.fwd-tls6-kresd.udp6
 
 fwd-udp6-kresd.udp6:
   <<: *respdiff
   variables:
-    RESPDIFF_TEST: shortlist.fwd-udp6-kresd.udp6
+    RESPDIFF_TEST: odvr.fwd-udp6-kresd.udp6
 
 iter.udp6:
   <<: *respdiff
   variables:
-    RESPDIFF_TEST: shortlist.iter.udp6
+    RESPDIFF_TEST: odvr.iter.udp6
 
 iter.tls6:
   <<: *respdiff
   variables:
-    RESPDIFF_TEST: shortlist.iter.tls6
+    RESPDIFF_TEST: odvr.iter.tls6
 
 fwd-udp6-unbound.udp6:
   <<: *respdiff
   variables:
-    RESPDIFF_TEST: shortlist.fwd-udp6-unbound.udp6
+    RESPDIFF_TEST: odvr.fwd-udp6-unbound.udp6
 
 fwd-udp6-unbound.tcp6:
   <<: *respdiff
   variables:
-    RESPDIFF_TEST: shortlist.fwd-udp6-unbound.tcp6
+    RESPDIFF_TEST: odvr.fwd-udp6-unbound.tcp6
 
 fwd-udp6-unbound.tls6:
   <<: *respdiff
   variables:
-    RESPDIFF_TEST: shortlist.fwd-udp6-unbound.tls6
+    RESPDIFF_TEST: odvr.fwd-udp6-unbound.tls6
 
 .resperf:  &resperf
   <<: *condor
@@ -803,10 +802,10 @@ docs:environment:
     name: docs/$CI_COMMIT_REF_NAME
     url: https://www.knot-resolver.cz/documentation/artifacts/$CI_JOB_ID/index.html
 
-# Automatically deploys the latest documentation from the master branch.
-# The latest doc is available at https://www.knot-resolver.cz/documentation/latest/,
+# Automatically deploys the documentation from the master branch.
+# The master docs is available at https://www.knot-resolver.cz/documentation/master/,
 # which redirects to the GitLab pages at https://knot.pages.nic.cz/knot-resolver.
-docs:latest:
+docs:master:
   stage: deploy
   needs:
     - docs:build

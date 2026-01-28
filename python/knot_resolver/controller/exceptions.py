@@ -1,17 +1,19 @@
 from typing import List
 
-from knot_resolver import KresBaseException
+from knot_resolver import KresBaseError
 
 
-class SubprocessControllerError(KresBaseException):
-    pass
+class KresSubprocessControllerError(KresBaseError):
+    """Class for errors that are raised in the controller module."""
 
 
-class SubprocessControllerExecError(Exception):
+class KresSubprocessControllerExec(Exception):  # noqa: N818
     """
-    Exception that is used to deliberately terminate system startup
-    and make exec() of something else. This is used by the subprocess controller
-    as supervisord to run as the top-level process in a process tree hierarchy.
+    Custom non-error exception that indicates the need for exec().
+
+    Raised by the controller (supervisord) and caught by the controlled process (manager).
+    The exception says that the process needs to perform a re-exec during startup.
+    This ensures that the process runs under the controller (supervisord) in a process tree hierarchy.
     """
 
     def __init__(self, exec_args: List[str], *args: object) -> None:
