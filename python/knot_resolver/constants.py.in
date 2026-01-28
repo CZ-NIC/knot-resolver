@@ -33,7 +33,8 @@ def _freebsd_workers_support() -> bool:
         release = platform.release()
         match = re.match(r"(\d+)", release)
         if match:
-            return int(match.group(1)) >= 12
+            freebsd_min_version = 12
+            return int(match.group(1)) >= freebsd_min_version
     return False
 
 

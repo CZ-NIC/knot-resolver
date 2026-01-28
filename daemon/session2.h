@@ -974,9 +974,11 @@ static inline struct session2 *session2_new_io(uv_handle_t *handle,
 {
 	struct session2 *s = session2_new(SESSION2_TRANSPORT_IO, layer_grp,
 			layer_param, layer_param_count, outgoing);
-	s->transport.io.handle = handle;
-	handle->data = s;
-	session2_inc_refs(s); /* Session owns the handle */
+	if (likely(s != NULL)) {
+		s->transport.io.handle = handle;
+		handle->data = s;
+		session2_inc_refs(s); /* Session owns the handle */
+	}
 	return s;
 }
 
@@ -990,7 +992,9 @@ static inline struct session2 *session2_new_child(struct session2 *parent,
 {
 	struct session2 *s = session2_new(SESSION2_TRANSPORT_PARENT, layer_grp,
 			layer_param, layer_param_count, outgoing);
-	s->transport.parent = parent;
+	if (likely(s != NULL)) {
+		s->transport.parent = parent;
+	}
 	return s;
 }
 

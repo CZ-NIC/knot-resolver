@@ -32,11 +32,11 @@ In the declarative configuration there is a ``lua`` section where you can insert
 
    :default: false
 
-   Ignore declarative configuration for ``kresd`` workers and use only Lua script or script file configured in this section.
+   Ignore declarative configuration intended for workers and use only Lua script or script file configured in this section.
 
 .. option:: lua/script: <script string>
 
-   Custom Lua configuration script.
+   Custom Lua configuration script intended for workers.
 
    .. code-block:: yaml
 
@@ -58,7 +58,26 @@ In the declarative configuration there is a ``lua`` section where you can insert
 
 .. option:: lua/script-file: <path>
 
-   Path to the file that contains Lua configuration script.
+   Path to file that contains Lua configuration script for workers.
+
+.. option:: lua/policy-script-only: true|false
+
+   :default: false
+
+   Ignore declarative configuration for policy-loader and use only Lua script or script file configured in this section.
+
+.. warning::
+
+   The policy loader is designed to use functions primarily from `rules API <./dev/lib.html#rules>`_.
+   For example, using a configuration intended for workers may result in an error when loading policy rules.
+
+.. option:: lua/policy-script: <script string>
+
+   Custom Lua configuration script intended for policy-loader.
+
+.. option:: lua/policy-script-file: <path>
+
+   Path to file that contains Lua configuration script for policy-loader.
 
 .. note::
 

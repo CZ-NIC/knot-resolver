@@ -16,7 +16,7 @@ T = TypeVar("T")
 
 async def to_thread(func: Callable[..., T], *args: Any, **kwargs: Any) -> T:
     # version 3.9 and higher, call directly
-    if sys.version_info.major >= 3 and sys.version_info.minor >= 9:
+    if sys.version_info >= (3, 9):
         return await asyncio.to_thread(func, *args, **kwargs)  # type: ignore[attr-defined]
 
     # earlier versions, run with default executor
@@ -34,12 +34,12 @@ def async_in_a_thread(func: Callable[..., T]) -> Callable[..., Coroutine[None, N
 
 def create_task(coro: Awaitable[T], name: Optional[str] = None) -> "asyncio.Task[T]":
     # version 3.8 and higher, call directly
-    if sys.version_info.major >= 3 and sys.version_info.minor >= 8:
+    if sys.version_info >= (3, 8):
         # pylint: disable=unexpected-keyword-arg
         return asyncio.create_task(coro, name=name)  # type: ignore[attr-defined,arg-type,call-arg]
 
     # version 3.7 and higher, call directly without the name argument
-    if sys.version_info.major >= 3 and sys.version_info.minor >= 8:
+    if sys.version_info >= (3, 8):
         return asyncio.create_task(coro)  # type: ignore[attr-defined,arg-type]
 
     # earlier versions, use older function
@@ -57,7 +57,7 @@ def run(coro: Awaitable[T], debug: Optional[bool] = None) -> T:
 
     # version 3.7 and higher, call directly
     # disabled due to incompatibilities
-    if sys.version_info.major >= 3 and sys.version_info.minor >= 7:
+    if sys.version_info >= (3, 7):
         return asyncio.run(coro, debug=debug)  # type: ignore[attr-defined,arg-type]
 
     # earlier versions, use backported version of the function
@@ -95,7 +95,7 @@ def _cancel_all_tasks(loop: AbstractEventLoop) -> None:
     for task in to_cancel:
         task.cancel()
 
-    if sys.version_info.minor >= 7:
+    if sys.version_info >= (3, 7):
         # since 3.7, the loop argument is implicitely the running loop
         # since 3.10, the loop argument is removed
         loop.run_until_complete(tasks.gather(*to_cancel, return_exceptions=True))

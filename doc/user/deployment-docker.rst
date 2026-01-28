@@ -1,3 +1,5 @@
+.. _deployment-docker:
+
 ******
 Docker
 ******
@@ -13,7 +15,7 @@ First you can try running the container in interactive mode.
 
 .. code-block:: bash
 
-    $ docker run --rm -ti --network host docker.io/cznic/knot-resolver:6
+    $ docker run --rm -ti --network host docker.io/cznic/knot-resolver
 
 For more robust deployments you will also probably need to configure network, for that see `Docker networking <https://docs.docker.com/engine/network/>`_.
 
@@ -45,7 +47,7 @@ for more see `Docker persisting container data <https://docs.docker.com/get-star
 .. code-block:: bash
 
     $ docker volume create config
-    $ docker run --rm -ti --network host -v config:/etc/knot-resolver docker.io/cznic/knot-resolver:6
+    $ docker run --rm -ti --network host -v config:/etc/knot-resolver docker.io/cznic/knot-resolver
 
 After a configuration change there is no need to restart the entire container, just tell the resolver to reload the configuration.
 Get ``CONTAINER_ID`` using the ``docker ps`` command or give your container name with the ``--name`` argument at container startup.
@@ -65,4 +67,4 @@ It is also good to mount the cache on ``tmpfs`` (semi-persistent), otherwise it 
 .. code-block:: bash
 
     $ docker volume create --opt type=tmpfs --opt device=tmpfs cache
-    $ docker run --rm -ti --pid=host --network host -v cache:/var/cache/knot-resolver docker.io/cznic/knot-resolver:6
+    $ docker run --rm -ti --pid=host --network host -v cache:/var/cache/knot-resolver docker.io/cznic/knot-resolver

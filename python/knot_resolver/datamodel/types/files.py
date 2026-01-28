@@ -1,3 +1,4 @@
+# ruff: noqa: D205, D400, D415
 import logging
 import os
 import stat
@@ -16,8 +17,9 @@ logger = logging.getLogger(__name__)
 
 class UncheckedPath(BaseValueType):
     """
-    Wrapper around pathlib.Path object. Can represent pretty much any Path. No checks are
-    performed on the value. The value is taken as is.
+    Wrapper around pathlib.Path object.
+
+    Can represent pretty much any Path. No checks are performed on the value. The value is taken as is.
     """
 
     _value: Path
@@ -32,10 +34,7 @@ class UncheckedPath(BaseValueType):
         if isinstance(source_value, str):
             # we do not load global validation context if the path is absolute
             # this prevents errors when constructing defaults in the schema
-            if source_value.startswith("/"):
-                resolve_root = Path("/")
-            else:
-                resolve_root = get_resolve_root()
+            resolve_root = Path("/") if source_value.startswith("/") else get_resolve_root()
 
             self._raw_value: str = source_value
             if self._parents:
@@ -65,15 +64,13 @@ class UncheckedPath(BaseValueType):
         return self._raw_value
 
     def relative_to(self, parent: "UncheckedPath") -> "UncheckedPath":
-        """return a path with an added parent part"""
+        """Return a path with an added parent part."""
         return UncheckedPath(self._raw_value, parents=(parent, *self._parents), object_path=self._object_path)
 
     UPT = TypeVar("UPT", bound="UncheckedPath")
 
     def reconstruct(self, cls: Type[UPT]) -> UPT:
-        """
-        Rebuild this object as an instance of its subclass. Practically, allows for conversions from
-        """
+        """Rebuild this object as an instance of its subclass. Practically, allows for conversions from."""
         return cls(self._raw_value, parents=self._parents, object_path=self._object_path)
 
     @classmethod
@@ -197,16 +194,13 @@ def _check_permission(dest_path: Path, perm_mode: _PermissionMode) -> bool:
 
     # __iter__ for class enum.Flag added in python3.11
     # 'for perm in perm_mode:' fails for <=python3.11
-    for perm in _PermissionMode:
-        if perm in perm_mode:
-            if not accessible(perm):
-                return False
-    return True
+    return all(not (perm in perm_mode and not accessible(perm)) for perm in _PermissionMode)
 
 
 class ReadableFile(File):
     """
     Path, that is enforced to be:
+
     - an existing file
     - readable by knot-resolver processes
     """

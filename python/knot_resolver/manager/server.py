@@ -20,7 +20,7 @@ from aiohttp.web_runner import AppRunner, TCPSite, UnixSite
 
 from knot_resolver.constants import USER
 from knot_resolver.controller import get_best_controller_implementation
-from knot_resolver.controller.exceptions import SubprocessControllerError, SubprocessControllerExecError
+from knot_resolver.controller.exceptions import KresSubprocessControllerError, KresSubprocessControllerExec
 from knot_resolver.controller.interface import SubprocessType
 from knot_resolver.controller.registered_workers import command_single_registered_worker
 from knot_resolver.datamodel import kres_config_json_schema
@@ -43,7 +43,7 @@ from knot_resolver.utils.systemd_notify import systemd_notify
 
 from .config_store import ConfigStore
 from .constants import PID_FILE_NAME, init_user_constants
-from .exceptions import KresManagerException
+from .exceptions import KresManagerBaseError
 from .logger import logger_init
 from .manager import KresManager
 
@@ -53,19 +53,18 @@ logger = logging.getLogger(__name__)
 @middleware
 async def error_handler(request: web.Request, handler: Any) -> web.Response:
     """
-    Generic error handler for route handlers.
+    Handle errors in route handlers.
 
     If an exception is thrown during request processing, this middleware catches it
     and responds accordingly.
     """
-
     try:
         return await handler(request)
     except (AggregateDataValidationError, DataValidationError) as e:
         return web.Response(text=str(e), status=HTTPStatus.BAD_REQUEST)
     except DataParsingError as e:
         return web.Response(text=f"request processing error:\n{e}", status=HTTPStatus.BAD_REQUEST)
-    except KresManagerException as e:
+    except KresManagerBaseError as e:
         return web.Response(text=f"request processing failed:\n{e}", status=HTTPStatus.INTERNAL_SERVER_ERROR)
 
 
@@ -88,7 +87,7 @@ class Server:
     # This is top-level class containing pretty much everything. Instead of global
     # variables, we use instance attributes. That's why there are so many and it's
     # ok.
-    def __init__(self, store: ConfigStore, config_path: Optional[List[Path]], manager: KresManager):
+    def __init__(self, store: ConfigStore, config_path: Optional[List[Path]], manager: KresManager) -> None:
         # config store & server dynamic reconfiguration
         self.config_store = store
 
@@ -111,7 +110,7 @@ class Server:
     ) -> Result[None, str]:
         if config_old.management != config_new.management:
             return Result.err(
-                "/server/management: Changing management API address/unix-socket dynamically is not allowed as it's really dangerous."
+                "/management: Changing the management API configuration dynamically is not allowed."
                 " If you really need this feature, please contact the developers and explain why. Technically,"
                 " there are no problems in supporting it. We are only blocking the dynamic changes because"
                 " we think the consequences of leaving this footgun unprotected are worse than its usefulness."
@@ -150,7 +149,7 @@ class Server:
             except (DataParsingError, DataValidationError) as e:
                 logger.error(f"Failed to parse the updated configuration file: {e}")
                 logger.error("Configuration has NOT been changed.")
-            except KresManagerException as e:
+            except KresManagerBaseError as e:
                 logger.error(f"Reloading of the configuration file failed: {e}")
                 logger.error("Configuration has NOT been changed.")
 
@@ -158,7 +157,7 @@ class Server:
         try:
             await self.config_store.renew(force)
             logger.info("Configuration successfully renewed")
-        except KresManagerException as e:
+        except KresManagerBaseError as e:
             logger.error(f"Renewing the configuration failed: {e}")
             logger.error("Configuration has NOT been renewed.")
 
@@ -180,12 +179,12 @@ class Server:
     def all_handled_signals() -> Set[signal.Signals]:
         return {signal.SIGHUP, signal.SIGINT, signal.SIGTERM}
 
-    def bind_signal_handlers(self):
+    def bind_signal_handlers(self) -> None:
         asyncio_compat.add_async_signal_handler(signal.SIGTERM, self.sigterm_handler)
         asyncio_compat.add_async_signal_handler(signal.SIGINT, self.sigint_handler)
         asyncio_compat.add_async_signal_handler(signal.SIGHUP, self.sighup_handler)
 
-    def unbind_signal_handlers(self):
+    def unbind_signal_handlers(self) -> None:
         asyncio_compat.remove_signal_handler(signal.SIGTERM)
         asyncio_compat.remove_signal_handler(signal.SIGINT)
         asyncio_compat.remove_signal_handler(signal.SIGHUP)
@@ -205,9 +204,7 @@ class Server:
         self._exit_code = exit_code
 
     async def _handler_index(self, _request: web.Request) -> web.Response:
-        """
-        Dummy index handler to indicate that the server is indeed running...
-        """
+        """Indicate that the server is indeed running (dummy index handler)."""
         return json_response(
             {
                 "msg": "Knot Resolver Manager is running! The configuration endpoint is at /config",
@@ -216,9 +213,7 @@ class Server:
         )
 
     async def _handler_config_query(self, request: web.Request) -> web.Response:
-        """
-        Route handler for changing resolver configuration
-        """
+        """Route handler for changing resolver configuration."""
         # There are a lot of local variables in here, but they are usually immutable (almost SSA form :) )
         # pylint: disable=too-many-locals
 
@@ -305,7 +300,7 @@ class Server:
 
     async def _handle_view_schema(self, _request: web.Request) -> web.Response:
         """
-        Provides a UI for visuallising and understanding JSON schema.
+        Provide a UI for visuallising and understanding JSON schema.
 
         The feature in the Knot Resolver Manager to render schemas is unwanted, as it's completely
         out of scope. However, it can be convinient. We therefore rely on a public web-based viewers
@@ -333,37 +328,25 @@ class Server:
         )
 
     async def _handler_stop(self, _request: web.Request) -> web.Response:
-        """
-        Route handler for shutting down the server (and whole manager)
-        """
-
+        """Route handler for shutting down the server (and whole manager)."""
         self._shutdown_event.set()
         logger.info("Shutdown event triggered...")
         return web.Response(text="Shutting down...")
 
     async def _handler_reload(self, request: web.Request) -> web.Response:
-        """
-        Route handler for reloading the configuration
-        """
-
+        """Route handler for reloading the configuration."""
         logger.info("Reloading event triggered...")
         await self._reload_config(force=bool(request.path.endswith("/force")))
         return web.Response(text="Reloading...")
 
     async def _handler_renew(self, request: web.Request) -> web.Response:
-        """
-        Route handler for renewing the configuration
-        """
-
+        """Route handler for renewing the configuration."""
         logger.info("Renewing configuration event triggered...")
         await self._renew_config(force=bool(request.path.endswith("/force")))
         return web.Response(text="Renewing configuration...")
 
     async def _handler_processes(self, request: web.Request) -> web.Response:
-        """
-        Route handler for listing PIDs of subprocesses
-        """
-
+        """Route handler for listing PIDs of subprocesses."""
         proc_type: Optional[SubprocessType] = None
 
         if "path" in request.match_info and len(request.match_info["path"]) > 0:
@@ -423,7 +406,7 @@ class Server:
                 nsite = web.TCPSite(self.runner, str(mgn.interface.addr), int(mgn.interface.port))
                 logger.info(f"Starting API HTTP server on http://{mgn.interface.addr}:{mgn.interface.port}")
             else:
-                raise KresManagerException("Requested API on unsupported configuration format.")
+                raise KresManagerBaseError("Requested API on unsupported configuration format.")
             await nsite.start()
 
             # stop the old listen
@@ -454,7 +437,7 @@ async def _load_raw_config(config: Union[Path, Dict[str, Any]]) -> Dict[str, Any
     # Initial configuration of the manager
     if isinstance(config, Path):
         if not config.exists():
-            raise KresManagerException(
+            raise KresManagerBaseError(
                 f"Manager is configured to load config file at {config} on startup, but the file does not exist."
             )
         logger.info(f"Loading configuration from '{config}' file.")
@@ -475,10 +458,7 @@ async def _init_config_store(config: Dict[str, Any]) -> ConfigStore:
 
 
 async def _init_manager(config_store: ConfigStore) -> KresManager:
-    """
-    Called asynchronously when the application initializes.
-    """
-
+    """Call asynchronously when the application initializes."""
     # Instantiate subprocess controller (if we wanted to, we could switch it at this point)
     controller = await get_best_controller_implementation(config_store.get())
 
@@ -525,11 +505,11 @@ def _lock_working_directory(attempt: int = 0) -> None:
                     os.unlink(PID_FILE_NAME)
                     _lock_working_directory(attempt=attempt + 1)
                     return
-            raise KresManagerException(
+            raise KresManagerBaseError(
                 "Another manager is running in the same working directory."
                 f" PID file is located at {os.getcwd()}/{PID_FILE_NAME}"
             ) from e
-        raise KresManagerException(
+        raise KresManagerBaseError(
             "Another manager is running in the same working directory."
             f" PID file is located at {os.getcwd()}/{PID_FILE_NAME}"
         ) from e
@@ -546,19 +526,19 @@ def _lock_working_directory(attempt: int = 0) -> None:
     atexit.register(lambda: os.unlink(PID_FILE_NAME))
 
 
-async def _sigint_while_shutting_down():
+async def _sigint_while_shutting_down() -> None:
     logger.warning(
         "Received SIGINT while already shutting down. Ignoring."
         " If you want to forcefully stop the manager right now, use SIGTERM."
     )
 
 
-async def _sigterm_while_shutting_down():
+async def _sigterm_while_shutting_down() -> None:
     logger.warning("Received SIGTERM. Invoking dirty shutdown!")
     sys.exit(128 + signal.SIGTERM)
 
 
-async def start_server(config: List[str]) -> int:  # noqa: PLR0915
+async def start_server(config: List[str]) -> int:  # noqa: C901, PLR0915
     # This function is quite long, but it describes how manager runs. So let's silence pylint
     # pylint: disable=too-many-statements
 
@@ -623,7 +603,8 @@ async def start_server(config: List[str]) -> int:  # noqa: PLR0915
         # After the working directory is set, we can initialize proper config store with a newly parsed configuration.
         config_store = await _init_config_store(config_data)
 
-        # Some "constants" need to be loaded from the initial config, some need to be stored from the initial run conditions
+        # Some "constants" need to be loaded from the initial config,
+        # some need to be stored from the initial run conditions
         await init_user_constants(config_store, working_directory_on_startup)
 
         # This behaviour described above with paths means, that we MUST NOT allow `rundir` change after initialization.
@@ -650,7 +631,7 @@ async def start_server(config: List[str]) -> int:  # noqa: PLR0915
         # add Server's shutdown trigger to the manager
         manager.add_shutdown_trigger(server.trigger_shutdown)
 
-    except SubprocessControllerExecError as e:
+    except KresSubprocessControllerExec as e:
         # if we caught this exception, some component wants to perform a reexec during startup. Most likely, it would
         # be a subprocess manager like supervisord, which wants to make sure the manager runs under supervisord in
         # the process tree. So now we stop everything, and exec what we are told to. We are assuming, that the thing
@@ -666,11 +647,11 @@ async def start_server(config: List[str]) -> int:  # noqa: PLR0915
         # and finally exec what we were told to exec
         os.execl(*e.exec_args)
 
-    except SubprocessControllerError as e:
+    except KresSubprocessControllerError as e:
         logger.error(f"Server initialization failed: {e}")
         return 1
 
-    except KresManagerException as e:
+    except KresManagerBaseError as e:
         # We caught an error with a pretty error message. Just print it and exit.
         logger.error(e)
         return 1

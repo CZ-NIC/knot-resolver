@@ -2,14 +2,14 @@ import errno
 import socket
 import sys
 from http.client import HTTPConnection
-from typing import Any, Literal, Optional, Union
+from typing import Any, Literal, Optional
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, unquote, urlparse
 from urllib.request import AbstractHTTPHandler, Request, build_opener, install_opener, urlopen
 
 
 class SocketDesc:
-    def __init__(self, socket_def: str, source: str):
+    def __init__(self, socket_def: str, source: str) -> None:
         self.source = source
         if ":" in socket_def:
             # `socket_def` contains a schema, probably already URI-formatted, use directly
@@ -96,8 +96,10 @@ def request(
 # Code heavily inspired by requests-unixsocket
 # https://github.com/msabramo/requests-unixsocket/blob/master/requests_unixsocket/adapters.py
 class UnixHTTPConnection(HTTPConnection):
-    def __init__(self, unix_socket_url: str, timeout: Union[int, float] = 60):
-        """Create an HTTP connection to a unix domain socket
+    def __init__(self, unix_socket_url: str, timeout: float = 60) -> None:
+        """
+        Create an HTTP connection to a unix domain socket.
+
         :param unix_socket_url: A URL with a scheme of 'http+unix' and the
         netloc is a percent-encoded path to a unix domain socket. E.g.:
         'http+unix://%2Ftmp%2Fprofilesvc.sock/status/pid'
@@ -107,11 +109,11 @@ class UnixHTTPConnection(HTTPConnection):
         self.timeout = timeout
         self.sock: Optional[socket.socket] = None
 
-    def __del__(self):  # base class does not have d'tor
+    def __del__(self) -> None:  # base class does not have d'tor
         if self.sock:
             self.sock.close()
 
-    def connect(self):
+    def connect(self) -> None:
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         sock.settimeout(self.timeout)
         sock.connect(self.unix_socket_path)

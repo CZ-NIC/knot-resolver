@@ -19,7 +19,7 @@ Major version
     * We might release a new major also when internal implementation details change significantly.
 
 Minor version
-   * Configuration stays compatible with the previous version, except for undocumented or very obscure options.
+   * YAML configuration stays compatible with the previous version, except for undocumented or Lua-level options.
    * Upgrade should be seamless for users who use modules shipped as part of Knot Resolver distribution.
    * Incompatible changes in internal APIs are allowed in minor versions. Users who develop or use custom modules
      (i.e. modules not distributed together with Knot Resolver) need to double check their modules for incompatibilities.
@@ -30,7 +30,11 @@ Patch version
     * API for modules should be stable on best effort basis, i.e. API is very unlikely to break in patch releases.
     * Custom modules might need to be recompiled, i.e. ABI compatibility is not guaranteed.
 
-This definition is not applicable to versions older than 5.2.0.
+Exceptions
+----------
+    * The 6.0.x series was special.  It was an "early access" phase after huge changes,
+      and smaller incompatible changes still did happen during 6.0.x.
+    * This definition is not applicable to versions older than 5.2.0.
 
 .. include:: ../../NEWS
     :end-before: 5.x branch longterm support

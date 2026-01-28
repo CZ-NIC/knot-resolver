@@ -12,9 +12,9 @@ from typing import Any, Dict, Generic, List, Optional, TypeVar, Union
 from knot_resolver.utils.compat.asyncio import to_thread
 
 
-def unblock_signals():
-    if sys.version_info.major >= 3 and sys.version_info.minor >= 8:
-        signal.pthread_sigmask(signal.SIG_UNBLOCK, signal.valid_signals())  # type: ignore
+def unblock_signals() -> None:
+    if sys.version_info >= (3, 8):
+        signal.pthread_sigmask(signal.SIG_UNBLOCK, signal.valid_signals())
     else:
         # the list of signals is not exhaustive, but it should cover all signals we might ever want to block
         signal.pthread_sigmask(
@@ -32,9 +32,7 @@ def unblock_signals():
 async def call(
     cmd: Union[str, bytes, List[str], List[bytes]], shell: bool = False, discard_output: bool = False
 ) -> int:
-    """
-    custom async alternative to subprocess.call()
-    """
+    """Async alternative to subprocess.call()."""
     kwargs: Dict[str, Any] = {
         "preexec_fn": unblock_signals,
     }
@@ -57,9 +55,7 @@ async def call(
 
 
 async def readfile(path: Union[str, PurePath]) -> str:
-    """
-    asynchronously read whole file and return its content
-    """
+    """Asynchronously read whole file and return its content."""
 
     def readfile_sync(path: Union[str, PurePath]) -> str:
         with open(path, "r", encoding="utf8") as f:
@@ -69,9 +65,7 @@ async def readfile(path: Union[str, PurePath]) -> str:
 
 
 async def writefile(path: Union[str, PurePath], content: str) -> None:
-    """
-    asynchronously set content of a file to a given string `content`.
-    """
+    """Asynchronously set content of a file to a given string `content`."""
 
     def writefile_sync(path: Union[str, PurePath], content: str) -> int:
         with open(path, "w", encoding="utf8") as f:
@@ -82,9 +76,11 @@ async def writefile(path: Union[str, PurePath], content: str) -> None:
 
 async def wait_for_process_termination(pid: int, sleep_sec: float = 0) -> None:
     """
-    will wait for any process (does not have to be a child process) given by its PID to terminate
+    Wait for the process termination.
 
-    sleep_sec configures the granularity, with which we should return
+    Will wait for any process (does not have to be a child process)
+    given by its PID to terminate sleep_sec configures the granularity,
+    with which we should return.
     """
 
     def wait_sync(pid: int, sleep_sec: float) -> None:
@@ -116,11 +112,9 @@ class BlockingEventDispatcher(Thread, Generic[T]):
         self._main_event_loop = asyncio.get_event_loop()
 
     def dispatch_event(self, event: T) -> None:
-        """
-        Method to dispatch events from the blocking thread
-        """
+        """Dispatch events from the blocking thread."""
 
-        async def add_to_queue():
+        async def add_to_queue() -> None:
             await self._removed_unit_names.put(event)
 
         self._main_event_loop.call_soon_threadsafe(add_to_queue)

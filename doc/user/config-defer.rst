@@ -25,7 +25,7 @@ The limits can be adjusted for different packet origins using :option:`price-fac
 
 .. option:: defer/enable: true|false
 
-    :default: false
+    :default: true
 
     Enable request prioritization.
 

@@ -4,7 +4,7 @@ project(
   'knot-resolver',
   ['c', 'cpp'],
   license: 'GPLv3+',
-  version: '6.0.17',
+  version: '6.1.0',
   default_options: ['c_std=gnu11', 'b_ndebug=true'],
   meson_version: '>=0.53',
 )
@@ -197,7 +197,9 @@ endif
 malloc = meson.get_compiler('c').find_library(
   malloc_name,
   required: get_option('malloc') == 'jemalloc',
-  static: false, # static linking would most likely cause issues.
+  # Static linking would most likely cause issues.
+  # Unfortunately even `static: false` option won't do that.
+  # Fortunately it seems unlikely that dynamic wouldn't be found and static would be.
 )
 
 summary({'sendmmsg': sendmmsg,

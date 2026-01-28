@@ -1,3 +1,4 @@
+# noqa: INP001
 import argparse
 import sys
 from enum import Enum
@@ -72,7 +73,8 @@ class CacheCommand(Command):
             "name",
             type=str,
             nargs="?",
-            help="Optional, subtree name to purge; if omitted, the entire cache is purged (and all other parameters are ignored).",
+            help="Optional, subtree name to purge; if omitted,"
+            " the entire cache is purged (and all other parameters are ignored).",
             default=None,
         )
 

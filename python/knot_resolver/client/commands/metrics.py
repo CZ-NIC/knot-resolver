@@ -1,3 +1,4 @@
+# noqa: INP001
 import argparse
 import sys
 from typing import List, Optional, Tuple, Type
@@ -21,7 +22,8 @@ class MetricsCommand(Command):
     ) -> Tuple[argparse.ArgumentParser, "Type[Command]"]:
         metrics = subparser.add_parser(
             "metrics",
-            help="Get aggregated metrics from the running resolver in JSON format (default) or optionally in Prometheus format."
+            help="Get aggregated metrics from the running resolver"
+            " in JSON format (default) or optionally in Prometheus format."
             "\nThe 'prometheus-client' Python package needs to be installed if you wish to use the Prometheus format."
             "\nRequires a connection to the management HTTP API.",
         )
