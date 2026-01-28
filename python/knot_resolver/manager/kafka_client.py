@@ -277,7 +277,7 @@ if KAFKA_LIB:
 
             # reduce the verbosity of kafka module logger
             kafka_logger = logging.getLogger("kafka")
-            kafka_logger.setLevel(logging.WARNING)
+            kafka_logger.setLevel(logging.DEBUG)
 
             brokers = []
             for server in config.kafka.server.to_std():
