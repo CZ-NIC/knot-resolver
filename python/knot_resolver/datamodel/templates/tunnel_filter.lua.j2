@@ -3,12 +3,14 @@
 modules.load('dns_tunnel_filter')
 ffi.cdef([[
 int dns_tunnel_filter_setup(const char *nn_file, const char *mmap_file, kr_rule_tags_t tags,
-		size_t capacity, uint32_t instant_limit, uint32_t rate_limit);
+		uint8_t sensitivity, uint8_t threshold, size_t capacity, uint32_t instant_limit, uint32_t rate_limit);
 ]])
 assert(C.dns_tunnel_filter_setup(
 	'{{ cfg.tunnel_filter.file }}',
 	'dns_tunnel_filter',
 	{{ policy_get_tagset(cfg.tunnel_filter.tags) }},
+	{{ cfg.tunnel_filter.sensitivity }},
+	{{ cfg.tunnel_filter.threshold }},
 	2^20, 2^8, 2^17
 ) == 0);
 {%- endif %}

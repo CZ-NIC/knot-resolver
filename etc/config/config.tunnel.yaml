@@ -5,6 +5,8 @@ network:
 tunnel-filter:
   enable: true
   file: /home/blcnn.pt # Edit path to NN model
+  sensitivity: 10
+  threshold: 97
 logging:
   level: info
   groups: [tunnel]

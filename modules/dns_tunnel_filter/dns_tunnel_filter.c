@@ -11,7 +11,7 @@
 #include "lib/utils.h"
 #include "lib/resolve.h"
 
-enum { DNAME_SCALE_MULT = 2622 };
+enum { DNAME_SCALE_MULT = 6500 };
 enum { STATS_DI = 0, STATS_M = 1, STATS_B = 2, STATS_CNT = 3};
 
 #define STAT_FILE "/tmp/knot-resolver-tunnel_stat_file.txt"
@@ -36,13 +36,15 @@ bool load_attempted = false;
 /// Config/state that's not suitable for mmapping.  TODO: name, etc?
 struct {
 	TorchModule net;
+	uint8_t sensitivity;
+	uint8_t threshold;
 	kr_rule_tags_t tags;
 } config = {0};
 
 
 KR_EXPORT
 int dns_tunnel_filter_setup(const char *nn_file, const char *mmap_file, kr_rule_tags_t tags,
-		size_t capacity, uint32_t instant_limit, uint32_t rate_limit)
+		uint8_t sensitivity, uint8_t threshold, size_t capacity, uint32_t instant_limit, uint32_t rate_limit)
 {
 	if (dns_tunnel_filter)
 		return kr_error(EALREADY); // we don't support reconfiguration for now
@@ -55,6 +57,8 @@ int dns_tunnel_filter_setup(const char *nn_file, const char *mmap_file, kr_rule_
 		ret = kr_error(EINVAL); // we don't know what's wrong
 		goto fail;
 	}
+	config.sensitivity = sensitivity;
+	config.threshold = threshold;
 
 	size_t capacity_log = 0;
 	for (size_t c = capacity - 1; c > 0; c >>= 1) capacity_log++;
@@ -133,6 +137,7 @@ static bool ensure_loaded(void)
 	kr_log_warning(TUNNEL, "Tunneling filter not initialized from Lua, using hardcoded default.\n");
 	int ret = dns_tunnel_filter_setup("/home/blcnn.pt", // FIXME TMP
 					"dns_tunnel_filter", KR_RULE_TAGS_ALL,
+					10, 95,
 					(1 << 20), (1 << 8), (1 << 17));
 	return ret == kr_ok();
 }
@@ -240,7 +245,7 @@ static void do_filter(kr_layer_t *ctx, knot_pkt_t *pkt)
 		return; // we save the expensive computations
 
 	const uint32_t time_now = kr_now();
-	uint32_t price_scale_factor = knot_dname_size(qry->sname) * DNAME_SCALE_MULT;
+	uint32_t price_scale_factor = knot_dname_size(qry->sname) * config.sensitivity * DNAME_SCALE_MULT;
 
 	// classify
 	_Alignas(16) uint8_t key[16] = {0, };
@@ -279,9 +284,9 @@ static void do_filter(kr_layer_t *ctx, knot_pkt_t *pkt)
 	uint8_t *packet = req->qsource.packet->wire;
 	size_t packet_size = req->qsource.size;
 
-	float tunnel_prob = predict_packet(config.net, packet, packet_size);
+	float tunnel_prob = predict_packet(config.net, packet, packet_size) * 100;
 
-	if (tunnel_prob <= 0.95) {
+	if (tunnel_prob <= config.threshold) {
 		update_stats(STATS_B, qry);
 		return;
 	}
