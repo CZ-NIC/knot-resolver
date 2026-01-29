@@ -1,0 +1,21 @@
+from __future__ import annotations
+
+from knot_resolver import BaseKresError
+
+
+class SubprocessControllerError(BaseKresError):
+    """Class for errors that are used in the subprocess controller module."""
+
+
+class SubprocessControllerExec(Exception):  # noqa: N818
+    """
+    Custom non-error exception that indicates the need for exec().
+
+    Raised by the controller (supervisord) and caught by the controlled process (manager).
+    The exception says that the process needs to perform a re-exec during startup.
+    This ensures that the process runs under the controller (supervisord) in a process tree hierarchy.
+    """
+
+    def __init__(self, exec_args: list[str], *args: object) -> None:
+        self.exec_args = exec_args
+        super().__init__(*args)

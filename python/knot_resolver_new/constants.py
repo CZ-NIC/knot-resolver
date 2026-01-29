@@ -12,7 +12,6 @@ RUN_DIR = Path("/home/amrazek/src/knot-resolver/.install_dev/run/knot-resolver")
 ETC_DIR = Path("/home/amrazek/src/knot-resolver/.install_dev/etc/knot-resolver")
 SBIN_DIR = Path("/home/amrazek/src/knot-resolver/.install_dev/sbin")
 CACHE_DIR = Path("/home/amrazek/src/knot-resolver/.install_dev/var/cache/knot-resolver")
-WORK_DIR = Path("/home/amrazek/src/knot-resolver/.install_dev/var/lib/knot-resolver")
 
 # files paths
 CONFIG_FILE = ETC_DIR / "config.yaml"
@@ -27,7 +26,6 @@ FREEBSD_SYS = platform.system() == "FreeBSD"
 
 WATCHDOG_LIB = bool(importlib.util.find_spec("watchdog"))
 PROMETHEUS_LIB = bool(importlib.util.find_spec("prometheus_client"))
-KAFKA_LIB = bool(importlib.util.find_spec("kafka"))
 
 
 def _freebsd_workers_support() -> bool:

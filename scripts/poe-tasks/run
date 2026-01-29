@@ -32,4 +32,4 @@ echo
 echo --------------------------------------
 echo Starting Knot Resolver wit the Manager
 echo --------------------------------------
-python3 -m knot_resolver.manager --config "$KRES_DEV_CONFIG_FILE" "$@"
+python3 -m knot_resolver_new.manager --config "$KRES_DEV_CONFIG_FILE" "$@"
