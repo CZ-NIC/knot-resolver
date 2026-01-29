@@ -143,7 +143,7 @@ if get_option('quic') == 'disabled'
   enable_quic = false
   libngtcp2_deps = []
 else
-  libngtcp2 = dependency('libngtcp2', version: '>=1.11.0', required: get_option('quic') == 'external')
+  libngtcp2 = dependency('libngtcp2', required: get_option('quic') == 'external')
   libngtcp2_crypto = dependency('libngtcp2_crypto_gnutls', required: get_option('quic') == 'external')
   if libngtcp2.found() and libngtcp2_crypto.found()
     quic_sumstr = 'with external libngtcp2*'

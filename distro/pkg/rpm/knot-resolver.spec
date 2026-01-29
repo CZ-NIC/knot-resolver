@@ -43,6 +43,8 @@ BuildRequires:  pkgconfig(libknot) >= 3.0.2
 BuildRequires:  pkgconfig(libzscanner) >= 3.0.2
 BuildRequires:  pkgconfig(libdnssec) >= 3.0.2
 BuildRequires:  pkgconfig(libnghttp2)
+BuildRequires:  pkgconfig(libngtcp2)
+BuildRequires:  pkgconfig(libngtcp2_crypto_gnutls)
 BuildRequires:  pkgconfig(libsystemd)
 BuildRequires:  pkgconfig(libcap-ng)
 BuildRequires:  pkgconfig(libuv)

@@ -14,6 +14,8 @@ Build-Depends:
  liblmdb-dev,
  libluajit-5.1-dev,
  libnghttp2-dev,
+ libngtcp2-crypto-gnutls-dev,
+ libngtcp2-dev,
  libprotobuf-c-dev,
  libssl-dev,
  libsystemd-dev (>= 227) [linux-any],
