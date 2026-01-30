@@ -67,8 +67,10 @@ sphinx-rtd-theme = "^2.0.0"
 breathe = "^4.35.0"
 
 [tool.poetry.scripts]
-kresctl = 'knot_resolver.client.main:main'
-knot-resolver = 'knot_resolver.manager.main:main'
+knot-resolver = 'knot_resolver_new.main:main'
+kres-manager = 'knot_resolver_new.manager.main:main'
+kresctl = 'knot_resolver_new.client.main:main'
+
 
 [tool.poe.tasks]
 # Tasks to configure, build and run

@@ -1,13 +1,13 @@
-from __future__ import annotations
+from typing import List
 
-from knot_resolver import BaseKresError
-
-
-class SubprocessControllerError(BaseKresError):
-    """Class for errors that are used in the subprocess controller module."""
+from knot_resolver import KresBaseError
 
 
-class SubprocessControllerExec(Exception):  # noqa: N818
+class KresSubprocessControllerError(KresBaseError):
+    """Class for errors that are raised in the controller module."""
+
+
+class KresSubprocessControllerExec(Exception):  # noqa: N818
     """
     Custom non-error exception that indicates the need for exec().
 
@@ -16,6 +16,6 @@ class SubprocessControllerExec(Exception):  # noqa: N818
     This ensures that the process runs under the controller (supervisord) in a process tree hierarchy.
     """
 
-    def __init__(self, exec_args: list[str], *args: object) -> None:
+    def __init__(self, exec_args: List[str], *args: object) -> None:
         self.exec_args = exec_args
         super().__init__(*args)
