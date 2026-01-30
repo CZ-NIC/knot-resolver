@@ -1158,6 +1158,20 @@
                     "description": "path to the neural network to be used",
                     "default": null
                 },
+                "sensitivity": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100,
+                    "description": "deep inspection sensitivity to domain name length",
+                    "default": 10
+                },
+                "threshold": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100,
+                    "description": "neural network inference threshold in percentage",
+                    "default": 95
+                },
                 "tags": {
                     "type": [
                         "array",

@@ -13,12 +13,13 @@ modules.load('dns_tunnel_filter')
 local ffi = require('ffi')
 ffi.cdef([[
 int dns_tunnel_filter_setup(const char *nn_file, const char *mmap_file, kr_rule_tags_t tags,
-		size_t capacity, uint32_t instant_limit, uint32_t rate_limit);
+		uint8_t sensitivity, uint8_t threshold, size_t capacity, uint32_t instant_limit, uint32_t rate_limit);
 ]])
 assert(ffi.C.dns_tunnel_filter_setup(
 	'/home/blcnn.pt', -- Edit path to NN model
 	'dns_tunnel_filter',
 	0,
+	10, 95,
 	2^20, 2^8, 2^17
 ) == 0);
 
