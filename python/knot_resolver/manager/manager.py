@@ -135,6 +135,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                 config.monitoring,
                 config.rate_limiting,
                 config.defer,
+                config.tunnel_filter,
                 config.lua,
             ]
 
