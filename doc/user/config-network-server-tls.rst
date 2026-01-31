@@ -212,10 +212,12 @@ policies.
 DNS-over-QUIC (DoQ)
 ^^^^^^^^^^^^^^^^^^^
 
-.. note::
-    DoQ is currently considered an experimental feature. If you encounter any
-    issues or have any questions, please do not hesitate to contact us via the
-    standard communication channels.
+.. warning::
+    DoQ is currently considered a beta feature,
+    and its configuration might change.
+
+    If you encounter any issues or have any questions,
+    please do not hesitate to contact us via the standard communication channels.
 
 
 DNS-over-QUIC server (:rfc:`9250`) can be configured using ``doq`` kind in
@@ -225,15 +227,15 @@ For certificate configuration, refer to :ref:`dot-doh-doq-config-options`.
 
 .. option:: network/quic:
 
-    .. option:: max_conns: <1-4096>
+    .. option:: max-conns: <1-4096>
 
     :default: 1024
 
-    The maximum number of active connections a worker is permitted to accept.
+    The maximum number of active connections each worker is permitted to accept.
     Setting this value too low or too high may negatively affect performance.
     Changing this value requires a worker restart.
 
-    .. option:: max_streams: <1-4096>
+    .. option:: max-streams: <1-4096>
 
     :default: 1024
 
@@ -241,7 +243,7 @@ For certificate configuration, refer to :ref:`dot-doh-doq-config-options`.
     Setting this value too low or too high may negatively affect performance.
     Changing this value requires a worker restart.
 
-    .. option:: require_retry: true|false
+    .. option:: require-retry: true|false
 
     :default: false
 
