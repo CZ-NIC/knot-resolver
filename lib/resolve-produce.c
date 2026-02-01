@@ -666,10 +666,9 @@ int kr_resolve_produce(struct kr_request *request, struct kr_transport **transpo
 	}
 	/* At this point we need to send a query upstream to proceed towards success. */
 
-	/* This query has RD=0 or is ANY, stop here. */
-	if (qry->stype == KNOT_RRTYPE_ANY ||
-	    !knot_wire_get_rd(request->qsource.packet->wire)) {
-		VERBOSE_MSG(qry, "=> qtype is ANY or RD=0, bail out\n");
+	/* This query has RD=0, stop here. */
+	if (!knot_wire_get_rd(request->qsource.packet->wire)) {
+		VERBOSE_MSG(qry, "=> RD=0, bail out\n");
 		return KR_STATE_FAIL;
 	}
 

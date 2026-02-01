@@ -60,6 +60,8 @@ struct kr_qflags {
 	bool DNS64_DISABLE : 1;  /**< Don't do any DNS64 stuff (meant for view:addr). */
 	bool PASSTHRU_LEGACY : 1;/**< Ignore local-data overrides/blocks for this kr_request. */
 	bool FALLBACK_DISABLE : 1;/**< Don't attempt fallback.  Meant for views.  */
+	bool QTYPE_ANY : 1;      /**< Allow ANY as QTYPE. */
+	bool QTYPE_RRSIG : 1;    /**< Allow RRSIG as QTYPE. */
 };
 
 /** Combine flags together.  This means set union for simple flags. */
