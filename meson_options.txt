@@ -162,6 +162,19 @@ option(
 )
 
 option(
+  'quic',
+  type: 'combo',
+  choices: [
+    'auto',
+    'external',
+    'embedded',
+    'disabled',
+  ],
+  value: 'auto',
+  description: 'build DNS-over-QUIC support',
+)
+
+option(
   'doc',
   type: 'combo',
   choices: [

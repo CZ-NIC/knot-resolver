@@ -3,6 +3,7 @@
  */
 
 #include "kresconfig.h"
+#include "lib/proto.h"
 
 #include <ucw/lib.h>
 #include <sys/socket.h>
@@ -66,8 +67,20 @@ static const enum protolayer_type protolayer_grp_doh[] = {
 	PROTOLAYER_TYPE_DNS_UNSIZED_STREAM,
 };
 
-static const enum protolayer_type protolayer_grp_doq[] = {
-	// not yet used
+static const enum protolayer_type protolayer_grp_doq_stream[] = {
+	PROTOLAYER_TYPE_QUIC_STREAM,
+	PROTOLAYER_TYPE_DNS_SINGLE_STREAM,
+};
+
+static const enum protolayer_type protolayer_grp_doq_conn[] = {
+	PROTOLAYER_TYPE_DEFER,
+	PROTOLAYER_TYPE_QUIC_CONN,
+	PROTOLAYER_TYPE_NULL,
+};
+
+static const enum protolayer_type protolayer_grp_doq_demux[] = {
+	PROTOLAYER_TYPE_UDP,
+	PROTOLAYER_TYPE_QUIC_DEMUX,
 	PROTOLAYER_TYPE_NULL,
 };
 
@@ -626,7 +639,9 @@ static int session2_submit(
 	// but we may not know the client's IP yet.
 	// Note two cases: incoming session (new request)
 	// vs. outgoing session (resuming work on some request)
-	if ((direction == PROTOLAYER_UNWRAP) && (layer_ix == 0))
+	if ((direction == PROTOLAYER_UNWRAP) && (layer_ix == 0) &&
+			session->proto != KR_PROTO_DOQ_STREAM &&
+			session->proto != KR_PROTO_DOQ)
 		defer_sample_start(NULL);
 
 	struct protolayer_iter_ctx *ctx = malloc(session->iter_ctx_size);
@@ -669,6 +684,7 @@ static int session2_submit(
 			ctx->comm_storage.dst_addr = &addrst->dst_addr.ip;
 		}
 		ctx->comm = &ctx->comm_storage;
+		ctx->comm->target = comm->target;
 	} else {
 		ctx->comm = &session->comm_storage;
 	}
@@ -688,7 +704,9 @@ static int session2_submit(
 	}
 
 	int ret = protolayer_step(ctx);
-	if ((direction == PROTOLAYER_UNWRAP) && (layer_ix == 0))
+	if ((direction == PROTOLAYER_UNWRAP) && (layer_ix == 0) &&
+			session->proto != KR_PROTO_DOQ_STREAM &&
+			session->proto != KR_PROTO_DOQ)
 		defer_sample_stop(NULL, false);
 	return ret;
 }
@@ -1518,7 +1536,7 @@ static int session2_transport_pushv(struct session2 *s,
 		}
 
 		if (handle->type == UV_UDP) {
-			if (ENABLE_SENDMMSG && !s->outgoing) {
+			if (ENABLE_SENDMMSG && !s->outgoing && s->proto != KR_PROTO_DOQ) {
 				int fd;
 				int ret = uv_fileno(handle, &fd);
 				if (kr_fails_assert(!ret)) {

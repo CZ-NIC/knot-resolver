@@ -26,6 +26,7 @@ typedef struct {
 	bool tls;         /**< only used together with .kind == NULL and SOCK_STREAM */
 	bool http;        /**< DoH2, implies .tls (in current implementation) */
 	bool xdp;         /**< XDP is special (not a normal socket, in particular) */
+	bool quic;         /**< DoQ, implies .tls (in current implementation) */
 	bool freebind;    /**< used for binding to non-local address */
 	const char *kind; /**< tag for other types: "control" or module-handled kinds */
 } endpoint_flags_t;
@@ -67,6 +68,12 @@ struct net_tcp_param {
 struct net_proxy_data {
 	union kr_in_addr addr;
 	uint8_t netmask;   /**< Number of bits to be matched */
+};
+
+struct net_quic_params {
+	uint16_t max_conns;
+	uint16_t max_streams;
+	bool require_retry;
 };
 
 struct network {
@@ -115,6 +122,8 @@ struct network {
 
 	/** Low source port (e.g. 53) might be useful for attacks with spoofed source IPs. */
 	uint16_t min_udp_source_port;
+
+	struct net_quic_params *quic_params;
 };
 
 /** Pointer to the singleton network state. NULL if not initialized. */

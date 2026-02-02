@@ -55,7 +55,7 @@ address + port combination.
 
       Port number to listen on.
 
-   .. option:: kind: dns|xdp|dot|doh2|doh-legacy
+   .. option:: kind: dns|xdp|dot|doh2|doh-legacy|doq
 
       :default: dns
 

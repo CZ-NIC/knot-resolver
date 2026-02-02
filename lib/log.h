@@ -82,6 +82,8 @@ enum kr_log_group {
 	LOG_GRP_RULES,
 	LOG_GRP_PROTOLAYER,
 	LOG_GRP_DEFER,
+	LOG_GRP_DOQ,
+	LOG_GRP_DOQ_LIBNGTCP2,
 	/* ^^ Add new log groups above ^^. */
 	LOG_GRP_REQDBG, /* Must be first non-displayed entry in enum! */
 };
@@ -137,6 +139,8 @@ enum kr_log_group {
 #define LOG_GRP_RULES_TAG		"rules"		/**< ``rules``: new policy rules (their processing) */
 #define LOG_GRP_PROTOLAYER_TAG		"prlayr"	/**< ``prlayr``: protocol layer system (session2) */
 #define LOG_GRP_DEFER_TAG		"defer" 	/**< ``defer``: prioritization of requests */
+#define LOG_GRP_DOQ_TAG			"doq" 		/**< ``doq``: DNS-over-QUIC logger */
+#define LOG_GRP_DOQ_LIBNGTCP2_TAG	"ngtcp2" 	/**< ``ngtcp2``: ngtcp2 debug output */
 #define LOG_GRP_REQDBG_TAG		"reqdbg"	/**< ``reqdbg``: debug logs enabled by policy actions */
 ///@}
 

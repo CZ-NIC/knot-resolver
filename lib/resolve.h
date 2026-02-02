@@ -195,6 +195,7 @@ struct kr_request_qsource_flags {
 	bool tls:1; /**< true if the request is encrypted; only meaningful if (dst_addr). */
 	bool http:1; /**< true if the request is on HTTP; only meaningful if (dst_addr). */
 	bool xdp:1; /**< true if the request is on AF_XDP; only meaningful if (dst_addr). */
+	bool quic:1; /**< true if the request is over QUIC; only meaningful if (dst_addr). */
 };
 
 /* Extended DNS Errors, RFC 8914 */

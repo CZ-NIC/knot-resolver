@@ -5,6 +5,7 @@ from knot_resolver.datamodel.types import (
     EscapedStr32B,
     Int0_512,
     Int0_65535,
+    Int1_4096,
     InterfaceOptionalPort,
     IPAddress,
     IPAddressEM,
@@ -19,7 +20,7 @@ from knot_resolver.datamodel.types import (
 )
 from knot_resolver.utils.modeling import ConfigSchema
 
-KindEnum = Literal["dns", "xdp", "dot", "doh-legacy", "doh2"]
+KindEnum = Literal["dns", "xdp", "dot", "doh-legacy", "doh2", "doq"]
 
 
 class EdnsBufferSizeSchema(ConfigSchema):
@@ -46,6 +47,22 @@ class AddressRenumberingSchema(ConfigSchema):
 
     source: IPNetwork
     destination: Union[IPAddressEM, IPAddress]
+
+
+class QUICSchema(ConfigSchema):
+    """
+    Optional DoQ configuration.
+
+    ---
+    max_conns: Maximum number of active connections a single worker is allowed to accept.
+    max_streams: Maximum number of concurrent streams a connection is allowed to open.
+    require_retry: Require address validation for unknown source addresses.
+                    This adds a 1-RTT delay to connection establishment.
+    """
+
+    max_conns: Int1_4096 = Int1_4096(1024)
+    max_streams: Int1_4096 = Int1_4096(1024)
+    require_retry: bool = False
 
 
 class TLSSchema(ConfigSchema):
@@ -139,7 +156,7 @@ class ListenSchema(ConfigSchema):
             return origin.port
         # default port number based on kind
         if origin.interface:
-            if origin.kind == "dot":
+            if origin.kind in ["dot", "doq"]:
                 return PortNumber(853)
             if origin.kind in ["doh-legacy", "doh2"]:
                 return PortNumber(443)
@@ -182,7 +199,8 @@ class NetworkSchema(ConfigSchema):
     edns_tcp_keepalive: Allows clients to discover the connection timeout. (RFC 7828)
     edns_buffer_size: Maximum EDNS payload size advertised in DNS packets. Different values can be configured for communication downstream (towards clients) and upstream (towards other DNS servers).
     address_renumbering: Renumbers addresses in answers to different address space.
-    tls: TLS configuration, also affects DNS over TLS and DNS over HTTPS.
+    tls: TLS configuration, also affects DNS over TLS, DNS over HTTPS and DNS over QUIC.
+    quic: DNS over QUIC configuration.
     proxy_protocol: PROXYv2 protocol configuration.
     listen: List of interfaces to listen to and its configuration.
     """  # noqa: E501
@@ -197,6 +215,7 @@ class NetworkSchema(ConfigSchema):
     address_renumbering: Optional[List[AddressRenumberingSchema]] = None
     tls: TLSSchema = TLSSchema()
     proxy_protocol: ProxyProtocolSchema = ProxyProtocolSchema()
+    quic: QUICSchema = QUICSchema()
     listen: List[ListenSchema] = [
         ListenSchema({"interface": "127.0.0.1"}),
         ListenSchema({"interface": "::1", "freebind": True}),

@@ -228,6 +228,9 @@ static inline size_t wire_buf_free_space_length(const struct wire_buf *wb)
 	XX(TCP)\
 	XX(TLS)\
 	XX(HTTP)\
+	XX(QUIC_DEMUX)\
+	XX(QUIC_CONN)\
+	XX(QUIC_STREAM)\
 	\
 	/* PROXYv2 */\
 	XX(PROXYV2_DGRAM)\
@@ -342,6 +345,10 @@ typedef void (*protolayer_finished_cb)(int status, struct session2 *session,
 	XX(STATS_QRY_OUT) \
 	/** OS buffers are full, so not sending any more data. */\
 	XX(OS_BUFFER_FULL) \
+	/** Request update of connection data, only used by DoQ */\
+	XX(CONNECT_UPDATE) \
+	/** Request removal of cid, only used by DoQ */\
+	XX(CONNECT_RETIRE) \
 	//
 
 /** Event type, to be interpreted by a layer. */
@@ -563,6 +570,8 @@ size_t protolayer_iter_size_est(struct protolayer_iter_ctx *ctx, bool incl_paylo
 /** Layer-specific data - the generic struct. To be added as the first member of
  * each specific struct. */
 struct protolayer_data {
+	int heap_node_placeholder; // MUST be first field of the struct
+	uint64_t heap_value;
 	struct session2 *session; /**< Pointer to the owner session. */\
 };
 

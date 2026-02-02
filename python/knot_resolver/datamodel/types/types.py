@@ -31,6 +31,11 @@ class Int0_512(IntRangeBase):  # noqa: N801
     _max: int = 512
 
 
+class Int1_4096(IntRangeBase):  # noqa: N801
+    _min: int = 1
+    _max: int = 4096
+
+
 class Int0_65535(IntRangeBase):  # noqa: N801
     _min: int = 0
     _max: int = 65_535

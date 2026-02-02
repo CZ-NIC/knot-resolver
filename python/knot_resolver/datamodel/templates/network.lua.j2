@@ -57,6 +57,15 @@ false
 {%- endif -%}
 )
 
+-- network.quic.max_conns
+net.quic_max_conns({{ cfg.network.quic.max_conns }})
+
+-- network.quic.max_streams
+net.quic_max_streams({{ cfg.network.quic.max_streams }})
+
+-- network.quic.require_retry
+net.quic_require_retry({{ boolean(cfg.network.quic.require_retry) }})
+
 {% if cfg.network.address_renumbering %}
 -- network.address-renumbering
 modules.load('renumber')

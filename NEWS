@@ -1,5 +1,9 @@
-Knot Resolver 6.1.1 (2026-0m-dd)
+Knot Resolver 6.2.0 (2026-02-dd)
 ================================
+
+Improvements:
+-------------
+- DNS-over-QUIC (DoQ) is available for serving (beta, !1747)
 
 Bugfixes
 --------

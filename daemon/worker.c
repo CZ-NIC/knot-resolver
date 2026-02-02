@@ -3,8 +3,12 @@
  */
 
 #include "kresconfig.h"
+#include "lib/proto.h"
+#include "mempattern.h"
 #include "daemon/worker.h"
 
+#include <libknot/wire.h>
+#include <string.h>
 #include <uv.h>
 #include <lua.h>
 #include <lauxlib.h>
@@ -1019,6 +1023,9 @@ static int qr_task_finalize(struct qr_task *task, int state)
 		.comm_addr = &ctx->source.comm_addr.ip,
 		.xdp = ctx->source.xdp
 	};
+	if (ctx->req.qsource.flags.quic) {
+		out_comm.target = ctx->source.session->comm_storage.target;
+	}
 	if (ctx->source.xdp) {
 		memcpy(out_comm.eth_from, ctx->source.eth_from, sizeof(out_comm.eth_from));
 		memcpy(out_comm.eth_to,   ctx->source.eth_to,   sizeof(out_comm.eth_to));
@@ -2349,7 +2356,7 @@ static void pl_dns_stream_request_init(struct session2 *session,
                                        struct kr_request *req,
                                        void *sess_data)
 {
-	req->qsource.comm_flags.tcp = true;
+	req->qsource.comm_flags.tcp = !req->qsource.comm_flags.quic;
 }
 
 __attribute__((constructor))

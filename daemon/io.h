@@ -20,7 +20,7 @@ struct io_stream_data;
 /** Bind address into a file-descriptor (only, no libuv).  type is e.g. SOCK_DGRAM */
 int io_bind(const struct sockaddr *addr, int type, const endpoint_flags_t *flags);
 /** Initialize a UDP handle and start listening. */
-int io_listen_udp(uv_loop_t *loop, uv_udp_t *handle, int fd);
+int io_listen_udp(uv_loop_t *loop, uv_udp_t *handle, int fd, bool doq);
 /** Initialize a TCP handle and start listening. */
 int io_listen_tcp(uv_loop_t *loop, uv_tcp_t *handle, int fd, int tcp_backlog, bool has_tls, bool has_http);
 /** Initialize a pipe handle and start listening. */
