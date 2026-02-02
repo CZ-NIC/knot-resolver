@@ -3,7 +3,7 @@ import platform
 import re
 from pathlib import Path
 
-VERSION = "6.1.0"
+VERSION = "6.1.1"
 USER = "knot-resolver"
 GROUP = "knot-resolver"
 
