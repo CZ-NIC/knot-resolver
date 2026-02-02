@@ -50,22 +50,15 @@ class AddressRenumberingSchema(ConfigSchema):
 
 
 class QUICSchema(ConfigSchema):
-    class Raw(ConfigSchema):
-        """
-        Optional DoQ configuration.
+    """
+    Optional DoQ configuration.
 
-        ---
-        max_conns: Maximum number of active connections a single worker is allowed to accept.
-        max_streams: Maximum number of concurrent streams a connection is allowed to open.
-        require_retry: Require address validation for unknown source addresses.
-                        This adds a 1-RTT delay to connection establishment.
-        """
-
-        max_conns: Int1_4096 = Int1_4096(1024)
-        max_streams: Int1_4096 = Int1_4096(1024)
-        require_retry: bool = False
-
-    _LAYER = Raw
+    ---
+    max_conns: Maximum number of active connections a single worker is allowed to accept.
+    max_streams: Maximum number of concurrent streams a connection is allowed to open.
+    require_retry: Require address validation for unknown source addresses.
+                    This adds a 1-RTT delay to connection establishment.
+    """
 
     max_conns: Int1_4096 = Int1_4096(1024)
     max_streams: Int1_4096 = Int1_4096(1024)
