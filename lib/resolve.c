@@ -481,6 +481,7 @@ int kr_resolver_init(module_array_t *modules, knot_mm_t *pool)
 
 	/* Default options (request flags). */
 	the_resolver->options.REORDER_RR = true;
+	the_resolver->options.QTYPE_RRSIG = true;
 	the_resolver->vld_limit_crypto = KR_VLD_LIMIT_CRYPTO_DEFAULT;
 
 	/* Open resolution context */

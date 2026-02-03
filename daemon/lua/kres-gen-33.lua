@@ -143,6 +143,8 @@ struct kr_qflags {
 	_Bool DNS64_DISABLE : 1;
 	_Bool PASSTHRU_LEGACY : 1;
 	_Bool FALLBACK_DISABLE : 1;
+	_Bool QTYPE_ANY : 1;
+	_Bool QTYPE_RRSIG : 1;
 };
 typedef struct ranked_rr_array_entry {
 	uint32_t qry_uid;
