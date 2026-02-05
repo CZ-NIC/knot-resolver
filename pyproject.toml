@@ -1,14 +1,13 @@
 [tool.poetry]
 name = "knot-resolver"
 version = "6.2.0"
-description = "Knot Resolver Manager - a Python program that automatically manages the other components of the resolver"
+description = "A modern, high-performance, modular DNS resolver with DNSSEC validation and advanced policy."
 license = "GPL-3.0-or-later"
-authors = [
-    "Aleš Mrázek <ales.mrazek@nic.cz>",
-    "Václav Šraier <vaclav.sraier@nic.cz>"
-]
 maintainers = [
     "Aleš Mrázek <ales.mrazek@nic.cz>"
+]
+authors = [
+    "Václav Šraier <vaclav.sraier@nic.cz>"
 ]
 readme = "README.md"
 homepage = "https://www.knot-resolver.cz"
@@ -19,12 +18,6 @@ packages = [
     {include = "knot_resolver", from = "python"}
 ]
 exclude = ["**/*.in", "**/meson.build"]
-
-# See currently open issue about building C extensions here:
-# https://github.com/python-poetry/poetry/issues/2740
-[tool.poetry.build]
-script = "build_c_extensions.py"
-generate-setup-file = true
 
 [tool.poetry.dependencies]
 python = "^3.8"
@@ -67,8 +60,9 @@ sphinx-rtd-theme = "^2.0.0"
 breathe = "^4.35.0"
 
 [tool.poetry.scripts]
-kresctl = 'knot_resolver.client.main:main'
-knot-resolver = 'knot_resolver.manager.main:main'
+knot-resolver = "knot_resolver.main:main"
+kres-manager = "knot_resolver.manager.main:main"
+kresctl = "knot_resolver.client.main:main"
 
 [tool.poe.tasks]
 # Tasks to configure, build and run
@@ -198,15 +192,7 @@ ignore = [
     "TCH003",     # *Move standard library import into a type-checking block
 ]
 exclude = [
-    "tests/pytests/*",
-    "python/knot_resolver/controller/supervisord/plugin/*",
-
-    # submodules
-    # "python/knot_resolver/client/*",
-    # "python/knot_resolver/client/*",
-    # "python/knot_resolver/controller/*",
-    # "python/knot_resolver/manager/*",
-    # "python/knot_resolver/utils/*",
+    "tests/python/knot_resolver*"
 ]
 
 [tool.ruff.lint.isort]
