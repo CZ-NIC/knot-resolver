@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import asyncio
-import sys
 
 from .constants import CONFIG_FILE, VERSION
 from .logging import startup_logger
@@ -43,5 +41,4 @@ def main() -> None:
     args = parser.parse_args()
 
     startup_logger(args.verbose)
-    exit_code = asyncio.run(start_resolver(config=args.config))
-    sys.exit(exit_code)
+    start_resolver(config=args.config)
