@@ -1,3 +1,11 @@
+Knot Resolver 6.x.y (2026-0m-dd)
+================================
+
+Improvements:
+-------------
+- RPZ now supports  *.some.name. CNAME block.page. (!1808)
+
+
 Knot Resolver 6.2.0 (2026-02-03)
 ================================
 
