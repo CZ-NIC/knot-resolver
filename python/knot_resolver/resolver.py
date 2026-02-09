@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .constants import RUN_DIR
+from .controller import SupervisordController
+from .controller.errors import ControllerError
 from .logging import get_logger
 
 if TYPE_CHECKING:
@@ -25,3 +28,11 @@ def start_resolver(args: KresArgs) -> None:
     # TODO(amrazek): use 'rundir' from configuration
     logger.debug("Changing working directory to '%s'", RUN_DIR)
     os.chdir(RUN_DIR)
+
+    try:
+        controller = SupervisordController(args)
+        controller.write_config()
+        controller.exec()
+    except ControllerError as e:
+        logger.critical(e)
+        sys.exit(1)
