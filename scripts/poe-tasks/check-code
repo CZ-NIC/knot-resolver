@@ -8,7 +8,7 @@ source $src_dir/utils/_env.sh
 set +e
 
 # dirs to check
-dirs="python/knot_resolver/ tests/manager scripts/poe-tasks/utils/create_setup.py"
+dirs="python/knot_resolver/ tests/python/knot_resolver scripts/poe-tasks/utils/create_setup.py"
 
 # check imports
 echo -e "${yellow}Checking Python imports using Ruff...${reset}"
@@ -24,7 +24,7 @@ echo
 
 # run static code analysis 
 echo -e "${yellow}Running static code analysis using Ruff linter...${reset}"
-ruff check python/knot_resolver/ tests/pytests
+ruff check python/knot_resolver/ tests/python/knot_resolver
 check_rv $?
 echo
 
