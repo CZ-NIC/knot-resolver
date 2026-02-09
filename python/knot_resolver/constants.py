@@ -10,6 +10,7 @@ GROUP = "knot-resolver"
 # dirs paths
 RUN_DIR = Path("/run/knot-resolver")
 ETC_DIR = Path("/etc/knot-resolver")
+BIN_DIR = Path("/usr/bin")
 SBIN_DIR = Path("/usr/sbin")
 CACHE_DIR = Path("/var/cache/knot-resolver")
 
@@ -20,6 +21,7 @@ API_SOCK_FILE = RUN_DIR / "kres-api.sock"
 # executables paths
 KRESD_EXECUTABLE = SBIN_DIR / "kresd"
 KRES_CACHE_GC_EXECUTABLE = SBIN_DIR / "kres-cache-gc"
+KRES_MANAGER_EXECUTABLE = BIN_DIR / "kres-manager"
 
 LINUX_SYS = platform.system() == "Linux"
 FREEBSD_SYS = platform.system() == "FreeBSD"
@@ -41,6 +43,9 @@ def _freebsd_workers_support() -> bool:
 # It is possible to configure multiple kresd workers on Linux systems due to the SO_REUSEPORT socket option.
 # FreeBSD version >=12 supports it specifically due to the additional SO_REUSEPORT_LB socket option.
 WORKERS_SUPPORT = LINUX_SYS or _freebsd_workers_support()
+
+# default maximum number of workers
+WORKERS_MAX = 256
 
 # Systemd-like NOTIFY message is supported only on Linux systems
 NOTIFY_SUPPORT = LINUX_SYS
