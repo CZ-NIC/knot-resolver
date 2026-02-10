@@ -1,0 +1,72 @@
+[supervisord]
+directory = {{ supervisord.workdir }}
+pidfile = {{ supervisord.pidfile }}
+logfile = {{ supervisord.logfile }}
+logfile_maxbytes = 0
+loglevel = {{ supervisord.loglevel }}
+nodaemon = true
+silent = true
+
+[supervisorctl]
+serverurl = unix://{{ supervisord.unix_http_server }}
+
+[unix_http_server]
+file = {{ supervisord.unix_http_server }}
+
+[program:manager]
+command = {{ manager.command }}
+directory = {{ manager.workdir }}
+environment = {{ manager.environment }}
+startsecs= {{ manager.startsecs }}
+redirect_stderr = false
+autostart = true
+autorestart = true
+killasgroup = true
+stopsignal = SIGTERM
+stopwaitsecs = 30
+stdout_logfile = NONE
+stderr_logfile = NONE
+
+[program:worker]
+process_name = %(program_name)s%(process_num)d
+numprocs = {{ worker.max_procs }}
+command = {{ worker.command }}
+directory = {{ worker.workdir }}
+environment = {{ worker.environment }}
+startsecs = {{ worker.startsecs }}
+redirect_stderr = false
+autostart = false
+autorestart = true
+killasgroup = true
+stopsignal = SIGTERM
+stopwaitsecs = 30
+stdout_logfile = NONE
+stderr_logfile = NONE
+
+[program:loader]
+command = {{ loader.command }}
+directory = {{ loader.workdir }}
+environment = {{ loader.environment }}
+startsecs = {{ loader.startsecs }}
+redirect_stderr = false
+autostart = false
+exitcodes = 0
+killasgroup = true
+stopsignal = SIGTERM
+stopwaitsecs = 30
+stdout_logfile = NONE
+stderr_logfile = NONE
+
+[program:cache-gc]
+command = {{ cache_gc.command }}
+directory = {{ cache_gc.workdir }}
+environment = {{ cache_gc.environment }}
+startsecs={{ cache_gc.startsecs }}
+redirect_stderr=false
+autostart=false
+autorestart=true
+killasgroup=true
+stopsignal = SIGTERM
+stopwaitsecs = 30
+stdout_logfile=NONE
+stderr_logfile=NONE

@@ -8,6 +8,7 @@ packages = \
 ['knot_resolver',
  'knot_resolver.client',
  'knot_resolver.config',
+ 'knot_resolver.config.templates',
  'knot_resolver.controller',
  'knot_resolver.manager',
  'knot_resolver.utils']
