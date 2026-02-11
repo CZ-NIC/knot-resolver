@@ -50,6 +50,7 @@ if get_option('doc') == 'enabled'
 endif
 
 
+# we create the doc targets even if -Ddoc=disabled (and we didn't check deps in that case)
 make_doc = [find_program('../scripts/meson/make-doc.sh'), '-j', 'auto']
 run_target(
   'doc',
