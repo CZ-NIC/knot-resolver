@@ -2,81 +2,60 @@ import asyncio
 import os
 import pkgutil
 import signal
-import sys
 import time
 from asyncio import create_subprocess_exec, create_subprocess_shell
-from pathlib import PurePath
-from threading import Thread
-from typing import Any, Dict, Generic, List, Optional, TypeVar, Union
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
 
 from knot_resolver.utils.compat.asyncio import to_thread
-
-
-def unblock_signals() -> None:
-    if sys.version_info >= (3, 8):
-        signal.pthread_sigmask(signal.SIG_UNBLOCK, signal.valid_signals())
-    else:
-        # the list of signals is not exhaustive, but it should cover all signals we might ever want to block
-        signal.pthread_sigmask(
-            signal.SIG_UNBLOCK,
-            {
-                signal.SIGHUP,
-                signal.SIGINT,
-                signal.SIGTERM,
-                signal.SIGUSR1,
-                signal.SIGUSR2,
-            },
-        )
 
 
 async def call(
     cmd: Union[str, bytes, List[str], List[bytes]], shell: bool = False, discard_output: bool = False
 ) -> int:
     """Async alternative to subprocess.call()."""
-    kwargs: Dict[str, Any] = {
-        "preexec_fn": unblock_signals,
-    }
+    kwargs: Dict[str, Any] = {"preexec_fn": signal.pthread_sigmask(signal.SIG_UNBLOCK, signal.valid_signals())}
     if discard_output:
         kwargs["stdout"] = asyncio.subprocess.DEVNULL
         kwargs["stderr"] = asyncio.subprocess.DEVNULL
 
     if shell:
         if isinstance(cmd, list):
-            raise RuntimeError("can't use list of arguments with shell=True")
+            msg = "can't use list of arguments with shell=True"
+            raise RuntimeError(msg)
         proc = await create_subprocess_shell(cmd, **kwargs)
     else:
         if not isinstance(cmd, list):
-            raise RuntimeError(
-                "Please use list of arguments, not a single string. It will prevent ambiguity when parsing"
-            )
+            msg = "Please use list of arguments, not a single string. It will prevent ambiguity when parsing"
+            raise RuntimeError(msg)
         proc = await create_subprocess_exec(*cmd, **kwargs)
 
     return await proc.wait()
 
 
-async def readfile(path: Union[str, PurePath]) -> str:
-    """Asynchronously read whole file and return its content."""
+async def readfile(path: Path) -> str:
+    """Asynchronously read file on a path and return its content."""
 
-    def readfile_sync(path: Union[str, PurePath]) -> str:
-        with open(path, "r", encoding="utf8") as f:
-            return f.read()
+    def readfile_sync(path: Path) -> str:
+        with path.open("r", encoding="utf8") as file:
+            return file.read()
 
     return await to_thread(readfile_sync, path)
 
 
-async def writefile(path: Union[str, PurePath], content: str) -> None:
-    """Asynchronously set content of a file to a given string `content`."""
+async def writefile(path: Path, content: str) -> None:
+    """Asynchronously set content of a file on path to a given string content."""
 
-    def writefile_sync(path: Union[str, PurePath], content: str) -> int:
-        with open(path, "w", encoding="utf8") as f:
-            return f.write(content)
+    def writefile_sync(path: Path, content: str) -> int:
+        with path.open("w", encoding="utf8") as file:
+            return file.write(content)
 
     await to_thread(writefile_sync, path, content)
 
 
 async def wait_for_process_termination(pid: int, sleep_sec: float = 0) -> None:
     """
-    Wait for the process termination.
+    Wait for any process (does not have to be a child process) given by its PID to terminate.
 
     Will wait for any process (does not have to be a child process)
     given by its PID to terminate sleep_sec configures the granularity,
@@ -84,40 +63,18 @@ async def wait_for_process_termination(pid: int, sleep_sec: float = 0) -> None:
     """
 
     def wait_sync(pid: int, sleep_sec: float) -> None:
-        while True:
-            try:
+        try:
+            while True:
                 os.kill(pid, 0)
                 if sleep_sec == 0:
                     os.sched_yield()
                 else:
                     time.sleep(sleep_sec)
-            except ProcessLookupError:
-                break
+        except ProcessLookupError:
+            pass
 
     await to_thread(wait_sync, pid, sleep_sec)
 
 
 async def read_resource(package: str, filename: str) -> Optional[bytes]:
     return await to_thread(pkgutil.get_data, package, filename)
-
-
-T = TypeVar("T")
-
-
-class BlockingEventDispatcher(Thread, Generic[T]):
-    def __init__(self, name: str = "blocking_event_dispatcher") -> None:
-        super().__init__(name=name, daemon=True)
-        # warning: the asyncio queue is not thread safe
-        self._removed_unit_names: "asyncio.Queue[T]" = asyncio.Queue()
-        self._main_event_loop = asyncio.get_event_loop()
-
-    def dispatch_event(self, event: T) -> None:
-        """Dispatch events from the blocking thread."""
-
-        async def add_to_queue() -> None:
-            await self._removed_unit_names.put(event)
-
-        self._main_event_loop.call_soon_threadsafe(add_to_queue)
-
-    async def next_event(self) -> T:
-        return await self._removed_unit_names.get()

@@ -1,4 +1,3 @@
-import enum
 import logging
 import os
 import socket
@@ -6,49 +5,33 @@ import socket
 logger = logging.getLogger(__name__)
 
 
-class _Status(enum.Enum):
-    NOT_INITIALIZED = 1
-    FUNCTIONAL = 2
-    FAILED = 3
-
-
-_status = _Status.NOT_INITIALIZED
-_socket = None
-
-
 def systemd_notify(**values: str) -> None:
-    global _status
-    global _socket
+    """
+    Send systemd notify message to notify socket.
 
-    if _status is _Status.NOT_INITIALIZED:
-        socket_addr = os.getenv("NOTIFY_SOCKET")
-        os.unsetenv("NOTIFY_SOCKET")
-        if socket_addr is None:
-            _status = _Status.FAILED
-            return
-        if socket_addr.startswith("@"):
-            socket_addr = socket_addr.replace("@", "\0", 1)
-
-        try:
-            _socket = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
-            _socket.connect(socket_addr)
-            _status = _Status.FUNCTIONAL
-        except Exception:
-            _socket = None
-            _status = _Status.FAILED
-            logger.warning(f"Failed to connect to $NOTIFY_SOCKET at '{socket_addr}'", exc_info=True)
-            return
-
-    elif _status is _Status.FAILED:
+    Notify socket location (unix socket) should be saved in $NOTIFY_SOCKET environment variable.
+    It is typically set by the processes supervisor (supervisord).
+    If $NOTIFY_SOCKET is not configured, it is not possible to send a notification and the operation will fail.
+    """
+    socket_addr = os.getenv("NOTIFY_SOCKET")
+    if socket_addr is None:
+        logger.warning("Failed to get $NOTIFY_SOCKET environment variable")
         return
 
-    if _status is _Status.FUNCTIONAL:
-        assert _socket is not None
-        payload = "\n".join((f"{key}={value}" for key, value in values.items()))
-        try:
-            _socket.send(payload.encode("utf8"))
-        except Exception:
-            logger.warning("Failed to send notification to systemd", exc_info=True)
-            _status = _Status.FAILED
-            _socket.close()
-            _socket = None
+    if socket_addr.startswith("@"):
+        socket_addr = socket_addr.replace("@", "\0", 1)
+
+    try:
+        notify_socket = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+        notify_socket.connect(socket_addr)
+    except OSError:
+        logger.exception("Failed to connect to $NOTIFY_SOCKET at '%s'", socket_addr)
+        return
+
+    payload = "\n".join((f"{key}={value}" for key, value in values.items()))
+    try:
+        notify_socket.send(payload.encode("utf8"))
+    except OSError:
+        logger.exception("Failed to send systemd notification to $NOTIFY_SOCKET at '%s'", socket_addr)
+
+    notify_socket.close()
