@@ -217,7 +217,7 @@ int entry_h_splice(
 	const knot_db_val_t key, const uint16_t ktype, const uint16_t type,
 	const knot_dname_t *owner/*log only*/,
 	const struct kr_query *qry, struct kr_cache *cache, uint32_t timestamp,
-	size_t *cache_record_size_out)
+	size_t *cache_record_size_out, bool force_overwrite)
 {
 	//TODO: another review, perhaps including the API
 	if (kr_fails_assert(val_new_entry && val_new_entry->len > 0))
@@ -251,7 +251,7 @@ int entry_h_splice(
 		}
 	}
 
-	if (!kr_rank_test(rank, KR_RANK_SECURE) && eh_orig) {
+	if (!force_overwrite && !kr_rank_test(rank, KR_RANK_SECURE) && eh_orig) {
 		/* If equal rank was accepted, spoofing a *single* answer would be
 		 * enough to e.g. override NS record in AUTHORITY section.
 		 * This way they would have to hit the first answer
@@ -271,7 +271,7 @@ int entry_h_splice(
 		}
 	}
 
-	kr_cache_prefetch_unsched(key, eh_orig, type);
+	kr_cache_prefetch_unschedule(key, eh_orig, type);
 
 	if (!i_type) {
 		/* The non-list types are trivial now. */
