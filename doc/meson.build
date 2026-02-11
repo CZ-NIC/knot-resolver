@@ -36,15 +36,8 @@ if get_option('doc') == 'enabled'
 
   # python dependencies: breathe, sphinx_rtd_theme
   python = find_program('python3')
-  python_breathe = run_command(python, '-c', 'import breathe', check: false)
-  if python_breathe.returncode() != 0
-    error('missing doc dependency: python breathe')
-  endif
-
-  python_sphinx_rtd_theme = run_command(python, '-c', 'import sphinx_rtd_theme', check: false)
-  if python_sphinx_rtd_theme.returncode() != 0
-    error('missing doc dependency: python sphinx_rtd_theme')
-  endif
+  python_breathe = run_command(python, '-c', 'import breathe', check: true)
+  python_sphinx_rtd_theme = run_command(python, '-c', 'import sphinx_rtd_theme', check: true)
 
   message('------------------------')
 
