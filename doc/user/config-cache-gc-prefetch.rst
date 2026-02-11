@@ -172,7 +172,7 @@ both of which have to be met to consider the record eligible for prefetching.
    Require at least this number of accesses to the record per automatic update.
    It serves as a guarantee that prefetching will not significantly increase the traffic to authoritative servers.
 
-   Let us denote the min-accesses-per-update by k.
+   Let us denote the :option:`min-accesses-per-update <cache/prefetch/min-accesses-per-update: <float>>` by k.
    If we refresh the record for the first time,
    it means that at most one of those k accesses caused a normal update
    and we initiate the other one.
@@ -186,7 +186,7 @@ which is checked both at the time of scheduling the update while inserting the r
 and just before the update.
 
 Specifically, for the accesses per update requirement we seek a counter value
-such that its decrease between the time of insertion and time of update (5s before expiration)
+such that its decrease between the time of insertion and time of update
 is at least the configured value.
 Satisfying this lower bound during insertion assures us
 that we will not count the same accesses again during further updates.
@@ -194,7 +194,27 @@ For the other condition, we require decrease by one access per the given time pe
 As different records have different TTLs,
 sometimes one condition may be stricter, sometimes the other.
 
-Prefetch can benefit from activated defer,
+.. option:: cache/prefetch/update-before-expiration: <0-100>
+
+   :default: 1
+
+   Percents of the original TTL determining how long before the expiration the update may be initiated.
+   If this is less than 5s for a specific record, we use those 5s instead.
+
+   It specifies from which point in time the record is allowed to be updated;
+   the actual update may be delayed if the resolver is busy.
+   In 2s before the expiration,
+   the conditions for the record to be updated start rising from what was configured,
+   so that only the most useful records are updated if overloaded.
+   No record is updated after its expiration.
+
+   Setting higher percentage allows to maintain higher remaining TTLs for the useful records,
+   which might decrease traffic from clients if they are caching our answers.
+   On the other hand, the time between record insertion and update is decreased,
+   which strengthens the :option:`min-accesses-per-update <cache/prefetch/min-accesses-per-update: <float>>` condition.
+
+
+Prefetch can benefit from activated :ref:`defer <config-defer>`,
 in which case it will better recognize when no work is waiting to be processed
 and so automatic updates may be invoked.
 

@@ -699,7 +699,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 	/* Prepare raw memory for the new entry. */
 	size_t whole_val_len = 0;
 	ret = entry_h_splice(&val_new_entry, rank, key, k->type, rr->type,
-				rr->owner, qry, cache, timestamp, &whole_val_len);
+				rr->owner, qry, cache, timestamp, &whole_val_len, qry->flags.NO_CACHE);
 	if (ret) return kr_ok(); /* some aren't really errors */
 	if (kr_fails_assert(val_new_entry.data))
 		return kr_error(EFAULT);
@@ -716,7 +716,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 		return kr_error(EINVAL);
 	if (qry) // it's possible to insert outside a request
 		kr_cache_top_access(qry->request, key.data, key.len, whole_val_len, "stash_rrset");
-	kr_cache_prefetch_sched(key, eh, val_new_entry.len, whole_val_len, rr->type);
+	kr_cache_prefetch_schedule(key, eh, val_new_entry.len, whole_val_len, rr->type);
 
 	#if 0 /* Occasionally useful when debugging some kinds of changes. */
 	{

@@ -168,7 +168,7 @@ int kr_gc_cache_iter(knot_db_t * knot_db, struct kr_cache_top *top, const kr_cac
 			goto error;
 		}
 
-		struct kr_gc_cat_record_info info = { .key = key };
+		struct kr_gc_cat_record_info info = { .key = key, .expires_in = -1 };
 		info.entry_size = kr_cache_top_entry_size(key.len, val.len);
 		info.valid = false;
 		const int entry_type = key_consistent(key);
@@ -177,13 +177,12 @@ int kr_gc_cache_iter(knot_db_t * knot_db, struct kr_cache_top *top, const kr_cac
 			counter_gc_consistent++;
 			switch (entry_type) {
 				case KNOT_CACHE_PREFETCH:
-					uint32_t exp_time;
-					if (!kr_cache_prefetch_parse_pkey(key, &info.prefetch_ekey, &exp_time)) break;
-					info.expires_in = exp_time - now;
-					if (val.len != sizeof(struct entry_p)) break;
-					struct entry_p *ep = val.data;
-					info.prefetch_ekeydata_len = ep->ekeydata_len;
-					info.prefetch_min_load = ep->min_load;
+					struct kr_cache_prefetch_sched sched = { 0 };
+					if (!kr_cache_prefetch_decode_entry(key, val, &sched)) break;
+					info.prefetch_ekey = sched.ekey;
+					info.prefetch_ekeydata_len = sched.ep->ekeydata_len;
+					info.prefetch_min_load = sched.ep->min_load;
+					info.expires_in = sched.ep->exp_time - now;
 					// fall through
 				case KNOT_CACHE_RTT:
 					info.valid = true;

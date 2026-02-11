@@ -245,7 +245,7 @@ int entry_h_splice(
 	const knot_db_val_t key, const uint16_t ktype, const uint16_t type,
 	const knot_dname_t *owner/*log only*/,
 	const struct kr_query *qry, struct kr_cache *cache, uint32_t timestamp,
-	size_t *cache_record_size_out);
+	size_t *cache_record_size_out, bool force_overwrite);
 
 /** Parse an entry_apex into individual items.  @return error code. */
 KR_EXPORT int entry_list_parse(const knot_db_val_t val, entry_list_t list);
