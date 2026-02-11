@@ -13,7 +13,17 @@ struct entry_h;
 struct entry_p {
 	uint16_t ekeydata_len;
 	uint16_t min_load;
+	uint32_t exp_time;
 } __attribute__ ((packed,aligned(1))); // needed by LMDB
+
+// Data of P-entry incl. those encoded in its key.
+struct kr_cache_prefetch_sched {
+	knot_db_val_t ekey;   // RRSet record key (E type)
+	uint32_t update_time;
+	uint16_t rrtype;      // the original type (incl. DNAME/CNAME)
+	uint8_t priority;     // accesses normalized to 1B for normal-size records
+	struct entry_p *ep;
+};
 
 
 // Callback function invoking RR update.
@@ -26,17 +36,17 @@ void kr_cache_prefetch_callback_init(uv_loop_t *loop, kr_cache_prefetch_callback
 
 // Initialize the rest and activate prefetch, to be called from Lua.
 KR_EXPORT
-void kr_cache_prefetch_init(uint32_t max_access_period_sec, float min_accesses_per_update);
+void kr_cache_prefetch_init(uint32_t max_access_period_sec, float min_accesses_per_update, int update_before_exp_perc);
 
 
 // Try scheduling prefetching.
 // To be called during write transaction of (key, eh); eh may be modified inside.
 KR_EXPORT
-void kr_cache_prefetch_sched(knot_db_val_t key, struct entry_h *eh, size_t eh_len, size_t whole_entry_len, uint16_t rrtype);
+void kr_cache_prefetch_schedule(knot_db_val_t key, struct entry_h *eh, size_t eh_len, size_t whole_entry_len, uint16_t rrtype);
 
 // Cancel scheduled prefetching if set. Void if eh is NULL.
 KR_EXPORT
-void kr_cache_prefetch_unsched(knot_db_val_t key, const struct entry_h *eh, uint16_t rrtype);
+void kr_cache_prefetch_unschedule(knot_db_val_t key, const struct entry_h *eh, uint16_t rrtype);
 
 
 // Pause prefetching if defer is busy.
@@ -44,7 +54,12 @@ void kr_cache_prefetch_unsched(knot_db_val_t key, const struct entry_h *eh, uint
 KR_EXPORT
 void kr_cache_prefetch_defer_busy(bool busy);
 
-// Parse E-key and expiration time from P-key;
-// returns true on success.
+
+// Encode sched to P-entry key and data.
 KR_EXPORT
-bool kr_cache_prefetch_parse_pkey(knot_db_val_t pkey, knot_db_val_t *ekey, uint32_t *exp_time);
+void kr_cache_prefetch_encode_entry(struct kr_cache_prefetch_sched *sched, knot_db_val_t *pkey, knot_db_val_t *pdata);
+
+// Decode P-entry key and data,
+// returns kr_ok() on success.
+KR_EXPORT
+int kr_cache_prefetch_decode_entry(knot_db_val_t pkey, knot_db_val_t pdata, struct kr_cache_prefetch_sched *sched);

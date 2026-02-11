@@ -17,7 +17,6 @@
  * Both _analyze and _decide internally evaluate to which category the entry falls.
  */
 
-
 typedef uint8_t category_t;
 #define CATEGORIES 100           // number of categories
 

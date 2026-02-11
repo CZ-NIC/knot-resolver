@@ -29,7 +29,7 @@ category_t categorize(struct kr_cache_top *top, struct kr_gc_cat_record_info *in
 		goto done;
 	}
 
-	if ((info->rrtype == KNOT_CACHE_PREFETCH) && (info->expires_in <= 0)) {
+	if ((info->rrtype == KNOT_CACHE_PREFETCH) && (info->expires_in < 0)) {
 		// cancel prefetch for all expired records; updates are performed only before expiration anyway
 		res = CATEGORIES - 1;
 		goto done;

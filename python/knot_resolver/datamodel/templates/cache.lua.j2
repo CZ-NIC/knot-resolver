@@ -20,5 +20,6 @@ prefill.config({
 {% if cfg.cache.prefetch.expiring %}
 C.kr_cache_prefetch_init(
     {{ cfg.cache.prefetch.max_access_period.seconds() }},
-    {{ cfg.cache.prefetch.min_accesses_per_update }})
+    {{ cfg.cache.prefetch.min_accesses_per_update }},
+    {{ cfg.cache.prefetch.update_before_expiration }})
 {% endif %}

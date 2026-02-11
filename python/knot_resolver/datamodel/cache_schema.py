@@ -113,12 +113,14 @@ class PrefetchSchema(ConfigSchema):
     expiring: Use prefetching.
     max_access_period: How often the record has to be accessed to be eligible for prefetch.
     min_accesses_per_update: How many accesses to the record are required to occur before each prefetch.
+    update_before_expiration: How many percents of TTL before expiration to initiate update (always at least 5s).
     prediction: Obsolete, does not affect anything now.
     """
 
     expiring: bool = False
     max_access_period: TimeUnit = TimeUnit("1h")
     min_accesses_per_update: FloatNonNegative = FloatNonNegative(4)
+    update_before_expiration: Percent = Percent(1)
     prediction: PredictionSchema = PredictionSchema()  # void, TODO add warning if used
 
 
