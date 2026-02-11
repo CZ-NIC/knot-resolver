@@ -178,7 +178,6 @@ option(
   'doc',
   type: 'combo',
   choices: [
-    'auto',
     'enabled',
     'disabled',
   ],
