@@ -95,6 +95,10 @@ static inline void get_size_capacity(size_t cache_size, size_t *top_size, size_t
 	*top_size = offsetof(struct top_data, kru) + KRU.get_size(*capacity_log);
 }
 
+double kr_cache_top_decay_mult(struct kr_cache_top *top, uint32_t ticks) {
+	return KRU.decay_mult((struct kru *)&top->data->kru, ticks);
+}
+
 size_t kr_cache_top_get_size(size_t cache_size)
 {
 	size_t top_size, capacity_log;
