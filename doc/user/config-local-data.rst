@@ -35,6 +35,7 @@ It provides various input formats described in following subsections.
 
       Enabling NODATA synthesis, false if disabling.
       If set to true (the default), an empty answer will be synthesised for matching name but mismatching type (e.g. AAAA query when only A hint exists).
+      This setting also applies to normal records defined in RPZ files.
 
    Records
    -------

@@ -30,7 +30,7 @@ typedef struct {
 
 
 /// Process scanned RR of other types, gather RRsets in a map.
-static void rr_scan2trie(zs_scanner_t *s)
+static void rr_scan2trie(zs_scanner_t *s, const struct kr_rule_zonefile_config *c)
 {
 	s_data_t *s_data = s->process.data;
 	uint8_t key_data[KEY_MAXLEN];
@@ -48,7 +48,10 @@ static void rr_scan2trie(zs_scanner_t *s)
 	} else {
 		rr = *rr_p = mm_alloc(s_data->pool, sizeof(*rr));
 		knot_dname_t *owner = NULL; // we only utilize owner for DNAMEs
-		if (s->r_type == KNOT_RRTYPE_DNAME) // Nit: copy could be done a bit faster
+		// LATER(optim.): there are certainly opportunities around this,
+		//   probably function to replace RR type in key from local_data_key(),
+		//   but performance of policy-loader isn't that important
+		if (s->r_type == KNOT_RRTYPE_DNAME || (c->nodata && s->r_type != KNOT_RRTYPE_CNAME))
 			owner = knot_dname_copy(s->r_owner, s_data->pool);
 		knot_rrset_init(rr, owner, s->r_type, KNOT_CLASS_IN, s->r_ttl);
 	}
@@ -61,6 +64,12 @@ static int rr_trie2rule(const char *key_data, uint32_t key_len, trie_val_t *rr_p
 	const knot_db_val_t key = { .data = (void *)key_data, .len = key_len };
 	const knot_rrset_t *rr = *rr_p;
 	const struct kr_rule_zonefile_config *c = config;
+	if (c->nodata && rr->type != KNOT_RRTYPE_CNAME) {
+		knot_rrset_t rr_empty;
+		knot_rrset_init(&rr_empty, rr->owner, KNOT_RRTYPE_CNAME, KNOT_CLASS_IN, rr->ttl);
+		int ret = kr_rule_local_data_ins(&rr_empty, NULL, c->tags, c->opts);
+		if (ret) return ret;
+	}
 	return local_data_ins(key, rr, NULL, c->tags, c->opts);
 	//TODO: check error logging path here (LMDB)
 }
@@ -233,7 +242,7 @@ static void process_record(zs_scanner_t *s)
 	}
 	// Records in zonefile format generally may not be grouped by name and RR type,
 	// so we accumulate RR sets in a trie and push them as rules at the end.
-	rr_scan2trie(s);
+	rr_scan2trie(s, s_data->c);
 }
 
 int kr_rule_zonefile(const struct kr_rule_zonefile_config *c)
