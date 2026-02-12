@@ -538,6 +538,7 @@ int kr_cache_insert_rr(struct kr_cache *, const knot_rrset_t *, const knot_rrset
 int kr_cache_remove(struct kr_cache *, const knot_dname_t *, uint16_t);
 int kr_cache_remove_subtree(struct kr_cache *, const knot_dname_t *, _Bool, int);
 int kr_cache_commit(struct kr_cache *);
+void kr_cache_prefetch_init(uint32_t, float, int);
 uint32_t packet_ttl(const knot_pkt_t *);
 int kr_rules_init(const char *, size_t, _Bool);
 int kr_rules_commit(_Bool);
@@ -663,7 +664,6 @@ _Bool ratelimiting_request_begin(struct kr_request *);
 int ratelimiting_init(const char *, size_t, uint32_t, uint32_t, uint16_t, uint32_t, _Bool);
 int defer_init(const char *, uint32_t, int);
 void defer_set_price_factor16(struct kr_request *, uint32_t);
-void kr_cache_prefetch_init(uint32_t, float, int);
 struct engine {
 	char _stub[];
 };

@@ -242,8 +242,6 @@ int entry_h_splice(
 			if (!ret) ret = entry_list_parse(val, el);
 			if (ret) memset(el, 0, sizeof(el));
 			val = el[i_type];
-		} else {
-			memset(el, 0, sizeof(el));
 		}
 		/* val is on the entry, in either case (or error) */
 		if (!ret) {
