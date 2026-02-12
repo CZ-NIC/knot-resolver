@@ -107,22 +107,32 @@ void debug_printbin(const char *str, unsigned int len)
 }
 
 /** Return one entry_h reference from a cache DB value.  NULL if not consistent/suitable. */
-static const struct entry_h *val2entry(const knot_db_val_t val, uint16_t ktype)
+static const struct entry_h *val2entry(const knot_db_val_t val, uint16_t ktype, uint32_t *latest_exp_time_out)
 {
-	if (ktype != KNOT_RRTYPE_NS)
-		return entry_h_consistent(val, ktype);
+	*latest_exp_time_out = 0;
+	if (ktype != KNOT_RRTYPE_NS) {
+		struct entry_h *eh = entry_h_consistent(val, ktype);
+		if (eh) *latest_exp_time_out = eh->time + eh->ttl;
+		return eh;
+	}
 	/* Otherwise we have a multi-purpose entry.
 	 * Well, for now we simply choose the most suitable entry;
-	 * the only realistic collision is DNAME in apex where we'll prefer NS. */
+	 * the only realistic collision is DNAME in apex where we'll prefer NS.
+	 * As TTL we however use the latest expiration of the entries. */
 	entry_list_t el;
 	if (entry_list_parse(val, el))
 		return NULL;
+	struct entry_h *eh_ret = NULL;
 	for (int i = ENTRY_APEX_NSECS_CNT; i < EL_LENGTH; ++i) {
-		if (el[i].len)
-			return entry_h_consistent(el[i], EL2RRTYPE(i));
+		if (el[i].len) {
+			struct entry_h *eh = entry_h_consistent(el[i], EL2RRTYPE(i));
+			if (eh) {
+				*latest_exp_time_out = MAX(*latest_exp_time_out, eh->time + eh->ttl);
+				if (!eh_ret) eh_ret = eh;
+			}
+		}
 	}
-	/* Only NSEC* meta-data inside. */
-	return NULL;
+	return eh_ret;
 }
 
 int kr_gc_cache_iter(knot_db_t * knot_db, struct kr_cache_top *top, const kr_cache_gc_cfg_t *cfg,
@@ -191,14 +201,15 @@ int kr_gc_cache_iter(knot_db_t * knot_db, struct kr_cache_top *top, const kr_cac
 				default:
 					/* TODO: perhaps improve some details around here:
 					 *  - xNAME have .rrtype NS
-					 *  - DNAME hidden on NS name will not be considered here
+					 *  - DNAME hidden on NS name will not be considered here (but as TTL the latest one is considered)
 					 *  - if zone has NSEC* meta-data but no NS, it will be seen
 					 *    here as kr_inconsistent */
-					entry = val2entry(val, entry_type);
+					uint32_t exp_time = 0;
+					entry = val2entry(val, entry_type, &exp_time);
 					if (!entry) break;
 					info.valid = true;
 					info.rrtype = entry_type;
-					info.expires_in = entry->time + entry->ttl - now;
+					info.expires_in = exp_time - now;
 					info.no_labels = entry_labels(&key, entry_type);  // TODO remove, not used
 					break;
 			}
