@@ -20,7 +20,6 @@
 #pragma once
 #include <stdalign.h>
 #include "lib/mmapped.h"
-#include "lib/kru.h"
 
 struct kr_request;
 
@@ -58,9 +57,7 @@ static inline uint32_t kr_cache_top_entry_price(struct kr_cache_top *top, uint32
 }
 
 /// Decay multiplier for the given time period in seconds.
-static inline double kr_cache_top_decay_mult(struct kr_cache_top *top, uint32_t ticks) {
-	return KRU.decay_mult((struct kru *)&top->data->kru, ticks);
-}
+double kr_cache_top_decay_mult(struct kr_cache_top *top, uint32_t ticks);
 
 /// Size of the top data as part of the cache size, LMDB should occupy the rest;
 /// currently between 6 and 13 %.
