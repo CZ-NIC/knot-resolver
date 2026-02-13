@@ -147,7 +147,7 @@ void mmapped_deinit(struct mmapped *mmapped)
 		 * Here we keep zero-size file not to accidentally remove the new file instead of the old one.
 		 * Still truncating the file will cause currently starting processes waiting for read lock on the same file to fail,
 		 * but such processes are not expected to exist. */
-		ftruncate(mmapped->fd, 0);
+		(void)!ftruncate(mmapped->fd, 0);
 
 		fcntl_flock_whole(mmapped->fd, F_UNLCK, false);
 	}
