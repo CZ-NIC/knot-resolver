@@ -39,6 +39,11 @@ int local_data_ins(knot_db_val_t key, const knot_rrset_t *rrs, const knot_rdatas
 /** Construct key for a zone-like-apex entry.  It's stored in `key_data`. */
 knot_db_val_t zla_key(const knot_dname_t *apex, uint8_t key_data[KEY_MAXLEN]);
 
+/** Like kr_rule_local_subtree() but has `target` to support other kr_rule_sub_t types. */
+int rule_local_subtree(const knot_dname_t *apex, enum kr_rule_sub_t type,
+			const knot_dname_t *target, uint32_t ttl,
+			kr_rule_tags_t tags, kr_rule_opts_t opts);
+
 /** Almost the whole kr_rule_local_data_answer() */
 int rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt);
 

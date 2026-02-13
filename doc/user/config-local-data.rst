@@ -145,8 +145,8 @@ It provides various input formats described in following subsections.
    * just files which are *not* automatically reloaded when changed
    * rules with ``rpz-*`` labels are ignored, e.g. ``.rpz-client-ip``
    .. * ``CNAME *.some.thing`` does not expand the wildcard
-   * wildcard support is limited only to blocking subtrees by
-     ``*.some.name. CNAME .`` or ``*.some.name. CNAME *.``
+   * wildcard support is limited to left-hand side of CNAME:
+     ``*.some.name. CNAME .`` or ``*.some.name. CNAME *.`` or ``*.some.name. CNAME block.page.``
 
    Advanced rules
    --------------

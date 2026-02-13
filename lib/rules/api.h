@@ -205,12 +205,15 @@ enum kr_rule_sub_t {
 	KR_RULE_SUB_REDIRECT,
 	/// Act similar to DNAME: rebase everything underneath by generated CNAMEs.
 	KR_RULE_SUB_DNAME,
+	/// Like _SUB_DNAME but the CNAMEs do not get prefixed.
+	KR_RULE_SUB_DNAME_FLAT,
 };
 /** Insert a simple sub-tree rule.
  *
  * - into the default rule-set
  * - SOA and NS for generated answers aren't overridable.
- * - type: you can't use _DNAME via this function; insert it by kr_rule_local_data_ins()
+ * - type: you can't use _DNAME* via this function;
+ *   internally we have rule_local_subtree() for now; TODO
  */
 KR_EXPORT
 int kr_rule_local_subtree(const knot_dname_t *apex, enum kr_rule_sub_t type,

@@ -79,34 +79,37 @@ static void cname_scan2rule(zs_scanner_t *s)
 		return;
 	}
 	int ret = 0;
-	if (s->r_data[0] == 0) { // "CNAME ." i.e. NXDOMAIN
-		const knot_dname_t *apex = s->r_owner;
-		if (knot_dname_is_wildcard(apex))
-			apex += 2;
+	knot_dname_t *owner = s->r_owner;
+	const knot_dname_t *target = s->r_data;
+	if (target[0] == 0) { // "CNAME ." i.e. NXDOMAIN
+		if (knot_dname_is_wildcard(owner))
+			owner += 2;
 		// RPZ_COMPAT: we NXDOMAIN the whole subtree regardless of being wildcard.
 		// Exact RPZ semantics would be hard here, it makes more sense
 		// to apply also to a subtree, and corresponding wildcard rule
 		// usually accompanies this rule anyway.
-		ret = kr_rule_local_subtree(apex, KR_RULE_SUB_NXDOMAIN,
+		ret = kr_rule_local_subtree(owner, KR_RULE_SUB_NXDOMAIN,
 						s->r_ttl, c->tags, c->opts);
-	} else if (knot_dname_is_wildcard(s->r_data) && s->r_data[2] == 0) {
+	} else if (knot_dname_is_wildcard(target) && target[2] == 0) {
 		// "CNAME *." -> NODATA
-		knot_dname_t *apex = s->r_owner;
-		if (knot_dname_is_wildcard(apex)) {
-			apex += 2;
-			ret = kr_rule_local_subtree(apex, KR_RULE_SUB_NODATA,
+		if (knot_dname_is_wildcard(owner)) {
+			owner += 2;
+			ret = kr_rule_local_subtree(owner, KR_RULE_SUB_NODATA,
 							s->r_ttl, c->tags, c->opts);
 		} else { // using special kr_rule_ semantics of empty CNAME RRset
 			knot_rrset_t rrs;
-			knot_rrset_init(&rrs, apex, KNOT_RRTYPE_CNAME,
+			knot_rrset_init(&rrs, owner, KNOT_RRTYPE_CNAME,
 					KNOT_CLASS_IN, s->r_ttl);
 			ret = kr_rule_local_data_ins(&rrs, NULL, c->tags, c->opts);
 		}
-	} else {
-		knot_dname_t *target = s->r_owner;
-		knot_rrset_t rrs;
-		knot_rrset_init(&rrs, target, KNOT_RRTYPE_CNAME, KNOT_CLASS_IN, s->r_ttl);
+	} else if (knot_dname_is_wildcard(owner)) {
+		owner += 2;
+		ret = rule_local_subtree(owner, KR_RULE_SUB_DNAME_FLAT, target,
+						s->r_ttl, c->tags, c->opts);
 		// TODO: implement wildcard expansion for target
+	} else {
+		knot_rrset_t rrs;
+		knot_rrset_init(&rrs, s->r_owner, KNOT_RRTYPE_CNAME, KNOT_CLASS_IN, s->r_ttl);
 		ret = knot_rrset_add_rdata(&rrs, s->r_data, s->r_data_length, NULL);
 		if (!ret) ret = kr_rule_local_data_ins(&rrs, NULL, c->tags, c->opts);
 		knot_rdataset_clear(&rrs.rrs, NULL);

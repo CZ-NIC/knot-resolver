@@ -385,7 +385,7 @@ struct kr_query_data_src {
 	kr_rule_fwd_flags_t flags;
 	knot_db_val_t targets_ptr;
 };
-enum kr_rule_sub_t {KR_RULE_SUB_EMPTY = 1, KR_RULE_SUB_NXDOMAIN, KR_RULE_SUB_NODATA, KR_RULE_SUB_REDIRECT, KR_RULE_SUB_DNAME};
+enum kr_rule_sub_t {KR_RULE_SUB_EMPTY = 1, KR_RULE_SUB_NXDOMAIN, KR_RULE_SUB_NODATA, KR_RULE_SUB_REDIRECT, KR_RULE_SUB_DNAME, KR_RULE_SUB_DNAME_FLAT};
 enum kr_proto {KR_PROTO_INTERNAL, KR_PROTO_UDP53, KR_PROTO_TCP53, KR_PROTO_DOT, KR_PROTO_DOH, KR_PROTO_DOQ, KR_PROTO_DOQ_CONN, KR_PROTO_DOQ_STREAM, KR_PROTO_COUNT};
 typedef unsigned char kr_proto_set;
 kr_layer_t kr_layer_t_static;
