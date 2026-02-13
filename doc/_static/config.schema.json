@@ -1963,7 +1963,7 @@
                     "localhost@9092"
                 ],
                 "group_id": null,
-                "message_key": null,
+                "zone_id": null,
                 "files_dir": "/var/lib/knot-resolver",
                 "security_protocol": "plaintext",
                 "cert_file": null,

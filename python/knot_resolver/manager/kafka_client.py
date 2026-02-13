@@ -52,6 +52,7 @@ if KAFKA_LIB:
         def __init__(self, headers: List[Tuple[str, bytes]]) -> None:
             # default values
             self.hostname: Optional[str] = None
+            self.hostname: Optional[str] = None
             self.file_name: Optional[str] = None
             self.total_chunks: Optional[int] = None
             self.chunk_index: Optional[int] = None
@@ -138,23 +139,23 @@ if KAFKA_LIB:
         logger.info(f"Received message with '{key}' key (group-id)")
 
         hostname = str(config.hostname)
-        message_key = config.kafka.message_key
+        zone_id = config.kafka.zone_id
 
-        if not message_key and not headers.hostname:
+        if not zone_id and not headers.hostname:
             raise KresKafkaClientError(
-                "The 'group-id' option is not configured and the 'hostname' message header is also missing:"
+                "The 'zone-id' option is not configured and the 'hostname' message header is also missing:"
                 " It is not possible to determine which resolver the message is intended for."
             )
 
         if headers.hostname and headers.hostname == hostname:
             logger.info("The message headers hostname matches the resolver's. The message will be processed.")
-        elif message_key and key == str(message_key):
-            logger.info("The message key (group-id) matches the resolver's. The message will be processed.")
+        elif zone_id and key == str(zone_id):
+            logger.info("The message key (zone-id) matches the resolver's. The message will be processed.")
         else:
             logger.info(
-                f"The Kafka's message-key '{str(message_key)}' or the resolver's hostname '{hostname}'"
-                f" do not match with the message key '{key}' or headers hostname '{headers.hostname}':"
-                " The message is intended for a resolver with the matching message-key or hostname."
+                f"The Kafka's message-key ({str(zone_id)}) or the resolver's hostname '{hostname}'"
+                f" do not match with the zone-id '{key}' or headers hostname '{headers.hostname}':"
+                " The message is intended for a resolver with the matching zone-id or hostname."
                 " Message processing is skipped."
             )
             return
