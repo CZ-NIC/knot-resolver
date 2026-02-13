@@ -13,6 +13,10 @@ serverurl = unix://{{ supervisord.unix_http_server }}
 [unix_http_server]
 file = {{ supervisord.unix_http_server }}
 
+[rpcinterface:logger_patch]
+supervisor.rpcinterface_factory = knot_resolver.controller.plugins.logger_patch:inject
+logtarget = {{ supervisord.logtarget }}
+
 [program:manager]
 command = {{ manager.command }}
 directory = {{ manager.workdir }}

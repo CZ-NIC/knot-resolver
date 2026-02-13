@@ -10,6 +10,7 @@ packages = \
  'knot_resolver.config',
  'knot_resolver.config.templates',
  'knot_resolver.controller',
+ 'knot_resolver.controller.plugins',
  'knot_resolver.manager',
  'knot_resolver.utils']
 
