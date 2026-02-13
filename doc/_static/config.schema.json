@@ -1188,6 +1188,8 @@
             "default": {
                 "enable": false,
                 "file": null,
+                "sensitivity": 10,
+                "threshold": 95,
                 "tags": null
             }
         },
@@ -1909,7 +1911,7 @@
                     "description": "Optional, Kafka consumer group identifier.",
                     "default": null
                 },
-                "message-key": {
+                "zone-id": {
                     "type": [
                         "string",
                         "null"
