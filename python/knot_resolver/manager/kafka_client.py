@@ -52,7 +52,6 @@ if KAFKA_LIB:
         def __init__(self, headers: List[Tuple[str, bytes]]) -> None:
             # default values
             self.hostname: Optional[str] = None
-            self.hostname: Optional[str] = None
             self.file_name: Optional[str] = None
             self.total_chunks: Optional[int] = None
             self.chunk_index: Optional[int] = None
