@@ -1,12 +1,19 @@
 from __future__ import annotations
 
 import logging
+import os
+import shutil
+import xmlrpc.client
+from pathlib import Path
 from typing import TYPE_CHECKING
+
+import supervisor.xmlrpc
 
 from knot_resolver.config.templates import SUPERVISORD_TEMPLATE
 from knot_resolver.logging import get_logger
 
 from .config import SUPERVISORD_CONFIGFILE_NAME, SUPERVISORD_CONFIGFILE_NAME_TMP, SubprocessConfig, SupervisordConfig
+from .errors import ControllerError
 
 if TYPE_CHECKING:
     from knot_resolver.args import KresArgs
@@ -37,5 +44,27 @@ class SupervisordController:
         config_path_tmp.rename(SUPERVISORD_CONFIGFILE_NAME)
 
     def exec(self) -> None:
-        logger.debug("Execing supervisord...")
+        supervisord = shutil.which("supervisord")
+        if not supervisord:
+            msg = "failed to find 'supervisord' executable"
+            raise ControllerError(msg)
+
+        config_path = Path(SUPERVISORD_CONFIGFILE_NAME)
+        if not config_path.exists():
+            msg = f"failed to find supervisord configuration file '{config_path}'"
+            raise ControllerError(msg)
+
+        args = [
+            str(supervisord),
+            "--configuration",
+            str(config_path),
+        ]
+
+        logger.notice("Execing supervisord...")
         logging.shutdown()
+
+        try:
+            os.execv(supervisord, args)  # noqa: S606
+        except OSError as e:
+            msg = f"supervisord exec failed: {e}"
+            raise ControllerError(msg) from e
