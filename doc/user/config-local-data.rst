@@ -52,31 +52,31 @@ It provides various input formats described in following subsections.
 
       Optional, direct addition of hostname and IP address pairs from files in ``/etc/hosts`` like format.
 
-   .. code-block:: yaml
+      .. code-block:: yaml
 
-      local-data:
-        addresses:
-          a1.example.com: 2001:db8::1
-          a2.example.com: 2001:db8::2
-        addresses-files:
-          - /etc/hosts
-        # some options
-        ttl: 5m
-        nodata: false # don't force empty answer for missing record types on mentioned names
+        local-data:
+          addresses:
+            a1.example.com: 2001:db8::1
+            a2.example.com: 2001:db8::2
+          addresses-files:
+            - /etc/hosts
+          # some options
+          ttl: 5m
+          nodata: false # don't force empty answer for missing record types on mentioned names
 
    .. option:: records: <zonefile format string>
 
       Optional, direct addition of records in DNS zonefile format.
       The zonefile syntax is more flexible, e.g. it can define any type of records.
 
-   .. code-block:: yaml
+      .. code-block:: yaml
 
-      local-data:
-        records: |
-          www.google.com.  CNAME  forcesafesearch.google.com.
-          example.com  TXT  "an example text record"
-          34.example.com  AAAA  2001:db8::3
-          34.example.com  AAAA  2001:db8::4
+        local-data:
+          records: |
+            www.google.com.  CNAME  forcesafesearch.google.com.
+            example.com  TXT  "an example text record"
+            34.example.com  AAAA  2001:db8::3
+            34.example.com  AAAA  2001:db8::4
 
    .. warning::
 
