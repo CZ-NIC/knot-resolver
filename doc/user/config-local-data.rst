@@ -78,6 +78,11 @@ It provides various input formats described in following subsections.
             34.example.com  AAAA  2001:db8::3
             34.example.com  AAAA  2001:db8::4
 
+      If you want records from an actual file, e.g. because you have too many,
+      we suggest using :ref:`config-local-data-rpz` just below,
+      even if you do not need any additional behavior defined by RPZ.
+      Same syntax of normal record definitions in RPZs will cause the same result.
+
    .. warning::
 
       While you can insert all kinds of records and rules into ``local-data:``,
@@ -219,6 +224,11 @@ It provides various input formats described in following subsections.
                 - records: |
                     www.google.com.  CNAME  forcesafesearch.google.com.
                   tags: [ adult ]
+
+         If you want records from an actual file, e.g. because you have too many,
+         we suggest using :ref:`config-local-data-rpz`,
+         even if you do not need any additional behavior defined by RPZ.
+         Same syntax of normal record definitions in RPZs will cause the same result.
 
       .. option:: tags: <list of tags>
 
