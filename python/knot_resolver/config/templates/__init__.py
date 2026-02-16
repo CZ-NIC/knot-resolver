@@ -31,3 +31,7 @@ def _import_template(template: str) -> Template:
 
 
 SUPERVISORD_TEMPLATE: Template = _import_template("supervisord.conf.j2")
+
+WORKER_TEMPLATE: Template = _import_template("worker.lua.j2")
+
+LOADER_TEMPLATE: Template = _import_template("loader.lua.j2")
