@@ -186,7 +186,7 @@ int kr_gc_cache_iter(knot_db_t * knot_db, struct kr_cache_top *top, const kr_cac
 		if (entry_type >= 0) {
 			counter_gc_consistent++;
 			switch (entry_type) {
-				case KNOT_CACHE_PREFETCH:
+				case KNOT_CACHE_PREFETCH: (void) 0;
 					struct kr_cache_prefetch_sched sched = { 0 };
 					if (!kr_cache_prefetch_decode_entry(key, val, &sched)) break;
 					info.prefetch_ekey = sched.ekey;
@@ -198,7 +198,7 @@ int kr_gc_cache_iter(knot_db_t * knot_db, struct kr_cache_top *top, const kr_cac
 					info.valid = true;
 					info.rrtype = entry_type;
 					break;
-				default:
+				default: (void) 0;
 					/* TODO: perhaps improve some details around here:
 					 *  - xNAME have .rrtype NS
 					 *  - DNAME hidden on NS name will not be considered here (but as TTL the latest one is considered)

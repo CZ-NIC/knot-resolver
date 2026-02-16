@@ -77,7 +77,7 @@ done:
 void kr_gc_cat_analyze(struct kr_cache_top *top, struct kr_gc_cat_record_info *info, void *analysis_ctx)
 {
 	struct kr_gc_cat_analysis *analysis = analysis_ctx;
-	bool P_eligible;
+	bool P_eligible = false;
 
 	category_t cat = categorize(top, info, &P_eligible);
 	analysis->categories_sizes[cat] += info->entry_size;

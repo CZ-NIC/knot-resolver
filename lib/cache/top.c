@@ -14,7 +14,7 @@
 
 #define FILE_FORMAT_VERSION 1  // fail if different
 
-#define KRU_CAPACITY(cache_size) (cache_size / 128)   // KRU size is approx. (8 * capacity) B
+#define KRU_CAPACITY(cache_size) ((cache_size) / 128)   // KRU size is approx. (8 * capacity) B
 	// average entry size seems to be 100-200 B,
 	// make KRU capacity between cache_size/128 and cache_size/64 (power of two)
 	// -> KRU size: between cache_size/16 and cache_size/8 (LMDB size is the rest)
@@ -47,7 +47,7 @@ static inline bool first_access_ro(struct kr_cache_top_context *ctx, kru_hash_t 
 {
 	// struct kr_cache_top_context { uint32_t bloom[32]; }
 	static_assert(sizeof(((struct kr_cache_top_context *)0)->bloom[0]) * 8 == 32, "");
-	static_assert(sizeof(((struct kr_cache_top_context *)0)->bloom)    * 8 == 32 * 32, "");
+	static_assert(sizeof(((struct kr_cache_top_context *)0)->bloom)    * 8 == 32 * 32l, "");
 		// expected around 40 unique cache accesses per request context, possibly up to ~200;
 		// prob. of collision of 50th unique access with the preceeding ones: ~0.1 %;
 		// 75th: ~0.4 %; 100th: ~1.1 %; 150th: ~3.9 %; 200th: ~8.7 %; 300th: ~23 %; 400th: ~39 %
@@ -227,6 +227,7 @@ char *kr_cache_top_strkey(void *key, size_t len)
 						force_bytes = 5;
 						zeroes = 1;  // E-key begins after forced bytes
 						break;
+					default: break;
 				}
 			} else {
 				if (k[i] == '\0') {
