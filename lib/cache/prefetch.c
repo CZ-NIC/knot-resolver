@@ -11,7 +11,8 @@
 #include <math.h>
 
 #define VERBOSE_LOG(fmt, ...) kr_log_notice(CACHE, "PREFETCH  " fmt "\n", ## __VA_ARGS__)
-#define VERBOSE_LOG_pkey(fmt, ...) VERBOSE_LOG(fmt " %6d %s", ## __VA_ARGS__, sched.ep->exp_time - time_now, kr_cache_top_strkey(pkey.data, pkey.len))
+#define VERBOSE_LOG_pkey(fmt, ...) VERBOSE_LOG(fmt " %6d %s", ## __VA_ARGS__, sched.ep ? sched.ep->exp_time - time_now : 0, kr_cache_top_strkey(pkey.data, pkey.len))
+	// TODO avoid calling strkey unless verbose
 
 #define FIRST_TIMEOUT_MS           2000  // ms, no prefetch during this time after init
 #define UPDATE_BEFORE_EXP_S        5     // s
@@ -28,7 +29,8 @@ bool conf_enabled = false;
 
 void timer_callback(uv_timer_t *handle);
 
-void kr_cache_prefetch_encode_entry(struct kr_cache_prefetch_sched *sched, knot_db_val_t *pkey, knot_db_val_t *val) {
+void kr_cache_prefetch_encode_entry(struct kr_cache_prefetch_sched *sched, knot_db_val_t *pkey, knot_db_val_t *val)
+{
 	// CACHE_KEY_DEF:  type 'P', -(time of update), priority, original E-type key with type replaced by original rrtype
 	static uint8_t buf[KR_CACHE_KEY_MAXLEN + 7] = "\0P";
 
@@ -54,7 +56,8 @@ void kr_cache_prefetch_encode_entry(struct kr_cache_prefetch_sched *sched, knot_
 	val->data = sched->ep;
 }
 
-int kr_cache_prefetch_decode_entry(knot_db_val_t pkey, knot_db_val_t val, struct kr_cache_prefetch_sched *sched) {
+int kr_cache_prefetch_decode_entry(knot_db_val_t pkey, knot_db_val_t val, struct kr_cache_prefetch_sched *sched)
+{
 	static uint8_t buf[KR_CACHE_KEY_MAXLEN];
 	uint8_t *s = pkey.data;
 	if ((pkey.len < 2) || (*s++ != '\0') || (*s++ != 'P')) return kr_error(EINVAL);  // not a P-entry
@@ -69,15 +72,15 @@ int kr_cache_prefetch_decode_entry(knot_db_val_t pkey, knot_db_val_t val, struct
 
 	sched->priority = *s++;
 
-	sched->ekey.len = pkey.len - ((void *)s - pkey.data);
+	sched->ekey.len = pkey.len - (s - (uint8_t *)pkey.data);
 	memcpy(buf, s, sched->ekey.len);
 	sched->ekey.data = buf;
-	memcpy(&sched->rrtype, sched->ekey.data + sched->ekey.len - 2, 2);
+	memcpy(&sched->rrtype, (uint8_t *)sched->ekey.data + sched->ekey.len - 2, 2);
 
 	// replace rrtype with key type in ekey
 	if ((sched->rrtype == KNOT_RRTYPE_CNAME) || (sched->rrtype == KNOT_RRTYPE_DNAME)) {
 		const uint16_t type = KNOT_RRTYPE_NS;
-		memcpy(sched->ekey.data + sched->ekey.len - 2, &type, 2);
+		memcpy((uint8_t *)sched->ekey.data + sched->ekey.len - 2, &type, 2);
 	}
 
 	sched->ep = val.data;
@@ -102,9 +105,9 @@ void kr_cache_prefetch_init(uint32_t max_access_period_sec, float min_accesses_p
 	conf_enabled = true;
 }
 
-uint32_t get_update_time(uint32_t inception, uint32_t ttl) {
-
-	return inception + ttl - MAX(UPDATE_BEFORE_EXP_S, ttl * conf_update_before_exp_perc / 100);  // TODO add percents
+uint32_t get_update_time(uint32_t inception, uint32_t ttl)
+{
+	return inception + ttl - MAX(UPDATE_BEFORE_EXP_S, ttl * conf_update_before_exp_perc / 100);
 }
 
 void kr_cache_prefetch_schedule(knot_db_val_t key, struct entry_h *eh, size_t eh_len, size_t whole_entry_len, uint16_t rrtype)
@@ -230,9 +233,10 @@ void timer_callback(uv_timer_t *handle)
 	}
 
 	struct timespec ts;
-	clock_gettime(CLOCK_REALTIME_COARSE, &ts);
+	int ret = clock_gettime(CLOCK_REALTIME_COARSE, &ts);
+	kr_assert(ret == 0);
 	uint32_t time_now = ts.tv_sec;
-	uint64_t time_now_msec = 1000 * time_now + ts.tv_nsec / 1000000;
+	uint64_t time_now_msec = 1000l * time_now + ts.tv_nsec / 1000000;
 
 	for (int i = 0; i < 100; i++) {
 		knot_db_val_t pkey = { .data = "\0Q", .len = 2 };  // a key just after last P-record
@@ -243,7 +247,7 @@ void timer_callback(uv_timer_t *handle)
 
 		struct kr_cache_prefetch_sched sched = { 0 };
 		bool invalid = false;
-		int ret = kr_cache_prefetch_decode_entry(pkey, val, &sched);
+		ret = kr_cache_prefetch_decode_entry(pkey, val, &sched);
 		if (ret == kr_error(EINVAL)) {
 			goto done; // not a P-entry
 		} else if (ret == kr_error(EILSEQ)) {
@@ -296,7 +300,7 @@ void timer_callback(uv_timer_t *handle)
 
 		// make min_load more strict closer to expiration
 		uint16_t min_load = sched.ep->min_load;
-		const int64_t ttl_msec = 1000 * (sched.ep->exp_time + 1) - time_now_msec;
+		const int64_t ttl_msec = 1000l * (sched.ep->exp_time + 1) - time_now_msec;
 			// with zero TTL, the record is considered valid till the end of the current second
 		const size_t keydata_len = kr_cache_top_entry_size(sched.ekey.len, val.len);
 		const float price16 = 0x1p-16 * kr_cache_top_entry_price(&the_resolver->cache.top, keydata_len);
