@@ -51,7 +51,7 @@ if KAFKA_LIB:
     class Headers:
         def __init__(self, headers: List[Tuple[str, bytes]]) -> None:
             # default values
-            self.hostname: Optional[str] = None
+            self.zone_id: Optional[str] = None
             self.file_name: Optional[str] = None
             self.total_chunks: Optional[int] = None
             self.chunk_index: Optional[int] = None
@@ -60,8 +60,8 @@ if KAFKA_LIB:
 
         def _assign_headers(self, headers: List[Tuple[str, bytes]]) -> None:
             for hkey, hvalue in headers:
-                if hkey == "hostname":
-                    self.hostname = hvalue.decode("utf-8")
+                if hkey == "zone-id":
+                    self.zone_id = hvalue.decode("utf-8")
                 elif hkey == "file-name":
                     self.file_name = hvalue.decode("utf-8")
                 elif hkey == "total-chunks":
@@ -71,18 +71,18 @@ if KAFKA_LIB:
                 else:
                     logger.warning(f"Unknown headers key '{hkey}'")
 
-    def hostname_match(headers: Headers, hostname: str) -> bool:
-        if not headers.hostname:
-            KresKafkaClientError("The required 'hostname' message header is missing")
+    # def hostname_match(headers: Headers, hostname: str) -> bool:
+    #     if not headers.hostname:
+    #         KresKafkaClientError("The required 'hostname' message header is missing")
 
-        # skip processing if hostname don't match
-        if headers.hostname != hostname:
-            logger.info(
-                f"The resolver's hostname '{hostname}' do not match the message header hostname '{headers.hostname}':"
-                " The message is intended for a resolver with the matching hostname"
-            )
-            return False
-        return True
+    #     # skip processing if hostname don't match
+    #     if headers.hostname != hostname:
+    #         logger.info(
+    #             f"The resolver's hostname '{hostname}' do not match the message header hostname '{headers.hostname}':"
+    #             " The message is intended for a resolver with the matching hostname"
+    #         )
+    #         return False
+    #     return True
 
     def check_chunk_headers(headers: Headers) -> None:
         index = headers.chunk_index
@@ -135,26 +135,17 @@ if KAFKA_LIB:
         value: bytes = record.value
         headers = Headers(record.headers)
 
-        logger.info(f"Received message with '{key}' key (group-id)")
+        logger.info(f"Received message with '{key}' key (zone-id)")
 
-        hostname = str(config.hostname)
-        zone_id = config.kafka.zone_id
-
-        if not zone_id and not headers.hostname:
-            raise KresKafkaClientError(
-                "The 'zone-id' option is not configured and the 'hostname' message header is also missing:"
-                " It is not possible to determine which resolver the message is intended for."
+        zone_id = str(config.kafka.zone_id)
+        if zone_id and key == zone_id:
+            logger.info(
+                f"The message key (zone-id) {key} matches the resolver's configured one. The message will be processed."
             )
-
-        if headers.hostname and headers.hostname == hostname:
-            logger.info("The message headers hostname matches the resolver's. The message will be processed.")
-        elif zone_id and key == str(zone_id):
-            logger.info("The message key (zone-id) matches the resolver's. The message will be processed.")
         else:
             logger.info(
-                f"The Kafka's message-key ({str(zone_id)}) or the resolver's hostname '{hostname}'"
-                f" do not match with the zone-id '{key}' or headers hostname '{headers.hostname}':"
-                " The message is intended for a resolver with the matching zone-id or hostname."
+                f"The resolver's configured zone-id ({zone_id}) do not match with the message key (zone-id) '{key}'."
+                " The message is intended for a resolver with the matching zone-id."
                 " Message processing is skipped."
             )
             return

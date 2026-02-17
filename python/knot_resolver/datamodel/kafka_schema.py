@@ -21,7 +21,7 @@ class KafkaSchema(ConfigSchema):
     topic: Topic to subscribe data from.
     server: Kafka server(s) to connect.
     group_id: Optional, Kafka consumer group identifier.
-    zone_id: Optional, identifier for determining the recipient(s) using a key in the Kafka message.
+    zone_id: Identifier for determining the recipient(s) using a the key (zone-id) of the Kafka message.
     files_dir: Directory for storing files received via Kafka.
     security_protocol: Protocol used to communicate with server(broker).
     cert_file: Optional, the client's certificate file in PEM format.
@@ -47,3 +47,5 @@ class KafkaSchema(ConfigSchema):
             raise ValueError(
                 "'kafka' is enabled, but the required 'kafka-python' dependency (optional) is not installed"
             )
+        if self.enable and self.zone_id:
+            raise ValueError("'zone-id' option is required for enabled Kafka client")
