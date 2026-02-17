@@ -10,9 +10,10 @@
 
 #include <math.h>
 
-#define VERBOSE_LOG(fmt, ...) kr_log_notice(CACHE, "PREFETCH  " fmt "\n", ## __VA_ARGS__)
-#define VERBOSE_LOG_pkey(fmt, ...) VERBOSE_LOG(fmt " %6d %s", ## __VA_ARGS__, sched.ep ? sched.ep->exp_time - time_now : 0, kr_cache_top_strkey(pkey.data, pkey.len))
-	// TODO avoid calling strkey unless verbose
+#define VERBOSE_LOG(fmt, ...) kr_log_debug(CACHE, "PREFETCH  " fmt "\n", ## __VA_ARGS__)
+#define VERBOSE_LOG_pkey(fmt, ...) \
+	{ WITH_VERBOSE((struct kr_query *) NULL) \
+		VERBOSE_LOG(fmt " %6d %s", ## __VA_ARGS__, sched.ep ? sched.ep->exp_time - time_now : 0, kr_cache_top_strkey(pkey.data, pkey.len)); }
 
 #define FIRST_TIMEOUT_MS           2000  // ms, no prefetch during this time after init
 #define UPDATE_BEFORE_EXP_S        5     // s
@@ -203,7 +204,7 @@ bool resolve_ekey(knot_db_val_t *ekey, uint16_t rrtype)
 {
 	if (!update_callback) return false;
 	if (key_consistent(*ekey) & ~0xFFFF) {  // E-type key
-		VERBOSE_LOG("    invalid ekey: %s", kr_cache_top_strkey(ekey->data, ekey->len));
+		WITH_VERBOSE((struct kr_query *)NULL) VERBOSE_LOG("    invalid ekey: %s", kr_cache_top_strkey(ekey->data, ekey->len));
 		return false;
 	}
 
