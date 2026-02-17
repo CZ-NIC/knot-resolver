@@ -47,5 +47,5 @@ class KafkaSchema(ConfigSchema):
             raise ValueError(
                 "'kafka' is enabled, but the required 'kafka-python' dependency (optional) is not installed"
             )
-        if self.enable and self.zone_id:
+        if self.enable and not self.zone_id:
             raise ValueError("'zone-id' option is required for enabled Kafka client")
