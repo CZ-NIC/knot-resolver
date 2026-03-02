@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+# ensure consistent behaviour
+src_dir="$(dirname "$(realpath "$0")")"
+cd $src_dir
+
+testing_dir=path_types_testing
+
+# default
+chmod -R 755 $testing_dir
+# readable
+chmod 555 $testing_dir/readable*
+# unreadable
+chmod 000 $testing_dir/unreadable*
+# writable
+chmod 333 $testing_dir/unwritable*
+# unwritable
+chmod 555 $testing_dir/unwritable*

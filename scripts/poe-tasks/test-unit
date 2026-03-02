@@ -4,5 +4,16 @@
 src_dir="$(dirname "$(realpath "$0")")"
 source $src_dir/utils/_env.sh
 
+test_dir="tests/python/knot_resolver"
+
+# we cannot test path types permissions if running under root
+if [ "$(id -u)" -eq 0 ]; then
+  ignore="$test_dir/utils/modeling/types/test_path_types.py"
+else
+  # prepare permissions
+  bash $test_dir/utils/modeling/types/prepare_path_types_testing
+  ignore="$test_dir/utils/modeling/types/path_types_testing"
+fi
+
 # run pytest
-env PYTHONPATH=. pytest --junitxml=unit.junit.xml --cov=python/knot_resolver --show-capture=all tests/python/knot_resolver
+env PYTHONPATH=. pytest --junitxml=unit.junit.xml --cov=python/knot_resolver --show-capture=all --ignore=$ignore $test_dir

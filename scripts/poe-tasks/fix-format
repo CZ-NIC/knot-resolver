@@ -14,7 +14,7 @@ echo
 
 # format python code
 echo -e "${yellow}Formatting Python code using ruff...${reset}"
-ruff format $dirs
+ruff format --exclude=tests/python/knot_resolver/utils/modeling/types/path_testing $dirs
 check_rv $?
 echo
 
