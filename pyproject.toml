@@ -192,7 +192,8 @@ ignore = [
     "TCH003",     # *Move standard library import into a type-checking block
 ]
 exclude = [
-    "tests/python/knot_resolver*"
+    "tests/python/knot_resolver*",
+    "tests/python/knot_resolver/utils/modeling/types/path_testing*",
 ]
 
 [tool.ruff.lint.isort]
