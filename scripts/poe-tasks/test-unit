@@ -4,5 +4,14 @@
 src_dir="$(dirname "$(realpath "$0")")"
 source $src_dir/utils/_env.sh
 
+test_dir="tests/python/knot_resolver"
+ignore="$test_dir/utils/modeling/types/path_testing"
+
+# prepare permissions
+bash $test_dir/utils/modeling/types/prepare_path_testing
+
 # run pytest
-env PYTHONPATH=. pytest --junitxml=unit.junit.xml --cov=python/knot_resolver --show-capture=all tests/python/knot_resolver
+env PYTHONPATH=. pytest --junitxml=unit.junit.xml --cov=python/knot_resolver --show-capture=all --ignore=$ignore $test_dir
+
+# reset permissions
+chmod -R 755 $test_dir/utils/modeling/types/path_testing/

@@ -9,8 +9,19 @@ from .integer_types import (
     Percent,
     PortNumber,
 )
+from .path_types import (
+    Directory,
+    File,
+    FilePath,
+    ReadableFile,
+    WritableDirectory,
+    WritableFilePath,
+)
 
 __all__ = [
+    "Directory",
+    "File",
+    "FilePath",
     "FloatNonNegative",
     "Integer0_32",
     "Integer0_512",
@@ -20,4 +31,7 @@ __all__ = [
     "ListOrItem",
     "Percent",
     "PortNumber",
+    "ReadableFile",
+    "WritableDirectory",
+    "WritableFilePath",
 ]
