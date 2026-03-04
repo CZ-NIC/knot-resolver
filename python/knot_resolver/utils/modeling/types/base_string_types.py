@@ -19,11 +19,7 @@ class BaseString(BaseCustomType):
     """Base class to work with string value."""
 
     def validate(self, context: Context) -> None:
-        if (
-            context.strictness > Strictness.PERMISSIVE
-            and not isinstance(self._value, (str, int))
-            or isinstance(self._value, bool)
-        ):
+        if context.strictness > Strictness.PERMISSIVE and not isinstance(self._value, str):
             msg = (
                 f"Unexpected value for '{type(self)}'."
                 f" Expected string, got '{self._value}' with type '{type(self._value)}'"
@@ -77,16 +73,14 @@ class BaseStringPattern(BaseString):
 class BaseUnit(BaseString):
     _re: Pattern[str]
     _units: dict[str, int]
+    _base_value: int | float | None = None
 
     def __init__(self, value: Any, tree_path: str = "/", base_path: Path = Path()) -> None:
         super().__init__(value, tree_path, base_path)
         type(self)._re = re.compile(rf"^(\d+)({r'|'.join(type(self)._units.keys())})$")  # noqa: SLF001
 
-    def _get_base_value(self) -> float:
+    def _get_base_value(self) -> int | float:
         cls = self.__class__
-
-        if isinstance(self._value, int) and not isinstance(self._value, bool):
-            return self._value
 
         grouped = self._re.search(self._value)
         if grouped:
@@ -100,7 +94,8 @@ class BaseUnit(BaseString):
                     f" Accepted units are {list(cls._units.keys())}"
                 )
                 raise DataValueError(msg, self._tree_path)
-            return float(val) * cls._units[unit]
+            self._base_value = float(val) * cls._units[unit]
+            return self._base_value
         msg = (
             f"Unexpected value for '{type(self)}'."
             " Expected string that matches pattern "
@@ -108,6 +103,12 @@ class BaseUnit(BaseString):
             f" Positive integer and one of the units {list(type(self)._units.keys())}, got '{self._value}'."  # noqa: SLF001
         )
         raise DataValueError(msg, self._tree_path)
+
+    @property
+    def base_value(self) -> float:
+        if self._base_value:
+            return self._base_value
+        return self._get_base_value()
 
     def validate(self, context: Context) -> None:
         super().validate(context)

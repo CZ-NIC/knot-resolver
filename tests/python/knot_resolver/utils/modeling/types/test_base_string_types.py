@@ -11,14 +11,14 @@ from knot_resolver.utils.modeling.types.base_string_types import BaseString, Bas
 context_default = Context()
 
 
-@pytest.mark.parametrize("value", [-65_535, -1, 0, 1, 65_535, "a", "abcdef"])
+@pytest.mark.parametrize("value", ["a", "abcdef"])
 def test_base_string(value: str):
     obj = BaseString(value)
     obj.validate(context_default)
     assert str(obj) == str(value)
 
 
-@pytest.mark.parametrize("value", [True, False])
+@pytest.mark.parametrize("value", [1234, True, False])
 def test_base_string_invalid(value: Any):
     with pytest.raises(DataModelingError):
         BaseString(value).validate(context_default)
@@ -93,7 +93,7 @@ def test_base_string_length_invalid(min: Optional[int], max: Optional[int]):
             TestStringLength(invalid_string).validate(context_default)
 
 
-@pytest.mark.parametrize("value", [1000, "1000a", "100b", "10c", "1d"])
+@pytest.mark.parametrize("value", ["1000a", "100b", "10c", "1d"])
 def test_base_unit(value: str):
     class TestBaseUnit(BaseUnit):
         _units = {"a": 1, "b": 10, "c": 100, "d": 1000}
