@@ -22,6 +22,11 @@ who do not need to whitelist certain subnets.
 
 .. warning::
 
+   Addresses embedded in records like SVCB and HTTPS (:rfc:`9460`)
+   are currently not checked by this module.
+
+.. warning::
+
    DNS Blacklists (`RFC 5782`_) often use `127.0.0.0/8` to blacklist
    a domain. Using the rebinding module prevents DNSBL from functioning
    properly.
