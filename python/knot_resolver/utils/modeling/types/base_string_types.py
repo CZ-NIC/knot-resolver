@@ -4,15 +4,13 @@ import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from knot_resolver.utils.modeling.context import Strictness
+from knot_resolver.utils.modeling.context import Context, Strictness
 from knot_resolver.utils.modeling.errors import DataTypeError, DataValueError
 
 from .base_custom_type import BaseCustomType
 
 if TYPE_CHECKING:
     from re import Pattern
-
-    from knot_resolver.utils.modeling.context import Context
 
 
 class BaseString(BaseCustomType):
@@ -104,16 +102,16 @@ class BaseUnit(BaseString):
         )
         raise DataValueError(msg, self._tree_path)
 
-    @property
-    def base_value(self) -> float:
-        if self._base_value:
-            return self._base_value
-        return self._get_base_value()
+    def get_base_value(self) -> float:
+        if not self._base_value:
+            context = Context()
+            self.validate(context)
+        return self._base_value
 
     def validate(self, context: Context) -> None:
         super().validate(context)
         if context.strictness > Strictness.PERMISSIVE:
-            self._get_base_value()
+            _ = self._get_base_value()
 
     def __int__(self) -> int:
         return int(self._get_base_value())
