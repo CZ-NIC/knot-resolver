@@ -922,6 +922,17 @@ static int begin(kr_layer_t *ctx)
 		return KR_STATE_FAIL;
 	}
 
+	/* Check whether the requested EDNS version is supported. */
+	if (knot_pkt_has_edns(pkt) && knot_edns_get_version(pkt->opt_rr) > KR_EDNS_VERSION) {
+		knot_pkt_t *ans = kr_request_ensure_answer(ctx->req);
+		if (!ans)
+			return ctx->req->state;
+		/* See RFC 6891, section 6.1.3 */
+		knot_wire_set_rcode(ans->wire, KNOT_EDNS_RCODE_LO(KNOT_RCODE_BADVERS));
+		knot_edns_set_ext_rcode(ans->opt_rr, KNOT_EDNS_RCODE_HI(KNOT_RCODE_BADVERS));
+		return KR_STATE_DONE;
+	}
+
 	struct kr_query *qry = ctx->req->current_query;
 	/* Avoid any other classes, and avoid any meta-types (except if allowed). */
 	bool typeOK;
