@@ -34,8 +34,7 @@ integr_tests += [
   ['serve_stale', meson.current_source_dir() / 'serve_stale' / 'test.integr'],
 ]
 
-mod_inc_dir = include_directories('..', '../contrib',
-  luajit.get_variable(pkgconfig: 'includedir'))
+mod_inc_dir = include_directories('..', '../contrib')
 
 mod_deps = [
   contrib_dep,
