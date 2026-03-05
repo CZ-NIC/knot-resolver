@@ -923,7 +923,7 @@ static int begin(kr_layer_t *ctx)
 	}
 
 	/* Check whether the requested EDNS version is supported. */
-	if (knot_pkt_has_edns(pkt) && knot_edns_get_version(pkt->opt_rr) != KR_EDNS_VERSION) {
+	if (knot_pkt_has_edns(pkt) && knot_edns_get_version(pkt->opt_rr) > KR_EDNS_VERSION) {
 		knot_pkt_t *ans = kr_request_ensure_answer(ctx->req);
 		if (!ans)
 			return ctx->req->state;
