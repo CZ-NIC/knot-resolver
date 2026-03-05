@@ -52,31 +52,36 @@ It provides various input formats described in following subsections.
 
       Optional, direct addition of hostname and IP address pairs from files in ``/etc/hosts`` like format.
 
-   .. code-block:: yaml
+      .. code-block:: yaml
 
-      local-data:
-        addresses:
-          a1.example.com: 2001:db8::1
-          a2.example.com: 2001:db8::2
-        addresses-files:
-          - /etc/hosts
-        # some options
-        ttl: 5m
-        nodata: false # don't force empty answer for missing record types on mentioned names
+        local-data:
+          addresses:
+            a1.example.com: 2001:db8::1
+            a2.example.com: 2001:db8::2
+          addresses-files:
+            - /etc/hosts
+          # some options
+          ttl: 5m
+          nodata: false # don't force empty answer for missing record types on mentioned names
 
    .. option:: records: <zonefile format string>
 
       Optional, direct addition of records in DNS zonefile format.
       The zonefile syntax is more flexible, e.g. it can define any type of records.
 
-   .. code-block:: yaml
+      .. code-block:: yaml
 
-      local-data:
-        records: |
-          www.google.com.  CNAME  forcesafesearch.google.com.
-          example.com  TXT  "an example text record"
-          34.example.com  AAAA  2001:db8::3
-          34.example.com  AAAA  2001:db8::4
+        local-data:
+          records: |
+            www.google.com.  CNAME  forcesafesearch.google.com.
+            example.com  TXT  "an example text record"
+            34.example.com  AAAA  2001:db8::3
+            34.example.com  AAAA  2001:db8::4
+
+      If you want records from an actual file, e.g. because you have too many,
+      we suggest using :ref:`config-local-data-rpz` just below,
+      even if you do not need any additional behavior defined by RPZ.
+      Same syntax of normal record definitions in RPZs will cause the same result.
 
    .. warning::
 
@@ -219,6 +224,11 @@ It provides various input formats described in following subsections.
                 - records: |
                     www.google.com.  CNAME  forcesafesearch.google.com.
                   tags: [ adult ]
+
+         If you want records from an actual file, e.g. because you have too many,
+         we suggest using :ref:`config-local-data-rpz`,
+         even if you do not need any additional behavior defined by RPZ.
+         Same syntax of normal record definitions in RPZs will cause the same result.
 
       .. option:: tags: <list of tags>
 
