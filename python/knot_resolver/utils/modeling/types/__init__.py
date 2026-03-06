@@ -17,9 +17,23 @@ from .path_types import (
     WritableDirectory,
     WritableFilePath,
 )
+from .string_types import (
+    DomainName,
+    EscapedString,
+    EscapedStringMin32B,
+    InterfaceName,
+    InterfaceNameIPAddressOptionalPort,
+    InterfaceNameIPAddressPort,
+    PinSha256,
+    SizeUnit,
+    TimeUnit,
+)
 
 __all__ = [
     "Directory",
+    "DomainName",
+    "EscapedString",
+    "EscapedStringMin32B",
     "File",
     "FilePath",
     "FloatNonNegative",
@@ -28,10 +42,16 @@ __all__ = [
     "Integer0_65535",
     "IntegerNonNegative",
     "IntegerPositive",
+    "InterfaceName",
+    "InterfaceNameIPAddressOptionalPort",
+    "InterfaceNameIPAddressPort",
     "ListOrItem",
     "Percent",
+    "PinSha256",
     "PortNumber",
     "ReadableFile",
+    "SizeUnit",
+    "TimeUnit",
     "WritableDirectory",
     "WritableFilePath",
 ]
