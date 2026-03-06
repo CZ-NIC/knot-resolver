@@ -30,6 +30,14 @@ class BaseInteger(BaseCustomType):
         return int(self._value)
 
     @classmethod
+    def from_string(cls, value: str, tree_path: str = "/") -> BaseInteger:
+        try:
+            return cls(int(value), tree_path)
+        except ValueError as e:
+            msg = f"invalid integer {value}"
+            raise DataValueError(msg) from e
+
+    @classmethod
     def json_schema(cls) -> dict[Any, Any]:
         return {"type": "integer"}
 
