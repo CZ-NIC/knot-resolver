@@ -45,7 +45,7 @@ char *mm_strdup(knot_mm_t *mm, const char *s);
 
 /*! \brief Free using 'mm' if any, uses system free() otherwise. */
 KR_EXPORT
-void mm_free(knot_mm_t *mm, void *what);
+void mm_free(knot_mm_t *mm, const void *what);
 
 /*! \brief Initialize default memory allocation context. */
 void mm_ctx_init(knot_mm_t *mm);

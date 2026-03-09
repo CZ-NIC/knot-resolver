@@ -95,14 +95,14 @@ char *mm_strdup(knot_mm_t *mm, const char *s)
 	}
 }
 
-void mm_free(knot_mm_t *mm, void *what)
+void mm_free(knot_mm_t *mm, const void *what)
 {
 	if (mm) {
 		if (mm->free) {
-			mm->free(what);
+			mm->free((void *)what);
 		}
 	} else {
-		free(what);
+		free_const(what);
 	}
 }
 
