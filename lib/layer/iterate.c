@@ -807,7 +807,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 		next->flags.NO_MINIMIZE = req->options.NO_MINIMIZE;
 
 		if (query->flags.FORWARD) {
-			next->forward_flags.CNAME = true;
+			next->forward_CNAME = true;
 		}
 		next->cname_parent = query;
 		/* Want DNSSEC if and only if it's possible to secure

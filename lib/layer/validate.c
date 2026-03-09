@@ -843,7 +843,7 @@ static int unsigned_forward(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (nods && ns_exist && qtype == KNOT_RRTYPE_NS) {
 		qry->flags.DNSSEC_WANT = false;
 		qry->flags.DNSSEC_INSECURE = true;
-		if (qry->forward_flags.CNAME) {
+		if (qry->forward_CNAME) {
 			if (kr_fails_assert(qry->cname_parent))
 				return KR_STATE_FAIL;
 			qry->cname_parent->flags.DNSSEC_WANT = false;
@@ -861,7 +861,7 @@ static int unsigned_forward(kr_layer_t *ctx, knot_pkt_t *pkt)
 			qry = qry->parent;
 			qry->flags.DNSSEC_WANT = false;
 			qry->flags.DNSSEC_INSECURE = true;
-			if (qry->forward_flags.CNAME) {
+			if (qry->forward_CNAME) {
 				if (kr_fails_assert(qry->cname_parent))
 					return KR_STATE_FAIL;
 				qry->cname_parent->flags.DNSSEC_WANT = false;
@@ -1368,7 +1368,7 @@ static int validate(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 	if (qry->flags.FORWARD && qry->parent) {
 		if (pkt_rcode == KNOT_RCODE_NXDOMAIN) {
-			qry->parent->forward_flags.NO_MINIMIZE = true;
+			qry->parent->forward_NO_MINIMIZE = true;
 		}
 	}
 	VERBOSE_MSG(qry, "<= answer valid, OK\n");
