@@ -186,25 +186,49 @@ char * kr_absolutize_path(const char *dirname, const char *fname)
 	return NULL;
 }
 
+static inline size_t pool_next_count(size_t want, size_t have)
+{
+	const int q = 3;
+	if (want >= have * q) // We amortized enough and maybe more won't be needed.
+		return want;
+	return have * q;
+	/* Why a tripling growth in particular?  The issue with mempools is that
+	 * we can't really free memory (until the very end).
+	 * That changes the tradeoff, and consumed memory dominates, not cost of moving.
+	 * If @vcunat counted this right, with +1 requests and *q growth (q>1), we use about:
+	 *  - 2q^2 / (q^2 - 1) factor of space in the average case,
+	 *    which is a decreasing function of q;
+	 *  - q^2 / (q - 1) factor of space in the worst case,
+	 *    which has minimum for q=2 and it grows for q>2
+	 * Note that for q<2 both values end up worse (i.e. larger) than for q=2.
+	 * That gives us:
+	 *   q=2   -> (2.67, 4   )
+	 *   q=3   -> (2.25, 4.5 )
+	 *   q=4   -> (2.13, 5.33)
+	 * We're not really limited to whole numbers, but the changes are slow,
+	 * and q=3 looks like a decent compromise.
+	 */
+}
+/* Also see array_std_reserve() */
 int kr_memreserve(void *baton, void **mem, size_t elm_size, size_t want, size_t *have)
 {
-    if (*have >= want) {
-        return 0;
-    } else {
-        knot_mm_t *pool = baton;
-        size_t next_size = array_next_count(elm_size, want, *have);
-        void *mem_new = mm_alloc(pool, next_size * elm_size);
-        if (mem_new != NULL) {
-	    if (*mem) { /* 0-length memcpy from NULL isn't technically OK */
-		memcpy(mem_new, *mem, (*have)*(elm_size));
-		mm_free(pool, *mem);
-	    }
-            *mem = mem_new;
-            *have = next_size;
-            return 0;
-        }
-    }
-    return -1;
+	if (*have >= want)
+		return 0;
+
+	knot_mm_t *pool = baton;
+	size_t next_size = pool_next_count(want, *have);
+
+	void *mem_new = mm_alloc(pool, next_size * elm_size);
+	if (mem_new != NULL) {
+		if (*mem) { /* 0-length memcpy from NULL isn't technically OK */
+			memcpy(mem_new, *mem, (*have)*(elm_size));
+			mm_free(pool, *mem);
+		}
+		*mem = mem_new;
+		*have = next_size;
+		return 0;
+	}
+	return -1;
 }
 
 static int pkt_recycle(knot_pkt_t *pkt, bool keep_question)

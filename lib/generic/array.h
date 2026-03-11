@@ -53,7 +53,7 @@
 #pragma once
 #include <stdlib.h>
 
-/** Choose array length when it overflows. */
+/** Choose array length when it overflows.  Also see pool_next_count() */
 static inline size_t array_next_count(size_t elm_size, size_t want, size_t have)
 {
 	if (want >= have * 2) // We amortized enough and maybe more won't be needed.
@@ -66,7 +66,7 @@ static inline size_t array_next_count(size_t elm_size, size_t want, size_t have)
 	return want * 2; // Doubling growth amortizes to roughly 2 copies per element.
 }
 
-/** @internal Incremental memory reservation */
+/** @internal Incremental memory reservation.  Also see kr_memreserve() */
 static inline int array_std_reserve(void *baton, void **mem, size_t elm_size, size_t want, size_t *have)
 {
 	if (*have >= want) {
