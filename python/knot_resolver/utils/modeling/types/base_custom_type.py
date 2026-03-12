@@ -81,8 +81,8 @@ class BaseCustomType(ABC):
             # use default context
             context = Context()
 
+        self._validate(context)
         if context.strictness > Strictness.PERMISSIVE:
-            self._validate(context)
             self._is_valid = True
 
     @classmethod
