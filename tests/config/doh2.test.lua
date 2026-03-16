@@ -115,8 +115,8 @@ else
 		if not (headers and pkt) then
 			return
 		end
-		-- uncacheable
-		same(headers:get('cache-control'), 'max-age=0', desc .. ': TTL 0')
+		-- failure but we limit the TTL
+		same(headers:get('cache-control'), 'max-age=5', desc .. ': TTL 5')
 		same(headers:get('access-control-allow-origin'), '*', desc .. ': CORS headers')
 		same(pkt:rcode(), kres.rcode.SERVFAIL, desc .. ': rcode matches')
 	end
@@ -252,8 +252,8 @@ else
 		if not (headers and pkt) then
 			return
 		end
-		-- uncacheable
-		same(headers:get('cache-control'), 'max-age=0', desc .. ': TTL 0')
+		-- failure but we limit the TTL
+		same(headers:get('cache-control'), 'max-age=5', desc .. ': TTL 5')
 		same(pkt:rcode(), kres.rcode.SERVFAIL, desc .. ': rcode matches')
 	end
 

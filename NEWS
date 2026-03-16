@@ -8,12 +8,14 @@ Improvements
 - packaging: rpm: added systemd's sysusers support (!1830)  
   This should also resolve the issue with user and group  
   configuration during installation (GH#130).
+- make DoH cache-control header respect our cache's TTL limits (!1832)
 
 
 Bugfixes
 --------
 - respect disablement of QNAME case randomization even after TCP issues
 - cache: fix wrong TTL in some cases, typically 32768
+- reduce excessive caching of some uncommon failed answers (!1832)
 
 
 Knot Resolver 5.7.6 (2025-07-17)
