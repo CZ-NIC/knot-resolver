@@ -31,6 +31,14 @@ class DataAnnotationError(DataModelingError):
         super().__init__(msg, error_pointer)
 
 
+class DataReadingError(DataModelingError):
+    """Exception class for data reading errors."""
+
+    def __init__(self, msg: str, error_pointer: str = "") -> None:
+        msg = f"reading error: {msg}"
+        super().__init__(msg, error_pointer)
+
+
 class DataParsingError(DataModelingError):
     """Exception class for data parsing errors."""
 

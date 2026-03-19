@@ -1,0 +1,9 @@
+none: null
+boolean: false
+number: 2026
+string: this is string
+object: !include include.object.yaml
+array:
+  - item1
+  - item2
+  - item3

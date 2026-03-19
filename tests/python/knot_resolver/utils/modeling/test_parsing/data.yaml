@@ -1,0 +1,11 @@
+none: null
+boolean: false
+number: 2026
+string: this is string
+object:
+  number: 5000
+  string: this is object string
+array:
+  - item1
+  - item2
+  - item3

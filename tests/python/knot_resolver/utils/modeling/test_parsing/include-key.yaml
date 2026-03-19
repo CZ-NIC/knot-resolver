@@ -1,0 +1,7 @@
+none: null
+boolean: false
+number: 2026
+string: this is string
+include:
+  - include1.yaml
+  - include2.yaml
