@@ -107,7 +107,7 @@ class TLSSchema(ConfigSchema):
             raise ValueError("'cert-file' and 'key-file' must be configured together")
         if self.cert_file and self.key_file and self.watchdog and not WATCHDOG_LIB:
             raise ValueError(
-                "'files-watchdog' is enabled, but the required 'watchdog' dependency (optional) is not installed"
+                "'watchdog' is enabled, but the required 'watchdog' dependency (optional) is not installed"
             )
 
 

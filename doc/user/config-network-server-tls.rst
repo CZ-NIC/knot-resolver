@@ -123,7 +123,7 @@ policies.
 
    .. option:: key-file: <path>
 
-   .. option:: files-watchdog: auto|true|false
+   .. option:: watchdog: auto|true|false
 
       :default: auto
 
