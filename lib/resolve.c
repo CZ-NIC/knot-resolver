@@ -487,7 +487,6 @@ int kr_resolver_init(module_array_t *modules, knot_mm_t *pool)
 	/* Open resolution context */
 	the_resolver->trust_anchors = trie_create(NULL);
 	the_resolver->negative_anchors = trie_create(NULL);
-	the_resolver->pool = pool;
 	the_resolver->modules = modules;
 	the_resolver->cache_rtt_tout_retry_interval = KR_NS_TIMEOUT_RETRY_INTERVAL;
 	/* Create OPT RR */
