@@ -181,7 +181,7 @@ KR_EXPORT extern struct kr_context *the_resolver;
 
 /** Initializes the resolver. */
 KR_EXPORT
-int kr_resolver_init(module_array_t *modules, knot_mm_t *pool);
+int kr_resolver_init(module_array_t *modules);
 
 /** Cleans up the resolver. */
 KR_EXPORT

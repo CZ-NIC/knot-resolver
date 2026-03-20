@@ -475,7 +475,7 @@ static int query_finalize(struct kr_request *request, struct kr_query *qry, knot
 	return kr_ok();
 }
 
-int kr_resolver_init(module_array_t *modules, knot_mm_t *pool)
+int kr_resolver_init(module_array_t *modules)
 {
 	the_resolver = &the_resolver_value;
 
@@ -490,17 +490,17 @@ int kr_resolver_init(module_array_t *modules, knot_mm_t *pool)
 	the_resolver->modules = modules;
 	the_resolver->cache_rtt_tout_retry_interval = KR_NS_TIMEOUT_RETRY_INTERVAL;
 	/* Create OPT RR */
-	the_resolver->downstream_opt_rr = mm_alloc(pool, sizeof(knot_rrset_t));
-	the_resolver->upstream_opt_rr = mm_alloc(pool, sizeof(knot_rrset_t));
+	the_resolver->downstream_opt_rr = malloc(sizeof(knot_rrset_t));
+	the_resolver->upstream_opt_rr = malloc(sizeof(knot_rrset_t));
 	if (!the_resolver->downstream_opt_rr || !the_resolver->upstream_opt_rr) {
 		return kr_error(ENOMEM);
 	}
-	knot_edns_init(the_resolver->downstream_opt_rr, KR_EDNS_PAYLOAD, 0, KR_EDNS_VERSION, pool);
-	knot_edns_init(the_resolver->upstream_opt_rr, KR_EDNS_PAYLOAD, 0, KR_EDNS_VERSION, pool);
+	knot_edns_init(the_resolver->downstream_opt_rr, KR_EDNS_PAYLOAD, 0, KR_EDNS_VERSION, NULL);
+	knot_edns_init(the_resolver->upstream_opt_rr, KR_EDNS_PAYLOAD, 0, KR_EDNS_VERSION, NULL);
 	/* Use default TLS padding */
 	the_resolver->tls_padding = -1;
 	/* Empty init; filled via ./lua/postconfig.lua */
-	kr_zonecut_init(&the_resolver->root_hints, (const uint8_t *)"", pool);
+	kr_zonecut_init(&the_resolver->root_hints, (const uint8_t *)"", NULL);
 	lru_create(&the_resolver->cache_cookie, LRU_COOKIES_SIZE, NULL, NULL);
 
 	return kr_ok();
@@ -518,6 +518,9 @@ void kr_resolver_deinit(void)
 	trie_free(the_resolver->trust_anchors);
 	kr_ta_clear(the_resolver->negative_anchors);
 	trie_free(the_resolver->negative_anchors);
+
+	knot_rrset_free(the_resolver->downstream_opt_rr, NULL);
+	knot_rrset_free(the_resolver->upstream_opt_rr, NULL);
 
 	the_resolver = NULL;
 }
