@@ -173,7 +173,7 @@ int kr_rules_init(const char *path, size_t maxsize, bool overwrite)
 		.maxsize = !overwrite ? 0 :
 			(maxsize ? maxsize : (size_t)(sizeof(size_t) > 4 ? 2048 : 500) * 1024*1024),
 	};
-	int ret = the_rules->api->open(&the_rules->db, &the_rules->stats, &opts, NULL);
+	int ret = the_rules->api->open(&the_rules->db, &the_rules->stats, &opts);
 
 	if (ret == 0 && overwrite) ret = ruledb_op(clear, 0);
 	if (ret != 0) goto failure;

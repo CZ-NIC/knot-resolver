@@ -52,7 +52,7 @@ struct kr_cdb_api {
 
 	/* Context operations */
 
-	int (*open)(kr_cdb_pt *db, struct kr_cdb_stats *stat, struct kr_cdb_opts *opts, knot_mm_t *mm);
+	int (*open)(kr_cdb_pt *db, struct kr_cdb_stats *stat, struct kr_cdb_opts *opts);
 	void (*close)(kr_cdb_pt db, struct kr_cdb_stats *stat);
 	int (*count)(kr_cdb_pt db, struct kr_cdb_stats *stat);
 

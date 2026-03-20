@@ -30,7 +30,7 @@ int kr_gc_cache_open(const char *cache_path, struct kr_cache *kres_db,
 		.maxsize = 0,/*don't resize*/
 	};
 
-	int ret = kr_cache_open(kres_db, NULL, &opts, NULL);
+	int ret = kr_cache_open(kres_db, NULL, &opts);
 	if (ret || kres_db->db == NULL) {
 		printf("Error opening Resolver cache (%s).\n", kr_strerror(ret));
 		return -EINVAL;

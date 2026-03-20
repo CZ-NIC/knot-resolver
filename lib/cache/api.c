@@ -107,7 +107,7 @@ static int assert_right_version(struct kr_cache *cache)
 	return ret;
 }
 
-int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct kr_cdb_opts *opts, knot_mm_t *mm)
+int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct kr_cdb_opts *opts)
 {
 	if (kr_fails_assert(cache && opts))
 		return kr_error(EINVAL);
@@ -125,7 +125,7 @@ int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct k
 		}
 	}
 
-	int ret = cache->api->open(&cache->db, &cache->stats, opts, mm);
+	int ret = cache->api->open(&cache->db, &cache->stats, opts);
 	if (ret == 0) {
 		ret = assert_right_version(cache);
 		// The included write also committed maxsize increase to the file.
@@ -137,7 +137,7 @@ int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct k
 		cache->api->close(cache->db, &cache->stats);
 		struct kr_cdb_opts opts2 = *opts;
 		opts2.maxsize = 0;
-		ret = cache->api->open(&cache->db, &cache->stats, &opts2, mm);
+		ret = cache->api->open(&cache->db, &cache->stats, &opts2);
 	}
 
 	free_const(kr_cache_emergency_file_to_remove);
