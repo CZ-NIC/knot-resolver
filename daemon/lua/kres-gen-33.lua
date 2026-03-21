@@ -408,7 +408,8 @@ struct kr_query {
 	uint16_t id;
 	uint16_t reorder;
 	struct kr_qflags flags;
-	struct kr_qflags forward_flags;
+	_Bool forward_CNAME;
+	_Bool forward_NO_MINIMIZE;
 	uint32_t secret;
 	uint32_t uid;
 	int32_t vld_limit_crypto_remains;

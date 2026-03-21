@@ -433,8 +433,7 @@ error_sys:
 	return kr_error(ret);
 }
 
-static int cdb_init(kr_cdb_pt *db, struct kr_cdb_stats *stats,
-		struct kr_cdb_opts *opts, knot_mm_t *pool)
+static int cdb_init(kr_cdb_pt *db, struct kr_cdb_stats *stats, struct kr_cdb_opts *opts)
 {
 	if (!db || !stats || !opts) {
 		return kr_error(EINVAL);

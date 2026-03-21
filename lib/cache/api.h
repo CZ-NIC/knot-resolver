@@ -43,11 +43,10 @@ struct kr_cache
  * @param cache cache structure to be initialized
  * @param api   storage engine API (may be NULL for default)
  * @param opts  storage-specific options
- * @param mm    memory context.
  * @return 0 or an error code
  */
 KR_EXPORT
-int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct kr_cdb_opts *opts, knot_mm_t *mm);
+int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct kr_cdb_opts *opts);
 
 /**
  * Path to cache file to remove on critical out-of-space error. (do NOT modify it)

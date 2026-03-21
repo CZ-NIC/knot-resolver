@@ -190,7 +190,7 @@ static int cache_open(lua_State *L)
 		.path = (conf && strlen(conf)) ? conf : ".",
 		.maxsize = cache_size,
 	};
-	int ret = kr_cache_open(&the_resolver->cache, api, &opts, &the_engine->pool);
+	int ret = kr_cache_open(&the_resolver->cache, api, &opts);
 	if (ret != 0) {
 		char cwd[PATH_MAX];
 		get_workdir(cwd, sizeof(cwd));

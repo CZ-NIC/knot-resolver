@@ -174,7 +174,6 @@ struct kr_context
 	struct kr_cookie_ctx cookie_ctx;
 	kr_cookie_lru_t *cache_cookie;
 	int32_t tls_padding; /**< See net.tls_padding in ../daemon/README.rst -- -1 is "true" (default policy), 0 is "false" (no padding) */
-	knot_mm_t *pool;
 };
 
 /** Pointer to the singleton resolver context. NULL if not initialized */
@@ -182,7 +181,7 @@ KR_EXPORT extern struct kr_context *the_resolver;
 
 /** Initializes the resolver. */
 KR_EXPORT
-int kr_resolver_init(module_array_t *modules, knot_mm_t *pool);
+int kr_resolver_init(module_array_t *modules);
 
 /** Cleans up the resolver. */
 KR_EXPORT

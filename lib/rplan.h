@@ -94,7 +94,8 @@ struct kr_query {
 	uint16_t id;
 	uint16_t reorder; /**< Seed to reorder (cached) RRs in answer or zero. */
 	struct kr_qflags flags;
-	struct kr_qflags forward_flags;
+	bool forward_CNAME;
+	bool forward_NO_MINIMIZE;
 	uint32_t secret;
 	uint32_t uid; /**< Query iteration number, unique within the kr_rplan. */
 

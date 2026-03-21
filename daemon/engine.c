@@ -563,7 +563,6 @@ int engine_init(void)
 {
 	kr_require(!the_engine);
 	the_engine = &engine;
-	mm_ctx_mempool(&the_engine->pool, MM_DEFAULT_BLKSIZE);
 
 	/* Initialize state */
 	int ret = init_state();
@@ -628,7 +627,6 @@ void engine_deinit(void)
 	array_clear(the_engine->modules);
 	array_clear(the_engine->backends);
 	free(the_engine->hostname);
-	mp_delete(the_engine->pool.ctx);
 
 	the_engine = NULL;
 }
