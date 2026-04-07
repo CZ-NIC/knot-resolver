@@ -179,11 +179,13 @@ void kr_cache_prefetch_schedule(knot_db_val_t key, struct entry_h *eh, size_t eh
 	VERBOSE_LOG_pkey("scheduling      %7.1f > %-7.1f",
 		load / price16, min_load / price16);
 
-	cache_op(cache, write, &pkey, &val, 1);
-
+	// here we probably write directly to LMDB memory during an open write operation
 	eh->prefetch_priority = sched.priority;
 
-	// to be called during another write transaction, so we are not committing here
+	// here we perform another write to LMDB invalidating eh -- beware from outside
+	cache_op(cache, write, &pkey, &val, 1);
+
+	// we keep the write transaction open as it is expected to have been open from outside
 }
 
 void kr_cache_prefetch_unschedule(knot_db_val_t key, const struct entry_h *eh, uint16_t rrtype)
