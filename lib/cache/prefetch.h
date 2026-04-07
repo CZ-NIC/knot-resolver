@@ -40,11 +40,13 @@ void kr_cache_prefetch_init(uint32_t max_access_period_sec, float min_accesses_p
 
 
 // Try scheduling prefetching.
-// To be called during write transaction of (key, eh); eh may be modified inside.
+// To be called during LMDB write operation of (key, eh);
+// eh may be modified inside and P-record is inserted into cache afterwards, closing previous LMDB write.
 KR_EXPORT
 void kr_cache_prefetch_schedule(knot_db_val_t key, struct entry_h *eh, size_t eh_len, size_t whole_entry_len, uint16_t rrtype);
 
 // Cancel scheduled prefetching if set. Void if eh is NULL.
+// It reads eh and then removes P-record from cache.
 KR_EXPORT
 void kr_cache_prefetch_unschedule(knot_db_val_t key, const struct entry_h *eh, uint16_t rrtype);
 

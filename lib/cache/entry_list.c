@@ -269,11 +269,11 @@ int entry_h_splice(
 		}
 	}
 
-	kr_cache_prefetch_unschedule(key, eh_orig, type);
-
 	if (!i_type) {
 		/* The non-list types are trivial now. */
 		*cache_record_size_out = val_new_entry->len;
+		kr_cache_prefetch_unschedule(key, eh_orig, type);
+			// writes to cache, invalidates eh_orig and el-pointed memory
 		return cache_write_or_clear(cache, &key, val_new_entry, qry);
 	}
 	/* Now we're in trouble.  In some cases, parts of data to be written
@@ -294,6 +294,8 @@ int entry_h_splice(
 	uint8_t buf[val.len];
 	entry_list_memcpy((struct entry_apex *)buf, el);
 	*cache_record_size_out = val.len;
+	kr_cache_prefetch_unschedule(key, eh_orig, type);
+		// writes to cache, invalidates eh_orig and el-pointed memory
 	ret = cache_write_or_clear(cache, &key, &val, qry);
 	if (ret) return kr_error(ret);
 	memcpy(val.data, buf, val.len); /* we also copy the "empty" space, but well... */
