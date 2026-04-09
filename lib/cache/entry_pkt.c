@@ -12,6 +12,7 @@
 #include "lib/layer/iterate.h" /* kr_response_classify */
 #include "lib/cache/impl.h"
 #include "lib/cache/top.h"
+#include "lib/cache/prefetch.h"
 
 /** Compute TTL for a packet.  It's minimum TTL or zero.  (You can apply limits.) */
 static uint32_t packet_ttl_simple(const knot_pkt_t *pkt)
@@ -135,7 +136,10 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 	eh->has_optout = qf->DNSSEC_OPTOUT;
 	memcpy(eh->data, &pkt_size, sizeof(pkt_size));
 	memcpy(eh->data + sizeof(pkt_size), pkt->wire, pkt_size);
-	kr_cache_top_access(req, key.data, key.len, whole_val_len, "stash_pkt");
+	if (qry)
+		kr_cache_top_access(req, key.data, key.len, whole_val_len, "stash_pkt");
+	kr_cache_prefetch_schedule(key, eh, val_new_entry.len, whole_val_len, pkt_type);
+		// needs writable eh, but contains another write to LMDB, so eh is invalidated afterwards
 
 	WITH_VERBOSE(qry) {
 		auto_free char *type_str = kr_rrtype_text(pkt_type),
