@@ -634,6 +634,7 @@ int local_data_ins(knot_db_val_t key, const knot_rrset_t *rrs, const knot_rdatas
 	rdataset_dematerialize(sig_rds, data);
 
 	knot_db_val_t val = { .data = buf, .len = val_len };
+	ruledb_op(remove, &key, 1); // ignore error — key may not exist yet
 	int ret = ruledb_op(write, &key, &val, 1); // TODO: overwriting on ==tags?
 	// ENOSPC seems to be the only expectable error.
 	kr_assert(ret == 0 || ret == kr_error(ENOSPC));
