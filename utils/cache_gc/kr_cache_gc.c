@@ -196,6 +196,7 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 	kr_timer_start(&timer_rw_txn);
 	rrtype_array_t deleted_rrtypes = { 0 };
 	bool deleted_rtt = false;
+	bool deleted_prefetch = false;
 
 	ret = api->txn_begin(db, &txn, 0);
 	if (ret != KNOT_EOK) {
@@ -214,10 +215,16 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 			deleted_records++;
 			const int entry_type = key_consistent(*val);
 			if (entry_type >= 0) { // some "inconsistent" entries are OK
-				if (entry_type == KNOT_CACHE_RTT) {  // TODO add PREFETCH
-					deleted_rtt = true;
-				} else {
-					rrtypelist_add(&deleted_rrtypes, entry_type);
+				switch (entry_type) {
+					case KNOT_CACHE_RTT:
+						deleted_rtt = true;
+						break;
+					case KNOT_CACHE_PREFETCH:
+						deleted_prefetch = true;
+						break;
+					default:
+						rrtypelist_add(&deleted_rrtypes, entry_type);
+						break;
 				}
 			}
 			break;
@@ -271,9 +278,10 @@ int kr_cache_gc(kr_cache_gc_cfg_t *cfg, kr_cache_gc_state_t **state)
 finish:
 	printf("Deleted %zu records (%zu already gone) types", deleted_records,
 	       already_gone);
-	if (deleted_rtt) {
-		printf(" RTT");
-	}
+
+	if (deleted_rtt)      printf(" rtt");
+	if (deleted_prefetch) printf(" prefetch");
+
 	rrtypelist_print(&deleted_rrtypes);
 	printf("It took %.0lf msecs, %zu transactions (%s)\n\n",
 	       kr_timer_elapsed(&timer_delete) * 1000, rw_txn_count, knot_strerror(ret));
