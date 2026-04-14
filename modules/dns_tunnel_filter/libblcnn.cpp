@@ -43,8 +43,8 @@ float predict_packet(TorchModule module, const unsigned char *data, size_t size)
 
 	torch::Tensor output = wrapper->model.forward({one_hot}).toTensor();
 	torch::Tensor tensor_prob = torch::softmax(output, 1);
-	
-	return tensor_prob[0][0].item<float>();
+
+	return tensor_prob[0][1].item<float>();
 }
 
 void free_model(TorchModule model) {
