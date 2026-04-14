@@ -28,6 +28,7 @@ class SubprocessStatus(Enum):
     RUNNING = auto()
     FATAL = auto()
     EXITED = auto()
+    UNEXPECTED = auto()
     UNKNOWN = auto()
 
 
