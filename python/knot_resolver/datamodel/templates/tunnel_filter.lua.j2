@@ -11,6 +11,6 @@ assert(C.dns_tunnel_filter_setup(
 	{{ policy_get_tagset(cfg.tunnel_filter.tags) }},
 	{{ cfg.tunnel_filter.sensitivity }},
 	{{ cfg.tunnel_filter.threshold }},
-	2^20, 2^8, 2^17
+	2^20, 2^12, 2^12
 ) == 0);
 {%- endif %}

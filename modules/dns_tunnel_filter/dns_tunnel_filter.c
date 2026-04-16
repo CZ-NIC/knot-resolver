@@ -237,6 +237,11 @@ static void do_filter(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (qry->flags.CACHED) {
 		return; // don't consider cached results
 	}
+	if (req->options.TUNNEL_CHECKED) {
+		return; // don't consider already checked requests
+	}
+
+	req->options.TUNNEL_CHECKED = 1;
 
 // this logic comes from kr_rule_consume_tags()
 	// _apply tags take precendence, and we store the last one
@@ -251,57 +256,55 @@ static void do_filter(kr_layer_t *ctx, knot_pkt_t *pkt)
 	const uint32_t time_now = kr_now();
 	uint32_t price_scale_factor = knot_dname_size(qry->sname) * config.sensitivity * DNAME_SCALE_MULT;
 
-	if (config.sensitivity < 100){
-		// classify
-		_Alignas(16) uint8_t key[16] = {0, };
-		uint8_t limited_prefix;
-		if (req->qsource.addr->sa_family == AF_INET6) {
-			struct sockaddr_in6 *ipv6 = (struct sockaddr_in6 *)req->qsource.addr;
-			memcpy(key, &ipv6->sin6_addr, 16);
+	// classify
+	_Alignas(16) uint8_t key[16] = {0, };
+	uint8_t limited_prefix;
+	if (req->qsource.addr->sa_family == AF_INET6) {
+		struct sockaddr_in6 *ipv6 = (struct sockaddr_in6 *)req->qsource.addr;
+		memcpy(key, &ipv6->sin6_addr, 16);
 
-			// compute adjusted prices, using standard rounding
-			kru_price_t prices[V6_PREFIXES_CNT];
-			for (int i = 0; i < V6_PREFIXES_CNT; ++i) {
-				prices[i] = (req->qsource.price_factor16 * (uint64_t)price_scale_factor
-						* (uint64_t)dns_tunnel_filter->v6_prices[i] + (1ull<<31)) >> 32;
-			}
-			limited_prefix = KRU.limited_multi_prefix_or((struct kru *)dns_tunnel_filter->kru, time_now,
-					1, key, V6_PREFIXES, prices, V6_PREFIXES_CNT, NULL);
-		} else {
-			struct sockaddr_in *ipv4 = (struct sockaddr_in *)req->qsource.addr;
-			memcpy(key, &ipv4->sin_addr, 4);  // TODO append port?
-
-			// compute adjusted prices, using standard rounding
-			kru_price_t prices[V4_PREFIXES_CNT];
-			for (int i = 0; i < V4_PREFIXES_CNT; ++i) {
-				prices[i] = (req->qsource.price_factor16 * (uint64_t)price_scale_factor
-						* (uint64_t)dns_tunnel_filter->v4_prices[i] + (1ull<<31)) >> 32;
-			}
-			limited_prefix = KRU.limited_multi_prefix_or((struct kru *)dns_tunnel_filter->kru, time_now,
-					0, key, V4_PREFIXES, prices, V4_PREFIXES_CNT, NULL);
+		// compute adjusted prices, using standard rounding
+		kru_price_t prices[V6_PREFIXES_CNT];
+		for (int i = 0; i < V6_PREFIXES_CNT; ++i) {
+			prices[i] = (req->qsource.price_factor16 * (uint64_t)price_scale_factor
+					* (uint64_t)dns_tunnel_filter->v6_prices[i] + (1ull<<31)) >> 32;
 		}
-		if (!limited_prefix) {
-			update_stats(STATS_B, -1, qry);
-			return;  // not limited
+		limited_prefix = KRU.limited_multi_prefix_or((struct kru *)dns_tunnel_filter->kru, time_now,
+				1, key, V6_PREFIXES, prices, V6_PREFIXES_CNT, NULL);
+	} else {
+		struct sockaddr_in *ipv4 = (struct sockaddr_in *)req->qsource.addr;
+		memcpy(key, &ipv4->sin_addr, 4);  // TODO append port?
+
+		// compute adjusted prices, using standard rounding
+		kru_price_t prices[V4_PREFIXES_CNT];
+		for (int i = 0; i < V4_PREFIXES_CNT; ++i) {
+			prices[i] = (req->qsource.price_factor16 * (uint64_t)price_scale_factor
+					* (uint64_t)dns_tunnel_filter->v4_prices[i] + (1ull<<31)) >> 32;
 		}
+		limited_prefix = KRU.limited_multi_prefix_or((struct kru *)dns_tunnel_filter->kru, time_now,
+				0, key, V4_PREFIXES, prices, V4_PREFIXES_CNT, NULL);
 	}
-	update_stats(STATS_DI, -1, qry);
 
-	uint8_t *packet = req->qsource.packet->wire;
-	size_t packet_size = req->qsource.size;
+	float tunnel_prob = -1;
 
-	float tunnel_prob = predict_packet(config.net, packet, packet_size) * 100;
+	if (!limited_prefix) {
+		uint8_t *packet = req->qsource.packet->wire;
+		size_t packet_size = req->qsource.size;
 
-	if (tunnel_prob <= config.threshold) {
-		update_stats(STATS_B, tunnel_prob, qry);
-		return;
+		tunnel_prob = predict_packet(config.net, packet, packet_size) * 100;
+
+		if (tunnel_prob <= config.threshold) {
+			update_stats(STATS_B, tunnel_prob, qry);
+			return;
+		}
+
+		kr_log_debug(TUNNEL, "Malicious packet detected! (%f %%) %s\n",
+				(tunnel_prob),
+				(do_apply ? "Blocking." : "Auditing.")
+		);
 	}
+
 	update_stats(STATS_M, tunnel_prob, qry);
-
-	kr_log_debug(TUNNEL, "Malicious packet detected! (%f %%) %s\n",
-			(tunnel_prob) * 100,
-	      		(do_apply ? "Blocking." : "Auditing.")
-	);
 
 	if (do_apply) {
 		kr_rule_do_answer(KR_RULE_SUB_NXDOMAIN, qry, pkt, qry->sname);
@@ -311,6 +314,7 @@ static void do_filter(kr_layer_t *ctx, knot_pkt_t *pkt)
 		req->rule.action = KREQ_ACTION_AUDIT;
 	}
 }
+
 static int produce(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
 	do_filter(ctx, pkt);
