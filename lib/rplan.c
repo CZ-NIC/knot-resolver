@@ -187,7 +187,7 @@ struct kr_query *kr_rplan_push_empty(struct kr_rplan *rplan, struct kr_query *pa
 		return NULL;
 	}
 
-	VERBOSE_MSG(qry, "plan '%s' type '%s'  uid [%05u.%02u]\n", "", "",
+	VERBOSE_MSG(qry, "=\\>> plan '%s' type '%s'  uid [%05u.%02u]\n", "", "",
 		    qry->request ? qry->request->uid : 0, qry->uid);
 	return qry;
 }
@@ -210,7 +210,7 @@ struct kr_query *kr_rplan_push(struct kr_rplan *rplan, struct kr_query *parent,
 	if (kr_log_is_debug_qry(PLAN, qry)) {
 		KR_DNAME_GET_STR(name_str, name);
 		KR_RRTYPE_GET_STR(type_str, type);
-		VERBOSE_MSG(parent, "plan '%s' type '%s' uid [%05u.%02u]\n",
+		VERBOSE_MSG(parent, "=\\>> plan '%s' type '%s' uid [%05u.%02u]\n",
 			    name_str, type_str,
 			    qry->request ? qry->request->uid : 0, qry->uid);
 	}
