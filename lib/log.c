@@ -282,9 +282,42 @@ static void kr_vlog_req(
 {
 	struct mempool *mp = mp_new(512);
 
+	static const struct kr_request *req_last = NULL;
+	const bool req_same = req && req == req_last;
+	static int indent_last = 0;
+
+	const char *graph_struct = req_same ? "╞" : "╒";
+	if (indent_last - 2 == indent && req_same)
+		graph_struct = "╒═╧";
+
+	const char *graph_phase;
+	// TODO: often req->state is unset :-( so we guess from `fmt` (and skip that `fmt` part)
+	//   Maybe just amend RESUME_LAYERS, so that we can also see _BEGIN, etc.?
+	if (fmt && fmt[0] && fmt[1] == '\\') {
+		fmt += 2;
+		graph_phase = "═╤";
+		graph_struct = req_same ? "╘" : "═";
+	} else if (fmt && fmt[0] == '=' && fmt[1] == '>') {
+		fmt += 2;
+		if (*fmt == ' ') ++fmt;
+		graph_phase = "═> ";
+	} else if (req && (req->state & KR_STATE_PRODUCE)) {
+		graph_phase = "═> ";
+	} else if (fmt && fmt[0] == '<' && fmt[1] == '=') {
+		fmt += 2;
+		if (*fmt == ' ') ++fmt;
+		graph_phase = "<═ ";
+	} else if (req && (req->state & KR_STATE_CONSUME)) {
+		graph_phase = "<═ ";
+	} else {
+		graph_phase = "═  ";
+	};
+	// TODO: another character representing _DONE+_FAIL ?
+
 	const uint32_t req_uid = req ? req->uid : 0;
-	char *msg = mp_printf(mp, "[%-6s][%05u.%02u] %*s",
-				tag, req_uid, qry_uid, indent, "");
+	char *msg = mp_printf(mp, "[%-6s][%05u.%02u]%*s%s%s",
+				tag, req_uid, qry_uid, indent, "",
+				graph_struct, graph_phase);
 
 	msg = mp_vprintf_append(mp, msg, fmt, args);
 
@@ -294,6 +327,9 @@ static void kr_vlog_req(
 	kr_log_fmt(group, LOG_DEBUG, SD_JOURNAL_METADATA, "%s", msg);
 
 	mp_delete(mp);
+
+	indent_last = indent;
+	req_last = req;
 }
 
 void kr_log_req1(const struct kr_request * const req, uint32_t qry_uid,

@@ -288,7 +288,7 @@ static bool check_dname_for_lf(const knot_dname_t *n, const struct kr_query *qry
 	const bool ret = knot_dname_size(n) == strlen((const char *)n) + 1;
 	if (!ret && kr_log_is_debug_qry(CACHE, qry)) {
 		auto_free char *n_str = kr_dname_text(n);
-		VERBOSE_MSG(qry, "=> skipping zero-containing name %s\n", n_str);
+		VERBOSE_MSG(qry, "skipping zero-containing name %s\n", n_str);
 	}
 	return ret;
 }
@@ -299,7 +299,7 @@ static bool check_rrtype(uint16_t type, const struct kr_query *qry/*logging*/)
 	const bool ret = !knot_rrtype_is_metatype(type) || type == KNOT_RRTYPE_ANY;
 	if (!ret && kr_log_is_debug_qry(CACHE, qry)) {
 		auto_free char *type_str = kr_rrtype_text(type);
-		VERBOSE_MSG(qry, "=> skipping RR type %s\n", type_str);
+		VERBOSE_MSG(qry, "skipping RR type %s\n", type_str);
 	}
 	return ret;
 }
@@ -447,7 +447,7 @@ int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 					 * in our (resolver) answers */
 					(psec == KNOT_ADDITIONAL ? NULL : &needs_pkt));
 			if (ret) {
-				VERBOSE_MSG(qry, "=> stashing RRs errored out\n");
+				VERBOSE_MSG(qry, "<= stashing RRs errored out\n");
 				goto finally;
 			}
 			/* LATER(optim.): maybe filter out some type-rank combinations
@@ -471,7 +471,7 @@ stash_packet:
 
 finally:
 	if (unauth_cnt) {
-		VERBOSE_MSG(qry, "=> stashed also %d nonauth RRsets\n", unauth_cnt);
+		VERBOSE_MSG(qry, "<= stashed also %d nonauth RRsets\n", unauth_cnt);
 	};
 	kr_cache_commit(cache);
 	return ctx->state; /* we ignore cache-stashing errors */
@@ -531,7 +531,7 @@ static bool rrset_has_min_range_or_weird(const knot_rrset_t *rr, const struct kr
 	} else {
 		return false;
 	}
-	if (ret) VERBOSE_MSG(qry, "=> minimized NSEC* range detected\n");
+	if (ret) VERBOSE_MSG(qry, "<= minimized NSEC* range detected\n");
 	return ret;
 }
 
@@ -542,14 +542,14 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 	if (kr_rank_test(rank, KR_RANK_BOGUS)) {
 		WITH_VERBOSE(qry) {
 			auto_free char *type_str = kr_rrtype_text(rr->type);
-			VERBOSE_MSG(qry, "=> skipping bogus RR set %s\n", type_str);
+			VERBOSE_MSG(qry, "<= skipping bogus RR set %s\n", type_str);
 		}
 		return kr_ok();
 	}
 	if (rr->type == KNOT_RRTYPE_NSEC3 && rr->rrs.count
 	    && kr_nsec3_limited_rdata(rr->rrs.rdata)) {
 		/* This shouldn't happen often, thanks to downgrades during validation. */
-		VERBOSE_MSG(qry, "=> skipping NSEC3 with too many iterations\n");
+		VERBOSE_MSG(qry, "<= skipping NSEC3 with too many iterations\n");
 		return kr_ok();
 	}
 	if (kr_fails_assert(cache && stash_rrset_precond(rr, qry) > 0))
@@ -676,7 +676,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 				|| rr->type == KNOT_RRTYPE_NS) {
 		auto_free char *type_str = kr_rrtype_text(rr->type),
 			*encl_str = kr_dname_text(encloser);
-		VERBOSE_MSG(qry, "=> stashed %s%s %s, rank 0%.2o, "
+		VERBOSE_MSG(qry, "<= stashed %s%s %s, rank 0%.2o, "
 			"%d B total, incl. %d RRSIGs\n",
 			(wild_labels ? "*." : ""), encl_str, type_str, rank,
 			(int)val_new_entry.len, (rr_sigs ? rr_sigs->rrs.count : 0)
@@ -771,7 +771,7 @@ static int stash_nsec_p(const knot_dname_t *dname, const char *nsec_p_v,
 	knot_db_val_t val_orig = { NULL, 0 };
 	ret = cache_op(cache, read, &key, &val_orig, 1);
 	if (ret && ret != -ABS(ENOENT)) {
-		VERBOSE_MSG(qry, "=> EL read failed (ret: %d)\n", ret);
+		VERBOSE_MSG(qry, "<= EL read failed (ret: %d)\n", ret);
 		return kr_ok();
 	}
 	/* Prepare new entry_list_t so we can just write at el[0]. */
@@ -799,7 +799,7 @@ static int stash_nsec_p(const knot_dname_t *dname, const char *nsec_p_v,
 			const int32_t ttl_extended_by = valid_until - valid_orig;
 			if (ttl_extended_by < ttl_margin) {
 				VERBOSE_MSG(qry,
-					"=> nsec_p stash for %s skipped (extra TTL: %d, hash: %x)\n",
+					"<= nsec_p stash for %s skipped (extra TTL: %d, hash: %x)\n",
 					log_dname, ttl_extended_by, log_hash);
 				return kr_ok();
 			}
@@ -830,16 +830,16 @@ static int stash_nsec_p(const knot_dname_t *dname, const char *nsec_p_v,
 	ret = cache_op(cache, write, &key, &val, 1);
 	mm_free(pool, val.data);
 	if (ret || !val.data) {
-		VERBOSE_MSG(qry, "=> EL write failed (ret: %d)\n", ret);
+		VERBOSE_MSG(qry, "<= EL write failed (ret: %d)\n", ret);
 		return kr_ok();
 	}
 	if (qry)
 		kr_cache_top_access(qry->request, key.data, key.len, val.len, "stash_nsec_p");
 	if (log_refresh_by) {
-		VERBOSE_MSG(qry, "=> nsec_p stashed for %s (refresh by %d, hash: %x)\n",
+		VERBOSE_MSG(qry, "<= nsec_p stashed for %s (refresh by %d, hash: %x)\n",
 				log_dname, log_refresh_by, log_hash);
 	} else {
-		VERBOSE_MSG(qry, "=> nsec_p stashed for %s (new, hash: %x)\n",
+		VERBOSE_MSG(qry, "<= nsec_p stashed for %s (new, hash: %x)\n",
 				log_dname, log_hash);
 	}
 	return kr_ok();

@@ -225,7 +225,7 @@ int peek_nosync(kr_layer_t *ctx, knot_pkt_t *pkt)
 			nsec_p_init(&ans.nsec_p, el[i], !ret);
 		}
 		if (ret) {
-			VERBOSE_MSG(qry, "=> skipping zone: %s, %s, hash %x;"
+			VERBOSE_MSG(qry, "=> skipping zone: %s, %s, hash %x; "
 				"new TTL %d, ret %d\n",
 				log_zname, (ans.nsec_p.raw ? "NSEC3" : "NSEC"),
 				(unsigned)ans.nsec_p.hash, (int)log_new_ttl, ret);

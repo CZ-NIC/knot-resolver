@@ -125,7 +125,7 @@ void stash_pkt(const knot_pkt_t *pkt, const struct kr_query *qry,
 	WITH_VERBOSE(qry) {
 		auto_free char *type_str = kr_rrtype_text(pkt_type),
 			*owner_str = kr_dname_text(owner);
-		VERBOSE_MSG(qry, "=> stashed packet: rank 0%.2o, TTL %d, "
+		VERBOSE_MSG(qry, "<= stashed packet: rank 0%.2o, TTL %d, "
 				"%s %s (%d B)\n",
 				eh->rank, eh->ttl,
 				type_str, owner_str, (int)val_new_entry.len);

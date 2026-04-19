@@ -165,7 +165,7 @@ static int cache_write_or_clear(struct kr_cache *cache, const knot_db_val_t *key
 		ignoring_errors_until = 0;
 		return kr_ok();
 	}
-	VERBOSE_MSG(qry, "=> failed backend write, ret = %d\n", ret);
+	VERBOSE_MSG(qry, "<= failed backend write, ret = %d\n", ret);
 
 	if (ret == kr_error(ENOSPC) && cache->api->usage_percent(cache->db) > 90) {
 		// Cache seems overfull.  Maybe kres-cache-gc service doesn't work.
@@ -264,7 +264,7 @@ int entry_h_splice(
 			WITH_VERBOSE(qry) {
 				auto_free char *type_str = kr_rrtype_text(type),
 					*owner_str = kr_dname_text(owner);
-				VERBOSE_MSG(qry, "=> not overwriting %s %s\n",
+				VERBOSE_MSG(qry, "<= not overwriting %s %s\n",
 						type_str, owner_str);
 			}
 			return kr_error(EEXIST);
