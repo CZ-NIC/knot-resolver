@@ -4,12 +4,14 @@
 
 #include <sys/file.h>
 #include <stdatomic.h>
+#include <libpsl.h>
 #include "libblcnn.h"
 #include "lib/kru.h"
 #include "lib/kru-utils.h"
 #include "lib/mmapped.h"
 #include "lib/utils.h"
 #include "lib/resolve.h"
+#include "lib/rules/api.h"
 
 enum { DNAME_SCALE_MULT = 6500 };
 enum { STATS_DI = 0, STATS_M = 1, STATS_B = 2, STATS_CNT = 3};
@@ -302,6 +304,8 @@ static void do_filter(kr_layer_t *ctx, knot_pkt_t *pkt)
 				(tunnel_prob),
 				(do_apply ? "Blocking." : "Auditing.")
 		);
+
+		req->options.SUB_BLACKLIST = 1;
 	}
 
 	update_stats(STATS_M, tunnel_prob, qry);
@@ -322,6 +326,59 @@ static int produce(kr_layer_t *ctx, knot_pkt_t *pkt)
 	return ctx->state;
 }
 
+static bool qname_to_registrable_dname(const struct kr_request *req, knot_dname_t *out, size_t out_size)
+{
+	uint8_t *qname = req->qsource.packet->wire + 12;
+	size_t len = req->qsource.packet->size;
+	char domain[256] = {0};
+	size_t pos = 0, i = 0;
+
+	while (qname[i] && i < len) {
+		uint8_t label_len = qname[i++];
+		if (i + label_len > len) break;
+		if (pos) domain[pos++] = '.';
+		memcpy(domain + pos, qname + i, label_len);
+		pos += label_len;
+		i += label_len;
+	}
+	domain[pos++] = '.';
+	domain[pos] = '\0';
+
+	const char *rg = psl_registrable_domain(psl_builtin(), domain);
+	if (!rg) return false;
+
+	char rg_fqdn[256];
+	size_t rg_len = strlen(rg);
+	memcpy(rg_fqdn, rg, rg_len);
+	if (rg[rg_len - 1] != '.') rg_fqdn[rg_len++] = '.';
+	rg_fqdn[rg_len] = '\0';
+
+	return knot_dname_from_str(out, rg_fqdn, out_size) != NULL;
+}
+
+static int finish(kr_layer_t *ctx)
+{
+	struct kr_request *req = ctx->req;
+	if (!req->options.SUB_BLACKLIST)
+		return ctx->state;
+
+	kr_rule_tags_t const tags_apply = config.tags & req->rule_tags_apply;
+	const bool do_apply = config.tags == KR_RULE_TAGS_ALL || tags_apply;
+
+	// get the top most registrable domain, e.g. example.com from subdomain.example.com
+	knot_dname_t registrable[300];
+	if (!qname_to_registrable_dname(req, registrable, sizeof(registrable)))
+		return ctx->state;
+
+	const kr_rule_opts_t opts = { .score = 9, .is_block = do_apply };
+	kr_rules_commit(true);
+	kr_rule_local_subtree(registrable, KR_RULE_SUB_NXDOMAIN,
+				KR_RULE_TTL_DEFAULT, config.tags, opts);
+	kr_rules_commit(true);
+
+	return ctx->state;
+}
+
 /// Remove mmapped file data if not used by other processes.
 KR_EXPORT
 int dns_tunnel_filter_deinit(struct kr_module *self)
@@ -336,6 +393,7 @@ KR_EXPORT
 int dns_tunnel_filter_init(struct kr_module *module) {
 	static kr_layer_api_t layer = {
 		.produce = produce,
+		.finish = finish,
 	};
 	layer.data = module;
 	module->layer = &layer;

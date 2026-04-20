@@ -146,6 +146,7 @@ struct kr_qflags {
 	_Bool QTYPE_ANY : 1;
 	_Bool QTYPE_RRSIG : 1;
 	_Bool TUNNEL_CHECKED : 1;
+	_Bool SUB_BLACKLIST : 1;
 };
 typedef struct ranked_rr_array_entry {
 	uint32_t qry_uid;

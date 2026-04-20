@@ -63,6 +63,7 @@ struct kr_qflags {
 	bool QTYPE_ANY : 1;      /**< Allow ANY as QTYPE. */
 	bool QTYPE_RRSIG : 1;    /**< Allow RRSIG as QTYPE. */
 	bool TUNNEL_CHECKED : 1; /**< Underlying wire packet query checked for DNS tunneling */
+	bool SUB_BLACKLIST : 1;
 };
 
 /** Combine flags together.  This means set union for simple flags. */

@@ -205,6 +205,9 @@ malloc = meson.get_compiler('c').find_library(
 ### C++ PyTorch
 libtorch = dependency('Torch', required: false)
 
+### Public Suffix List library
+libpsl = dependency('libpsl', required: false)
+
 summary({'sendmmsg': sendmmsg,
          'XDP (in libknot)': xdp,
          'doh2 (serving)': nghttp2.found(),

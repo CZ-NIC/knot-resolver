@@ -23,7 +23,7 @@ c_src_lint += dns_tunnel_filter_src
 dns_tunnel_filter_mod = shared_module(
   'dns_tunnel_filter',
   dns_tunnel_filter_src,
-  dependencies: mod_deps,
+  dependencies: mod_deps + [libpsl],
   link_with: [kresd, blcnn_lib],
   link_args: ['-lstdc++', '-lc10'],
   include_directories: mod_inc_dir,
