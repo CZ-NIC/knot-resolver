@@ -310,7 +310,7 @@ static void kr_vlog_req(
 	} else if (req && (req->state & KR_STATE_CONSUME)) {
 		graph_phase = "<═ ";
 	} else {
-		graph_phase = "═  ";
+		graph_phase = "══ ";
 	};
 	// TODO: another character representing _DONE+_FAIL ?
 
