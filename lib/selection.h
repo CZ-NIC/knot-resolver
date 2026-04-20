@@ -63,6 +63,15 @@ enum kr_transport_protocol {
 	KR_TRANSPORT_TCP,
 	KR_TRANSPORT_TLS,
 };
+static inline const char * kr_transport_protocol2str(enum kr_transport_protocol tp)
+{
+	switch(tp) {
+		case KR_TRANSPORT_UDP:	return "UDP";
+		case KR_TRANSPORT_TCP:	return "TCP";
+		case KR_TRANSPORT_TLS:	return "TLS";
+		default:		return "???"; // TODO QUIC
+	};
+}
 
 /**
  * Output of the selection algorithm.

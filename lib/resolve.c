@@ -919,12 +919,13 @@ int kr_resolve_checkout(struct kr_request *request, const struct sockaddr *src,
 		KR_DNAME_GET_STR(zonecut_str, qry->zone_cut.name);
 		KR_RRTYPE_GET_STR(type_str, knot_pkt_qtype(packet));
 		const char *ns_str = kr_straddr(&transport->address.ip);
+		if (!ns_str) ns_str = "";
 
-		VERBOSE_MSG(qry,
-			"=> id: '%05u' querying: '%s'@'%s' zone cut: '%s' "
-			"qname: '%s' qtype: '%s' proto: '%s'\n",
-			qry->id, ns_name, ns_str ? ns_str : "", zonecut_str,
-			qname_str, type_str, (qry->flags.TCP) ? "tcp" : "udp");
+		VERBOSE_MSG(qry, "=> sending %s %s to %s(%s) over %s, cut %s, ID %d\n",
+			qname_str, type_str, ns_name, ns_str,
+			kr_transport_protocol2str(transport->protocol),
+			zonecut_str, qry->id
+		);
 	}
 
 	return kr_ok();
