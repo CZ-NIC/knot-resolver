@@ -13,10 +13,8 @@
 #include "lib/cache/impl.h"
 #include "lib/cache/top.h"
 
-
 /** Compute TTL for a packet.  It's minimum TTL or zero.  (You can apply limits.) */
-KR_EXPORT
-uint32_t packet_ttl(const knot_pkt_t *pkt)
+static uint32_t packet_ttl_simple(const knot_pkt_t *pkt)
 {
 	bool has_ttl = false;
 	uint32_t ttl = TTL_MAX_MAX;
@@ -34,6 +32,23 @@ uint32_t packet_ttl(const knot_pkt_t *pkt)
 		}
 	}
 	return has_ttl ? ttl : 0;
+}
+/** Compute TTL for a packet.  Cache limits do apply here.
+ *
+ * Also, failure packets (SERVFAIL in particular) have the minimal TTL.
+ * TODO: overall design around caching SERVFAIL-inducing situations. */
+KR_EXPORT
+uint32_t packet_ttl(const knot_pkt_t *pkt)
+{
+	struct kr_cache *cache = &the_resolver->cache;
+	switch (knot_wire_get_rcode(pkt->wire)) {
+	case KNOT_RCODE_NOERROR:
+	case KNOT_RCODE_NXDOMAIN:
+	case KNOT_RCODE_YXDOMAIN:
+		return MAX(MIN(packet_ttl_simple(pkt), cache->ttl_max), cache->ttl_min);
+	default:
+		return cache->ttl_min;
+	}
 }
 
 

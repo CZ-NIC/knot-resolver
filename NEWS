@@ -7,10 +7,12 @@ Improvements:
 - /local-data/rpz: print line number in the RPZ on error (!1823)
 - /local-data/nodata: also apply to `rpz:` and `records:` (!1812)
 - reply BADVERS on unsupported EDNS versions (#404, !1599)
+- make DoH cache-control header respect our cache's TTL limits (!1819)
 
 Bugfixes
 --------
 - don't loop on reload in case policy-loader can't succeed (#950, !1824)
+- reduce excessive caching of some uncommon failed answers (!1819)
 
 
 Knot Resolver 6.2.0 (2026-02-03)
