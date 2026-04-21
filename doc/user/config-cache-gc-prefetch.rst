@@ -179,6 +179,12 @@ both of which have to be met to consider the record eligible for prefetching.
    For successive refreshes, we again require at least other k accesses,
    but this time, there is no need for normal updates, and so only the one refresh is incurred.
 
+   So in the worst-case we have no more than two updates (1 user-initiated + 1 automatic) per k accesses.
+   In the usual scenario, where the updates are successful and restore TTL to the same value as previously,
+   at most one update per k accesses is performed.
+   Furthermore, to meet the bound the precise timing of accesses is needed;
+   for regular accesses (and k > 1) the bound is even stricter.
+
 If the accesses are regular, their exponentially decreasing counter will converge to the equilibrium,
 where the increase in time is the same as the decay.
 Each of the last two configuration options gives us the lower bound on this value,
