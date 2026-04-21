@@ -183,12 +183,12 @@ void kr_quic_stream_ack_data(struct pl_quic_stream_sess_data *stream,
 		rem_node(&first->node);
 		stream->obufs_size -= first->len;
 		stream->first_offset += first->len;
-		free(first);
 		if (stream->unsent_obuf == first) {
 			stream->unsent_obuf =
 				EMPTY_LIST(*obs) == 0 ? NULL : HEAD(*obs);
 			stream->unsent_offset = 0;
 		}
+		free(first);
 	}
 }
 
