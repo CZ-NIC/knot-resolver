@@ -198,7 +198,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
 
     def _is_policy_loader_exited(self) -> bool:
         if self._policy_loader:
-            return self._policy_loader.status() is SubprocessStatus.EXITED
+            return self._policy_loader.status() in (SubprocessStatus.EXITED, SubprocessStatus.UNEXPECTED)
         return False
 
     def _is_gc_running(self) -> bool:
@@ -346,7 +346,14 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                 # If we don't do this, we may start with
                 # an old configuration and fail to detect a bug.
                 if self._policy_loader:
+                    status = self._policy_loader.status()
                     await self._policy_loader.cleanup()
+
+                    if status is SubprocessStatus.UNEXPECTED:
+                        return Result.err(
+                            "kresd 'policy-loader' process exited unexpectedly."
+                            " The configuration may be invalid. Please check the log."
+                        )
 
         except (SubprocessError, KresSubprocessControllerError) as e:
             logger.error(f"Failed to load policy rules: {e}")

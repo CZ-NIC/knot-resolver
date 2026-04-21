@@ -28,6 +28,7 @@ from knot_resolver.datamodel.cache_schema import CacheClearRPCSchema
 from knot_resolver.datamodel.config_schema import KresConfig, get_rundir_without_validation
 from knot_resolver.datamodel.globals import Context, set_global_validation_context
 from knot_resolver.datamodel.management_schema import ManagementSchema
+from knot_resolver.exceptions import KresBaseError
 from knot_resolver.manager import files, metrics
 from knot_resolver.utils import custom_atexit as atexit
 from knot_resolver.utils import ignore_exceptions_optional
@@ -651,7 +652,7 @@ async def start_server(config: List[str]) -> int:  # noqa: C901, PLR0915
         logger.error(f"Server initialization failed: {e}")
         return 1
 
-    except KresManagerBaseError as e:
+    except KresBaseError as e:
         # We caught an error with a pretty error message. Just print it and exit.
         logger.error(e)
         return 1

@@ -152,6 +152,9 @@ def _convert_subprocess_status(proc: Any) -> SubprocessStatus:
 
     if proc["statename"] in conversion_tbl:
         status = conversion_tbl[proc["statename"]]
+        exitstatus = proc["exitstatus"]
+        if exitstatus != 0:
+            status = SubprocessStatus.UNEXPECTED
     else:
         logger.warning(f"Unknown supervisord process state {proc['statename']}")
         status = SubprocessStatus.UNKNOWN
