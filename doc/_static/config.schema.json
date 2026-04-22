@@ -1677,8 +1677,7 @@
                             "rules",
                             "prlayr",
                             "defer",
-                            "tunnel"
-                            "defer"
+                            "tunnel",
                             "doq",
                             "ngtcp2"
                         ]
@@ -1955,7 +1954,7 @@
                         "string",
                         "null"
                     ],
-                    "description": "Optional, identifier for determining the recipient(s) using a key in the Kafka message.",
+                    "description": "Identifier for determining the recipient(s) using a the key (zone-id) of the Kafka message.",
                     "default": null
                 },
                 "files-dir": {
