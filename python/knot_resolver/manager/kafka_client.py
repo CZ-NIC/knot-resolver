@@ -130,7 +130,7 @@ if KAFKA_LIB:
                 logger.debug(f"Cleaned up file '{path}'")
                 path.unlink()
 
-    def process_record(config: KresConfig, record: ConsumerRecord) -> None:  # noqa: PLR0912, PLR0915
+    def process_record(config: KresConfig, record: ConsumerRecord) -> None:  # noqa: C901, PLR0912, PLR0915
         key: str = record.key.decode("utf-8")
         value: bytes = record.value
         headers = Headers(record.headers)
@@ -244,7 +244,7 @@ if KAFKA_LIB:
     ) -> None:
         error_msg_prefix = "Processing message failed with"
 
-        for _partition, records in messages.items():
+        for records in messages.values():
             for record in records:
                 try:
                     process_record(config, record)
@@ -306,11 +306,11 @@ if KAFKA_LIB:
             except Exception as e:
                 logger.error(f"{error_msg_prefix} unknown error:\n{e}")
 
-        async def _stop(self):
+        async def _stop(self) -> None:
             self._stop_event.set()
 
         def deinit(self) -> None:
-            asyncio.create_task(self._stop())
+            asyncio.create_task(self._stop())  # noqa: RUF006
             self._consumer = None
 
         async def _consume(self) -> None:

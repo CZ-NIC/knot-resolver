@@ -16,6 +16,7 @@ from knot_resolver.utils.modeling.base_schema import lazy_default
 class KafkaSchema(ConfigSchema):
     """
     Configuration of Apache Kafka client.  Requires the optional 'kafka-python' dependency.
+
     ---
     enable: Enable/disable Kafka client.
     topic: Topic to subscribe data from.
