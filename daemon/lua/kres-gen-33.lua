@@ -143,6 +143,9 @@ struct kr_qflags {
 	_Bool DNS64_DISABLE : 1;
 	_Bool PASSTHRU_LEGACY : 1;
 	_Bool FALLBACK_DISABLE : 1;
+	_Bool QTYPE_ANY : 1;
+	_Bool QTYPE_RRSIG : 1;
+	_Bool TUNNEL_CHECKED : 1;
 };
 typedef struct ranked_rr_array_entry {
 	uint32_t qry_uid;
@@ -202,6 +205,7 @@ struct kr_request_qsource_flags {
 	_Bool tls : 1;
 	_Bool http : 1;
 	_Bool xdp : 1;
+	_Bool quic : 1;
 };
 typedef unsigned long kr_rule_tags_t;
 struct kr_rule_opts {
@@ -383,7 +387,7 @@ struct kr_server_selection {
 	struct local_state *local_state;
 };
 typedef int kr_log_level_t;
-enum kr_log_group {LOG_GRP_UNKNOWN = -1, LOG_GRP_SYSTEM = 1, LOG_GRP_CACHE, LOG_GRP_IO, LOG_GRP_NETWORK, LOG_GRP_TA, LOG_GRP_TLS, LOG_GRP_GNUTLS, LOG_GRP_TLSCLIENT, LOG_GRP_XDP, LOG_GRP_DOH, LOG_GRP_DNSSEC, LOG_GRP_HINT, LOG_GRP_PLAN, LOG_GRP_ITERATOR, LOG_GRP_VALIDATOR, LOG_GRP_RESOLVER, LOG_GRP_SELECTION, LOG_GRP_ZCUT, LOG_GRP_COOKIES, LOG_GRP_STATISTICS, LOG_GRP_REBIND, LOG_GRP_WORKER, LOG_GRP_POLICY, LOG_GRP_TASENTINEL, LOG_GRP_TASIGNALING, LOG_GRP_TAUPDATE, LOG_GRP_DAF, LOG_GRP_DETECTTIMEJUMP, LOG_GRP_DETECTTIMESKEW, LOG_GRP_GRAPHITE, LOG_GRP_PREFILL, LOG_GRP_PRIMING, LOG_GRP_SRVSTALE, LOG_GRP_WATCHDOG, LOG_GRP_NSID, LOG_GRP_DNSTAP, LOG_GRP_TESTS, LOG_GRP_DOTAUTH, LOG_GRP_HTTP, LOG_GRP_CONTROL, LOG_GRP_MODULE, LOG_GRP_DEVEL, LOG_GRP_RENUMBER, LOG_GRP_EDE, LOG_GRP_RULES, LOG_GRP_PROTOLAYER, LOG_GRP_DEFER, LOG_GRP_TUNNEL, LOG_GRP_REQDBG};
+enum kr_log_group {LOG_GRP_UNKNOWN = -1, LOG_GRP_SYSTEM = 1, LOG_GRP_CACHE, LOG_GRP_IO, LOG_GRP_NETWORK, LOG_GRP_TA, LOG_GRP_TLS, LOG_GRP_GNUTLS, LOG_GRP_TLSCLIENT, LOG_GRP_XDP, LOG_GRP_DOH, LOG_GRP_DNSSEC, LOG_GRP_HINT, LOG_GRP_PLAN, LOG_GRP_ITERATOR, LOG_GRP_VALIDATOR, LOG_GRP_RESOLVER, LOG_GRP_SELECTION, LOG_GRP_ZCUT, LOG_GRP_COOKIES, LOG_GRP_STATISTICS, LOG_GRP_REBIND, LOG_GRP_WORKER, LOG_GRP_POLICY, LOG_GRP_TASENTINEL, LOG_GRP_TASIGNALING, LOG_GRP_TAUPDATE, LOG_GRP_DAF, LOG_GRP_DETECTTIMEJUMP, LOG_GRP_DETECTTIMESKEW, LOG_GRP_GRAPHITE, LOG_GRP_PREFILL, LOG_GRP_PRIMING, LOG_GRP_SRVSTALE, LOG_GRP_WATCHDOG, LOG_GRP_NSID, LOG_GRP_DNSTAP, LOG_GRP_TESTS, LOG_GRP_DOTAUTH, LOG_GRP_HTTP, LOG_GRP_CONTROL, LOG_GRP_MODULE, LOG_GRP_DEVEL, LOG_GRP_RENUMBER, LOG_GRP_EDE, LOG_GRP_RULES, LOG_GRP_PROTOLAYER, LOG_GRP_DEFER, LOG_GRP_TUNNEL, LOG_GRP_DOQ, LOG_GRP_DOQ_LIBNGTCP2, LOG_GRP_REQDBG};
 struct kr_query_data_src {
 	_Bool initialized;
 	_Bool all_set;
@@ -391,8 +395,8 @@ struct kr_query_data_src {
 	kr_rule_fwd_flags_t flags;
 	knot_db_val_t targets_ptr;
 };
-enum kr_rule_sub_t {KR_RULE_SUB_EMPTY = 16, KR_RULE_SUB_NXDOMAIN, KR_RULE_SUB_NODATA, KR_RULE_SUB_REDIRECT, KR_RULE_SUB_DNAME};
-enum kr_proto {KR_PROTO_INTERNAL, KR_PROTO_UDP53, KR_PROTO_TCP53, KR_PROTO_DOT, KR_PROTO_DOH, KR_PROTO_DOQ, KR_PROTO_COUNT};
+enum kr_rule_sub_t {KR_RULE_SUB_EMPTY = 16, KR_RULE_SUB_NXDOMAIN, KR_RULE_SUB_NODATA, KR_RULE_SUB_REDIRECT, KR_RULE_SUB_DNAME, KR_RULE_SUB_DNAME_FLAT};
+enum kr_proto {KR_PROTO_INTERNAL, KR_PROTO_UDP53, KR_PROTO_TCP53, KR_PROTO_DOT, KR_PROTO_DOH, KR_PROTO_DOQ, KR_PROTO_DOQ_CONN, KR_PROTO_DOQ_STREAM, KR_PROTO_COUNT};
 typedef unsigned char kr_proto_set;
 kr_layer_t kr_layer_t_static;
 _Bool kr_dbg_assertion_abort;
@@ -414,7 +418,8 @@ struct kr_query {
 	uint16_t id;
 	uint16_t reorder;
 	struct kr_qflags flags;
-	struct kr_qflags forward_flags;
+	_Bool forward_CNAME;
+	_Bool forward_NO_MINIMIZE;
 	uint32_t secret;
 	uint32_t uid;
 	int32_t vld_limit_crypto_remains;
@@ -563,6 +568,7 @@ typedef struct {
 	_Bool tls;
 	_Bool http;
 	_Bool xdp;
+	_Bool quic;
 	_Bool freebind;
 	const char *kind;
 } endpoint_flags_t;
@@ -638,6 +644,7 @@ struct network {
 	} listen_tcp_buflens;
 	_Bool enable_connect_udp;
 	uint16_t min_udp_source_port;
+	struct net_quic_params *quic_params;
 };
 struct args *the_args;
 struct endpoint {

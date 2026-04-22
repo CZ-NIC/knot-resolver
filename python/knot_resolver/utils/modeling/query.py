@@ -13,9 +13,7 @@ class PatchError(Exception):
 class Op(BaseSchema, ABC):
     @abstractmethod
     def eval(self, fakeroot: Any) -> Any:
-        """
-        modifies the given fakeroot, returns a new one
-        """
+        """Modify the given fakeroot, returns a new one."""
 
     def _resolve_ptr(self, fakeroot: Any, ptr: str) -> Tuple[Any, Any, Union[str, int, None]]:
         # Lookup tree part based on the given JSON pointer
@@ -82,7 +80,7 @@ class MoveOp(Op):
     source: str
     path: str
 
-    def _source(self, source):
+    def _source(self, source: Any) -> Any:
         if "from" not in source:
             raise ValueError("missing property 'from' in 'move' JSON patch operation")
         return str(source["from"])
@@ -103,7 +101,7 @@ class CopyOp(Op):
     source: str
     path: str
 
-    def _source(self, source):
+    def _source(self, source: Any) -> Any:
         if "from" not in source:
             raise ValueError("missing property 'from' in 'copy' JSON patch operation")
         return str(source["from"])

@@ -151,6 +151,8 @@ static inline knot_db_val_t key_exact_type(struct key *k, uint16_t type)
 	/* Sanity check: forbidden types represented in other way(s). */
 	case KNOT_RRTYPE_NSEC:
 	case KNOT_RRTYPE_NSEC3:
+	case KNOT_RRTYPE_ANY:
+	case KNOT_RRTYPE_RRSIG:
 		kr_assert(false);
 		return (knot_db_val_t){ NULL, 0 };
 	}

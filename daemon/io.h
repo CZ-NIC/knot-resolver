@@ -20,7 +20,7 @@ struct io_stream_data;
 /** Bind address into a file-descriptor (only, no libuv).  type is e.g. SOCK_DGRAM */
 int io_bind(const struct sockaddr *addr, int type, const endpoint_flags_t *flags);
 /** Initialize a UDP handle and start listening. */
-int io_listen_udp(uv_loop_t *loop, uv_udp_t *handle, int fd);
+int io_listen_udp(uv_loop_t *loop, uv_udp_t *handle, int fd, bool doq);
 /** Initialize a TCP handle and start listening. */
 int io_listen_tcp(uv_loop_t *loop, uv_tcp_t *handle, int fd, int tcp_backlog, bool has_tls, bool has_http);
 /** Initialize a pipe handle and start listening. */
@@ -37,14 +37,11 @@ struct io_stream_data *io_tty_alloc_data(void);
 
 void tcp_timeout_trigger(uv_timer_t *timer);
 
-/** Initialize the handle, incl. ->data = struct session * instance.
+/** Initialize the handle
  * \param type = SOCK_*
  * \param family = AF_*
  * \param has_tls has meanings only when type is SOCK_STREAM */
-int io_create(uv_loop_t *loop, struct session2 **out_session, int type,
-              unsigned family, enum kr_proto grp,
-              struct protolayer_data_param *layer_param,
-              size_t layer_param_count, bool outgoing);
+int io_create(uv_loop_t *loop, uv_handle_t **handle, int type, unsigned family);
 void io_free(uv_handle_t *handle);
 
 int io_start_read(uv_handle_t *handle);

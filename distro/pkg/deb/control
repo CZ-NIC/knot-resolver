@@ -5,6 +5,7 @@ Maintainer: Knot Resolver <knot-resolver@labs.nic.cz>
 Build-Depends:
  debhelper (>= 12~),
  dh-python,
+ dns-root-data,
  libcap-ng-dev,
  libcmocka-dev (>= 1.0.0),
  libfstrm-dev,
@@ -15,21 +16,21 @@ Build-Depends:
  libluajit-5.1-dev,
  libnghttp2-dev,
  libprotobuf-c-dev,
+ libpython3-dev,
  libssl-dev,
  libsystemd-dev (>= 227) [linux-any],
  libuv1-dev,
  luajit,
- meson (>= 0.49),
- pkg-config,
+ meson,
+ ninja-build,
+ pkgconf,
  protobuf-compiler,
  protobuf-c-compiler,
- python3,
- python3-dev,
+ python3-dev:any,
  python3-setuptools,
  libtorch-dev,
-Standards-Version: 4.7.0
+Standards-Version: 4.7.3
 Homepage: https://www.knot-resolver.cz/
-Rules-Requires-Root: no
 
 Package: knot-resolver6
 Architecture: any
@@ -62,7 +63,7 @@ Recommends:
  python3-kafka,
 Suggests:
  knot-resolver6-module-http,
-Description: caching, DNSSEC-validating DNS resolver - core binaries
+Description: caching, DNSSEC-validating DNS resolver - binaries
  Knot Resolver is a caching full resolver implementation
  written in C and LuaJIT, including both a resolver library and a
  daemon. Modular architecture of the library keeps the core tiny and
@@ -120,11 +121,11 @@ Description: dnstap module for Knot Resolver
 Package: knot-resolver6-module-http
 Architecture: all
 Depends:
- knot-resolver6 (>= ${source:Version}),
+ knot-resolver6 (= ${binary:Version}),
  libjs-bootstrap,
  libjs-d3,
  libjs-jquery,
- lua-cqueues (>= 20171014),
+ lua-cqueues,
  lua-http,
  lua-mmdb,
  systemd,

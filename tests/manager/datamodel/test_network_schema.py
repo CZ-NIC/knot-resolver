@@ -33,6 +33,7 @@ def test_listen_defaults():
         ({"interface": ["::1"], "kind": "dot"}, 853),
         ({"interface": ["::1"], "kind": "doh-legacy"}, 443),
         ({"interface": ["::1"], "kind": "doh2"}, 443),
+        ({"interface": ["::1"], "kind": "doq"}, 853),
     ],
 )
 def test_listen_port_defaults(listen: Dict[str, Any], port: Optional[int]):

@@ -1,16 +1,18 @@
 """
-Effectively the same as normal __main__.py. However, we moved it's content over to this
+Effectively the same as normal __main__.py.
+
+However, we moved it's content over to this
 file to allow us to exclude the __main__.py file from black's autoformatting
 """
 
 import argparse
+import asyncio
 import sys
 from typing import NoReturn
 
 from knot_resolver.constants import CONFIG_FILE, VERSION
 from knot_resolver.manager.logger import logger_startup
 from knot_resolver.manager.server import start_server
-from knot_resolver.utils import compat
 
 
 def parse_args() -> argparse.Namespace:
@@ -46,5 +48,5 @@ def main() -> NoReturn:
     # parse arguments
     args = parse_args()
 
-    exit_code = compat.asyncio.run(start_server(config=args.config))
+    exit_code = asyncio.run(start_server(config=args.config))
     sys.exit(exit_code)

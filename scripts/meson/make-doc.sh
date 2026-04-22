@@ -3,9 +3,6 @@
 set -o errexit -o nounset
 cd "$(dirname "${0}")/../.."
 
-# convert JSON schema to html
-generate-schema-doc --config expand_buttons=true doc/_static/config.schema.json doc/_static/schema_doc.html
-
 # generating the user documentation
 SPHINX=$(type -P sphinx-build-3 sphinx-build | head -n1)
 rm -rf doc/html

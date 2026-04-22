@@ -1,3 +1,4 @@
+# noqa: INP001
 import argparse
 from typing import List, Tuple, Type
 

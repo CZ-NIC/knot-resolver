@@ -129,7 +129,7 @@ static bool check_uri(struct pl_http_sess_data *ctx, const char *path)
 		return false;
 	}
 
-	char *query_mark = strstr(path, "?");
+	const char *query_mark = strstr(path, "?");
 
 	/* calculating of endpoint_len - for POST or GET method */
 	endpoint_len = (query_mark) ? query_mark - path - 1 : strlen(path) - 1;
@@ -215,16 +215,16 @@ static int process_uri_path(struct pl_http_sess_data *ctx, const char* path, int
 
 	static const char key[] = "dns=";
 	static const char *delim = "&";
-	char *beg, *end;
+	const char *beg, *end;
 	uint8_t *dest;
 	uint32_t remaining;
 
-	char *query_mark = strstr(path, "?");
+	const char *query_mark = strstr(path, "?");
 	if (!query_mark || strlen(query_mark) == 0) /* no parameters in path */
 		return kr_error(EINVAL);
 
 	/* go over key:value pair */
-	for (beg = strtok(query_mark + 1, delim); beg != NULL; beg = strtok(NULL, delim)) {
+	for (beg = strtok((char *)query_mark + 1, delim); beg != NULL; beg = strtok(NULL, delim)) {
 		if (!strncmp(beg, key, 4)) /* dns variable in path found */
 			break;
 	}

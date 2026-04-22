@@ -6,17 +6,26 @@ from pathlib import Path
 @functools.lru_cache(maxsize=16)
 def which(binary_name: str) -> Path:
     """
-    Given a name of an executable, search $PATH and return
-    the absolute path of that executable. The results of this function
-    are LRU cached.
+    Get absolute path of an executable given name.
 
-    If not found, throws an RuntimeError.
+    Searches in $PATH.
+    The result of the function is LRU cached.
+
+    Args:
+        binary_name (str): The name of the executable binary.
+
+    Returns:
+        Path: Absolute path of the executable.
+
+    Raises:
+        RuntimeError: If the executable was not found.
+
     """
-
     possible_directories = os.get_exec_path()
     for dr in possible_directories:
-        p = Path(dr, binary_name)
-        if p.exists():
-            return p.absolute()
+        exec_path = Path(dr, binary_name)
+        if exec_path.exists():
+            return exec_path.absolute()
 
-    raise RuntimeError(f"Executable {binary_name} was not found in $PATH")
+    msg = f"The executable '{binary_name}' was not found in $PATH"
+    raise RuntimeError(msg)

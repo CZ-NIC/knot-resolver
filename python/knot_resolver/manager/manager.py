@@ -7,7 +7,7 @@ from secrets import token_hex
 from subprocess import SubprocessError
 from typing import Any, Callable, List, Optional
 
-from knot_resolver.controller.exceptions import SubprocessControllerError
+from knot_resolver.controller.exceptions import KresSubprocessControllerError
 from knot_resolver.controller.interface import Subprocess, SubprocessController, SubprocessStatus, SubprocessType
 from knot_resolver.controller.registered_workers import command_registered_workers, get_registered_workers_kresids
 from knot_resolver.datamodel import KresConfig
@@ -18,7 +18,6 @@ from knot_resolver.manager.config_store import (
     only_on_real_changes_verifier,
 )
 from knot_resolver.manager.files import files_reload
-from knot_resolver.utils.compat.asyncio import create_task
 from knot_resolver.utils.functional import Result
 from knot_resolver.utils.modeling.types import NoneType
 
@@ -37,13 +36,13 @@ class _FixCounter:
         self._timestamp = time.time()
 
     def try_decrease(self) -> None:
-        if time.time() - self._timestamp > FIX_COUNTER_DECREASE_INTERVAL_SEC:
-            if self._counter > 0:
-                logger.info(
-                    f"Enough time has passed since last detected instability, decreasing fix attempt counter to {self._counter}"
-                )
-                self._counter -= 1
-                self._timestamp = time.time()
+        if time.time() - self._timestamp > FIX_COUNTER_DECREASE_INTERVAL_SEC and self._counter > 0:
+            logger.info(
+                "Enough time has passed since last detected instability,"
+                f" decreasing fix attempt counter to {self._counter}"
+            )
+            self._counter -= 1
+            self._timestamp = time.time()
 
     def __str__(self) -> str:
         return str(self._counter)
@@ -62,13 +61,12 @@ async def _subprocess_desc(subprocess: Subprocess) -> object:
 
 class KresManager:  # pylint: disable=too-many-instance-attributes
     """
-    Core of the whole operation. Orchestrates individual instances under some
-    service manager like systemd.
+    Core of the whole operation. Orchestrates individual instances under some service manager like systemd.
 
     Instantiate with `KresManager.create()`, not with the usual constructor!
     """
 
-    def __init__(self, _i_know_what_i_am_doing: bool = False):
+    def __init__(self, _i_know_what_i_am_doing: bool = False) -> None:
         if not _i_know_what_i_am_doing:
             logger.error(
                 "Trying to create an instance of KresManager using normal constructor. Please use "
@@ -92,10 +90,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
         subprocess_controller: SubprocessController,
         config_store: ConfigStore,
     ) -> "KresManager":
-        """
-        Creates new instance of KresManager.
-        """
-
+        """Create new instance of KresManager."""
         inst = KresManager(_i_know_what_i_am_doing=True)
         await inst._async_init(subprocess_controller, config_store)  # noqa: SLF001
         return inst
@@ -107,7 +102,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
         # initialize subprocess controller
         logger.debug("Starting controller")
         await self._controller.initialize_controller(config_store.get())
-        self._processes_watchdog_task = create_task(self._processes_watchdog())
+        self._processes_watchdog_task = asyncio.create_task(self._processes_watchdog())
         logger.debug("Looking for already running workers")
         await self._collect_already_running_workers()
 
@@ -204,7 +199,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
 
     def _is_policy_loader_exited(self) -> bool:
         if self._policy_loader:
-            return self._policy_loader.status() is SubprocessStatus.EXITED
+            return self._policy_loader.status() in (SubprocessStatus.EXITED, SubprocessStatus.UNEXPECTED)
         return False
 
     def _is_gc_running(self) -> bool:
@@ -244,7 +239,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                 #   if it keeps running, the config is valid and others will soon join as well
                 #   if it crashes and the startup fails, then well, it's not running anymore... :)
                 await self._spawn_new_worker(new)
-            except (SubprocessError, SubprocessControllerError):
+            except (SubprocessError, KresSubprocessControllerError):
                 logger.error("Kresd with the new config failed to start, rejecting config")
                 return Result.err("canary kresd process failed to start. Config might be invalid.")
 
@@ -311,7 +306,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                     else:
                         logger.debug("Stopping cache GC")
                         await self._stop_gc()
-        except SubprocessControllerError as e:
+        except KresSubprocessControllerError as e:
             if _noretry:
                 raise
             if self._fix_counter.is_too_high():
@@ -345,16 +340,23 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
 
                 # wait for 'policy-loader' to finish
                 logger.debug("Waiting for 'policy-loader' to finish loading policy rules")
-                while not self._is_policy_loader_exited():
+                while not self._is_policy_loader_exited():  # noqa: ASYNC110
                     await asyncio.sleep(1)
 
                 # Clean up policy-loader configuration.
                 # If we don't do this, we may start with
                 # an old configuration and fail to detect a bug.
                 if self._policy_loader:
+                    status = self._policy_loader.status()
                     await self._policy_loader.cleanup()
 
-        except (SubprocessError, SubprocessControllerError) as e:
+                    if status is SubprocessStatus.UNEXPECTED:
+                        return Result.err(
+                            "kresd 'policy-loader' process exited unexpectedly."
+                            " The configuration may be invalid. Please check the log."
+                        )
+
+        except (SubprocessError, KresSubprocessControllerError) as e:
             logger.error(f"Failed to load policy rules: {e}")
             return Result.err("kresd 'policy-loader' process failed to start. Config might be invalid.")
 
@@ -362,7 +364,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
         logger.debug("Loading policy rules has been successfully completed")
         return Result.ok(None)
 
-    async def stop(self):
+    async def stop(self) -> None:
         if self._processes_watchdog_task is not None:
             try:
                 self._processes_watchdog_task.cancel()  # cancel it
@@ -403,7 +405,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
             logger.error("Failed attempting to fix an error. Forcefully shutting down.", exc_info=True)
             await self.forced_shutdown()
 
-    async def _processes_watchdog(self) -> None:  # pylint: disable=too-many-branches  # noqa: PLR0912
+    async def _processes_watchdog(self) -> None:  # noqa: C901, PLR0912
         while True:
             await asyncio.sleep(PROCESSES_WATCHDOG_INTERVAL_SEC)
 
@@ -431,7 +433,8 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                     if detected_subprocesses[eid] is SubprocessStatus.FATAL:
                         if self._policy_loader and self._policy_loader.id == eid:
                             logger.info(
-                                "Subprocess '%s' is skipped by WatchDog because its status is monitored in a different way.",
+                                "Subprocess '%s' is skipped by WatchDog"
+                                " because its status is monitored in a different way.",
                                 eid,
                             )
                             continue
@@ -450,7 +453,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                     )
                     invoke_callback = True
 
-            except SubprocessControllerError as e:
+            except KresSubprocessControllerError as e:
                 # wait few seconds and see if 'processes_watchdog' task is cancelled (during shutdown)
                 # otherwise it is an error
                 await asyncio.sleep(3)

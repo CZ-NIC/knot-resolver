@@ -1,21 +1,14 @@
-"""
-Implements JSON pointer resolution based on RFC 6901:
-https://www.rfc-editor.org/rfc/rfc6901
-"""
+"""Implements JSON pointer resolution based on RFC 6901: https://www.rfc-editor.org/rfc/rfc6901."""
 
 from typing import Any, Optional, Tuple, Union
 
-# JSONPtrAddressable = Optional[Union[Dict[str, "JSONPtrAddressable"], List["JSONPtrAddressable"], int, float, bool, str, None]]
-JSONPtrAddressable = Any  # the recursive definition above is not valid :(
+JSONPtrAddressable = Any
 
 
 class _JSONPtr:
     @staticmethod
     def _decode_token(token: str) -> str:
-        """
-        Resolves escaped characters ~ and /
-        """
-
+        """Resolve escaped characters ~ and /."""
         # the order of the replace statements is important, do not change without
         # consulting the RFC
         return token.replace("~1", "/").replace("~0", "~")
@@ -24,7 +17,7 @@ class _JSONPtr:
     def _encode_token(token: str) -> str:
         return token.replace("~", "~0").replace("/", "~1")
 
-    def __init__(self, ptr: str):
+    def __init__(self, ptr: str) -> None:
         if ptr == "":
             # pointer to the root
             self.tokens = []
@@ -41,10 +34,6 @@ class _JSONPtr:
     def resolve(
         self, obj: JSONPtrAddressable
     ) -> Tuple[Optional[JSONPtrAddressable], JSONPtrAddressable, Union[str, int, None]]:
-        """
-        Returns (Optional[parent], Optional[direct value], key of value in the parent object)
-        """
-
         parent: Optional[JSONPtrAddressable] = None
         current = obj
         current_ptr = ""
@@ -53,7 +42,8 @@ class _JSONPtr:
         for token in self.tokens:
             if current is None:
                 raise ValueError(
-                    f"JSON pointer cannot reference nested non-existent object: object at ptr '{current_ptr}' already points to None, cannot nest deeper with token '{token}'"
+                    f"JSON pointer cannot reference nested non-existent object: object at ptr '{current_ptr}'"
+                    f" already points to None, cannot nest deeper with token '{token}'"
                 )
 
             if isinstance(current, (bool, int, float, str)):

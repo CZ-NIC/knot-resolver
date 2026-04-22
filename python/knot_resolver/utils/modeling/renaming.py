@@ -1,6 +1,7 @@
 """
-This module implements a standard dict and list alternatives, which can dynamically rename its keys replacing `-` with `_`.
-They persist in nested data structes, meaning that if you try to obtain a dict from Renamed variant, you will actually
+Standard dict and list alternatives, which can dynamically rename its keys replacing `-` with `_`.
+
+They persist in nested data structures, meaning that if you try to obtain a dict from Renamed variant, you will actually
 get RenamedDict back instead.
 
 Usage:
@@ -22,9 +23,7 @@ from typing import Any, Dict, List, TypeVar
 class Renamed(ABC):
     @abstractmethod
     def original(self) -> Any:
-        """
-        Returns a data structure, which is the source without dynamic renamings
-        """
+        """Return a data structure, which is the source without dynamic renaming."""
 
     @staticmethod
     def map_public_to_private(name: Any) -> Any:
@@ -69,7 +68,7 @@ class RenamedDict(Dict[K, V], Renamed):
         return dict(super().items())
 
 
-class RenamedList(List[V], Renamed):  # type: ignore
+class RenamedList(List[V], Renamed):
     def __getitem__(self, key: Any) -> Any:
         res = super().__getitem__(key)
         return renamed(res)

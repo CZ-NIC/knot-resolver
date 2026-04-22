@@ -66,9 +66,6 @@ static int answer_zla_dname(val_zla_type_t type, struct kr_query *qry, knot_pkt_
 				const knot_dname_t apex_name[], uint32_t ttl, knot_db_val_t *val);
 static int answer_zla_redirect(struct kr_query *qry, knot_pkt_t *pkt, const char *ruleset_name,
 				/*const*/ knot_dname_t apex_name[], uint32_t ttl);
-static int rule_local_subtree(const knot_dname_t *apex, enum kr_rule_sub_t type,
-				const knot_dname_t *target, uint32_t ttl,
-				kr_rule_tags_t tags, kr_rule_opts_t opts);
 
 static void qry_set_action(struct kr_query *qry, enum kr_request_rule_action action)
 {
@@ -234,7 +231,7 @@ int kr_rules_init(const char *path, size_t maxsize, bool overwrite)
 		.maxsize = !overwrite ? 0 :
 			(maxsize ? maxsize : (size_t)(sizeof(size_t) > 4 ? 2048 : 500) * 1024*1024),
 	};
-	int ret = the_rules->api->open(&the_rules->db, &the_rules->stats, &opts, NULL);
+	int ret = the_rules->api->open(&the_rules->db, &the_rules->stats, &opts);
 
 	if (ret == 0 && overwrite) ret = ruledb_op(clear, 0);
 	if (ret != 0) goto failure;
@@ -520,6 +517,7 @@ static int subtree_search(const size_t lf_start_i, const knot_db_val_t key,
 			ret = answer_zla_redirect(qry, pkt, ruleset_name, apex_name, ttl);
 			break;
 		case KR_RULE_SUB_DNAME:
+		case KR_RULE_SUB_DNAME_FLAT:
 			ret = answer_zla_dname(ztype, qry, pkt, apex_name, ttl, &val);
 			break;
 		default:
@@ -531,7 +529,7 @@ static int subtree_search(const size_t lf_start_i, const knot_db_val_t key,
 		}
 		if (ret == kr_error(EAGAIN))
 			goto shorten;
-		return ret ? kr_error(ret) : RET_ANSWERED;
+		return ret;
 	} while (true);
 }
 
@@ -905,7 +903,7 @@ static int answer_zla_empty(val_zla_type_t type, struct kr_query *qry, knot_pkt_
 
 	VERBOSE_MSG(qry, "=> satisfied by local data (%s zone)\n",
 		     type == KR_RULE_SUB_EMPTY ? "empty" : "nxdomain");
-	return kr_ok();
+	return RET_ANSWERED;
 }
 int kr_rule_do_answer(enum kr_rule_sub_t type, struct kr_query *qry, knot_pkt_t *pkt,
 				const knot_dname_t apex_name[])
@@ -916,7 +914,7 @@ int kr_rule_do_answer(enum kr_rule_sub_t type, struct kr_query *qry, knot_pkt_t 
 static int answer_zla_dname(val_zla_type_t type, struct kr_query *qry, knot_pkt_t *pkt,
 				const knot_dname_t apex_name[], uint32_t ttl, knot_db_val_t *val)
 {
-	if (kr_fails_assert(type == KR_RULE_SUB_DNAME))
+	if (kr_fails_assert(type == KR_RULE_SUB_DNAME || type == KR_RULE_SUB_DNAME_FLAT))
 		return kr_error(EINVAL);
 	
 	const knot_dname_t *dname_target = val->data;
@@ -934,7 +932,7 @@ static int answer_zla_dname(val_zla_type_t type, struct kr_query *qry, knot_pkt_
 	}
 
 	const bool hit_apex = knot_dname_is_equal(qry->sname, apex_name);
-	if (hit_apex && type == KR_RULE_SUB_DNAME)
+	if (hit_apex)
 		return kr_error(EAGAIN); // LATER: maybe a type that matches apex
 
 	// Start constructing the (pseudo-)packet.
@@ -947,8 +945,9 @@ static int answer_zla_dname(val_zla_type_t type, struct kr_query *qry, knot_pkt_
 					KNOT_CLASS_IN, ttl, &pkt->mm);
 	if (kr_fails_assert(arrset.set.rr))
 		return kr_error(ENOMEM);
-	const knot_dname_t *cname_target = knot_dname_replace_suffix(qry->sname,
-			knot_dname_labels(apex_name, NULL), dname_target, &pkt->mm);
+	const knot_dname_t *cname_target = type == KR_RULE_SUB_DNAME_FLAT ? dname_target :
+		knot_dname_replace_suffix(qry->sname, knot_dname_labels(apex_name, NULL),
+						dname_target, &pkt->mm);
 	const int rdata_len = knot_dname_size(cname_target);
 	const bool cname_fits = rdata_len <= KNOT_DNAME_MAXLEN;
 	if (cname_fits) {
@@ -978,8 +977,8 @@ static int answer_zla_dname(val_zla_type_t type, struct kr_query *qry, knot_pkt_
 	qry->flags.NO_MINIMIZE = true;
 	qry_set_action(qry, KREQ_ACTION_LOCAL_DATA);
 
-	VERBOSE_MSG(qry, "=> satisfied by local data (DNAME)\n");
-	return kr_ok();
+	VERBOSE_MSG(qry, "=> satisfied by local data (DNAME-like)\n");
+	return RET_ANSWERED;
 }
 
 static int answer_zla_redirect(struct kr_query *qry, knot_pkt_t *pkt, const char *ruleset_name,
@@ -1049,7 +1048,7 @@ nodata: // Want NODATA answer (or NOERROR if it hits apex SOA).
 	}
 
 	VERBOSE_MSG(qry, "=> satisfied by local data (no data)\n");
-	return kr_ok();
+	return RET_ANSWERED;
 }
 
 int kr_rule_local_subtree(const knot_dname_t *apex, enum kr_rule_sub_t type,
@@ -1072,14 +1071,15 @@ knot_db_val_t zla_key(const knot_dname_t *apex, uint8_t key_data[KEY_MAXLEN], co
 	key.len = key_data + KEY_DNAME_END_OFFSET - (uint8_t *)key.data;
 	return key;
 }
-static int rule_local_subtree(const knot_dname_t *apex, enum kr_rule_sub_t type,
-				const knot_dname_t *target, uint32_t ttl,
-				kr_rule_tags_t tags, kr_rule_opts_t opts)
+int rule_local_subtree(const knot_dname_t *apex, enum kr_rule_sub_t type,
+			const knot_dname_t *target, uint32_t ttl,
+			kr_rule_tags_t tags, kr_rule_opts_t opts)
 {
 	// type-check
-	const bool has_target = (type == KR_RULE_SUB_DNAME);
+	const bool has_target = (type == KR_RULE_SUB_DNAME || type == KR_RULE_SUB_DNAME_FLAT);
 	switch (type) {
 	case KR_RULE_SUB_DNAME:
+	case KR_RULE_SUB_DNAME_FLAT:
 		if (kr_fails_assert(!!target == has_target))
 			return kr_error(EINVAL);
 		break;

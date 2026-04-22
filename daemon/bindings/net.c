@@ -8,6 +8,7 @@
 #include "contrib/cleanup.h"
 #include "daemon/network.h"
 #include "daemon/tls.h"
+#include "daemon/quic_common.h"
 #include "lib/utils.h"
 
 #include <stdlib.h>
@@ -32,6 +33,8 @@ static int net_list_add(const char *b_key, uint32_t key_len, trie_val_t *val, vo
 			lua_pushliteral(L, "tls");
 		} else if (ep->flags.xdp) {
 			lua_pushliteral(L, "xdp");
+		} else if (ep->flags.quic) {
+			lua_pushliteral(L, "doq");
 		} else {
 			lua_pushliteral(L, "dns");
 		}
@@ -140,13 +143,20 @@ static bool net_listen_addrs(lua_State *L, int port, endpoint_flags_t flags, int
 			flags.sock_type = SOCK_DGRAM;
 			ret = network_listen(str, port, nic_queue, flags);
 		}
-		if (!flags.kind && !flags.xdp && ret == 0) { /* common for TCP, DoT and DoH (v2) */
+		if (!flags.kind && flags.quic && ret == 0) {
+			flags.sock_type = SOCK_DGRAM;
+			ret = network_listen(str, port, nic_queue, flags);
+		}
+		if (!flags.kind && !flags.xdp && !flags.quic && ret == 0) { /* common for TCP, DoT and DoH (v2) */
 			flags.sock_type = SOCK_STREAM;
 			ret = network_listen(str, port, nic_queue, flags);
 		}
 		if (flags.kind) {
 			flags.kind = strdup(flags.kind);
-			flags.sock_type = SOCK_STREAM; /* TODO: allow to override this? */
+			if (flags.quic)
+				flags.sock_type =  SOCK_DGRAM;
+			else
+				flags.sock_type = SOCK_STREAM; /* TODO: allow to override this? */
 			ret = network_listen(str, (is_unix ? 0 : port), nic_queue, flags);
 		}
 		if (ret == 0) return true; /* success */
@@ -255,6 +265,8 @@ static int net_listen(lua_State *L)
 			flags.http = false;
 		} else if (k && strcasecmp(k, "doh2") == 0) {
 			flags.tls = flags.http = true;
+		} else if (k && strcasecmp(k, "doq") == 0) {
+			flags.tls = flags.quic = true;
 		} else if (k) {
 			flags.kind = k;
 			if (strcasecmp(k, "doh") == 0) {
@@ -608,6 +620,113 @@ static int net_doh_headers(lua_State *L)
 
 	return 0;
 }
+
+static int net_quic_max_conns(lua_State *L)
+{
+#if ENABLE_QUIC
+	if (kr_fails_assert(the_network)) {
+		return 0;
+	}
+
+	// /* Only return current max conns. */
+	if (lua_gettop(L) == 0) {
+		if (!the_network->quic_params) {
+			return 0;
+		}
+
+		lua_newtable(L);
+		lua_pushinteger(L, the_network->quic_params->max_conns);
+		return 1;
+	}
+
+	/* Allocate struct if needed */
+	if (!the_network->quic_params && quic_configuration_set() != kr_ok()) {
+		lua_error_p(L, "Out of memory allocating net_quic_params");
+	}
+
+	if (lua_gettop(L) != 1 || !lua_isnumber(L, 1))
+		lua_error_p(L, "net.quic_max_conns requires one integer value within <1,  4096>");
+
+	lua_Integer v = lua_tointeger(L, 1);
+	if (v < 1 || v > 4096)
+		lua_error_p(L, "net.quic_max_conns must be within <1,  4096>");
+
+	the_network->quic_params->max_conns = (uint16_t)v;
+#endif // otherwise we just ignore the setting
+	lua_pushboolean(L, true);
+	return 1;
+}
+
+static int net_quic_max_streams(lua_State *L)
+{
+#if ENABLE_QUIC
+	if (kr_fails_assert(the_network)) {
+		return 0;
+	}
+
+	// /* Only return current max streams. */
+	if (lua_gettop(L) == 0) {
+		if (!the_network->quic_params) {
+			return 0;
+		}
+
+		lua_newtable(L);
+		lua_pushinteger(L, the_network->quic_params->max_streams);
+		return 1;
+	}
+
+	/* Allocate struct if needed */
+	if (!the_network->quic_params && quic_configuration_set() != kr_ok()) {
+		lua_error_p(L, "Out of memory allocating net_quic_params");
+	}
+
+	if (lua_gettop(L) != 1 || !lua_isnumber(L, 1))
+		lua_error_p(L, "net.quic_max_streams requires one integer value within <1,  4096>");
+
+	lua_Integer v = lua_tointeger(L, 1);
+	if (v < 1 || v > 4096)
+		lua_error_p(L, "net.quic_max_streams must be within <1,  4096>");
+
+	the_network->quic_params->max_streams = (uint16_t)v;
+#endif // otherwise we just ignore the setting
+	lua_pushboolean(L, true);
+	return 1;
+}
+
+static int net_quic_reqire_retry(lua_State *L)
+{
+#if ENABLE_QUIC
+	if (kr_fails_assert(the_network)) {
+		return 0;
+	}
+
+	// /* Only return current require_retry. */
+	if (lua_gettop(L) == 0) {
+		if (!the_network->quic_params) {
+			return 0;
+		}
+
+		lua_newtable(L);
+		lua_pushboolean(L, the_network->quic_params->require_retry);
+		return 1;
+	}
+
+	if (lua_gettop(L) != 1 || !lua_isboolean(L, 1))
+		lua_error_p(L, "net.quic_require_retry requires one boolean value");
+
+	bool v = lua_toboolean(L, 1);
+
+	/* Allocate struct if needed */
+	if (!the_network->quic_params && quic_configuration_set() != kr_ok()) {
+		lua_error_p(L, "Out of memory allocating net_quic_params");
+	}
+
+	the_network->quic_params->require_retry = v;
+#endif // otherwise we just ignore the setting
+	lua_pushboolean(L, true);
+	return 1;
+}
+
 
 /** Return a lua table with TLS authentication parameters.
  * The format is the same as passed to policy.TLS_FORWARD();
@@ -1232,6 +1351,9 @@ int kr_bindings_net(lua_State *L)
 		{ "tls_padding",  net_tls_padding },
 		{ "tls_sticket_secret", net_tls_sticket_secret_string },
 		{ "tls_sticket_secret_file", net_tls_sticket_secret_file },
+		{ "quic_max_conns", net_quic_max_conns },
+		{ "quic_max_streams", net_quic_max_streams },
+		{ "quic_require_retry", net_quic_reqire_retry },
 		{ "outgoing_v4",  net_outgoing_v4 },
 		{ "outgoing_v6",  net_outgoing_v6 },
 		{ "tcp_in_idle",  net_tcp_in_idle },

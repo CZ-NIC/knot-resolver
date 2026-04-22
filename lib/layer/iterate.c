@@ -421,7 +421,7 @@ static int process_authority(knot_pkt_t *pkt, struct kr_request *req)
 		/* Work around for these NSs which are authoritative both for
 		 * parent and child and mixes data from both zones in single answer */
 		if (knot_wire_get_aa(pkt->wire) &&
-		    (rr->type == qry->stype) &&
+		    (rr->type == qry->stype || qry->stype == KNOT_RRTYPE_ANY) &&
 		    (knot_dname_is_equal(rr->owner, qry->sname))) {
 			return KR_STATE_CONSUME;
 		}
@@ -537,6 +537,7 @@ static int unroll_cname(knot_pkt_t *pkt, struct kr_request *req, bool referral, 
 			/* Skip the RR if its owner+type doesn't interest us. */
 			const uint16_t type = kr_rrset_type_maysig(rr);
 			const bool type_OK = rr->type == query->stype || type == query->stype
+						|| query->stype == KNOT_RRTYPE_ANY
 						|| type == KNOT_RRTYPE_CNAME;
 			if (rr->rclass != KNOT_CLASS_IN
 			    || knot_dname_in_bailiwick(rr->owner, query->zone_cut.name) < 0) {
@@ -689,7 +690,7 @@ static int process_final(knot_pkt_t *pkt, struct kr_request *req,
 			continue;
 		}
 		if ((rr->rclass != query->sclass) ||
-		    (rr->type != query->stype)) {
+		    (rr->type != query->stype && query->stype != KNOT_RRTYPE_ANY)) {
 			continue;
 		}
 		const bool to_wire = ((pkt_class & (PKT_NXDOMAIN|PKT_NODATA)) != 0);
@@ -806,7 +807,7 @@ static int process_answer(knot_pkt_t *pkt, struct kr_request *req)
 		next->flags.NO_MINIMIZE = req->options.NO_MINIMIZE;
 
 		if (query->flags.FORWARD) {
-			next->forward_flags.CNAME = true;
+			next->forward_CNAME = true;
 		}
 		next->cname_parent = query;
 		/* Want DNSSEC if and only if it's possible to secure
@@ -921,9 +922,32 @@ static int begin(kr_layer_t *ctx)
 		return KR_STATE_FAIL;
 	}
 
+	/* Check whether the requested EDNS version is supported. */
+	if (knot_pkt_has_edns(pkt) && knot_edns_get_version(pkt->opt_rr) > KR_EDNS_VERSION) {
+		knot_pkt_t *ans = kr_request_ensure_answer(ctx->req);
+		if (!ans)
+			return ctx->req->state;
+		/* See RFC 6891, section 6.1.3 */
+		knot_wire_set_rcode(ans->wire, KNOT_EDNS_RCODE_LO(KNOT_RCODE_BADVERS));
+		knot_edns_set_ext_rcode(ans->opt_rr, KNOT_EDNS_RCODE_HI(KNOT_RCODE_BADVERS));
+		return KR_STATE_DONE;
+	}
+
 	struct kr_query *qry = ctx->req->current_query;
-	/* Avoid any other classes, and avoid any meta-types. */
-	if (qry->sclass != KNOT_CLASS_IN || knot_rrtype_is_metatype(qry->stype)) {
+	/* Avoid any other classes, and avoid any meta-types (except if allowed). */
+	bool typeOK;
+	switch (qry->stype) {
+	case KNOT_RRTYPE_ANY:
+		typeOK = qry->flags.QTYPE_ANY;
+		break;
+	case KNOT_RRTYPE_RRSIG:
+		typeOK = qry->flags.QTYPE_RRSIG;
+		break;
+	default:
+		typeOK = !knot_rrtype_is_metatype(qry->stype);
+		break;
+	}
+	if (qry->sclass != KNOT_CLASS_IN || !typeOK) {
 		knot_pkt_t *ans = kr_request_ensure_answer(ctx->req);
 		if (!ans)
 			return ctx->req->state;

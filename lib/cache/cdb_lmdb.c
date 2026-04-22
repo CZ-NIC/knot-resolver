@@ -358,7 +358,10 @@ static int cdb_open_env(struct lmdb_env *env, const char *path, const size_t map
 		/* Cache doesn't require durability, we can be
 		 * loose with the requirements as a tradeoff for speed. */
 		? MDB_WRITEMAP | MDB_NOTLS | MDB_MAPASYNC
-		: MDB_WRITEMAP | MDB_NOTLS;
+		/* ruledb is quite different in terms of writes.
+		 * MDB_WRITEMAP|MDB_MAPASYNC wouldn't benefit us much,
+		 * so instead we get better protection + (integrity on crashes).*/
+		: MDB_NOTLS;
 	ret = mdb_env_open(env->env, path, flags, LMDB_FILE_MODE);
 	if (ret != MDB_SUCCESS) goto error_mdb;
 
@@ -433,8 +436,7 @@ error_sys:
 	return kr_error(ret);
 }
 
-static int cdb_init(kr_cdb_pt *db, struct kr_cdb_stats *stats,
-		struct kr_cdb_opts *opts, knot_mm_t *pool)
+static int cdb_init(kr_cdb_pt *db, struct kr_cdb_stats *stats, struct kr_cdb_opts *opts)
 {
 	if (!db || !stats || !opts) {
 		return kr_error(EINVAL);

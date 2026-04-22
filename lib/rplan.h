@@ -60,7 +60,9 @@ struct kr_qflags {
 	bool DNS64_DISABLE : 1;  /**< Don't do any DNS64 stuff (meant for view:addr). */
 	bool PASSTHRU_LEGACY : 1;/**< Ignore local-data overrides/blocks for this kr_request. */
 	bool FALLBACK_DISABLE : 1;/**< Don't attempt fallback.  Meant for views.  */
-	bool TUNNEL_CHECKED : 1;/**< Underlying wire packet query checked for DNS tunneling */
+	bool QTYPE_ANY : 1;      /**< Allow ANY as QTYPE. */
+	bool QTYPE_RRSIG : 1;    /**< Allow RRSIG as QTYPE. */
+	bool TUNNEL_CHECKED : 1; /**< Underlying wire packet query checked for DNS tunneling */
 };
 
 /** Combine flags together.  This means set union for simple flags. */
@@ -93,7 +95,8 @@ struct kr_query {
 	uint16_t id;
 	uint16_t reorder; /**< Seed to reorder (cached) RRs in answer or zero. */
 	struct kr_qflags flags;
-	struct kr_qflags forward_flags;
+	bool forward_CNAME;
+	bool forward_NO_MINIMIZE;
 	uint32_t secret;
 	uint32_t uid; /**< Query iteration number, unique within the kr_rplan. */
 

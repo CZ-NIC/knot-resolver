@@ -1,7 +1,6 @@
 """
 The parsing and validation of the datamodel is dependent on a global state:
-- a file system path used for resolving relative paths
-
+- a file system path used for resolving relative paths.
 
 Commentary from @vsraier:
 =========================
@@ -15,7 +14,7 @@ to the modelling tools. It is not technically complicated, but it requires
 massive model changes I am not willing to make at the moment. Ideally, when implementing this,
 the BaseSchema would turn into an empty class without any logic. Not even a constructor. All logic
 would be in the ObjectMapper class. Similar to how Gson works in Java or AutoMapper in C#.
-"""
+"""  # noqa: D205
 
 from pathlib import Path
 from typing import Optional

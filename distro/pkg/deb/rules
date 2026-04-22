@@ -26,6 +26,7 @@ override_dh_auto_configure:
 		--buildtype=plain \
 		--prefix=/usr \
 		--libdir=lib \
+		-Dinstall_root_keys=disabled \
 		-Dsystemd_files=enabled \
 		-Ddnstap=enabled \
 		-Dkeyfile_default=/usr/share/dns/root.key \
@@ -43,3 +44,9 @@ override_dh_auto_install:
 	PYBUILD_NAME=knot_resolver PYBUILD_DESTDIR="$${PYKRES_DESTDIR}" \
 		dh_auto_install --buildsystem=pybuild
 	install -m 644 -D etc/config/config.yaml debian/tmp/etc/knot-resolver/config.yaml
+
+override_dh_auto_clean:
+	rm -rf .pybuild/
+	rm -rf build/
+	rm -rf python/knot_resolver.egg-info
+	dh_auto_clean

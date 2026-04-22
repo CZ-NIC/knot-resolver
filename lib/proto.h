@@ -26,8 +26,9 @@
     XX(TCP53, tcp53, "DNS TCP") \
     XX(DOT, dot, "DNS-over-TLS") \
     XX(DOH, doh, "DNS-over-HTTPS") \
-    XX(DOQ, doq, "DNS-over-QUIC") /* unused for now */ \
-    //
+    XX(DOQ, doq_demux, "DNS-over-QUIC-demux") \
+    XX(DOQ_CONN, doq_conn, "DNS-over-QUIC-conn") \
+    XX(DOQ_STREAM, doq_stream, "DNS-over-QUIC-stream") \
 
 /** DNS protocol set - mutually exclusive options, contrary to
  * kr_request_qsource_flags

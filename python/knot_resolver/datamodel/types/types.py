@@ -31,6 +31,11 @@ class Int0_512(IntRangeBase):  # noqa: N801
     _max: int = 512
 
 
+class Int1_4096(IntRangeBase):  # noqa: N801
+    _min: int = 1
+    _max: int = 4096
+
+
 class Int0_65535(IntRangeBase):  # noqa: N801
     _min: int = 0
     _max: int = 65_535
@@ -84,9 +89,7 @@ class TimeUnit(UnitBase):
 
 
 class EscapedStr(StrBase):
-    """
-    A string where escape sequences are ignored and quotes are escaped.
-    """
+    """A string where escape sequences are ignored and quotes are escaped."""
 
     def __init__(self, source_value: Any, object_path: str = "/") -> None:
         super().__init__(source_value, object_path)
@@ -115,9 +118,9 @@ class EscapedStr(StrBase):
     def multiline(self) -> str:
         """
         Lua multiline string is enclosed in double square brackets '[[ ]]'.
+
         This method makes sure that double square brackets are escaped.
         """
-
         replace = {
             "[[": r"\[\[",
             "]]": r"\]\]",
@@ -130,17 +133,13 @@ class EscapedStr(StrBase):
 
 
 class EscapedStr32B(EscapedStr, StringLengthBase):
-    """
-    Same as 'EscapedStr', but minimal length is 32 bytes.
-    """
+    """Same as 'EscapedStr', but minimal length is 32 bytes."""
 
     _min_bytes: int = 32
 
 
 class DomainName(StrBase):
-    """
-    Fully or partially qualified domain name.
-    """
+    """Fully or partially qualified domain name."""
 
     _punycode: str
     # fmt: off
@@ -188,25 +187,19 @@ class DomainName(StrBase):
 
 
 class InterfaceName(PatternBase):
-    """
-    Network interface name.
-    """
+    """Network interface name."""
 
     _re = re.compile(r"^[a-zA-Z0-9]+(?:[-_][a-zA-Z0-9]+)*$")
 
 
 class IDPattern(PatternBase):
-    """
-    Alphanumerical ID for identifying systemd slice.
-    """
+    """Alphanumerical ID for identifying systemd slice."""
 
     _re = re.compile(r"^(?!-)[a-z0-9-]*[a-z0-9]+$")
 
 
 class PinSha256(PatternBase):
-    """
-    A string that stores base64 encoded sha256.
-    """
+    """A string that stores base64 encoded sha256."""
 
     _re = re.compile(r"^[A-Za-z\d+/]{43}=$")
 
@@ -343,9 +336,7 @@ class IPv4Address(BaseValueType):
         return f'{type(self).__name__}("{self._value}")'
 
     def __eq__(self, o: object) -> bool:
-        """
-        Two instances of IPv4Address are equal when they represent same IPv4 address as string.
-        """
+        """Two instances of IPv4Address are equal when they represent same IPv4 address as string."""
         return isinstance(o, IPv4Address) and str(o._value) == str(self._value)
 
     def serialize(self) -> Any:
@@ -387,9 +378,7 @@ class IPv6Address(BaseValueType):
         return f'{type(self).__name__}("{self._value}")'
 
     def __eq__(self, o: object) -> bool:
-        """
-        Two instances of IPv6Address are equal when they represent same IPv6 address as string.
-        """
+        """Two instances of IPv6Address are equal when they represent same IPv6 address as string."""
         return isinstance(o, IPv6Address) and str(o._value) == str(self._value)
 
     def serialize(self) -> Any:
@@ -406,9 +395,7 @@ IPAddress = Union[IPv4Address, IPv6Address]
 
 
 class IPAddressEM(BaseValueType):
-    """
-    IP address with exclamation mark suffix, e.g. '127.0.0.1!'.
-    """
+    """IP address with exclamation mark suffix, e.g. '127.0.0.1!'."""
 
     _value: str
     _addr: Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
@@ -446,9 +433,7 @@ class IPAddressEM(BaseValueType):
         return f'{type(self).__name__}("{self._value}")'
 
     def __eq__(self, o: object) -> bool:
-        """
-        Two instances of IPAddressEM are equal when they represent same string.
-        """
+        """Two instances of IPAddressEM are equal when they represent same string."""
         return isinstance(o, IPAddressEM) and o._value == self._value
 
     def serialize(self) -> Any:

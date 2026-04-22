@@ -1,3 +1,34 @@
+Knot Resolver 6.x.y (2026-0m-dd)
+================================
+
+Improvements:
+-------------
+- /local-data/rpz: support  *.some.name. CNAME block.page. (!1808)
+- /local-data/rpz: print line number in the RPZ on error (!1823)
+- /local-data/nodata: also apply to `rpz:` and `records:` (!1812)
+- reply BADVERS on unsupported EDNS versions (#404, !1599)
+- make DoH cache-control header respect our cache's TTL limits (!1819)
+
+Bugfixes
+--------
+- don't loop on reload in case policy-loader can't succeed (#950, !1824)
+- reduce excessive caching of some uncommon failed answers (!1819)
+- /local-data: fix `redirect` rules and *.localhost since v6.0.13 (!1817)
+
+
+Knot Resolver 6.2.0 (2026-02-03)
+================================
+
+Improvements:
+-------------
+- DNS-over-QUIC (DoQ) is available for serving (beta, !1747)
+
+Bugfixes
+--------
+- fix UDP answers without sendmmsg, e.g. on non-Linux (!1795)
+- fix /logging/groups in python 3.8 (!1799)
+
+
 Knot Resolver 6.1.0 (2026-01-08)
 ================================
 
@@ -20,6 +51,7 @@ Bugfixes
 - reload did not apply changes to /fallback (!1763)
 - fix config.cache.clear test on apple silicon (!1766)
 - cache: fix wrong TTL in some cases, typically 32768 (!1774)
+- fix handling of protolayer_data_sess_init_cb failure (!1797)
 
 
 Knot Resolver 6.0.17 (2025-12-02)

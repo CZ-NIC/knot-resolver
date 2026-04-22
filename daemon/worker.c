@@ -3,8 +3,12 @@
  */
 
 #include "kresconfig.h"
+#include "lib/proto.h"
+#include "mempattern.h"
 #include "daemon/worker.h"
 
+#include <libknot/wire.h>
+#include <string.h>
 #include <uv.h>
 #include <lua.h>
 #include <lauxlib.h>
@@ -157,14 +161,13 @@ static struct session2 *ioreq_spawn(int socktype, sa_family_t family,
 	}
 
 	/* Create connection for iterative query */
-	struct session2 *s;
-	int ret = io_create(the_worker->loop, &s, socktype, family, grp,
-			layer_param, layer_param_count, true);
-	if (ret) {
-		if (ret == UV_EMFILE) {
-			the_worker->too_many_open = true;
-			the_worker->rconcurrent_highwatermark = the_worker->stats.rconcurrent;
-		}
+	uv_handle_t *handle;
+	if (io_create(the_worker->loop, &handle, socktype, family)) {
+		return NULL;
+	}
+	struct session2 *s = session2_new_io(handle, grp, layer_param,
+			layer_param_count, true);
+	if (!s) {
 		return NULL;
 	}
 
@@ -175,6 +178,7 @@ static struct session2 *ioreq_spawn(int socktype, sa_family_t family,
 	} else {
 		addr = (union kr_sockaddr *)&the_worker->out_addr6;
 	}
+	int ret = 0;
 	if (addr->ip.sa_family != AF_UNSPEC) {
 		if (kr_fails_assert(addr->ip.sa_family == family)) {
 			session2_force_close(s);
@@ -1020,6 +1024,9 @@ static int qr_task_finalize(struct qr_task *task, int state)
 		.comm_addr = &ctx->source.comm_addr.ip,
 		.xdp = ctx->source.xdp
 	};
+	if (ctx->req.qsource.flags.quic) {
+		out_comm.target = ctx->source.session->comm_storage.target;
+	}
 	if (ctx->source.xdp) {
 		memcpy(out_comm.eth_from, ctx->source.eth_from, sizeof(out_comm.eth_from));
 		memcpy(out_comm.eth_to,   ctx->source.eth_to,   sizeof(out_comm.eth_to));
@@ -2350,7 +2357,7 @@ static void pl_dns_stream_request_init(struct session2 *session,
                                        struct kr_request *req,
                                        void *sess_data)
 {
-	req->qsource.comm_flags.tcp = true;
+	req->qsource.comm_flags.tcp = !req->qsource.comm_flags.quic;
 }
 
 __attribute__((constructor))

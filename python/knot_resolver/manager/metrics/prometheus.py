@@ -7,7 +7,7 @@ from knot_resolver.controller.interface import KresID
 from knot_resolver.controller.registered_workers import get_registered_workers_kresids
 from knot_resolver.datamodel.config_schema import KresConfig
 from knot_resolver.manager.config_store import ConfigStore, only_on_real_changes_update
-from knot_resolver.utils import compat
+from knot_resolver.utils.compat import asyncio as asyncio_compat
 from knot_resolver.utils.functional import Result
 
 from .collect import collect_kresd_workers_metrics
@@ -15,12 +15,12 @@ from .collect import collect_kresd_workers_metrics
 logger = logging.getLogger(__name__)
 
 if PROMETHEUS_LIB:
-    from prometheus_client import exposition  # type: ignore
-    from prometheus_client.bridge.graphite import GraphiteBridge  # type: ignore
+    from prometheus_client import exposition
+    from prometheus_client.bridge.graphite import GraphiteBridge
     from prometheus_client.core import (
         REGISTRY,
         CounterMetricFamily,
-        GaugeMetricFamily,  # type: ignore
+        GaugeMetricFamily,
         HistogramMetricFamily,
         Metric,
     )
@@ -31,19 +31,19 @@ if PROMETHEUS_LIB:
 
     def _counter(name: str, description: str, label: Tuple[str, str], value: float) -> CounterMetricFamily:
         c = CounterMetricFamily(name, description, labels=(label[0],))
-        c.add_metric((label[1],), value)  # type: ignore
+        c.add_metric((label[1],), value)
         return c
 
     def _gauge(name: str, description: str, label: Tuple[str, str], value: float) -> GaugeMetricFamily:
         c = GaugeMetricFamily(name, description, labels=(label[0],))
-        c.add_metric((label[1],), value)  # type: ignore
+        c.add_metric((label[1],), value)
         return c
 
     def _histogram(
         name: str, description: str, label: Tuple[str, str], buckets: List[Tuple[str, int]], sum_value: float
     ) -> HistogramMetricFamily:
         c = HistogramMetricFamily(name, description, labels=(label[0],))
-        c.add_metric((label[1],), buckets, sum_value=sum_value)  # type: ignore
+        c.add_metric((label[1],), buckets, sum_value=sum_value)
         return c
 
     def _parse_resolver_metrics(instance_id: "KresID", metrics: Any) -> Generator[Metric, None, None]:
@@ -183,6 +183,24 @@ if PROMETHEUS_LIB:
             "number of external requests received over IPv6 plain UDP via an AF_XDP socket",
             label=("instance_id", sid),
             value=metrics["request"]["xdp6"],
+        )
+        yield _counter(
+            "resolver_request_doq",
+            "number of external requests received over DNS-over-QUIC (RFC 9250)",
+            label=("instance_id", sid),
+            value=metrics["request"]["doq"],
+        )
+        yield _counter(
+            "resolver_request_doq4",
+            "number of external requests received over IPv4 DNS-over-QUIC (RFC 9250)",
+            label=("instance_id", sid),
+            value=metrics["request"]["doq4"],
+        )
+        yield _counter(
+            "resolver_request_doq6",
+            "number of external requests received over IPv6 DNS-over-QUIC (RF 9250)",
+            label=("instance_id", sid),
+            value=metrics["request"]["doq6"],
         )
 
         # "answer" metrics
@@ -387,24 +405,22 @@ if PROMETHEUS_LIB:
             # the Prometheus library. We just have to prevent the library from invoking it again. See the mentioned
             # function for details
 
-            if compat.asyncio.is_event_loop_running():
+            if asyncio_compat.is_event_loop_running():
                 # when running, we can schedule the new data collection
                 if self._collection_task is not None and not self._collection_task.done():
                     logger.warning("Statistics collection task is still running. Skipping scheduling of a new one!")
                 else:
-                    self._collection_task = compat.asyncio.create_task(
+                    self._collection_task = asyncio.create_task(
                         self.collect_kresd_stats(_triggered_from_prometheus_library=True)
                     )
 
             else:
                 # when not running, we can start a new loop (we are not in the manager's main thread)
-                compat.asyncio.run(self.collect_kresd_stats(_triggered_from_prometheus_library=True))
+                asyncio.run(self.collect_kresd_stats(_triggered_from_prometheus_library=True))
 
     @only_on_real_changes_update(lambda c: c.monitoring.graphite)
     async def _init_graphite_bridge(config: KresConfig, force: bool = False) -> None:
-        """
-        Starts graphite bridge if required
-        """
+        """Start graphite bridge if required."""
         global _graphite_bridge
         if config.monitoring.graphite.enable and _graphite_bridge is None:
             logger.info(
@@ -415,7 +431,7 @@ if PROMETHEUS_LIB:
             _graphite_bridge = GraphiteBridge(
                 (str(config.monitoring.graphite.host), int(config.monitoring.graphite.port))
             )
-            _graphite_bridge.start(  # type: ignore
+            _graphite_bridge.start(
                 interval=config.monitoring.graphite.interval.seconds(), prefix=str(config.monitoring.graphite.prefix)
             )
 
@@ -424,7 +440,8 @@ if PROMETHEUS_LIB:
     ) -> Result[None, str]:
         if old_config.monitoring.graphite.enable and not new_config.monitoring.graphite.enable:
             return Result.err(
-                "You can't turn off graphite monitoring dynamically. If you really want this feature, please let the developers know."
+                "You can't turn off graphite monitoring dynamically."
+                " If you really want this feature, please let the developers know."
             )
 
         if (
@@ -438,14 +455,12 @@ if PROMETHEUS_LIB:
 
 
 async def init_prometheus(config_store: ConfigStore) -> None:
-    """
-    Initialize metrics collection. Must be called before any other function from this module.
-    """
+    """Initialize metrics collection. Must be called before any other function from this module."""
     if PROMETHEUS_LIB:
         # init and register metrics collector
         global _metrics_collector
         _metrics_collector = KresPrometheusMetricsCollector(config_store)
-        REGISTRY.register(_metrics_collector)  # type: ignore
+        REGISTRY.register(_metrics_collector)  # type: ignore[arg-type]
 
         # register graphite bridge
         await config_store.register_verifier(_deny_turning_off_graphite_bridge)
@@ -459,5 +474,5 @@ async def report_prometheus() -> Optional[bytes]:
             await _metrics_collector.collect_kresd_stats()
         else:
             raise RuntimeError("Function invoked before initializing the module!")
-        return exposition.generate_latest()  # type: ignore
+        return exposition.generate_latest()
     return None

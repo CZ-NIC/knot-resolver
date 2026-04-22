@@ -1,5 +1,7 @@
 """
-Custom replacement for standard module `atexit`. We use `atexit` behind the scenes, we just add the option
+Custom replacement for standard module `atexit`.
+
+We use `atexit` behind the scenes, we just add the option
 to invoke the exit functions manually.
 """
 

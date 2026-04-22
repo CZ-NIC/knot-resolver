@@ -107,7 +107,7 @@ static int assert_right_version(struct kr_cache *cache)
 	return ret;
 }
 
-int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct kr_cdb_opts *opts, knot_mm_t *mm)
+int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct kr_cdb_opts *opts)
 {
 	if (kr_fails_assert(cache && opts))
 		return kr_error(EINVAL);
@@ -125,7 +125,7 @@ int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct k
 		}
 	}
 
-	int ret = cache->api->open(&cache->db, &cache->stats, opts, mm);
+	int ret = cache->api->open(&cache->db, &cache->stats, opts);
 	if (ret == 0) {
 		ret = assert_right_version(cache);
 		// The included write also committed maxsize increase to the file.
@@ -137,7 +137,7 @@ int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct k
 		cache->api->close(cache->db, &cache->stats);
 		struct kr_cdb_opts opts2 = *opts;
 		opts2.maxsize = 0;
-		ret = cache->api->open(&cache->db, &cache->stats, &opts2, mm);
+		ret = cache->api->open(&cache->db, &cache->stats, &opts2);
 	}
 
 	free_const(kr_cache_emergency_file_to_remove);
@@ -296,8 +296,7 @@ static bool check_dname_for_lf(const knot_dname_t *n, const struct kr_query *qry
 /** Return false on types to be ignored.  Meant both for sname and direct cache requests. */
 static bool check_rrtype(uint16_t type, const struct kr_query *qry/*logging*/)
 {
-	const bool ret = !knot_rrtype_is_metatype(type)
-			&& type != KNOT_RRTYPE_RRSIG;
+	const bool ret = !knot_rrtype_is_metatype(type) || type == KNOT_RRTYPE_ANY;
 	if (!ret && kr_log_is_debug_qry(CACHE, qry)) {
 		auto_free char *type_str = kr_rrtype_text(type);
 		VERBOSE_MSG(qry, "=> skipping RR type %s\n", type_str);
@@ -311,9 +310,6 @@ knot_db_val_t key_exact_type_maypkt(struct key *k, uint16_t type)
 	if (kr_fails_assert(check_rrtype(type, NULL)))
 		return (knot_db_val_t){ NULL, 0 };
 	switch (type) {
-	case KNOT_RRTYPE_RRSIG: /* no RRSIG query caching, at least for now */
-		kr_assert(false);
-		return (knot_db_val_t){ NULL, 0 };
 	/* xNAME lumped into NS. */
 	case KNOT_RRTYPE_CNAME:
 	case KNOT_RRTYPE_DNAME:
@@ -360,7 +356,7 @@ int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 	/* We first check various exit-conditions and then call the _real function. */
 	if (!kr_cache_is_open(&req->ctx->cache)
-	    || !check_rrtype(qry->stype, qry) /* LATER: some other behavior for some of these? */
+	    || !check_rrtype(qry->stype, qry)
 	    || qry->sclass != KNOT_CLASS_IN) {
 		return ctx->state; /* Already resolved/failed or already tried, etc. */
 	}
@@ -419,6 +415,14 @@ int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt)
 	int unauth_cnt = 0;
 	bool needs_pkt = false;
 	if (qry->flags.STUB) {
+		needs_pkt = true;
+		goto stash_packet;
+	}
+	if (qry->stype == KNOT_RRTYPE_ANY || qry->stype == KNOT_RRTYPE_RRSIG) {
+		/* In case of _ANY, useful records could be expected,
+		 * but let's be careful and only stash the whole packet,
+		 * as behavior of servers for _ANY is underspecified and tricky.
+		 * The effect is basically caching _ANY separately from other types. */
 		needs_pkt = true;
 		goto stash_packet;
 	}

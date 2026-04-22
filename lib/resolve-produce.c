@@ -214,7 +214,7 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 	trie_t *negative_anchors = request->ctx->negative_anchors;
 
 	if (qry->parent != NULL &&
-	    !(qry->forward_flags.CNAME) &&
+	    !(qry->forward_CNAME) &&
 	    !(qry->flags.DNS64_MARK) &&
 	    knot_dname_in_bailiwick(qry->zone_cut.name, qry->parent->zone_cut.name) >= 0) {
 		return KR_STATE_PRODUCE;
@@ -233,7 +233,7 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 		return KR_STATE_PRODUCE;
 	}
 
-	if (qry->forward_flags.NO_MINIMIZE) {
+	if (qry->forward_NO_MINIMIZE) {
 		qry->flags.AWAIT_CUT = false;
 		return KR_STATE_PRODUCE;
 	}
@@ -666,10 +666,9 @@ int kr_resolve_produce(struct kr_request *request, struct kr_transport **transpo
 	}
 	/* At this point we need to send a query upstream to proceed towards success. */
 
-	/* This query has RD=0 or is ANY, stop here. */
-	if (qry->stype == KNOT_RRTYPE_ANY ||
-	    !knot_wire_get_rd(request->qsource.packet->wire)) {
-		VERBOSE_MSG(qry, "=> qtype is ANY or RD=0, bail out\n");
+	/* This query has RD=0, stop here. */
+	if (!knot_wire_get_rd(request->qsource.packet->wire)) {
+		VERBOSE_MSG(qry, "=> RD=0, bail out\n");
 		return KR_STATE_FAIL;
 	}
 

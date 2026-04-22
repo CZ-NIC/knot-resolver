@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 from typing import List, Optional
 
 from knot_resolver.constants import CACHE_DIR
@@ -104,6 +105,7 @@ class PredictionSchema(ConfigSchema):
 class PrefetchSchema(ConfigSchema):
     """
     These options help keep the cache hot by prefetching expiring records or learning usage patterns and repetitive queries.
+
     ---
     expiring: Prefetch expiring records.
     prediction: Prefetch record by predicting based on usage patterns and repetitive queries.
@@ -137,6 +139,6 @@ class CacheSchema(ConfigSchema):
     prefill: Optional[List[PrefillSchema]] = None
     prefetch: PrefetchSchema = PrefetchSchema()
 
-    def _validate(self):
+    def _validate(self) -> None:
         if self.ttl_min.seconds() > self.ttl_max.seconds():
             raise ValueError("'ttl-max' can't be smaller than 'ttl-min'")

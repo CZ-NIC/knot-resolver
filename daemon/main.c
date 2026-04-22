@@ -544,7 +544,7 @@ int main(int argc, char **argv)
 	}
 
 	/* Create resolver context. */
-	ret = kr_resolver_init(&the_engine->modules, &the_engine->pool);
+	ret = kr_resolver_init(&the_engine->modules);
 	if (ret != 0) {
 		kr_log_error(SYSTEM, "failed to initialize resolver: %s\n", kr_strerror(ret));
 		return EXIT_FAILURE;

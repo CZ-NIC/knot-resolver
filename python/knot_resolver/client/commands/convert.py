@@ -1,3 +1,4 @@
+# noqa: INP001
 import argparse
 import sys
 from pathlib import Path
@@ -41,7 +42,8 @@ class ConvertCommand(Command):
             "--output",
             type=str,
             nargs="?",
-            help="Optional, output file for converted configuration in Lua script. If not specified, converted configuration is printed.",
+            help="Optional, output file for converted configuration in Lua script."
+            " If not specified, converted configuration is printed.",
             dest="output_file",
             default=None,
         )

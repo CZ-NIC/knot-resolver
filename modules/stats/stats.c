@@ -52,8 +52,8 @@
 	X(answer,edns0) X(answer,do) \
 	X(query,edns) X(query,dnssec) \
 	X(request,total) X(request,total4) X(request,total6) X(request,internal) \
-	X(request,udp4) X(request,tcp4) X(request,xdp4) X(request,dot4) X(request,doh4) \
-	X(request,udp6) X(request,tcp6) X(request,xdp6) X(request,dot6) X(request,doh6) \
+	X(request,udp4) X(request,tcp4) X(request,xdp4) X(request,dot4) X(request,doh4) X(request,doq4) \
+	X(request,udp6) X(request,tcp6) X(request,xdp6) X(request,dot6) X(request,doh6) X(request,doq6) \
 	X(const,end)
 
 enum const_metric {
@@ -96,6 +96,7 @@ static const struct sum_metric sum_metrics[] = {
 	DEF(xdp),
 	DEF(dot),
 	DEF(doh),
+	DEF(doq),
 	#undef DEF
 };
 static const size_t sum_metrics_len = sizeof(sum_metrics) / sizeof(sum_metrics[0]);
@@ -239,6 +240,8 @@ static int collect_transport(kr_layer_t *ctx)
 		INC_PROTO(tcp);
 	else if (req->qsource.flags.xdp)
 		INC_PROTO(xdp);
+	else if (req->qsource.flags.quic)
+		INC_PROTO(doq);
 	else
 		INC_PROTO(udp);
 	#undef INC_PROTO

@@ -8,6 +8,7 @@
 #include "daemon/bindings/impl.h"
 #include "daemon/io.h"
 #include "daemon/tls.h"
+#include "daemon/quic_common.h"
 #include "daemon/worker.h"
 #include "lib/utils.h"
 
@@ -80,6 +81,7 @@ void network_init(uv_loop_t *loop, int tcp_backlog)
 	the_network->tcp_backlog = tcp_backlog;
 	the_network->enable_connect_udp = true;
 	the_network->min_udp_source_port = 1024;
+	the_network->quic_params = NULL;
 
 	// On Linux, unset means some auto-tuning mechanism also depending on RAM,
 	// which might be OK default (together with the user_timeout above)
@@ -310,6 +312,9 @@ void network_deinit(void)
 	trie_free(the_network->proxy_addrs6);
 
 	tls_credentials_free(the_network->tls_credentials);
+#if HAS_QUIC
+	quic_configuration_free(the_network->quic_params);
+#endif
 	tls_client_params_free(the_network->tls_client_params);
 	tls_session_ticket_ctx_destroy(the_network->tls_session_ticket_ctx);
 #ifndef NDEBUG
@@ -439,12 +444,12 @@ static int open_endpoint(const char *addr_str,
 	} /* else */
 
 	if (ep->flags.sock_type == SOCK_DGRAM) {
-		if (kr_fails_assert(!ep->flags.tls))
+		if (kr_fails_assert(!ep->flags.tls || ep->flags.quic))
 			return kr_error(EINVAL);
 		uv_udp_t *ep_handle = malloc(sizeof(uv_udp_t));
 		ep->handle = (uv_handle_t *)ep_handle;
 		ret = !ep->handle ? ENOMEM
-			: io_listen_udp(the_network->loop, ep_handle, ep->fd);
+			: io_listen_udp(the_network->loop, ep_handle, ep->fd, ep->flags.quic);
 		goto finish_ret;
 	} /* else */
 

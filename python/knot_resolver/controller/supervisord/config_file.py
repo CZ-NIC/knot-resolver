@@ -76,9 +76,7 @@ def kres_cache_gc_args(config: KresConfig) -> str:
 
 @dataclass
 class ProcessTypeConfig:
-    """
-    Data structure holding data for supervisord config template
-    """
+    """Data structure holding data for supervisord config template."""
 
     logfile: Path
     workdir: str

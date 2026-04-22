@@ -3,6 +3,7 @@
  */
 
 #include "kresconfig.h"
+#include "lib/proto.h"
 
 #include <ucw/lib.h>
 #include <sys/socket.h>
@@ -66,8 +67,20 @@ static const enum protolayer_type protolayer_grp_doh[] = {
 	PROTOLAYER_TYPE_DNS_UNSIZED_STREAM,
 };
 
-static const enum protolayer_type protolayer_grp_doq[] = {
-	// not yet used
+static const enum protolayer_type protolayer_grp_doq_stream[] = {
+	PROTOLAYER_TYPE_QUIC_STREAM,
+	PROTOLAYER_TYPE_DNS_SINGLE_STREAM,
+};
+
+static const enum protolayer_type protolayer_grp_doq_conn[] = {
+	PROTOLAYER_TYPE_DEFER,
+	PROTOLAYER_TYPE_QUIC_CONN,
+	PROTOLAYER_TYPE_NULL,
+};
+
+static const enum protolayer_type protolayer_grp_doq_demux[] = {
+	PROTOLAYER_TYPE_UDP,
+	PROTOLAYER_TYPE_QUIC_DEMUX,
 	PROTOLAYER_TYPE_NULL,
 };
 
@@ -626,7 +639,9 @@ static int session2_submit(
 	// but we may not know the client's IP yet.
 	// Note two cases: incoming session (new request)
 	// vs. outgoing session (resuming work on some request)
-	if ((direction == PROTOLAYER_UNWRAP) && (layer_ix == 0))
+	if ((direction == PROTOLAYER_UNWRAP) && (layer_ix == 0) &&
+			session->proto != KR_PROTO_DOQ_STREAM &&
+			session->proto != KR_PROTO_DOQ)
 		defer_sample_start(NULL);
 
 	struct protolayer_iter_ctx *ctx = malloc(session->iter_ctx_size);
@@ -669,6 +684,7 @@ static int session2_submit(
 			ctx->comm_storage.dst_addr = &addrst->dst_addr.ip;
 		}
 		ctx->comm = &ctx->comm_storage;
+		ctx->comm->target = comm->target;
 	} else {
 		ctx->comm = &session->comm_storage;
 	}
@@ -688,7 +704,9 @@ static int session2_submit(
 	}
 
 	int ret = protolayer_step(ctx);
-	if ((direction == PROTOLAYER_UNWRAP) && (layer_ix == 0))
+	if ((direction == PROTOLAYER_UNWRAP) && (layer_ix == 0) &&
+			session->proto != KR_PROTO_DOQ_STREAM &&
+			session->proto != KR_PROTO_DOQ)
 		defer_sample_stop(NULL, false);
 	return ret;
 }
@@ -873,7 +891,8 @@ struct session2 *session2_new(enum session2_transport_type transport_type,
 	session2_inc_refs(s); /* Session owns the timer */
 
 	/* Initialize the layer's session data */
-	for (size_t i = 0; i < grp->num_layers; i++) {
+	size_t i;
+	for (i = 0; i < grp->num_layers; i++) {
 		struct protolayer_globals *globals = &protolayer_globals[grp->layers[i]];
 		struct protolayer_data *sess_data = protolayer_sess_data_get(s, i);
 		if (sess_data) {
@@ -882,13 +901,31 @@ struct session2 *session2_new(enum session2_transport_type transport_type,
 		}
 
 		void *param = get_init_param(grp->layers[i], layer_param, layer_param_count);
-		if (globals->sess_init)
-			globals->sess_init(s, sess_data, param);
+		if (globals->sess_init && globals->sess_init(s, sess_data, param) != 0) {
+			/* Init failed, terminate session */
+			goto failed_init;
+		}
 	}
 
 	session2_touch(s);
 
 	return s;
+
+failed_init:
+	while (i --> 0) {
+		struct protolayer_globals *globals = &protolayer_globals[grp->layers[i]];
+		struct protolayer_data *sess_data = protolayer_sess_data_get(s, i);
+		if (globals->sess_deinit) {
+			globals->sess_deinit(s, sess_data);
+		}
+
+		if (sess_data) {
+			memset(sess_data, 0, globals->sess_size);
+			sess_data->session = NULL;
+		}
+	}
+
+	return NULL;
 }
 
 /** De-allocates the session. Must only be called once the underlying IO handle
@@ -1499,7 +1536,7 @@ static int session2_transport_pushv(struct session2 *s,
 		}
 
 		if (handle->type == UV_UDP) {
-			if (ENABLE_SENDMMSG && !s->outgoing) {
+			if (ENABLE_SENDMMSG && !s->outgoing && s->proto != KR_PROTO_DOQ) {
 				int fd;
 				int ret = uv_fileno(handle, &fd);
 				if (kr_fails_assert(!ret)) {
@@ -1521,8 +1558,9 @@ static int session2_transport_pushv(struct session2 *s,
 						ctx);
 				return kr_ok();
 			} else {
+				bool conn = s->outgoing && the_network->enable_connect_udp;
 				int ret = uv_udp_try_send((uv_udp_t*)handle, (uv_buf_t *)iov, iovcnt,
-					the_network->enable_connect_udp ? NULL : comm->comm_addr);
+								conn ? NULL : comm->comm_addr);
 				if (ret > 0) // equals buffer size, only confuses us
 					ret = 0;
 				if (ret == UV_EAGAIN) {
@@ -1736,10 +1774,8 @@ static int session2_transport_event(struct session2 *s,
 	bool is_close_event = (event == PROTOLAYER_EVENT_CLOSE ||
 			event == PROTOLAYER_EVENT_FORCE_CLOSE);
 	if (is_close_event) {
-		if (kr_fails_assert(session2_is_empty(s))) {
-			session2_waitinglist_finalize(s, KR_STATE_FAIL);
-			session2_tasklist_finalize(s, KR_STATE_FAIL);
-		}
+		session2_waitinglist_finalize(s, KR_STATE_FAIL);
+		session2_tasklist_finalize(s, KR_STATE_FAIL);
 		session2_timer_stop(s);
 		s->closing = true;
 	}

@@ -35,6 +35,7 @@ It provides various input formats described in following subsections.
 
       Enabling NODATA synthesis, false if disabling.
       If set to true (the default), an empty answer will be synthesised for matching name but mismatching type (e.g. AAAA query when only A hint exists).
+      This setting also applies to normal records defined in RPZ files.
 
    Records
    -------
@@ -51,31 +52,36 @@ It provides various input formats described in following subsections.
 
       Optional, direct addition of hostname and IP address pairs from files in ``/etc/hosts`` like format.
 
-   .. code-block:: yaml
+      .. code-block:: yaml
 
-      local-data:
-        addresses:
-          a1.example.com: 2001:db8::1
-          a2.example.com: 2001:db8::2
-        addresses-files:
-          - /etc/hosts
-        # some options
-        ttl: 5m
-        nodata: false # don't force empty answer for missing record types on mentioned names
+        local-data:
+          addresses:
+            a1.example.com: 2001:db8::1
+            a2.example.com: 2001:db8::2
+          addresses-files:
+            - /etc/hosts
+          # some options
+          ttl: 5m
+          nodata: false # don't force empty answer for missing record types on mentioned names
 
    .. option:: records: <zonefile format string>
 
       Optional, direct addition of records in DNS zonefile format.
       The zonefile syntax is more flexible, e.g. it can define any type of records.
 
-   .. code-block:: yaml
+      .. code-block:: yaml
 
-      local-data:
-        records: |
-          www.google.com.  CNAME  forcesafesearch.google.com.
-          example.com  TXT  "an example text record"
-          34.example.com  AAAA  2001:db8::3
-          34.example.com  AAAA  2001:db8::4
+        local-data:
+          records: |
+            www.google.com.  CNAME  forcesafesearch.google.com.
+            example.com  TXT  "an example text record"
+            34.example.com  AAAA  2001:db8::3
+            34.example.com  AAAA  2001:db8::4
+
+      If you want records from an actual file, e.g. because you have too many,
+      we suggest using :ref:`config-local-data-rpz` just below,
+      even if you do not need any additional behavior defined by RPZ.
+      Same syntax of normal record definitions in RPZs will cause the same result.
 
    .. warning::
 
@@ -145,8 +151,8 @@ It provides various input formats described in following subsections.
    * just files which are *not* automatically reloaded when changed
    * rules with ``rpz-*`` labels are ignored, e.g. ``.rpz-client-ip``
    .. * ``CNAME *.some.thing`` does not expand the wildcard
-   * wildcard support is limited only to blocking subtrees by
-     ``*.some.name. CNAME .`` or ``*.some.name. CNAME *.``
+   * wildcard support is limited to left-hand side of CNAME:
+     ``*.some.name. CNAME .`` or ``*.some.name. CNAME *.`` or ``*.some.name. CNAME block.page.``
 
    Advanced rules
    --------------
@@ -218,6 +224,11 @@ It provides various input formats described in following subsections.
                 - records: |
                     www.google.com.  CNAME  forcesafesearch.google.com.
                   tags: [ adult ]
+
+         If you want records from an actual file, e.g. because you have too many,
+         we suggest using :ref:`config-local-data-rpz`,
+         even if you do not need any additional behavior defined by RPZ.
+         Same syntax of normal record definitions in RPZs will cause the same result.
 
       .. option:: tags: <list of tags>
 

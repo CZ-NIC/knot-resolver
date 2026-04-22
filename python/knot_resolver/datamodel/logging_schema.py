@@ -72,6 +72,8 @@ LogGroupsKresdEnum = Literal[
     "prlayr",
     "defer",
     "tunnel",
+    "doq",
+    "ngtcp2",
     # "reqdbg",... (non-displayed section of the enum)
 ]
 
@@ -133,7 +135,7 @@ class LoggingSchema(ConfigSchema):
             return cast(LogTargetEnum, target)
         return raw.target
 
-    def _validate(self):
+    def _validate(self) -> None:
         if self.groups is None:
             return
 
