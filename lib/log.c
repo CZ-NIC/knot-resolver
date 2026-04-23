@@ -286,31 +286,31 @@ static void kr_vlog_req(
 	const bool req_same = req && req == req_last;
 	static int indent_last = 0;
 
-	const char *graph_struct = req_same ? "╞" : "╒";
+	const char *graph_struct = req_same ? "|" : "/";
 	if (indent_last - 2 == indent && req_same)
-		graph_struct = "╒═╧";
+		graph_struct = "/=/";
 
 	const char *graph_phase;
 	// TODO: often req->state is unset :-( so we guess from `fmt` (and skip that `fmt` part)
 	//   Maybe just amend RESUME_LAYERS, so that we can also see _BEGIN, etc.?
 	if (fmt && fmt[0] && fmt[1] == '\\') {
 		fmt += 2;
-		graph_phase = "═╤";
-		graph_struct = req_same ? "╘" : "═";
+		graph_phase = "=\\";
+		graph_struct = req_same ? "\\" : "=";
 	} else if (fmt && fmt[0] == '=' && fmt[1] == '>') {
 		fmt += 2;
 		if (*fmt == ' ') ++fmt;
-		graph_phase = "═> ";
+		graph_phase = "=> ";
 	} else if (req && (req->state & KR_STATE_PRODUCE)) {
-		graph_phase = "═> ";
+		graph_phase = "=> ";
 	} else if (fmt && fmt[0] == '<' && fmt[1] == '=') {
 		fmt += 2;
 		if (*fmt == ' ') ++fmt;
-		graph_phase = "<═ ";
+		graph_phase = "<= ";
 	} else if (req && (req->state & KR_STATE_CONSUME)) {
-		graph_phase = "<═ ";
+		graph_phase = "<= ";
 	} else {
-		graph_phase = "══ ";
+		graph_phase = "== ";
 	};
 	// TODO: another character representing _DONE+_FAIL ?
 
