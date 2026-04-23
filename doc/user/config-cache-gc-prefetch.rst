@@ -160,14 +160,14 @@ both of which have to be met to consider the record eligible for prefetching.
 
 .. option:: cache/prefetch/max-access-period: <time s|m|h|d>
 
-   :default: 1h
+   :default: 2h
 
    Prefetch only records which are accessed at least once per the given time period.
 
 
 .. option:: cache/prefetch/min-accesses-per-update: <float>
 
-   :default: 4
+   :default: 2
 
    Require at least this number of accesses to the record per automatic update.
    It serves as a guarantee that prefetching will not significantly increase the traffic to authoritative servers.
