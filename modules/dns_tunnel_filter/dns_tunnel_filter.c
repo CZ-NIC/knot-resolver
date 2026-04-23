@@ -71,10 +71,10 @@ static uint32_t domain_hit_increment(const knot_dname_t *registrable, uint32_t t
 	uint32_t last = atomic_load_explicit(&e->last_seen, memory_order_relaxed);
 
 	// collision leads to overwrite and could mean undercounting
-	if (stored_hash != 0 && (uint32_t)(time_now - last) <= DOMAIN_HIT_EXPIRY_MS) {
+	if (stored_hash != 0 && (time_now - last) <= DOMAIN_HIT_EXPIRY_MS) {
 		kr_log_warning(TUNNEL, "Domain hit collision: new hash %lu, stored hash %lu\n", h, stored_hash);
 	}
-	if (stored_hash != h || (uint32_t)(time_now - last) > DOMAIN_HIT_EXPIRY_MS) {
+	if (stored_hash != h || (time_now - last) > DOMAIN_HIT_EXPIRY_MS) {
 		atomic_store_explicit(&e->name_hash, h, memory_order_relaxed);
 		atomic_store_explicit(&e->count, 0, memory_order_relaxed);
 	}
@@ -188,7 +188,7 @@ static void write_stats_line(FILE *f, uint64_t *stats_counts, float tunnel_prob,
 {
 	struct tm *tm_info = localtime(&qry->timestamp.tv_sec);
 
-	fprintf(f, "|%04d-%02d-%02d %02d:%02d:%02d",
+	(void)fprintf(f, "|%04d-%02d-%02d %02d:%02d:%02d",
 		tm_info->tm_year + 1900,
 		tm_info->tm_mon + 1,
 		tm_info->tm_mday,
@@ -196,16 +196,16 @@ static void write_stats_line(FILE *f, uint64_t *stats_counts, float tunnel_prob,
 		tm_info->tm_min,
 		tm_info->tm_sec);
 
-	fprintf(f, "|%d,%d", config.sensitivity, config.threshold);
+	(void)fprintf(f, "|%d,%d", config.sensitivity, config.threshold);
 
 	for (int i = 0; i < STATS_CNT; i++)
-		fprintf(f, "|%lu", stats_counts[i]);
+		(void)fprintf(f, "|%lu", stats_counts[i]);
 
-	fprintf(f, "|%f", tunnel_prob);
+	(void)fprintf(f, "|%f", tunnel_prob);
 
 	char buf[KNOT_DNAME_MAXLEN];
 	if (knot_dname_to_str(buf, qry->sname, sizeof(buf)))
-		fprintf(f, "|%s|\n", buf);
+		(void)fprintf(f, "|%s|\n", buf);
 }
 
 static bool read_last_counters(FILE *f, unsigned long out[STATS_CNT])
@@ -218,11 +218,14 @@ static bool read_last_counters(FILE *f, unsigned long out[STATS_CNT])
 
 	int bar_count = 0;
 	for (long i = pos - 1; i > 0; i--) {
-		fseek(f, i, SEEK_SET);
+		if (fseek(f, i, SEEK_SET))
+			return false;
 		int ch = fgetc(f);
 		if (ch == '|') {
 			if (++bar_count > 5)
 				break;
+		} else if (ch == EOF) {
+			return false;
 		}
 	}
 
@@ -230,9 +233,23 @@ static bool read_last_counters(FILE *f, unsigned long out[STATS_CNT])
 		return false;
 
 	char sname[256];
-	return sscanf(line,
-		"%lu|%lu|%lu|%s|\n",
-		&out[0], &out[1], &out[2], sname) == 4;
+	char *p = line;
+	char *end;
+
+	for (int i = 0; i < 3; i++) {
+		errno = 0;
+		out[i] = strtoul(p, &end, 10);
+		if (end == p || errno != 0)
+			return false;
+		p = end;
+		if (*p == '|')
+			p++;
+	}
+
+	if (sscanf(p, "%255[^|]", sname) != 1)
+		return false;
+
+	return true;
 }
 
 static void update_stats(uint8_t stat_index, float tunnel_prob, struct kr_query *qry)
@@ -244,7 +261,7 @@ static void update_stats(uint8_t stat_index, float tunnel_prob, struct kr_query 
 
 	int fd = fileno(f);
 	if (flock(fd, LOCK_EX) == -1) {
-		fclose(f);
+		(void)fclose(f);
 		return;
 	}
 
@@ -256,12 +273,12 @@ static void update_stats(uint8_t stat_index, float tunnel_prob, struct kr_query 
 
 	stats_counts[stat_index]++;
 
-	fseek(f, 0, SEEK_END);
-	write_stats_line(f, stats_counts, tunnel_prob, qry);
+	if (!fseek(f, 0, SEEK_END))
+		write_stats_line(f, stats_counts, tunnel_prob, qry);
 
-	fflush(f);
+	(void)fflush(f);
 	flock(fd, LOCK_UN);
-	fclose(f);
+	(void)fclose(f);
 }
 
 

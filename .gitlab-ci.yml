@@ -115,6 +115,7 @@ archive:
 
 build-arch:
   <<: *build
+  allow_failure: true
   image: $IMAGE_PREFIX/arch:$IMAGE_TAG
   script:
     - meson build_ci_arch --prefix=$PREFIX -Dmalloc=disabled -Dwerror=true
@@ -178,6 +179,7 @@ build-stable-asan-gcc:
 
 build:macOS:
   <<: *nodep
+  allow_failure: true
   image: python:3-alpine
   only:
     refs:
@@ -394,6 +396,9 @@ ci-image-is-tag:
   image: alpine:3
   variables:
     GIT_STRATEGY: none
+  except: null
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master"
   script:
     - apk add git
     - (

@@ -7,7 +7,6 @@
 #include "libblcnn.h"
 
 constexpr int MAX_PACKET_SIZE = 300;
-constexpr int ONE_HOT_SIZE = 257;
 
 struct TorchModuleWrapper {
 	torch::jit::script::Module model;
