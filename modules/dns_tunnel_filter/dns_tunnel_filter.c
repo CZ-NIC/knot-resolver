@@ -20,11 +20,24 @@ enum { STATS_DI = 0, STATS_M = 1, STATS_B = 2, STATS_CNT = 3};
 
 #define VERBOSE_LOG(...) kr_log_debug(TUNNEL, " | " __VA_ARGS__)
 
+// prone to future changes, experimentally chosen
+#define DOMAIN_HIT_TABLE_SIZE (1 << 16)
+#define DOMAIN_HIT_THRESHOLD  10
+#define DOMAIN_HIT_EXPIRY_MS  60000
+
+struct domain_hit {
+	_Atomic uint64_t name_hash;
+	_Atomic uint32_t count;
+	_Atomic uint32_t last_seen;
+};
+
 struct dns_tunnel_filter {
 	size_t capacity;
 	uint32_t instant_limit;
 	uint32_t rate_limit;
 	bool using_avx2;
+
+	struct domain_hit domain_hits[DOMAIN_HIT_TABLE_SIZE];
 
 	kru_price_t v4_prices[V4_PREFIXES_CNT];
 	kru_price_t v6_prices[V6_PREFIXES_CNT];
@@ -43,6 +56,33 @@ struct {
 	kr_rule_tags_t tags;
 } config = {0};
 
+static uint32_t domain_hit_increment(const knot_dname_t *registrable, uint32_t time_now)
+{
+	uint64_t h = KRU.hash_bytes(
+		(struct kru *)dns_tunnel_filter->kru,
+		(uint8_t *)registrable,
+		knot_dname_size(registrable)
+	);
+	// we accept the increased collision probability
+	size_t slot = h & (DOMAIN_HIT_TABLE_SIZE - 1);
+	struct domain_hit *e = &dns_tunnel_filter->domain_hits[slot];
+
+	uint64_t stored_hash = atomic_load_explicit(&e->name_hash, memory_order_relaxed);
+	uint32_t last = atomic_load_explicit(&e->last_seen, memory_order_relaxed);
+
+	// collision leads to overwrite and could mean undercounting
+	if (stored_hash != 0 && (uint32_t)(time_now - last) <= DOMAIN_HIT_EXPIRY_MS) {
+		kr_log_warning(TUNNEL, "Domain hit collision: new hash %lu, stored hash %lu\n", h, stored_hash);
+	}
+	if (stored_hash != h || (uint32_t)(time_now - last) > DOMAIN_HIT_EXPIRY_MS) {
+		atomic_store_explicit(&e->name_hash, h, memory_order_relaxed);
+		atomic_store_explicit(&e->count, 0, memory_order_relaxed);
+	}
+
+	atomic_store_explicit(&e->last_seen, time_now, memory_order_relaxed);
+
+	return atomic_fetch_add_explicit(&e->count, 1, memory_order_relaxed) + 1;
+}
 
 KR_EXPORT
 int dns_tunnel_filter_setup(const char *nn_file, const char *mmap_file, kr_rule_tags_t tags,
@@ -224,6 +264,37 @@ static void update_stats(uint8_t stat_index, float tunnel_prob, struct kr_query 
 	fclose(f);
 }
 
+
+static bool qname_to_registrable_dname(const struct kr_request *req, knot_dname_t *out, size_t out_size)
+{
+	uint8_t *qname = req->qsource.packet->wire + 12;
+	size_t len = req->qsource.packet->size;
+	char domain[256] = {0};
+	size_t pos = 0, i = 0;
+
+	while (qname[i] && i < len) {
+		uint8_t label_len = qname[i++];
+		if (i + label_len > len) break;
+		if (pos) domain[pos++] = '.';
+		memcpy(domain + pos, qname + i, label_len);
+		pos += label_len;
+		i += label_len;
+	}
+	domain[pos++] = '.';
+	domain[pos] = '\0';
+
+	const char *rg = psl_registrable_domain(psl_builtin(), domain);
+	if (!rg) return false;
+
+	char rg_fqdn[256];
+	size_t rg_len = strlen(rg);
+	memcpy(rg_fqdn, rg, rg_len);
+	if (rg[rg_len - 1] != '.') rg_fqdn[rg_len++] = '.';
+	rg_fqdn[rg_len] = '\0';
+
+	return knot_dname_from_str(out, rg_fqdn, out_size) != NULL;
+}
+
 static void do_filter(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
 	struct kr_request *req = ctx->req;
@@ -305,7 +376,15 @@ static void do_filter(kr_layer_t *ctx, knot_pkt_t *pkt)
 				(do_apply ? "Blocking." : "Auditing.")
 		);
 
-		req->options.SUB_BLACKLIST = 1;
+		knot_dname_t registrable[300];
+		if (qname_to_registrable_dname(req, registrable, sizeof(registrable))) {
+			uint32_t hits = domain_hit_increment(registrable, kr_now());
+
+			if (hits >= DOMAIN_HIT_THRESHOLD) {
+				req->options.SUB_BLACKLIST = 1;
+				kr_log_info(TUNNEL, "Domain %s hit threshold with %u hits, blacklisting.\n", (char *)registrable, hits);
+			}
+		}
 	}
 
 	update_stats(STATS_M, tunnel_prob, qry);
@@ -324,36 +403,6 @@ static int produce(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
 	do_filter(ctx, pkt);
 	return ctx->state;
-}
-
-static bool qname_to_registrable_dname(const struct kr_request *req, knot_dname_t *out, size_t out_size)
-{
-	uint8_t *qname = req->qsource.packet->wire + 12;
-	size_t len = req->qsource.packet->size;
-	char domain[256] = {0};
-	size_t pos = 0, i = 0;
-
-	while (qname[i] && i < len) {
-		uint8_t label_len = qname[i++];
-		if (i + label_len > len) break;
-		if (pos) domain[pos++] = '.';
-		memcpy(domain + pos, qname + i, label_len);
-		pos += label_len;
-		i += label_len;
-	}
-	domain[pos++] = '.';
-	domain[pos] = '\0';
-
-	const char *rg = psl_registrable_domain(psl_builtin(), domain);
-	if (!rg) return false;
-
-	char rg_fqdn[256];
-	size_t rg_len = strlen(rg);
-	memcpy(rg_fqdn, rg, rg_len);
-	if (rg[rg_len - 1] != '.') rg_fqdn[rg_len++] = '.';
-	rg_fqdn[rg_len] = '\0';
-
-	return knot_dname_from_str(out, rg_fqdn, out_size) != NULL;
 }
 
 static int finish(kr_layer_t *ctx)
