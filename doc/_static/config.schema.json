@@ -628,6 +628,7 @@
                             "price-factor": {
                                 "type": "number",
                                 "minimum": 0.0,
+                                "maximum": 65535.0,
                                 "description": "Multiplies rate-limiting and defer prices of operations, use 0 to whitelist.",
                                 "default": 1.0
                             },
