@@ -65,11 +65,15 @@ struct kr_cdb_api {
 	 * \return error code - accepting RW transactions can fail with LMDB.
 	 */
 	int (*commit)(kr_cdb_pt db, struct kr_cdb_stats *stat, bool accept_rw, bool reset_ro);
+	/** Run before a row of operations to ensure they happen in a single RW transaction,
+	 *   at least in case of successes. */
+	int (*txn_open_rw)(kr_cdb_pt db, struct kr_cdb_stats *stat/*unused*/);
 
 	/* Data access */
 
 	int (*read)(kr_cdb_pt db, struct kr_cdb_stats *stat,
 			const knot_db_val_t *key, knot_db_val_t *val, int maxcount);
+	/* TODO: the behavior of write() around transactions is a bit complex. */
 	int (*write)(kr_cdb_pt db, struct kr_cdb_stats *stat, const knot_db_val_t *key,
 			knot_db_val_t *val, int maxcount);
 
