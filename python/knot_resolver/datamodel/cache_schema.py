@@ -118,8 +118,8 @@ class PrefetchSchema(ConfigSchema):
     """
 
     expiring: bool = False
-    max_access_period: TimeUnit = TimeUnit("1h")
-    min_accesses_per_update: FloatNonNegative = FloatNonNegative(4)
+    max_access_period: TimeUnit = TimeUnit("2h")
+    min_accesses_per_update: FloatNonNegative = FloatNonNegative(2)
     update_before_expiration: Percent = Percent(1)
     prediction: PredictionSchema = PredictionSchema()  # void, TODO add warning if used
 
