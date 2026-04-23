@@ -228,6 +228,9 @@ enum kr_rule_sub_t {
  *
  * You can call it multiple times with different tags if the rest is the same;
  * the rules will then combine correctly.
+ *
+ * This function is safe also outside initialization + policy-loader,
+ * but of course beware that policy-loader rewrites the ruledb on each reload.
  */
 KR_EXPORT
 int kr_rule_local_subtree(const knot_dname_t *apex, enum kr_rule_sub_t type,

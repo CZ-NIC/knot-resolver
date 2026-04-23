@@ -1102,8 +1102,10 @@ int rule_local_subtree(const knot_dname_t *apex, enum kr_rule_sub_t type,
 	// Maybe the name is there already?  Read it and combine the tags.
 	// LATER: more precise logic after subtree_search() can iterate
 	//   over multiple rules on the same key
+	int ret = ruledb_op(txn_open_rw);
 	knot_db_val_t val = { 0 };
-	int ret = ruledb_op(read, &key, &val, 1);
+	if (ret == 0)
+		ret = ruledb_op(read, &key, &val, 1);
 	kr_assert(ret == 0 || ret == kr_error(ENOENT));
 	if (ret == 0) {
 		val_zla_type_t ztype_old;

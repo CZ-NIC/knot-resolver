@@ -244,6 +244,13 @@ static int cdb_commit(kr_cdb_pt db, struct kr_cdb_stats *stats, bool accept_rw, 
 	return ret;
 }
 
+static int cdb_txn_open_rw(kr_cdb_pt db, struct kr_cdb_stats *stat/*unused*/)
+{
+	struct lmdb_env *env = db2env(db);
+	MDB_txn *txn = NULL;
+	return txn_get(env, &txn, false);
+}
+
 /** Obtain a read-only cursor (and a read-only transaction).
  * TODO: allow RW transaction (for ruledb iterator) */
 static int txn_curs_get(struct lmdb_env *env, MDB_cursor **curs, struct kr_cdb_stats *stats)
@@ -958,7 +965,8 @@ const struct kr_cdb_api *kr_cdb_lmdb(void)
 {
 	static const struct kr_cdb_api api = {
 		"lmdb",
-		cdb_init, cdb_deinit, cdb_count, cdb_clear, cdb_commit,
+		cdb_init, cdb_deinit, cdb_count, cdb_clear,
+		cdb_commit, cdb_txn_open_rw,
 		cdb_readv, cdb_writev, cdb_remove,
 		cdb_match,
 		cdb_read_leq, cdb_read_less,
