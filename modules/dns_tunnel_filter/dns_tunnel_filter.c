@@ -307,6 +307,7 @@ static void do_filter(kr_layer_t *ctx, knot_pkt_t *pkt)
 	update_stats(STATS_M, tunnel_prob, qry);
 
 	if (do_apply) {
+		req->rule.tags = tags_apply; // .action is filled by _do_answer()
 		kr_rule_do_answer(KR_RULE_SUB_NXDOMAIN, qry, pkt, qry->sname);
 	} else {
 		kr_assert(do_audit);
