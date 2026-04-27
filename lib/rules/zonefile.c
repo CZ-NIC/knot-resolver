@@ -95,7 +95,16 @@ static void cname_scan2rule(zs_scanner_t *s)
 	for (knot_dname_t *dn = s->r_data; *dn != '\0'; dn += 1 + *dn)
 		last_label = (const char *)dn + 1;
 	if (last_label && strncmp(last_label, "rpz-", 4) == 0) {
-		kr_log_warning(RULES, "skipping unsupported CNAME target .%s\n", last_label);
+		if (strcmp(last_label, "rpz-passthru") == 0) {
+			knot_dname_t *actual_owner = s->r_owner;
+			if (knot_dname_is_wildcard(actual_owner))
+				actual_owner += 2;
+			int ret = kr_rule_local_subtree(actual_owner, KR_RULE_SUB_PASSTHRU,
+							s->r_ttl, c->tags, c->opts);
+			if (ret) kr_log_warning(RULES, "rpz-passthru insertion failure: %d\n", ret);
+		} else {
+			kr_log_warning(RULES, "skipping unsupported CNAME target .%s\n", last_label);
+		}
 		return;
 	}
 	int ret = 0;
