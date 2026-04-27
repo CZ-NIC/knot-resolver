@@ -42,7 +42,15 @@ V6_CONF = {1, V6_PREFIXES_CNT, V6_PREFIXES, V6_RATE_MULT, V6_SUBPRIO};
 
 #define Q0_INSTANT_LIMIT      1000000 // ns
 #define KRU_CAPACITY          (1<<19) // same as ratelimiting default
-#define BASE_PRICE(nsec)      ((uint64_t)KRU_LIMIT * LOADS_THRESHOLDS[0] / (1<<16) * (nsec) / Q0_INSTANT_LIMIT)
+static inline uint64_t BASE_PRICE(uint64_t nsec)
+{
+	// with current settings BASE_PRICE(x) is approximately x
+	// with nsec > ~(2<<32) the KRU limit is reached, so rounding >~(2<<44) to ~(2<<64) is OK
+	const uint64_t q0_kru_limit = (uint64_t)KRU_LIMIT * LOADS_THRESHOLDS[0] / (1<<16);
+	if (nsec >= UINT64_MAX / q0_kru_limit)
+		return UINT64_MAX;
+	return q0_kru_limit * nsec / Q0_INSTANT_LIMIT;
+}
 #define MAX_DECAY             (BASE_PRICE(1000000) / 2)  // max value at 50% utilization of single cpu
 	//   see log written by defer_str_conf for details
 

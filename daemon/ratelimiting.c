@@ -143,8 +143,9 @@ bool ratelimiting_request_begin(struct kr_request *req)
 		// compute adjusted prices, using standard rounding
 		kru_price_t prices[V6_PREFIXES_CNT];
 		for (int i = 0; i < V6_PREFIXES_CNT; ++i) {
-			prices[i] = (req->qsource.price_factor16
+			uint64_t price = (req->qsource.price_factor16
 					* (uint64_t)ratelimiting->v6_prices[i] + (1<<15)) >> 16;
+			prices[i] = price > (kru_price_t)-1 ? -1 : price;
 		}
 		limited_prefix = KRU.limited_multi_prefix_or((struct kru *)ratelimiting->kru, time_now,
 				1, key, V6_PREFIXES, prices, V6_PREFIXES_CNT, NULL);
@@ -155,8 +156,9 @@ bool ratelimiting_request_begin(struct kr_request *req)
 		// compute adjusted prices, using standard rounding
 		kru_price_t prices[V4_PREFIXES_CNT];
 		for (int i = 0; i < V4_PREFIXES_CNT; ++i) {
-			prices[i] = (req->qsource.price_factor16
+			uint64_t price = (req->qsource.price_factor16
 					* (uint64_t)ratelimiting->v4_prices[i] + (1<<15)) >> 16;
+			prices[i] = price > (kru_price_t)-1 ? -1 : price;
 		}
 		limited_prefix = KRU.limited_multi_prefix_or((struct kru *)ratelimiting->kru, time_now,
 				0, key, V4_PREFIXES, prices, V4_PREFIXES_CNT, NULL);
