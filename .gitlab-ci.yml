@@ -751,6 +751,8 @@ pkg:alma-9:
     # python-watchdog is not included in the official Alma 9 packages
     # install it using PyPi just for testing
     - pip3 install watchdog
+  after_script:
+    - ls -l /usr/lib64/knot-resolver/sandbox.lua
 
 pkg:alma-10:
   <<: *pkg_test
