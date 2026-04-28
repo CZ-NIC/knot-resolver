@@ -757,6 +757,10 @@ pkg:alma-9:
     - apkg install --build-dep
     - ls -l /usr/lib64/knot-resolver/sandbox.lua
     - apkg test --test-dep
+  after_script:
+    - journalctl -u knot-resolver.service
+    - ls -l /usr/lib64/knot-resolver/sandbox.lua
+    - ls -Z /usr/lib64/knot-resolver/sandbox.lua
 
 pkg:alma-10:
   <<: *pkg_test
