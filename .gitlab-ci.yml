@@ -748,11 +748,15 @@ pkg:alma-9:
   <<: *pkg_test
   image: $CI_REGISTRY/packaging/apkg/full/alma-9
   before_script:
-    # python-watchdog is not included in the official Alma 9 packages
+    # python3-watchdog is not included in the official Alma 9 packages
     # install it using PyPi just for testing
     - pip3 install watchdog
-  after_script:
+  script:
+    # make sure the archive from pkg:make-archive is available
+    - apkg info cache | grep archive/dev
+    - apkg install --build-dep
     - ls -l /usr/lib64/knot-resolver/sandbox.lua
+    - apkg test --test-dep
 
 pkg:alma-10:
   <<: *pkg_test
