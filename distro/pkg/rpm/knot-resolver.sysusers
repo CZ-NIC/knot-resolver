@@ -1,0 +1,2 @@
+u knot-resolver - "Knot Resolver" /var/lib/knot-resolver /sbin/nologin
+g knot-resolver -

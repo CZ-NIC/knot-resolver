@@ -25,6 +25,7 @@ Source100:      kresd-keyblock.asc
 BuildRequires:  gnupg2
 %endif
 
+Obsoletes:      knot-resolver < 6.0
 Provides:       knot-resolver6 = %{version}-%{release}
 
 # alpha packaging compat, can be removed around 6.2
@@ -49,9 +50,12 @@ BuildRequires:  pkgconfig(libuv)
 BuildRequires:  pkgconfig(luajit) >= 2.0
 BuildRequires:  jemalloc-devel
 BuildRequires:  python3-devel
+BuildRequires:  python3-setuptools
 
 Requires:       systemd
 Requires(post): systemd
+BuildRequires:  systemd-rpm-macros >= 245
+Source2: knot-resolver.sysusers
 
 # manager dependencies
 Requires:       python3
@@ -81,7 +85,6 @@ BuildRequires:  lmdb-devel
 Requires:       lua-basexx
 Requires:       lua-psl
 Requires:       lua-http
-Requires(pre):  shadow-utils
 %endif
 %if 0%{?fedora} || 0%{?rhel} > 7
 BuildRequires:  pkgconfig(lmdb)
@@ -89,7 +92,6 @@ Requires:       lua5.1-basexx
 Requires:       lua5.1-cqueues
 Requires:       lua5.1-http
 Recommends:     lua5.1-psl
-Requires(pre):  shadow-utils
 %endif
 
 # we do not build HTTP module on SuSE so the build requires is not needed
@@ -100,7 +102,6 @@ BuildRequires:  openssl-devel
 %if 0%{?suse_version}
 %define NINJA ninja
 BuildRequires:  lmdb-devel
-BuildRequires:  python3-setuptools
 Requires(pre):  shadow
 %endif
 
@@ -194,9 +195,6 @@ ln -s ../knot-resolver.service %{buildroot}%{_unitdir}/multi-user.target.wants/k
 # remove modules with missing dependencies
 rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/etcd.lua
 
-# remove unused sysusers
-rm %{buildroot}%{_prefix}/lib/sysusers.d/knot-resolver.conf
-
 %if 0%{?suse_version}
 rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/experimental_dot_auth.lua
 rm -r %{buildroot}%{_libdir}/knot-resolver/kres_modules/http
@@ -215,11 +213,9 @@ mv %{buildroot}/%{_datadir}/doc/%{name}/* %{buildroot}/%{_pkgdocdir}/
 
 install -m 644 -D etc/config/config.yaml %{buildroot}%{_sysconfdir}/knot-resolver/config.yaml
 
-%pre
-getent group knot-resolver >/dev/null || groupadd -r knot-resolver
-getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysconfdir}/knot-resolver -s /sbin/nologin -c "Knot Resolver" knot-resolver
-
+install -D -m 0644 %{SOURCE2} %{buildroot}%{_sysusersdir}/knot-resolver.conf
 %post
+%sysusers_create knot-resolver.sysusers
 # systemd_post macro is not needed for anything (calls systemctl preset)
 %tmpfiles_create %{_tmpfilesdir}/knot-resolver.conf
 %if "x%{?fedora}" == "x"
@@ -298,6 +294,7 @@ getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysc
 %{_mandir}/man8/kresd.8.gz
 %{_mandir}/man8/kresctl.8.gz
 %{_datadir}/bash-completion/completions/kresctl
+%{_sysusersdir}/knot-resolver.conf
 
 %files devel
 %{_includedir}/libkres
