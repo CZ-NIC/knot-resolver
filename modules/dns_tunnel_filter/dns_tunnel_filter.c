@@ -4,6 +4,7 @@
 
 #include <sys/file.h>
 #include <stdatomic.h>
+#include <ctype.h>
 #include <libpsl.h>
 #include "libblcnn.h"
 #include "lib/kru.h"
@@ -312,6 +313,57 @@ static bool qname_to_registrable_dname(const struct kr_request *req, knot_dname_
 	return knot_dname_from_str(out, rg_fqdn, out_size) != NULL;
 }
 
+static int qname_to_model_input(const char *full_domain, const char *registrable, uint8_t *out, size_t out_size)
+{
+	const int SEQ_LEN = 253;
+	if (out_size < (size_t)SEQ_LEN)
+		return -1;
+
+	char domain[256] = {0};
+	size_t dlen = strlen(full_domain);
+	if (dlen > 0 && full_domain[dlen - 1] == '.')
+		dlen--;
+	if (dlen >= sizeof(domain))
+		return -1;
+	for (size_t i = 0; i < dlen; i++)
+		domain[i] = (char)tolower((unsigned char)full_domain[i]);
+	domain[dlen] = '\0';
+
+	char reg[256] = {0};
+	size_t rlen = strlen(registrable);
+	if (rlen > 0 && registrable[rlen - 1] == '.')
+		rlen--;
+	if (rlen >= sizeof(reg))
+		return -1;
+	for (size_t i = 0; i < rlen; i++)
+		reg[i] = (char)tolower((unsigned char)registrable[i]);
+	reg[rlen] = '\0';
+
+	const char *subdomain = domain;
+	if (rlen < dlen) {
+		size_t sep = dlen - rlen;
+		if (domain[sep - 1] == '.' &&
+		    strncmp(domain + sep, reg, rlen) == 0 &&
+		    domain[sep + rlen] == '\0') {
+			domain[sep - 1] = '\0';
+			subdomain = domain;
+		}
+	} else {
+		// would lead to an empty string
+		return -1;
+	}
+
+	size_t slen = strlen(subdomain);
+	if (slen > (size_t)SEQ_LEN)
+		slen = SEQ_LEN;
+
+	size_t pad = SEQ_LEN - slen;
+	memset(out, 0, pad);
+	memcpy(out + pad, subdomain, slen);
+
+	return SEQ_LEN;
+}
+
 static void do_filter(kr_layer_t *ctx, knot_pkt_t *pkt)
 {
 	struct kr_request *req = ctx->req;
@@ -381,11 +433,31 @@ static void do_filter(kr_layer_t *ctx, knot_pkt_t *pkt)
 		uint8_t *packet = req->qsource.packet->wire;
 		size_t packet_size = req->qsource.size;
 
-		tunnel_prob = predict_packet(config.net, packet, packet_size) * 100;
+		knot_dname_t registrable[300];
+		int registrable_ret = qname_to_registrable_dname(req, registrable, sizeof(registrable));
 
-		if (tunnel_prob <= config.threshold) {
-			update_stats(STATS_B, tunnel_prob, qry);
-			return;
+		if (qry->stype != KNOT_RRTYPE_NULL || config.sensitivity >= 90) {
+			uint8_t model_version = get_model_version(config.net);
+
+			if (model_version == 1) {
+				tunnel_prob = predict_packet(config.net, packet, packet_size) * 100;
+			} else if (model_version == 2 && registrable_ret == 0) {
+				char full_domain[256]    = {0};
+				char registrable_str[256] = {0};
+				knot_dname_to_str(full_domain,      qry->sname,  sizeof(full_domain));
+				knot_dname_to_str(registrable_str, registrable, sizeof(registrable_str));
+
+				uint8_t model_input[253];
+				if (qname_to_model_input(full_domain, registrable_str, model_input, sizeof(model_input)) < 0)
+					return; // skips errors but also registrable domains with no subdomains
+
+				tunnel_prob = predict_packet(config.net, model_input, sizeof(model_input)) * 100;
+			}
+
+			if (tunnel_prob <= config.threshold) {
+				update_stats(STATS_B, tunnel_prob, qry);
+				return;
+			}
 		}
 
 		kr_log_debug(TUNNEL, "Malicious packet detected! (%f %%) %s\n",
@@ -393,8 +465,7 @@ static void do_filter(kr_layer_t *ctx, knot_pkt_t *pkt)
 				(do_apply ? "Blocking." : "Auditing.")
 		);
 
-		knot_dname_t registrable[300];
-		if (qname_to_registrable_dname(req, registrable, sizeof(registrable))) {
+		if (registrable_ret) {
 			uint32_t hits = domain_hit_increment(registrable, kr_now());
 
 			if (hits >= DOMAIN_HIT_THRESHOLD) {
