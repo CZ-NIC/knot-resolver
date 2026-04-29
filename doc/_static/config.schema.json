@@ -1208,6 +1208,20 @@
                     "description": "neural network inference threshold in percentage",
                     "default": 95
                 },
+                "hitms": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 65535,
+                    "description": "domain name hash table item expiry time",
+                    "default": 60000
+                },
+                "hitcap": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 65535,
+                    "description": "number of malicious queries from SLD needed for automatic blacklisting",
+                    "default": 10
+                },
                 "tags": {
                     "type": [
                         "array",
@@ -1226,6 +1240,8 @@
                 "file": null,
                 "sensitivity": 10,
                 "threshold": 95,
+                "hitms": 60000,
+                "hitcap": 10,
                 "tags": null
             }
         },
