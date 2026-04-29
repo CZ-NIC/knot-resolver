@@ -23,8 +23,6 @@ enum { STATS_DI = 0, STATS_M = 1, STATS_B = 2, STATS_CNT = 3};
 
 // prone to future changes, experimentally chosen
 #define DOMAIN_HIT_TABLE_SIZE (1 << 16)
-#define DOMAIN_HIT_THRESHOLD  10
-#define DOMAIN_HIT_EXPIRY_MS  60000
 
 struct domain_hit {
 	_Atomic uint64_t name_hash;
@@ -54,6 +52,8 @@ struct {
 	TorchModule net;
 	uint8_t sensitivity;
 	uint8_t threshold;
+	uint16_t hitms;
+	uint16_t hitcap;
 	kr_rule_tags_t tags;
 } config = {0};
 
@@ -72,10 +72,10 @@ static uint32_t domain_hit_increment(const knot_dname_t *registrable, uint32_t t
 	uint32_t last = atomic_load_explicit(&e->last_seen, memory_order_relaxed);
 
 	// collision leads to overwrite and could mean undercounting
-	if (stored_hash != 0 && (time_now - last) <= DOMAIN_HIT_EXPIRY_MS) {
+	if (stored_hash != 0 && (time_now - last) <= config.hitms) {
 		kr_log_warning(TUNNEL, "Domain hit collision: new hash %lu, stored hash %lu\n", h, stored_hash);
 	}
-	if (stored_hash != h || (time_now - last) > DOMAIN_HIT_EXPIRY_MS) {
+	if (stored_hash != h || (time_now - last) > config.hitms) {
 		atomic_store_explicit(&e->name_hash, h, memory_order_relaxed);
 		atomic_store_explicit(&e->count, 0, memory_order_relaxed);
 	}
@@ -87,7 +87,8 @@ static uint32_t domain_hit_increment(const knot_dname_t *registrable, uint32_t t
 
 KR_EXPORT
 int dns_tunnel_filter_setup(const char *nn_file, const char *mmap_file, kr_rule_tags_t tags,
-		uint8_t sensitivity, uint8_t threshold, size_t capacity, uint32_t instant_limit, uint32_t rate_limit)
+		uint8_t sensitivity, uint8_t threshold, uint16_t hitms, uint16_t hitcap,
+		size_t capacity, uint32_t instant_limit, uint32_t rate_limit)
 {
 	if (dns_tunnel_filter)
 		return kr_error(EALREADY); // we don't support reconfiguration for now
@@ -102,6 +103,9 @@ int dns_tunnel_filter_setup(const char *nn_file, const char *mmap_file, kr_rule_
 	}
 	config.sensitivity = sensitivity;
 	config.threshold = threshold;
+
+	config.hitms = hitms;
+	config.hitcap = hitcap;
 
 	size_t capacity_log = 0;
 	for (size_t c = capacity - 1; c > 0; c >>= 1) capacity_log++;
@@ -180,7 +184,7 @@ static bool ensure_loaded(void)
 	kr_log_warning(TUNNEL, "Tunneling filter not initialized from Lua, using hardcoded default.\n");
 	int ret = dns_tunnel_filter_setup("/home/blcnn.pt", // FIXME TMP
 					"dns_tunnel_filter", KR_RULE_TAGS_ALL,
-					10, 95,
+					10, 95, 60000, 10,
 					(1 << 20), (1 << 8), (1 << 17));
 	return ret == kr_ok();
 }
@@ -470,7 +474,7 @@ static void do_filter(kr_layer_t *ctx, knot_pkt_t *pkt)
 		if (registrable_ret) {
 			uint32_t hits = domain_hit_increment(registrable, kr_now());
 
-			if (hits >= DOMAIN_HIT_THRESHOLD) {
+			if (hits >= config.hitcap) {
 				req->options.SUB_BLACKLIST = 1;
 				kr_log_info(TUNNEL, "Domain %s hit threshold with %u hits, blacklisting.\n", (char *)registrable, hits);
 			}
@@ -480,7 +484,6 @@ static void do_filter(kr_layer_t *ctx, knot_pkt_t *pkt)
 	update_stats(STATS_M, tunnel_prob, qry);
 
 	if (do_apply) {
-		req->rule.tags = tags_apply; // .action is filled by _do_answer()
 		kr_rule_do_answer(KR_RULE_SUB_NXDOMAIN, qry, pkt, qry->sname);
 	} else {
 		kr_assert(do_audit);
