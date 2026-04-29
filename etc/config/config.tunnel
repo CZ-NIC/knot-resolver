@@ -19,7 +19,7 @@ assert(ffi.C.dns_tunnel_filter_setup(
 	'/home/blcnn.pt', -- Edit path to NN model
 	'dns_tunnel_filter',
 	0,
-	10, 95,
+	10, 95, 60000, 10
 	2^20, 2^12, 2^17
 ) == 0);
 
