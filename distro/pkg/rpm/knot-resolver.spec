@@ -49,6 +49,7 @@ BuildRequires:  pkgconfig(libuv)
 BuildRequires:  pkgconfig(luajit) >= 2.0
 BuildRequires:  jemalloc-devel
 BuildRequires:  python3-devel
+BuildRequires:  python3-setuptools
 
 Requires:       systemd
 Requires(post): systemd
@@ -100,7 +101,6 @@ BuildRequires:  openssl-devel
 %if 0%{?suse_version}
 %define NINJA ninja
 BuildRequires:  lmdb-devel
-BuildRequires:  python3-setuptools
 Requires(pre):  shadow
 %endif
 
