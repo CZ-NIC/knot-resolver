@@ -20,7 +20,7 @@ assert(ffi.C.dns_tunnel_filter_setup(
 	'dns_tunnel_filter',
 	0,
 	10, 95,
-	2^20, 2^2, 2^12
+	2^20, 2^12, 2^13
 ) == 0);
 
 -- Cache size
