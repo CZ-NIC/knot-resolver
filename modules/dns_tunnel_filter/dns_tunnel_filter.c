@@ -408,8 +408,9 @@ static void do_filter(kr_layer_t *ctx, knot_pkt_t *pkt)
 		// compute adjusted prices, using standard rounding
 		kru_price_t prices[V6_PREFIXES_CNT];
 		for (int i = 0; i < V6_PREFIXES_CNT; ++i) {
-			prices[i] = (req->qsource.price_factor16 * (uint64_t)price_scale_factor
+			uint64_t price = (req->qsource.price_factor16 * (uint64_t)price_scale_factor
 					* (uint64_t)dns_tunnel_filter->v6_prices[i] + (1ull<<31)) >> 32;
+			prices[i] = price > (kru_price_t)-1 ? -1 : price;
 		}
 		limited_prefix = KRU.limited_multi_prefix_or((struct kru *)dns_tunnel_filter->kru, time_now,
 				1, key, V6_PREFIXES, prices, V6_PREFIXES_CNT, NULL);
@@ -420,8 +421,9 @@ static void do_filter(kr_layer_t *ctx, knot_pkt_t *pkt)
 		// compute adjusted prices, using standard rounding
 		kru_price_t prices[V4_PREFIXES_CNT];
 		for (int i = 0; i < V4_PREFIXES_CNT; ++i) {
-			prices[i] = (req->qsource.price_factor16 * (uint64_t)price_scale_factor
+			uint64_t price = (req->qsource.price_factor16 * (uint64_t)price_scale_factor
 					* (uint64_t)dns_tunnel_filter->v4_prices[i] + (1ull<<31)) >> 32;
+			prices[i] = price > (kru_price_t)-1 ? -1 : price;
 		}
 		limited_prefix = KRU.limited_multi_prefix_or((struct kru *)dns_tunnel_filter->kru, time_now,
 				0, key, V4_PREFIXES, prices, V4_PREFIXES_CNT, NULL);
