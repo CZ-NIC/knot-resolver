@@ -31,7 +31,9 @@ class ParsedDataWrapper:
         self.file = Path(file)
 
 
-ParsedData = Union[Dict[str, "ParsedData"], List["ParsedData"], ParsedDataWrapper, str, int, float, bool, None]
+ParsedDataBase = Union[List["ParsedDataBase"], ParsedDataWrapper, str, int, float, bool, None]
+
+ParsedData = Union[Dict[str, "ParsedDataBase"], ParsedDataWrapper]
 
 
 def _yaml_include_constructor(self: _YAMLRaiseDuplicatesIncludeLoader, node: MappingNode) -> ParsedDataWrapper:
