@@ -1208,14 +1208,14 @@
                     "description": "neural network inference threshold in percentage",
                     "default": 95
                 },
-                "hitms": {
+                "hit-time-window-ms": {
                     "type": "integer",
                     "minimum": 0,
                     "maximum": 65535,
                     "description": "domain name hash table item expiry time",
                     "default": 60000
                 },
-                "hitcap": {
+                "hit-threshold": {
                     "type": "integer",
                     "minimum": 0,
                     "maximum": 65535,
@@ -1240,8 +1240,8 @@
                 "file": null,
                 "sensitivity": 10,
                 "threshold": 95,
-                "hitms": 60000,
-                "hitcap": 10,
+                "hit-time-window-ms": 60000,
+                "hit-threshold": 10,
                 "tags": null
             }
         },
