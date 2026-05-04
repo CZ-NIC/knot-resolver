@@ -52,8 +52,8 @@ struct {
 	TorchModule net;
 	uint8_t sensitivity;
 	uint8_t threshold;
-	uint16_t hitms;
-	uint16_t hitcap;
+	uint16_t hit_time_window_ms;
+	uint16_t hit_threshold;
 	kr_rule_tags_t tags;
 } config = {0};
 
@@ -72,10 +72,10 @@ static uint32_t domain_hit_increment(const knot_dname_t *registrable, uint32_t t
 	uint32_t last = atomic_load_explicit(&e->last_seen, memory_order_relaxed);
 
 	// collision leads to overwrite and could mean undercounting
-	if (stored_hash != 0 && (time_now - last) <= config.hitms) {
+	if (stored_hash != 0 && (time_now - last) <= config.hit_time_window_ms) {
 		kr_log_warning(TUNNEL, "Domain hit collision: new hash %lu, stored hash %lu\n", h, stored_hash);
 	}
-	if (stored_hash != h || (time_now - last) > config.hitms) {
+	if (stored_hash != h || (time_now - last) > config.hit_time_window_ms) {
 		atomic_store_explicit(&e->name_hash, h, memory_order_relaxed);
 		atomic_store_explicit(&e->count, 0, memory_order_relaxed);
 	}
@@ -87,7 +87,7 @@ static uint32_t domain_hit_increment(const knot_dname_t *registrable, uint32_t t
 
 KR_EXPORT
 int dns_tunnel_filter_setup(const char *nn_file, const char *mmap_file, kr_rule_tags_t tags,
-		uint8_t sensitivity, uint8_t threshold, uint16_t hitms, uint16_t hitcap,
+		uint8_t sensitivity, uint8_t threshold, uint16_t hit_time_window_ms, uint16_t hit_threshold,
 		size_t capacity, uint32_t instant_limit, uint32_t rate_limit)
 {
 	if (dns_tunnel_filter)
@@ -104,8 +104,8 @@ int dns_tunnel_filter_setup(const char *nn_file, const char *mmap_file, kr_rule_
 	config.sensitivity = sensitivity;
 	config.threshold = threshold;
 
-	config.hitms = hitms;
-	config.hitcap = hitcap;
+	config.hit_time_window_ms = hit_time_window_ms;
+	config.hit_threshold = hit_threshold;
 
 	size_t capacity_log = 0;
 	for (size_t c = capacity - 1; c > 0; c >>= 1) capacity_log++;
@@ -474,7 +474,7 @@ static void do_filter(kr_layer_t *ctx, knot_pkt_t *pkt)
 		if (registrable_ret) {
 			uint32_t hits = domain_hit_increment(registrable, kr_now());
 
-			if (hits >= config.hitcap) {
+			if (hits >= config.hit_threshold) {
 				req->options.SUB_BLACKLIST = 1;
 				kr_log_info(TUNNEL, "Domain %s hit threshold with %u hits, blacklisting.\n", (char *)registrable, hits);
 			}
