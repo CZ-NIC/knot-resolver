@@ -11,10 +11,10 @@ Name:           knot-resolver
 Version:        {{ version }}
 Release:        cznic.{{ release }}%{?dist}
 Summary:        Caching full DNS Resolver
-
 License:        GPL-3.0-or-later
 URL:            https://www.knot-resolver.cz/
 Source0:        knot-resolver-%{version}.tar.xz
+
 %if 0%{GPG_CHECK}
 Source1:        knot-resolver-%{version}.tar.xz.asc
 # PGP keys used to sign upstream releases
@@ -52,6 +52,7 @@ BuildRequires:  python3-devel
 BuildRequires:  python3-setuptools
 
 Requires:       systemd
+Requires(pre):  systemd
 Requires(post): systemd
 
 # manager dependencies
@@ -82,7 +83,6 @@ BuildRequires:  lmdb-devel
 Requires:       lua-basexx
 Requires:       lua-psl
 Requires:       lua-http
-Requires(pre):  shadow-utils
 %endif
 %if 0%{?fedora} || 0%{?rhel} > 7
 BuildRequires:  pkgconfig(lmdb)
@@ -90,7 +90,6 @@ Requires:       lua5.1-basexx
 Requires:       lua5.1-cqueues
 Requires:       lua5.1-http
 Recommends:     lua5.1-psl
-Requires(pre):  shadow-utils
 %endif
 
 # we do not build HTTP module on SuSE so the build requires is not needed
@@ -101,7 +100,6 @@ BuildRequires:  openssl-devel
 %if 0%{?suse_version}
 %define NINJA ninja
 BuildRequires:  lmdb-devel
-Requires(pre):  shadow
 %endif
 
 %description
@@ -185,6 +183,9 @@ CFLAGS="%{optflags}" LDFLAGS="%{?__global_ldflags}" meson build_rpm \
 %py3_build
 
 %install
+# install sysusers
+install -m 644 -D build_rpm/systemd/knot-resolver.sysusers %{_sysusersdir}/knot-resolver.conf
+
 DESTDIR="${RPM_BUILD_ROOT}" %{NINJA} -v -C build_rpm install
 
 # add knot-resolver.service to multi-user.target.wants to support enabling kresd services
@@ -193,9 +194,6 @@ ln -s ../knot-resolver.service %{buildroot}%{_unitdir}/multi-user.target.wants/k
 
 # remove modules with missing dependencies
 rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/etcd.lua
-
-# remove unused sysusers
-rm %{buildroot}%{_prefix}/lib/sysusers.d/knot-resolver.conf
 
 %if 0%{?suse_version}
 rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/experimental_dot_auth.lua
@@ -216,8 +214,7 @@ mv %{buildroot}/%{_datadir}/doc/%{name}/* %{buildroot}/%{_pkgdocdir}/
 install -m 644 -D etc/config/config.yaml %{buildroot}%{_sysconfdir}/knot-resolver/config.yaml
 
 %pre
-getent group knot-resolver >/dev/null || groupadd -r knot-resolver
-getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysconfdir}/knot-resolver -s /sbin/nologin -c "Knot Resolver" knot-resolver
+%sysusers_create %{_sysusersdir}/knot-resolver.conf
 
 %post
 # systemd_post macro is not needed for anything (calls systemctl preset)
@@ -246,6 +243,7 @@ getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysc
 %config(noreplace) %{_sysconfdir}/knot-resolver/config.yaml
 %config(noreplace) %{_sysconfdir}/knot-resolver/root.hints
 %{_sysconfdir}/knot-resolver/icann-ca.pem
+%{_sysusersdir}/knot-resolver.conf
 %attr(750,knot-resolver,knot-resolver) %dir %{_sharedstatedir}/knot-resolver
 %attr(640,knot-resolver,knot-resolver) %{_sharedstatedir}/knot-resolver/root.keys
 %dir %{_unitdir}/multi-user.target.wants
