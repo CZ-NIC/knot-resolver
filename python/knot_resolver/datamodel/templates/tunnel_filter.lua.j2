@@ -2,7 +2,7 @@
 {% if cfg.tunnel_filter.enable -%}
 modules.load('dns_tunnel_filter')
 ffi.cdef([[
-int dns_tunnel_filter_setup(const char *nn_file, const char *mmap_file, kr_rule_tags_t tags,
+int dns_tunnel_filter_setup(const char *nn_file, const char *mmap_file, kr_rule_tags_t tags, kr_rule_tags_t rpz_tags,
 		uint8_t sensitivity, uint8_t threshold, uint16_t hit_time_window_ms, uint16_t hit_threshold,
 		size_t capacity, uint32_t instant_limit, uint32_t rate_limit);
 ]])
@@ -10,6 +10,7 @@ assert(C.dns_tunnel_filter_setup(
 	'{{ cfg.tunnel_filter.file }}',
 	'dns_tunnel_filter',
 	{{ policy_get_tagset(cfg.tunnel_filter.tags) }},
+	{{ policy_get_tagset(cfg.tunnel_filter.rpz_tags) }},
 	{{ cfg.tunnel_filter.sensitivity }},
 	{{ cfg.tunnel_filter.threshold }},
 	{{ cfg.tunnel_filter.hit_time_window_ms }},

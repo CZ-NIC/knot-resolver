@@ -16,6 +16,7 @@ class TunnelFilterSchema(ConfigSchema):
     hit_time_window_ms: domain name hash table item expiry time
     hit_threshold: number of malicious queries from SLD needed for automatic blacklisting
     tags: set of tags when to apply the filtering (same as in other local-data)
+    rpz_tags: set of tags when to apply the filtering for RPZ (same as in other local-data)
     """
 
     enable: bool = False
@@ -25,6 +26,7 @@ class TunnelFilterSchema(ConfigSchema):
     hit_time_window_ms: Int0_65535 = Int0_65535(60000)
     hit_threshold: Int0_65535 = Int0_65535(10)
     tags: Optional[List[IDPattern]] = None
+    rpz_tags: Optional[List[IDPattern]] = None
 
     def _validate(self) -> None:
         if not self.enable:

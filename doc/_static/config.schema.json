@@ -1233,6 +1233,18 @@
                     },
                     "description": "set of tags when to apply the filtering (same as in other local-data)",
                     "default": null
+                },
+                "rpz-tags": {
+                    "type": [
+                        "array",
+                        "null"
+                    ],
+                    "items": {
+                        "type": "string",
+                        "pattern": "^(?!-)[a-z0-9-]*[a-z0-9]+$"
+                    },
+                    "description": "set of tags when to apply the filtering for RPZ (same as in other local-data)",
+                    "default": null
                 }
             },
             "default": {
@@ -1242,7 +1254,8 @@
                 "threshold": 95,
                 "hit-time-window-ms": 60000,
                 "hit-threshold": 10,
-                "tags": null
+                "tags": null,
+                "rpz-tags": null
             }
         },
         "cache": {
