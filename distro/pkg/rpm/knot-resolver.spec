@@ -27,10 +27,6 @@ BuildRequires:  gnupg2
 
 Provides:       knot-resolver6 = %{version}-%{release}
 
-# alpha packaging compat, can be removed around 6.2
-Conflicts:      knot-resolver-core
-Conflicts:      knot-resolver-manager
-
 # LuaJIT only on these arches
 ExclusiveArch:	%{arm} aarch64 %{ix86} x86_64
 
