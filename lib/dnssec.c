@@ -121,6 +121,28 @@ static inline int wildcard_radix_len_diff(const knot_dname_t *expanded,
 	return knot_dname_labels(expanded, NULL) - knot_rrsig_labels(rrsig);
 }
 
+static int validate_nsec_semantics(kr_rrset_validation_ctx_t *vctx, const knot_rdataset_t *rds)
+{
+	knot_rdata_t *rd = rds->rdata;
+	for (int i = 0; i < rds->count; ++i, rd = knot_rdataset_next(rd)) {
+		// We have to lower-case 'next' with libknot >= 2.7; see also RFC 6840 5.1.
+		// LATER(optim.): it's duplicate work with the nsec_covers() call.
+		knot_dname_t next[KNOT_DNAME_MAXLEN];
+		int ret = knot_dname_to_wire(next, knot_nsec_next(rd), sizeof(next));
+		if (ret < 0)
+			return kr_error(ret);
+		knot_dname_to_lower(next);
+		// NSEC's next leading out of bailiwick could be confusing;
+		// best to catch it early and prevent it from getting KR_RANK_SECURE.
+		bool ok = knot_dname_in_bailiwick(next, vctx->zone_name) >= 0;
+		if (!ok) {
+			++vctx->rrs_counters.nsec_invalid;
+			return kr_error(KNOT_ERANGE);
+		}
+	}
+	return kr_ok();
+}
+
 int kr_rrset_validate(kr_rrset_validation_ctx_t *vctx, knot_rrset_t *covered)
 {
 	if (!vctx) {
@@ -128,6 +150,10 @@ int kr_rrset_validate(kr_rrset_validation_ctx_t *vctx, knot_rrset_t *covered)
 	}
 	if (!vctx->pkt || !covered || !vctx->keys || !vctx->zone_name) {
 		return kr_error(EINVAL);
+	}
+	if (covered->type == KNOT_RRTYPE_NSEC) {
+		int ret = validate_nsec_semantics(vctx, &covered->rrs);
+		if (ret < 0) return vctx->result = kr_error(ret);
 	}
 
 	memset(&vctx->rrs_counters, 0, sizeof(vctx->rrs_counters));
@@ -306,6 +332,10 @@ int kr_svldr_rrset(knot_rrset_t *rrs, const knot_rdataset_t *rrsigs,
 	if (knot_dname_in_bailiwick(rrs->owner, ctx->vctx.zone_name) < 0) {
 		ctx->vctx.result = kr_error(EAGAIN);
 		return ctx->vctx.result;
+	}
+	if (rrs->type == KNOT_RRTYPE_NSEC) {
+		int ret = validate_nsec_semantics(&ctx->vctx, &rrs->rrs);
+		if (ret < 0) return ctx->vctx.result = kr_error(ret);
 	}
 	for (ssize_t i = 0; i < ctx->keys.len; ++i) {
 		kr_svldr_rrset_with_key(rrs, rrsigs, &ctx->vctx, &ctx->keys.at[i]);
