@@ -73,13 +73,6 @@ BuildRequires:  pkgconfig(libprotobuf-c)
 %endif
 
 # Distro-dependent dependencies
-%if 0%{?rhel} == 7
-BuildRequires:  lmdb-devel
-# Lua 5.1 version of the libraries have different package names
-Requires:       lua-basexx
-Requires:       lua-psl
-Requires:       lua-http
-%endif
 %if 0%{?fedora} || 0%{?rhel} > 7
 BuildRequires:  pkgconfig(lmdb)
 Requires:       lua5.1-basexx
@@ -198,8 +191,8 @@ rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/http*.lua
 rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/prometheus.lua
 %endif
 
-# rename doc directory for centos 7, opensuse
-%if 0%{?suse_version} || 0%{?rhel} == 7
+# rename doc directory for opensuse
+%if 0%{?suse_version}
 install -m 755 -d %{buildroot}/%{_pkgdocdir}
 mv %{buildroot}/%{_datadir}/doc/%{name}/* %{buildroot}/%{_pkgdocdir}/
 %endif
