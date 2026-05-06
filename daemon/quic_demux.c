@@ -48,49 +48,6 @@ void quic_conn_mark_used(struct pl_quic_conn_sess_data *conn,
 	conn_heap_reschedule(conn, table);
 }
 
-kr_quic_cid_t **kr_quic_table_insert(struct pl_quic_conn_sess_data *conn,
-		const ngtcp2_cid *cid, kr_quic_table_t *table)
-{
-	uint64_t hash = cid2hash(cid, table);
-
-	kr_quic_cid_t *cidobj = malloc(sizeof(*cidobj));
-	if (cidobj == NULL)
-		return NULL;
-
-	memcpy(cidobj->cid_placeholder, cid, sizeof(*cid));
-	cidobj->conn_sess = conn;
-
-	kr_quic_cid_t **addto = table->conns + (hash % table->size);
-	cidobj->next = *addto;
-	*addto = cidobj;
-	table->pointers++;
-	conn->cid_pointers++;
-
-	return addto;
-}
-
-int kr_quic_table_add(struct pl_quic_conn_sess_data *conn_sess,
-		const ngtcp2_cid *cid, kr_quic_table_t *table)
-{
-	if (!conn_sess || !cid || !table) {
-		return kr_error(EINVAL);
-	}
-
-	conn_sess->h.heap_value = UINT64_MAX;
-	if (!heap_insert(table->expiry_heap, (heap_val_t *)conn_sess)) {
-		return kr_error(ENOMEM);
-	}
-
-	kr_quic_cid_t **addto = kr_quic_table_insert(conn_sess, cid, table);
-	if (addto == NULL) {
-		heap_delete(table->expiry_heap, heap_find(table->expiry_heap, (heap_val_t *)conn_sess));
-		return kr_error(ENOMEM);
-	}
-
-	table->usage++;
-	return kr_ok();
-}
-
 int kr_quic_table_rem2(kr_quic_cid_t **pcid, kr_quic_table_t *table)
 {
 	kr_quic_cid_t *cid = *pcid;

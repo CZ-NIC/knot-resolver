@@ -8,6 +8,15 @@
 #include "quic_stream.h"
 #include "lib/dnssec.h"
 #include "worker.h"
+#include <gnutls/gnutls.h>
+#include <libknot/wire.h>
+#include <netinet/in.h>
+#include <ngtcp2/ngtcp2.h>
+#include <sched.h>
+#include <uv.h>
+
+/* option to turn of ngtcp2 log which is usually enabled for log_level = debug */
+#define DEBUG_NGTCP2 true
 
 #define EPHEMERAL_CERT_EXPIRATION_SECONDS_RENEW_BEFORE ((time_t)60*60*24*7)
 
@@ -73,7 +82,8 @@ static int handle_packet(struct pl_quic_conn_sess_data *conn,
 	return ret;
 }
 
-static struct tls_credentials *tls_credentials_reserve(struct tls_credentials *tls_credentials)
+static struct tls_credentials *tls_credentials_reserve(
+		struct tls_credentials *tls_credentials)
 {
 	if (!tls_credentials) {
 		return NULL;
@@ -127,7 +137,8 @@ static int kr_recv_stream_data_cb(ngtcp2_conn *ngconn, uint32_t flags,
 			/* length prefix arrived in one piece */
 			knot_wire_write_u16(wire_buf_data(&stream->pers_inbuf),
 						knot_wire_read_u16(data));
-			kr_require(wire_buf_consume(&stream->pers_inbuf, sizeof(uint16_t)) == 0);
+			kr_require(wire_buf_consume(&stream->pers_inbuf,
+						sizeof(uint16_t)) == 0);
 			data += sizeof(uint16_t);
 			datalen -= sizeof(uint16_t);
 		}
@@ -166,13 +177,20 @@ static int kr_recv_stream_data_cb(ngtcp2_conn *ngconn, uint32_t flags,
 
 finished:
 	if (flags & NGTCP2_STREAM_DATA_FLAG_FIN) {
-		if (unlikely(kr_fails_assert(
-				knot_wire_read_u16(wire_buf_data(&stream->pers_inbuf))
-							+ sizeof(uint16_t)
-				== wire_buf_data_length(&stream->pers_inbuf)))) {
-			/* should not happen according to the ngtcp2 documentation
-			 * but lets be extra safe */
-			kr_log_debug(DOQ, "length mismatch between length prefix and actual length of the query\n");
+		uint16_t query_size = sizeof(uint16_t) +
+			knot_wire_read_u16(wire_buf_data(&stream->pers_inbuf));
+		size_t payload_size = wire_buf_data_length(&stream->pers_inbuf);
+
+		/* a remote endpoint might maliciously or accidentally send
+		 * less that advertised by the length prefix => malformed data.
+		 * respond by closing the connection forcefully.
+		 * (see: RFC 9250 4.3.3. Protocol Errors) */
+		if (query_size != payload_size) {
+			kr_log_debug(DOQ, "length mismatch between length prefix and actual length of the query (%hu != %zu)\n",
+					query_size, payload_size);
+			const uint8_t msg[] = "Incomplete query";
+			set_application_error(conn, DOQ_PROTOCOL_ERROR,
+					msg, sizeof(msg) - 1);
 			return NGTCP2_ERR_CALLBACK_FAILURE;
 		}
 		queue_push(conn->pending_unwrap, stream);
@@ -584,32 +602,31 @@ int quic_init_server_conn(struct pl_quic_conn_sess_data *conn,
 }
 
 static void copy_comm_storage(
-		struct pl_quic_conn_sess_data *conn,
-		struct comm_info *comm)
+		 struct pl_quic_conn_sess_data *conn,
+		 struct comm_info *comm)
 {
 	struct comm_addr_storage *addrst = &conn->comm_addr_storage;
 	if (comm->src_addr) {
-		int len = kr_sockaddr_len(comm->src_addr);
-		kr_require(len > 0 && len <= sizeof(union kr_sockaddr));
-		memcpy(&addrst->src_addr, comm->src_addr, len);
-		conn->comm_storage.src_addr = &addrst->src_addr.ip;
+		 int len = kr_sockaddr_len(comm->src_addr);
+		 kr_require(len > 0 && len <= sizeof(union kr_sockaddr));
+		 memcpy(&addrst->src_addr, comm->src_addr, len);
+		 conn->comm_storage.src_addr = &addrst->src_addr.ip;
 	}
 	if (comm->comm_addr) {
-		int len = kr_sockaddr_len(comm->comm_addr);
-		kr_require(len > 0 && len <= sizeof(union kr_sockaddr));
-		memcpy(&addrst->comm_addr, comm->comm_addr, len);
-		conn->comm_storage.comm_addr = &addrst->comm_addr.ip;
+		 int len = kr_sockaddr_len(comm->comm_addr);
+		 kr_require(len > 0 && len <= sizeof(union kr_sockaddr));
+		 memcpy(&addrst->comm_addr, comm->comm_addr, len);
+		 conn->comm_storage.comm_addr = &addrst->comm_addr.ip;
 	}
 	if (comm->dst_addr) {
-		int len = kr_sockaddr_len(comm->dst_addr);
-		kr_require(len > 0 && len <= sizeof(union kr_sockaddr));
-		memcpy(&addrst->dst_addr, comm->dst_addr, len);
-		conn->comm_storage.dst_addr = &addrst->dst_addr.ip;
+		 int len = kr_sockaddr_len(comm->dst_addr);
+		 kr_require(len > 0 && len <= sizeof(union kr_sockaddr));
+		 memcpy(&addrst->dst_addr, comm->dst_addr, len);
+		 conn->comm_storage.dst_addr = &addrst->dst_addr.ip;
 	}
 }
 
-int send_special(ngtcp2_version_cid *dec_cids,
-		kr_quic_table_t *table,
+int send_special(ngtcp2_version_cid *dec_cids, kr_quic_table_t *table,
 		struct protolayer_iter_ctx *ctx, int action,
 		struct pl_quic_conn_sess_data *conn,
 		struct session2 *session, quic_doq_error_t *doq_error)
@@ -630,8 +647,6 @@ int send_special(ngtcp2_version_cid *dec_cids,
 
 	uint8_t sreset_rand[NGTCP2_MIN_STATELESS_RESET_RANDLEN];
 	dnssec_random_buffer(sreset_rand, sizeof(sreset_rand));
-	ngtcp2_ccerr ccerr;
-	ngtcp2_ccerr_default(&ccerr);
 	ngtcp2_pkt_info pi = { 0 };
 	uint8_t rnd = 0;
 
@@ -664,16 +679,15 @@ int send_special(ngtcp2_version_cid *dec_cids,
 			break;
 		}
 
-		if (doq_error != NULL) {
-			ngtcp2_ccerr_set_application_error(&ccerr,
-					*doq_error, NULL, 0);
+		if (conn->ccerr.error_code == DOQ_NO_ERROR) {
+			set_application_error(conn, *doq_error, NULL, 0);
 		}
 
 		ret = ngtcp2_conn_write_connection_close(
 			conn->conn, NULL, &pi,
 			wire_buf_free_space(ctx->payload.wire_buf),
 			wire_buf_free_space_length(ctx->payload.wire_buf),
-			&ccerr, now);
+			&conn->ccerr, now);
 
 		QUIC_SET_CLOSING(conn);
 		break;
@@ -686,10 +700,10 @@ int send_special(ngtcp2_version_cid *dec_cids,
 
 	if (ret > 0) {
 		wire_buf_consume(ctx->payload.wire_buf, ret);
-		session2_wrap(session,
+		session2_wrap_after(session,
+				PROTOLAYER_TYPE_QUIC_CONN,
 				ctx->payload,
 				ctx->comm,
-				NULL,
 				ctx->finished_cb,
 				ctx->finished_cb_baton);
 		ret = kr_ok();
@@ -852,6 +866,7 @@ static int pl_quic_conn_sess_init(struct session2 *session, void *sess_data, voi
 	conn->odcid = p->odcid;
 	conn->retry_sent = p->retry_sent;
 	conn->table_ref = p->table;
+	ngtcp2_ccerr_default(&conn->ccerr);
 
 	memcpy(&conn->dec_cids, p->dec_cids, sizeof(ngtcp2_version_cid));
 

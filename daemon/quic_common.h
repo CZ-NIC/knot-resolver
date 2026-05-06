@@ -52,6 +52,8 @@ typedef enum {
 #define QUIC_SEND_STATELESS_RESET        (-NGTCP2_STATELESS_RESET_TOKENLEN)
 #define QUIC_SEND_CONN_CLOSE             (-2000)
 
+#define MAX_REASONLEN 128
+
 #define BUCKETS_PER_CONNS 8
 
 #define MAX_QUIC_PKT_SIZE 65536
@@ -114,6 +116,18 @@ int quic_configuration_set(void);
 int quic_configuration_free(struct net_quic_params *quic_params);
 bool kr_quic_conn_timeout(struct pl_quic_conn_sess_data *conn, uint64_t *now);
 uint64_t cid2hash(const ngtcp2_cid *cid, kr_quic_table_t *table);
+/* start uv_timer with timeout equal to ms, this timer is to be used
+ * only during the handshake, after that the negotiated max_idle_timeout
+ * will be used. Returns 0 or EINVAL */
+int quic_set_hs_timeout(struct session2 *s, uint64_t ms);
+int quic_set_idle_timeout(struct session2 *s, uint64_t ms);
+void quic_reset_expiry(struct pl_quic_conn_sess_data *conn);
+int set_application_error(struct pl_quic_conn_sess_data *conn,
+		quic_doq_error_t error_code, const uint8_t *msg, size_t msglen);
+kr_quic_cid_t **kr_quic_table_insert(struct pl_quic_conn_sess_data *conn,
+		const ngtcp2_cid *cid, kr_quic_table_t *table);
+int kr_quic_table_add(struct pl_quic_conn_sess_data *conn_sess,
+		const ngtcp2_cid *cid, kr_quic_table_t *table);
 bool init_unique_cid(ngtcp2_cid *cid, size_t len, kr_quic_table_t *table);
 void init_random_cid(ngtcp2_cid *cid, size_t len);
 uint64_t quic_timestamp(void);

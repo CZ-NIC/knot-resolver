@@ -76,6 +76,11 @@ struct pl_quic_conn_sess_data {
 	struct comm_info comm_storage;
 	struct comm_addr_storage comm_addr_storage;
 
+	/* last application error
+	 * the msg is limited to MAX_REASONLEN bytes */
+	ngtcp2_ccerr ccerr;
+	uint8_t err_msg_buffer[MAX_REASONLEN];
+
 	/* TLS data */
 	gnutls_session_t tls_session;
 	struct gnutls_priority_st *priority;
