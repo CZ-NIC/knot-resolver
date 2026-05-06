@@ -96,15 +96,57 @@ static int kr_recv_stream_data_cb(ngtcp2_conn *ngconn, uint32_t flags,
 	struct pl_quic_conn_sess_data *conn = user_data;
 	struct pl_quic_stream_sess_data *stream = stream_user_data;
 
+	if (kr_fails_assert(offset == wire_buf_data_length(&stream->pers_inbuf))) {
+		session2_force_close(stream->h.session);
+		return NGTCP2_ERR_CALLBACK_FAILURE;
+	}
+
 	stream->incflags = flags;
 	stream->sdata_offset = offset;
 
-	if (wire_buf_free_space_length(&stream->pers_inbuf) < datalen) {
-		char *new_buf = realloc(stream->pers_inbuf.buf,
-				wire_buf_data_length(&stream->pers_inbuf) + datalen);
-		kr_require(new_buf);
-		stream->pers_inbuf.buf = new_buf;
-		stream->pers_inbuf.size += datalen;
+	/* The length prefix hasn't arrived yet */
+	if (wire_buf_data_length(&stream->pers_inbuf) < 2) {
+		if (datalen == 0) {
+			session2_force_close(stream->h.session);
+			return NGTCP2_ERR_CALLBACK_FAILURE;
+		}
+		if (datalen == 1 && wire_buf_data_length(&stream->pers_inbuf) == 0) {
+			/* received only the first length prefix octet */
+			stream->pers_inbuf.buf[0] = data[0];
+			kr_require(wire_buf_consume(&stream->pers_inbuf, 1) == 0);
+			goto finished;
+		}
+		if (wire_buf_data_length(&stream->pers_inbuf) == 1) {
+			/* finish partial length prefix octet
+			 * (previous first stream payload had datalen == 1) */
+			stream->pers_inbuf.buf[1] = data[0];
+			kr_require(wire_buf_consume(&stream->pers_inbuf, 1) == 0);
+			data += 1;
+			datalen--;
+		} else {
+			/* length prefix arrived in one piece */
+			knot_wire_write_u16(wire_buf_data(&stream->pers_inbuf),
+						knot_wire_read_u16(data));
+			kr_require(wire_buf_consume(&stream->pers_inbuf, sizeof(uint16_t)) == 0);
+			data += sizeof(uint16_t);
+			datalen -= sizeof(uint16_t);
+		}
+
+		uint16_t qsize = knot_wire_read_u16(wire_buf_data(&stream->pers_inbuf));
+		uint16_t qsize_prefixed = qsize + sizeof(uint16_t);
+		if (qsize > wire_buf_free_space_length(&stream->pers_inbuf)) {
+			char *new_buf = realloc(stream->pers_inbuf.buf,
+					qsize_prefixed);
+			if (!new_buf) {
+				session2_force_close(stream->h.session);
+				return NGTCP2_ERR_CALLBACK_FAILURE;
+			}
+			stream->pers_inbuf.buf = new_buf;
+			stream->pers_inbuf.size = qsize_prefixed;
+		}
+		if (datalen == 0) {
+			goto finished;
+		}
 	}
 
 	if (datalen == 0) {
@@ -116,22 +158,23 @@ static int kr_recv_stream_data_cb(ngtcp2_conn *ngconn, uint32_t flags,
 		goto finished;
 	}
 
-	if (offset == 0) {
-		memcpy(wire_buf_free_space(&stream->pers_inbuf), data, datalen);
-		wire_buf_consume(&stream->pers_inbuf, datalen);
-	} else {
-		/* remove size header from new data and add it to the start of wb. */
-		memcpy(wire_buf_free_space(&stream->pers_inbuf), data + sizeof(uint16_t), datalen - sizeof(uint16_t));
-		knot_wire_write_u16(wire_buf_data(&stream->pers_inbuf),
-				knot_wire_read_u16(wire_buf_data(&stream->pers_inbuf)) + datalen - sizeof(uint16_t));
-		wire_buf_consume(&stream->pers_inbuf, datalen - sizeof(uint16_t));
-	}
-
+	kr_require(wire_buf_free_space_length(&stream->pers_inbuf) >= datalen);
+	memcpy(wire_buf_free_space(&stream->pers_inbuf), data, datalen);
+	wire_buf_consume(&stream->pers_inbuf, datalen);
 	(void)ngtcp2_conn_extend_max_stream_offset(ngconn, stream_id, datalen);
 	ngtcp2_conn_extend_max_offset(ngconn, datalen);
 
 finished:
 	if (flags & NGTCP2_STREAM_DATA_FLAG_FIN) {
+		if (unlikely(kr_fails_assert(
+				knot_wire_read_u16(wire_buf_data(&stream->pers_inbuf))
+							+ sizeof(uint16_t)
+				== wire_buf_data_length(&stream->pers_inbuf)))) {
+			/* should not happen according to the ngtcp2 documentation
+			 * but lets be extra safe */
+			kr_log_debug(DOQ, "length mismatch between length prefix and actual length of the query\n");
+			return NGTCP2_ERR_CALLBACK_FAILURE;
+		}
 		queue_push(conn->pending_unwrap, stream);
 	}
 
