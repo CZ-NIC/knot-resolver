@@ -29,23 +29,39 @@
 /*! \brief Default memory block size. */
 #define MM_DEFAULT_BLKSIZE 4096
 
-/*! \brief Allocs using 'mm' if any, uses system malloc() otherwise. */
-KR_EXPORT
-void *mm_alloc(knot_mm_t *mm, size_t size);
 
-/*! \brief Callocs using 'mm' if any, uses system calloc() otherwise. */
-void *mm_calloc(knot_mm_t *mm, size_t nmemb, size_t size);
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wignored-attributes"
 
-/*! \brief Reallocs using 'mm' if any, uses system realloc() otherwise. */
-KR_EXPORT
-void *mm_realloc(knot_mm_t *mm, void *what, size_t size, size_t prev_size);
-
-/*! \brief Strdups using 'mm' if any, uses system strdup() otherwise. */
-char *mm_strdup(knot_mm_t *mm, const char *s);
+// TODO: also enable for clang at some version
+#if __GNUC__ >= 11
+	#define malloc_attr(...) malloc(__VA_ARGS__)
+#else
+	#define malloc_attr(...) malloc
+#endif
 
 /*! \brief Free using 'mm' if any, uses system free() otherwise. */
 KR_EXPORT
 void mm_free(knot_mm_t *mm, const void *what);
+
+/*! \brief Allocs using 'mm' if any, uses system malloc() otherwise. */
+KR_EXPORT
+void *mm_alloc(knot_mm_t *mm, size_t size)
+__attribute__ ((malloc_attr(mm_free,2),alloc_size(2),warn_unused_result));
+
+/*! \brief Callocs using 'mm' if any, uses system calloc() otherwise. */
+void *mm_calloc(knot_mm_t *mm, size_t nmemb, size_t size)
+__attribute__ ((malloc_attr(mm_free,2),alloc_size(2,3),warn_unused_result));
+
+/*! \brief Reallocs using 'mm' if any, uses system realloc() otherwise. */
+KR_EXPORT
+void *mm_realloc(knot_mm_t *mm, void *what, size_t size, size_t prev_size)
+__attribute__ ((alloc_size(3),warn_unused_result));
+
+/*! \brief Strdups using 'mm' if any, uses system strdup() otherwise. */
+char *mm_strdup(knot_mm_t *mm, const char *s)
+__attribute__ ((malloc_attr(mm_free,2),nonnull(2),warn_unused_result/*additionally to strdup()*/));
+// TODO: check in knot-dns that (s != NULL) is really assumed.
 
 /*! \brief Initialize default memory allocation context. */
 void mm_ctx_init(knot_mm_t *mm);
@@ -53,6 +69,8 @@ void mm_ctx_init(knot_mm_t *mm);
 /*! \brief Memory pool context. */
 void mm_ctx_mempool(knot_mm_t *mm, size_t chunk_size);
 
+#undef malloc_attr
+#pragma GCC diagnostic pop
 
 /* API in addition to Knot's mempattern. */
 

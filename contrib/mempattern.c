@@ -70,7 +70,13 @@ void *mm_realloc(knot_mm_t *mm, void *what, size_t size, size_t prev_size)
 				memcpy(p, what,
 				       prev_size < size ? prev_size : size);
 			}
+		#pragma GCC diagnostic push
+		#ifdef __clang__
+			#pragma GCC diagnostic ignored "-Wunknown-warning-option"
+		#endif
+		#pragma GCC diagnostic ignored "-Wmismatched-dealloc"
 			mm_free(mm, what);
+		#pragma GCC diagnostic pop
 			return p;
 		}
 	} else {
@@ -80,9 +86,6 @@ void *mm_realloc(knot_mm_t *mm, void *what, size_t size, size_t prev_size)
 
 char *mm_strdup(knot_mm_t *mm, const char *s)
 {
-	if (s == NULL) {
-		return NULL;
-	}
 	if (mm) {
 		size_t len = strlen(s) + 1;
 		void *mem = mm_alloc(mm, len);
