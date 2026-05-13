@@ -10,7 +10,7 @@ variables:
   RESPDIFF_COUNT: 1
   RESPDIFF_FORCE: 0
   RESPERF_FORCE: 0
-  KNOT_VERSION: '3.1'
+  KNOT_VERSION: '3.5'
   LIBKRES_ABI: 9
   LIBKRES_NAME: libkres
   MESON_TEST: meson test -C build_ci* -t 4 --print-errorlogs
@@ -23,7 +23,7 @@ variables:
   IMAGE_TAG: 'v20260326'
   IMAGE_PREFIX: '$CI_REGISTRY/knot/knot-resolver-ci'
 
-image: $IMAGE_PREFIX/debian12-knot_3_3:$IMAGE_TAG
+image: $IMAGE_PREFIX/debian12-knot_3_5:$IMAGE_TAG
 default:
   interruptible: true
   tags:
@@ -346,12 +346,12 @@ lint:coverity:
     - ninja -C build_ci_lib daemon/kresd
     - ninja -C build_ci_lib kres-gen
     - git diff --quiet || (git diff; exit 1)
-kres-gen-31:
+kres-gen-33:
   <<: *kres-gen
-  image: $IMAGE_PREFIX/debian11-knot_3_1:$IMAGE_TAG
-kres-gen-32:
+  image: $IMAGE_PREFIX/debian12-knot_3_3:$IMAGE_TAG
+kres-gen-35:
   <<: *kres-gen
-  image: $IMAGE_PREFIX/debian12-knot_3_2:$IMAGE_TAG
+  image: $IMAGE_PREFIX/debian12-knot_3_5:$IMAGE_TAG
 
 root.hints:
   <<: *sanity
