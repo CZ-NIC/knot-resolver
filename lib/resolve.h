@@ -177,6 +177,9 @@ struct kr_context
 	knot_mm_t *pool;
 };
 
+/** Pointer to the singleton resolver context. NULL if not initialized */
+KR_EXPORT extern struct kr_context *the_resolver;
+
 /* Kept outside, because kres-gen.lua can't handle this depth
  * (and lines here were too long anyway). */
 struct kr_request_qsource_flags {
