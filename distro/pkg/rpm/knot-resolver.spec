@@ -24,13 +24,7 @@ License:        GPL-3.0-or-later
 URL:            https://www.knot-resolver.cz/
 Source0:        knot-resolver-%{version}.tar.xz
 
-# LuaJIT only on these arches
-%if 0%{?rhel} == 7
-# RHEL 7 does not have aarch64 LuaJIT
-ExclusiveArch:	%{ix86} x86_64
-%else
 ExclusiveArch:	%{arm} aarch64 %{ix86} x86_64
-%endif
 
 %if 0%{GPG_CHECK}
 Source1:        knot-resolver-%{version}.tar.xz.asc
@@ -59,6 +53,7 @@ BuildRequires:  pkgconfig(luajit) >= 2.0
 BuildRequires:  jemalloc-devel
 
 Requires:       systemd
+Requires(pre):  systemd
 Requires(post): systemd
 
 # dnstap module dependencies
@@ -69,21 +64,12 @@ BuildRequires:  pkgconfig(libprotobuf-c)
 %endif
 
 # Distro-dependent dependencies
-%if 0%{?rhel} == 7
-BuildRequires:  lmdb-devel
-# Lua 5.1 version of the libraries have different package names
-Requires:       lua-basexx
-Requires:       lua-psl
-Requires:       lua-http
-Requires(pre):  shadow-utils
-%endif
 %if 0%{?fedora} || 0%{?rhel} > 7
 BuildRequires:  pkgconfig(lmdb)
 Requires:       lua5.1-basexx
 Requires:       lua5.1-cqueues
 Requires:       lua5.1-http
 Recommends:     lua5.1-psl
-Requires(pre):  shadow-utils
 %endif
 
 # we do not build HTTP module on SuSE so the build requires is not needed
@@ -95,10 +81,6 @@ BuildRequires:  openssl-devel
 # openSUSE specific
 %define NINJA ninja
 BuildRequires:  lmdb-devel
-Requires(pre):  shadow
-
-Provides:   user(knot-resolver)
-Provides:   group(knot-resolver)
 %endif
 
 %if 0%{?DOCS}
@@ -214,6 +196,9 @@ CFLAGS="%{optflags}" LDFLAGS="%{?__global_ldflags}" meson build_rpm \
 meson test -C build_rpm
 
 %install
+# install sysusers
+install -m 644 -D build_rpm/systemd/knot-resolver.sysusers %{_sysusersdir}/knot-resolver.conf
+
 DESTDIR="${RPM_BUILD_ROOT}" %{NINJA} -v -C build_rpm install
 
 # add kresd.target to multi-user.target.wants to support enabling kresd services
@@ -223,9 +208,6 @@ ln -s ../kresd.target %{buildroot}%{_unitdir}/multi-user.target.wants/kresd.targ
 # remove modules with missing dependencies
 rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/etcd.lua
 
-# remove unused sysusers
-rm %{buildroot}%{_prefix}/lib/sysusers.d/knot-resolver.conf
-
 %if 0%{?suse_version}
 rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/experimental_dot_auth.lua
 rm -r %{buildroot}%{_libdir}/knot-resolver/kres_modules/http
@@ -233,15 +215,14 @@ rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/http*.lua
 rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/prometheus.lua
 %endif
 
-# rename doc directory for centos 7, opensuse
-%if 0%{?suse_version} || 0%{?rhel} == 7
+# rename doc directory for opensuse
+%if 0%{?suse_version}
 install -m 755 -d %{buildroot}/%{_pkgdocdir}
 mv %{buildroot}/%{_datadir}/doc/%{name}/* %{buildroot}/%{_pkgdocdir}/
 %endif
 
 %pre
-getent group knot-resolver >/dev/null || groupadd -r knot-resolver
-getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysconfdir}/knot-resolver -s /sbin/nologin -c "Knot Resolver" knot-resolver
+%sysusers_create %{_sysusersdir}/knot-resolver.conf
 
 %if "x%{?rhel}" == "x"
 # upgrade-4-to-5
@@ -314,6 +295,7 @@ fi
 %config(noreplace) %{_sysconfdir}/knot-resolver/kresd.conf
 %config(noreplace) %{_sysconfdir}/knot-resolver/root.hints
 %{_sysconfdir}/knot-resolver/icann-ca.pem
+%{_sysusersdir}/knot-resolver.conf
 %attr(750,knot-resolver,knot-resolver) %dir %{_sharedstatedir}/knot-resolver
 %attr(640,knot-resolver,knot-resolver) %{_sharedstatedir}/knot-resolver/root.keys
 %{_unitdir}/kresd@.service

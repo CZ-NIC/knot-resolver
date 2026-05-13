@@ -1,10 +1,14 @@
 Knot Resolver 5.7.7 (2026-0m-dd)
 ================================
 
-Improvements:
--------------
+Improvements
+------------
 - support cmocka 2.0.0
 - avoid AD=1 in reply if ANSWER+AUTHORITY are empty (#914)
+- packaging: rpm: added systemd's sysusers support (!1830)  
+  This should also resolve the issue with user and group  
+  configuration during installation (GH#130).
+
 
 Bugfixes
 --------

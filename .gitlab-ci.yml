@@ -10,7 +10,7 @@ variables:
   RESPDIFF_COUNT: 1
   RESPDIFF_FORCE: 0
   RESPERF_FORCE: 0
-  KNOT_VERSION: '3.1'
+  KNOT_VERSION: '3.5'
   LIBKRES_ABI: 9
   LIBKRES_NAME: libkres
   MESON_TEST: meson test -C build_ci* -t 4 --print-errorlogs
@@ -20,10 +20,10 @@ variables:
   # IMAGE_TAG is a Git branch/tag name from https://gitlab.nic.cz/knot/knot-resolver-ci
   # In general, keep it pointing to a tag - use a branch only for development.
   # More info in the knot-resolver-ci repository.
-  IMAGE_TAG: 'v20250324'
+  IMAGE_TAG: 'v20260326'
   IMAGE_PREFIX: '$CI_REGISTRY/knot/knot-resolver-ci'
 
-image: $IMAGE_PREFIX/debian12-knot_3_3:$IMAGE_TAG
+image: $IMAGE_PREFIX/debian12-knot_3_5:$IMAGE_TAG
 default:
   interruptible: true
   tags:
@@ -119,33 +119,6 @@ build-stable:
     - meson build_ci_stable --prefix=$PREFIX -Dmalloc=disabled -Dwerror=true -Dextra_tests=enabled -Dbench=enabled
     - ninja -C build_ci_stable
     - ninja -C build_ci_stable install >/dev/null
-    - ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite snowflake
-
-build-deb11-knot31:
-  <<: *build
-  image: $IMAGE_PREFIX/debian11-knot_3_1:$IMAGE_TAG
-  script:
-    - meson build_ci_deb11_knot31 --prefix=$PREFIX -Dmalloc=disabled -Dwerror=true -Dextra_tests=enabled
-    - ninja -C build_ci_deb11_knot31
-    - ninja -C build_ci_deb11_knot31 install >/dev/null
-    - ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite snowflake
-
-build-deb11-knot32:
-  <<: *build
-  image: $IMAGE_PREFIX/debian11-knot_3_2:$IMAGE_TAG
-  script:
-    - meson build_ci_deb11_knot32 --prefix=$PREFIX -Dmalloc=disabled -Dwerror=true -Dextra_tests=enabled
-    - ninja -C build_ci_deb11_knot32
-    - ninja -C build_ci_deb11_knot32 install >/dev/null
-    - ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite snowflake
-
-build-deb12-knot32:
-  <<: *build
-  image: $IMAGE_PREFIX/debian12-knot_3_2:$IMAGE_TAG
-  script:
-    - meson build_ci_deb12_knot32 --prefix=$PREFIX -Dmalloc=disabled -Dwerror=true -Dextra_tests=enabled
-    - ninja -C build_ci_deb12_knot32
-    - ninja -C build_ci_deb12_knot32 install >/dev/null
     - ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite snowflake
 
 build-deb12-knot-master:
@@ -373,12 +346,12 @@ lint:coverity:
     - ninja -C build_ci_lib daemon/kresd
     - ninja -C build_ci_lib kres-gen
     - git diff --quiet || (git diff; exit 1)
-kres-gen-31:
+kres-gen-33:
   <<: *kres-gen
-  image: $IMAGE_PREFIX/debian11-knot_3_1:$IMAGE_TAG
-kres-gen-32:
+  image: $IMAGE_PREFIX/debian12-knot_3_3:$IMAGE_TAG
+kres-gen-35:
   <<: *kres-gen
-  image: $IMAGE_PREFIX/debian12-knot_3_2:$IMAGE_TAG
+  image: $IMAGE_PREFIX/debian12-knot_3_5:$IMAGE_TAG
 
 root.hints:
   <<: *sanity
@@ -859,7 +832,7 @@ pkg:make-archive:
   # archive is created once and reused in other pkg jobs
   <<: *pkg_deb_extras
   stage: pkg
-  image: $CI_REGISTRY/packaging/apkg/full/ubuntu-24.04
+  image: $CI_REGISTRY/packaging/apkg/full/ubuntu-26.04
   tags:
     - lxc
     - amd64
@@ -893,10 +866,6 @@ pkg:ubuntu-25.10:
   <<: *pkg_test_deb
   image: $CI_REGISTRY/packaging/apkg/full/ubuntu-25.10
 
-pkg:ubuntu-25.04:
-  <<: *pkg_test_deb
-  image: $CI_REGISTRY/packaging/apkg/full/ubuntu-25.04
-
 pkg:ubuntu-24.04:
   <<: *pkg_test_deb
   image: $CI_REGISTRY/packaging/apkg/full/ubuntu-24.04
@@ -914,6 +883,14 @@ pkg:ubuntu-20.04:
 pkg:fedora-42:
   <<: *pkg_test
   image: $CI_REGISTRY/packaging/apkg/full/fedora-42
+
+pkg:fedora-43:
+  <<: *pkg_test
+  image: $CI_REGISTRY/packaging/apkg/full/fedora-43
+
+pkg:fedora-44:
+  <<: *pkg_test
+  image: $CI_REGISTRY/packaging/apkg/full/fedora-44
 
 pkg:alma-9:
   <<: *pkg_test
