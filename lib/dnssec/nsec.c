@@ -10,10 +10,9 @@
 #include <libknot/rrset.h>
 #include <libknot/rrtype/nsec.h>
 #include <libknot/rrtype/rrsig.h>
-#include <libdnssec/error.h>
-#include <libdnssec/nsec.h>
 
 #include "lib/defines.h"
+#include "lib/dnssec.h"
 #include "lib/dnssec/nsec.h"
 #include "lib/utils.h"
 #include "lib/resolve.h"
