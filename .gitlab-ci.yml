@@ -736,6 +736,14 @@ pkg:fedora-42:
   <<: *pkg_test
   image: $CI_REGISTRY/packaging/apkg/full/fedora-42
 
+pkg:fedora-43:
+  <<: *pkg_test
+  image: $CI_REGISTRY/packaging/apkg/full/fedora-43
+
+pkg:fedora-44:
+  <<: *pkg_test
+  image: $CI_REGISTRY/packaging/apkg/full/fedora-44
+
 pkg:alma-9:
   <<: *pkg_test
   image: $CI_REGISTRY/packaging/apkg/full/alma-9
