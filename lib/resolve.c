@@ -27,6 +27,8 @@
 
 #define VERBOSE_MSG(qry, ...) kr_log_q((qry), RESOLVER,  __VA_ARGS__)
 
+struct kr_context *the_resolver = NULL;
+
 bool kr_rank_check(uint8_t rank)
 {
 	switch (rank & ~KR_RANK_AUTH) {

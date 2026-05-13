@@ -645,6 +645,7 @@ int engine_init(struct engine *engine, knot_mm_t *pool)
 		engine_deinit(engine);
 		return ret;
 	}
+	the_resolver = &engine->resolver;
 	/* Initialize network */
 	network_init(&engine->net, uv_default_loop(), TCP_BACKLOG_DEFAULT);
 
@@ -685,6 +686,7 @@ void engine_deinit(struct engine *engine)
 	for (size_t i = 0; i < engine->modules.len; ++i) {
 		engine_unload(engine, engine->modules.at[i]);
 	}
+	the_resolver = NULL;
 	kr_zonecut_deinit(&engine->resolver.root_hints);
 	kr_cache_close(&engine->resolver.cache);
 
