@@ -731,6 +731,7 @@ typedef struct zs_scanner {
 	_Bool long_string;
 	_Bool comma_list;
 	_Bool pending_backslash;
+	_Bool to_lower;
 	uint8_t *dname;
 	uint32_t *dname_length;
 	uint32_t dname_tmp_length;
@@ -769,6 +770,7 @@ typedef struct zs_scanner {
 	uint16_t r_class;
 	uint32_t r_ttl;
 	uint16_t r_type;
+	_Bool r_data_generic;
 	uint32_t r_data_length;
 	uint8_t r_data[65535];
 } zs_scanner_t;
