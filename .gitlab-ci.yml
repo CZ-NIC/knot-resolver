@@ -377,9 +377,6 @@ lint:coverity:
 kres-gen-35:
   <<: *kres-gen
   image: $IMAGE_PREFIX/debian13-knot_3_5:$IMAGE_TAG
-kres-gen-33:
-  <<: *kres-gen
-  image: $IMAGE_PREFIX/debian13-knot_3_3:$IMAGE_TAG
 
 root.hints:
   <<: *sanity
