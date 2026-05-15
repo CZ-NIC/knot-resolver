@@ -3,7 +3,7 @@ Knot Resolver 6.4.0 (2026-05-27)
 
 Improvements
 ------------
-- packaging: rpm: added systemd's sysusers support (!1830)
+- packaging: rpm: added systemd's sysusers support (!1830, !1836)
 
 
 Knot Resolver 6.3.0 (2026-04-27)

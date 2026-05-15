@@ -79,6 +79,7 @@ Requires:       lua5.1-basexx
 Requires:       lua5.1-cqueues
 Requires:       lua5.1-http
 Recommends:     lua5.1-psl
+Requires(pre):  shadow-utils
 %endif
 
 # we do not build HTTP module on SuSE so the build requires is not needed
@@ -89,6 +90,7 @@ BuildRequires:  openssl-devel
 %if 0%{?suse_version}
 %define NINJA ninja
 BuildRequires:  lmdb-devel
+Requires(pre):  shadow
 %endif
 
 %description
@@ -172,9 +174,6 @@ CFLAGS="%{optflags}" LDFLAGS="%{?__global_ldflags}" meson build_rpm \
 %py3_build
 
 %install
-# install sysusers
-install -m 644 -D build_rpm/systemd/knot-resolver.sysusers %{_sysusersdir}/knot-resolver.conf
-
 DESTDIR="${RPM_BUILD_ROOT}" %{NINJA} -v -C build_rpm install
 
 # add knot-resolver.service to multi-user.target.wants to support enabling kresd services
@@ -203,7 +202,8 @@ mv %{buildroot}/%{_datadir}/doc/%{name}/* %{buildroot}/%{_pkgdocdir}/
 install -m 644 -D etc/config/config.yaml %{buildroot}%{_sysconfdir}/knot-resolver/config.yaml
 
 %pre
-%sysusers_create %{_sysusersdir}/knot-resolver.conf
+getent group knot-resolver >/dev/null || groupadd -r knot-resolver
+getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysconfdir}/knot-resolver -s /sbin/nologin -c "Knot Resolver" knot-resolver
 
 %post
 # systemd_post macro is not needed for anything (calls systemctl preset)
