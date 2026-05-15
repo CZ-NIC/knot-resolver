@@ -32,8 +32,8 @@ Garbage collector
 Garbage collector keeps free space in cache for new records
 by evicting existing ones.
 
-The garbage collection process is spawned in a regular time intervals,
-each time checking whether the occupied space exceeded a threshold.
+The GC process checks in a regular time intervals
+whether the occupied space exceeded a set threshold.
 If the threshold is exceeded, the content of the cache is analysed
 and a set percentage of the occupied space is released.
 Furthermore, if prefetch is enabled, a higher percentage of the occupied space is considered
@@ -80,7 +80,7 @@ usually, it is not needed and not recommended to change them.
 
    Time interval how often GC is spawned.
 
-   Usually, GC just checks percentual cache utilization and immediatelly exits,
+   Usually, GC just checks percentual cache utilization and sleeps again,
    so it is recommended to keep the value small.
    Using a large interval may lead to not freeing space in time.
 
@@ -171,19 +171,6 @@ both of which have to be met to consider the record eligible for prefetching.
 
    Require at least this number of accesses to the record per automatic update.
    It serves as a guarantee that prefetching will not significantly increase the traffic to authoritative servers.
-
-   Let us denote the :option:`min-accesses-per-update <cache/prefetch/min-accesses-per-update: <float>>` by k.
-   If we refresh the record for the first time,
-   it means that at most one of those k accesses caused a normal update
-   and we initiate the other one.
-   For successive refreshes, we again require at least other k accesses,
-   but this time, there is no need for normal updates, and so only the one refresh is incurred.
-
-   So in the worst-case we have no more than two updates (1 user-initiated + 1 automatic) per k accesses.
-   In the usual scenario, where the updates are successful and restore TTL to the same value as previously,
-   at most one update per k accesses is performed.
-   Furthermore, to meet the bound the precise timing of accesses is needed;
-   for regular accesses (and k > 1) the bound is even stricter.
 
 If the accesses are regular, their exponentially decreasing counter will converge to the equilibrium,
 where the increase in time is the same as the decay.
@@ -281,7 +268,7 @@ We however still recommend to adjust the settings if this happens.
 
 Another warning arises from canceling prefetch of expired RRs.
 This means that resolver had not enough cpu time
-to initiate update of those RRs within 5s time period before their expiration.
+to initiate update of those RRs within the set time period before their expiration.
 If this happens, resolver normally removes those prefetch entries by itself
 immediately after entering the prefetch stage when idle, which also wasn't the case.
 If you are under DoS attack, this is correct behavior:
