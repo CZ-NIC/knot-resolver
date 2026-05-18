@@ -195,16 +195,19 @@ static inline size_t pool_next_count(size_t want, size_t have)
 	/* Why a tripling growth in particular?  The issue with mempools is that
 	 * we can't really free memory (until the very end).
 	 * That changes the tradeoff, and consumed memory dominates, not cost of moving.
-	 * If @vcunat counted this right, with +1 requests and *q growth (q>1), we use about:
-	 *  - 2q^2 / (q^2 - 1) factor of space in the average case,
-	 *    which is a decreasing function of q;
+	 * With +1 requests and *q growth (q>1), we use about:
 	 *  - q^2 / (q - 1) factor of space in the worst case,
-	 *    which has minimum for q=2 and it grows for q>2
-	 * Note that for q<2 both values end up worse (i.e. larger) than for q=2.
+	 *    which has minimum for q=2 and it grows for q>2;
+	 *  - q^2 / (q - 1)^2 * ln(q) factor of space in the average case,
+	 *    which has minimum between q=3 and q=4;
+	 *  - 2q^2 / (q^2 - 1) factor of space in the middle case between reallocations,
+	 *    which is a decreasing function of q.
+	 * Note that for q<2 all values end up worse (i.e. larger) than for q=2.
 	 * That gives us:
-	 *   q=2   -> (2.67, 4   )
-	 *   q=3   -> (2.25, 4.5 )
-	 *   q=4   -> (2.13, 5.33)
+	 *   q=2   -> (4,    2.77, 2.67)
+	 *   q=3   -> (4.5,  2.47, 2.25)
+	 *   q=4   -> (5.33, 2.46, 2.13)
+	 *   q=5   -> (6.25, 2.51, 2.08)
 	 * We're not really limited to whole numbers, but the changes are slow,
 	 * and q=3 looks like a decent compromise.
 	 */
