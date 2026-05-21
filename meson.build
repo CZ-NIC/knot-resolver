@@ -211,7 +211,7 @@ summary({'sendmmsg': sendmmsg,
 
 ### Systemd; most is in systemd/meson.build
 systemd_files = get_option('systemd_files')
-libsystemd = dependency('libsystemd', required: systemd_files == 'enabled')
+libsystemd = dependency('libsystemd', version: '>=235', required: systemd_files == 'enabled')
 summary({'libsystemd support': libsystemd.found(),
          'files': systemd_files == 'enabled',
         }, section: 'Systemd', bool_yn: true)
