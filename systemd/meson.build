@@ -15,7 +15,7 @@ systemd_config.set('lib_dir', lib_dir)
 
 if systemd_files == 'enabled'
 
-  manager_service = configure_file(
+  systemd_service = configure_file(
     input: 'knot-resolver.service.in',
     output: 'knot-resolver.service',
     configuration: systemd_config,
@@ -23,13 +23,13 @@ if systemd_files == 'enabled'
   )
 
   ## sysusers
-  sysusers = configure_file(
+  systemd_sysusers = configure_file(
     input: 'sysusers.d/knot-resolver.conf.in',
     output: 'knot-resolver.sysusers',
     configuration: systemd_config,
   )
   install_data(
-    sysusers,
+    systemd_sysusers,
     rename: ['knot-resolver.conf'],
     install_dir: systemd_sysusers_dir,
   )
