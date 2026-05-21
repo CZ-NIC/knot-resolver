@@ -13,36 +13,6 @@ systemd_config.set('etc_dir', etc_dir)
 systemd_config.set('run_dir', run_dir)
 systemd_config.set('lib_dir', lib_dir)
 
-if systemd_legacy_units == 'enabled'
-
-  ## unit files
-  kresd_service = configure_file(
-    input: 'kresd@.service.in',
-    output: 'kresd@.service',
-    configuration: systemd_config,
-    install_dir: systemd_unit_dir,
-  )
-  kres_cache_gc_service = configure_file(
-    input: 'kres-cache-gc.service.in',
-    output: 'kres-cache-gc.service',
-    configuration: systemd_config,
-    install_dir: systemd_unit_dir,
-  )
-  install_data(
-    sources: 'kresd.target',
-    install_dir: systemd_unit_dir,
-  )
-  ## man page
-  kresd_systemd_man = configure_file(
-    input: 'kresd.systemd.7.in',
-    output: 'kresd.systemd.7',
-    configuration: man_config,
-  )
-  install_man(kresd_systemd_man)
-
-endif
-
-
 if systemd_files == 'enabled'
 
   manager_service = configure_file(
