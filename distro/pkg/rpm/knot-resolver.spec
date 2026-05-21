@@ -36,6 +36,9 @@ Source100:      kresd-keyblock.asc
 BuildRequires:  gnupg2
 %endif
 
+Provides:       user(knot-resolver)
+Provides:       group(knot-resolver)
+
 BuildRequires:  gcc
 BuildRequires:  gcc-c++
 BuildRequires:  meson
@@ -53,7 +56,6 @@ BuildRequires:  pkgconfig(luajit) >= 2.0
 BuildRequires:  jemalloc-devel
 
 Requires:       systemd
-Requires(pre):  systemd
 Requires(post): systemd
 
 # dnstap module dependencies
@@ -70,6 +72,7 @@ Requires:       lua5.1-basexx
 Requires:       lua5.1-cqueues
 Requires:       lua5.1-http
 Recommends:     lua5.1-psl
+Requires(pre):  shadow-utils
 %endif
 
 # we do not build HTTP module on SuSE so the build requires is not needed
@@ -81,6 +84,7 @@ BuildRequires:  openssl-devel
 # openSUSE specific
 %define NINJA ninja
 BuildRequires:  lmdb-devel
+Requires(pre):  shadow
 %endif
 
 %if 0%{?DOCS}
@@ -196,9 +200,6 @@ CFLAGS="%{optflags}" LDFLAGS="%{?__global_ldflags}" meson build_rpm \
 meson test -C build_rpm
 
 %install
-# install sysusers
-install -m 644 -D build_rpm/systemd/knot-resolver.sysusers %{_sysusersdir}/knot-resolver.conf
-
 DESTDIR="${RPM_BUILD_ROOT}" %{NINJA} -v -C build_rpm install
 
 # add kresd.target to multi-user.target.wants to support enabling kresd services
@@ -207,6 +208,9 @@ ln -s ../kresd.target %{buildroot}%{_unitdir}/multi-user.target.wants/kresd.targ
 
 # remove modules with missing dependencies
 rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/etcd.lua
+
+# remove unused sysusers
+rm %{buildroot}%{_prefix}/lib/sysusers.d/knot-resolver.conf
 
 %if 0%{?suse_version}
 rm %{buildroot}%{_libdir}/knot-resolver/kres_modules/experimental_dot_auth.lua
@@ -222,7 +226,8 @@ mv %{buildroot}/%{_datadir}/doc/%{name}/* %{buildroot}/%{_pkgdocdir}/
 %endif
 
 %pre
-%sysusers_create %{_sysusersdir}/knot-resolver.conf
+getent group knot-resolver >/dev/null || groupadd -r knot-resolver
+getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysconfdir}/knot-resolver -s /sbin/nologin -c "Knot Resolver" knot-resolver
 
 %if "x%{?rhel}" == "x"
 # upgrade-4-to-5
@@ -295,7 +300,6 @@ fi
 %config(noreplace) %{_sysconfdir}/knot-resolver/kresd.conf
 %config(noreplace) %{_sysconfdir}/knot-resolver/root.hints
 %{_sysconfdir}/knot-resolver/icann-ca.pem
-%{_sysusersdir}/knot-resolver.conf
 %attr(750,knot-resolver,knot-resolver) %dir %{_sharedstatedir}/knot-resolver
 %attr(640,knot-resolver,knot-resolver) %{_sharedstatedir}/knot-resolver/root.keys
 %{_unitdir}/kresd@.service
