@@ -61,7 +61,7 @@ Equivalent to PUT method in the underlying HTTP API.
 .B stop
 Gracefully stops the running resolver.
 .SH "SEE ALSO"
-\fBkresd(8)\fR, @man_seealso_systemd@\fIhttps://www.knot-resolver.cz/documentation/latest/\fR
+\fBkresd(8)\fR, \fIhttps://www.knot-resolver.cz/documentation/latest/\fR
 .SH "AUTHORS"
 .B kresd
 developers are mentioned in the AUTHORS file in the distribution.

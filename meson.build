@@ -212,7 +212,6 @@ summary({'sendmmsg': sendmmsg,
 
 ### Systemd; most is in systemd/meson.build
 systemd_files = get_option('systemd_files')
-systemd_legacy_units = get_option('systemd_legacy_units')
 libsystemd = dependency('libsystemd', required: systemd_files == 'enabled')
 summary({'libsystemd support': libsystemd.found(),
          'files': systemd_files == 'enabled',
