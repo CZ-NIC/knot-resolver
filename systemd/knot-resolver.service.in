@@ -1,5 +1,5 @@
 [Unit]
-Description=Knot Resolver Manager
+Description=Knot Resolver
 Documentation=man:knot-resolver.systemd(7)
 Wants=network-online.target
 After=network-online.target
@@ -14,6 +14,12 @@ Environment=KRES_LOGGING_TARGET=syslog
 ExecReload=@bin_dir@/kresctl --config=@etc_dir@/config.yaml reload
 KillSignal=SIGINT
 WorkingDirectory=@systemd_work_dir@
+StateDirectory=knot-resolver
+StateDirectoryMode=0750
+RuntimeDirectory=knot-resolver
+RuntimeDirectoryMode=0750
+CacheDirectory=knot-resolver
+CacheDirectoryMode=0750
 User=@user@
 Group=@group@
 CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_SETPCAP
