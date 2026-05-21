@@ -78,7 +78,6 @@ endif
 systemd_work_dir = prefix / get_option('localstatedir') / 'lib' / 'knot-resolver'
 systemd_cache_dir = prefix / get_option('localstatedir') / 'cache' / 'knot-resolver'
 systemd_unit_dir = prefix / 'lib' / 'systemd' / 'system'
-systemd_tmpfiles_dir = prefix / 'lib' / 'tmpfiles.d'
 systemd_sysusers_dir = prefix / 'lib' / 'sysusers.d'
 completion_dir = prefix / 'share'
 
