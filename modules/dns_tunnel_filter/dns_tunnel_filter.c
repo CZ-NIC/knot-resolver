@@ -483,7 +483,7 @@ static void do_filter(kr_layer_t *ctx, knot_pkt_t *pkt)
 			}
 		}
 
-		if (registrable_ret == 0) {
+		if (registrable_ret == 0 && (rpz_do_apply || rpz_do_audit)) {
 			uint32_t hits = domain_hit_increment(registrable, kr_now());
 
 			if (hits >= config.hit_threshold) {
@@ -525,18 +525,22 @@ static int finish(kr_layer_t *ctx)
 	if (!req->options.SUB_BLACKLIST)
 		return ctx->state;
 
-	kr_rule_tags_t const tags_apply = config.tags & req->rule_tags_apply;
-	const bool do_apply = config.tags == KR_RULE_TAGS_ALL || tags_apply;
+	kr_rule_tags_t const tags_apply = config.rpz_tags & req->rule_tags_apply;
+	const bool do_apply = config.rpz_tags == KR_RULE_TAGS_ALL || tags_apply;
+
+	kr_rule_tags_t const tags_audit = config.rpz_tags & req->rule_tags_audit;
+	const bool do_audit = tags_audit && !req->rule.action;
 
 	// get the top most registrable domain, e.g. example.com from subdomain.example.com
 	knot_dname_t registrable[300];
-	if (!qname_to_registrable_dname(req, registrable, sizeof(registrable)))
+	if (qname_to_registrable_dname(req, registrable, sizeof(registrable)))
 		return ctx->state;
 
-	const kr_rule_opts_t opts = { .score = 9, .is_block = do_apply };
+	uint8_t score = do_apply ? KR_RULE_SCORE_APPLY : (do_audit ? KR_RULE_SCORE_LOG : 0);
+	const kr_rule_opts_t opts = { .score = score, .is_block = do_apply };
 	kr_rules_commit(true);
 	kr_rule_local_subtree(registrable, KR_RULE_SUB_NXDOMAIN,
-				KR_RULE_TTL_DEFAULT, config.tags, opts);
+				KR_RULE_TTL_DEFAULT, config.rpz_tags, opts);
 	kr_rules_commit(true);
 
 	return ctx->state;
