@@ -1208,20 +1208,6 @@
                     "description": "neural network inference threshold in percentage",
                     "default": 95
                 },
-                "hit-time-window-ms": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 65535,
-                    "description": "domain name hash table item expiry time",
-                    "default": 60000
-                },
-                "hit-threshold": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 65535,
-                    "description": "number of malicious queries from SLD needed for automatic blacklisting",
-                    "default": 10
-                },
                 "tags": {
                     "type": [
                         "array",
@@ -1234,17 +1220,55 @@
                     "description": "set of tags when to apply the filtering (same as in other local-data)",
                     "default": null
                 },
-                "rpz-tags": {
-                    "type": [
-                        "array",
-                        "null"
-                    ],
-                    "items": {
-                        "type": "string",
-                        "pattern": "^(?!-)[a-z0-9-]*[a-z0-9]+$"
+                "rpz-builder": {
+                    "description": "Create an RPZ from domains, which are frequently classified as tunneling",
+                    "type": "object",
+                    "properties": {
+                        "time-window-ms": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 65535,
+                            "description": "time between subsequent tunneling classifications of the same registrable domain",
+                            "default": 60000
+                        },
+                        "threshold": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 65535,
+                            "description": "number of malicious queries from a registrable domain needed for automatic blacklisting",
+                            "default": 10
+                        },
+                        "add-tags": {
+                            "type": [
+                                "array",
+                                "null"
+                            ],
+                            "items": {
+                                "type": "string",
+                                "pattern": "^(?!-)[a-z0-9-]*[a-z0-9]+$"
+                            },
+                            "description": "set of tags when to add the RPZ record for the registrable domain",
+                            "default": null
+                        },
+                        "rpz-tags": {
+                            "type": [
+                                "array",
+                                "null"
+                            ],
+                            "items": {
+                                "type": "string",
+                                "pattern": "^(?!-)[a-z0-9-]*[a-z0-9]+$"
+                            },
+                            "description": "set of tags when to apply the filtering using the created RPZ",
+                            "default": null
+                        }
                     },
-                    "description": "set of tags when to apply the filtering for RPZ (same as in other local-data)",
-                    "default": null
+                    "default": {
+                        "time_window_ms": 60000,
+                        "threshold": 10,
+                        "add_tags": null,
+                        "rpz_tags": null
+                    }
                 }
             },
             "default": {
@@ -1252,10 +1276,13 @@
                 "file": null,
                 "sensitivity": 10,
                 "threshold": 95,
-                "hit-time-window-ms": 60000,
-                "hit-threshold": 10,
                 "tags": null,
-                "rpz-tags": null
+                "rpz_builder": {
+                    "time_window_ms": 60000,
+                    "threshold": 10,
+                    "add_tags": null,
+                    "rpz_tags": null
+                }
             }
         },
         "cache": {
