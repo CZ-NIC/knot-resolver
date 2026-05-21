@@ -5,7 +5,8 @@ Improvements
 ------------
 - support cmocka 2.0.0
 - avoid AD=1 in reply if ANSWER+AUTHORITY are empty (#914)
-- packaging: rpm: added systemd's sysusers support (!1830)  
+- packaging: rpm: require python3-setuptools (!1831)
+- packaging: rpm: provide user/group (!1838)  
   This should also resolve the issue with user and group  
   configuration during installation (GH#130).
 - make DoH cache-control header respect our cache's TTL limits (!1832)
