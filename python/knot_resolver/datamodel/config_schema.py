@@ -21,8 +21,8 @@ from knot_resolver.datamodel.network_schema import NetworkSchema
 from knot_resolver.datamodel.options_schema import OptionsSchema
 from knot_resolver.datamodel.rate_limiting_schema import RateLimitingSchema
 from knot_resolver.datamodel.templates import KRESD_CONFIG_TEMPLATE, POLICY_LOADER_CONFIG_TEMPLATE
-from knot_resolver.datamodel.tunnel_filter_schema import TunnelFilterSchema
-from knot_resolver.datamodel.types import EscapedStr, IntPositive, WritableDir
+from knot_resolver.datamodel.tunnel_filter_schema import RpzBuilderSchema, TunnelFilterSchema
+from knot_resolver.datamodel.types import EscapedStr, IDPattern, IntPositive, WritableDir
 from knot_resolver.datamodel.view_schema import ViewSchema
 from knot_resolver.utils.modeling import ConfigSchema
 from knot_resolver.utils.modeling.base_schema import lazy_default
@@ -86,6 +86,35 @@ def _check_local_data_tags(
                     )
                 )
             i += 1
+    return tags, errs
+
+
+def _check_tag_field(
+    rule_tags: Optional[List[IDPattern]], views_tags: List[str], tags: List[str], path: str
+) -> List[DataValidationError]:
+    if not rule_tags:
+        return []
+    tags_not_in = []
+    for tag in rule_tags:
+        tag_str = str(tag)
+        if tag_str not in tags:
+            tags.append(tag_str)
+        if tag_str not in views_tags:
+            tags_not_in.append(tag_str)
+    if tags_not_in:
+        return [DataValidationError(f"some tags {tags_not_in} not found in '/views' tags", path)]
+    return []
+
+
+def _check_local_data_extra_tags(
+    views_tags: List[str], rules_or_rpz: List[RpzBuilderSchema]
+) -> Tuple[List[str], List[DataValidationError]]:
+    tags: List[str] = []
+    errs = []
+
+    for i, rule in enumerate(rules_or_rpz):
+        errs += _check_tag_field(rule.rpz_tags, views_tags, tags, f"/tunnel-filter/rpz-builder[{i}]/rpz-tags")
+        errs += _check_tag_field(rule.add_tags, views_tags, tags, f"/tunnel-filter/rpz-builder[{i}]/add-tags")
     return tags, errs
 
 
@@ -198,7 +227,7 @@ class KresConfig(ConfigSchema):
 
         return obj.workers
 
-    def _validate(self) -> None:  # noqa: C901
+    def _validate(self) -> None:  # noqa: C901, PLR0912
         # warn about '/management/unix-socket' not located in '/rundir'
         if self.management.unix_socket and self.management.unix_socket.to_path().parent != self.rundir.to_path():
             logger.warning(
@@ -241,6 +270,12 @@ class KresConfig(ConfigSchema):
             tunnel_tags, tunnel_errs = _check_local_data_tags(views_tags, [self.tunnel_filter])
             errs += tunnel_errs
             local_data_tags += tunnel_tags
+            if self.tunnel_filter.rpz_builder:
+                tunnel_rpz_tags, tunnel_rpz_errs = _check_local_data_extra_tags(
+                    views_tags, [self.tunnel_filter.rpz_builder]
+                )
+                errs += tunnel_rpz_errs
+                local_data_tags += tunnel_rpz_tags
 
         # look for unused tags in /views
         unused_tags = views_tags.copy()

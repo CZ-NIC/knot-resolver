@@ -55,6 +55,7 @@ struct {
 	uint16_t hit_time_window_ms;
 	uint16_t hit_threshold;
 	kr_rule_tags_t tags;
+	kr_rule_tags_t add_tags;
 	kr_rule_tags_t rpz_tags;
 } config = {0};
 
@@ -87,7 +88,7 @@ static uint32_t domain_hit_increment(const knot_dname_t *registrable, uint32_t t
 }
 
 KR_EXPORT
-int dns_tunnel_filter_setup(const char *nn_file, const char *mmap_file, kr_rule_tags_t tags, kr_rule_tags_t rpz_tags,
+int dns_tunnel_filter_setup(const char *nn_file, const char *mmap_file, kr_rule_tags_t tags, kr_rule_tags_t add_tags, kr_rule_tags_t rpz_tags,
 		uint8_t sensitivity, uint8_t threshold, uint16_t hit_time_window_ms, uint16_t hit_threshold,
 		size_t capacity, uint32_t instant_limit, uint32_t rate_limit)
 {
@@ -95,6 +96,7 @@ int dns_tunnel_filter_setup(const char *nn_file, const char *mmap_file, kr_rule_
 		return kr_error(EALREADY); // we don't support reconfiguration for now
 
 	config.tags = tags;
+	config.add_tags = add_tags;
 	config.rpz_tags = rpz_tags;
 
 	int ret;
@@ -185,7 +187,7 @@ static bool ensure_loaded(void)
 
 	kr_log_warning(TUNNEL, "Tunneling filter not initialized from Lua, using hardcoded default.\n");
 	int ret = dns_tunnel_filter_setup("/home/blcnn.pt", // FIXME TMP
-					"dns_tunnel_filter", KR_RULE_TAGS_ALL, KR_RULE_TAGS_ALL,
+					"dns_tunnel_filter", KR_RULE_TAGS_ALL, KR_RULE_TAGS_ALL, KR_RULE_TAGS_ALL,
 					10, 95, 60000, 10,
 					(1 << 20), (1 << 8), (1 << 17));
 	return ret == kr_ok();
@@ -404,13 +406,13 @@ static void do_filter(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 	// RPZ modification
 	// _apply tags take precendence, and we store the last one
-	kr_rule_tags_t const rpz_tags_apply = config.rpz_tags & req->rule_tags_apply;
-	const bool rpz_do_apply = config.rpz_tags == KR_RULE_TAGS_ALL || rpz_tags_apply;
+	kr_rule_tags_t const add_tags_apply = config.add_tags & req->rule_tags_apply;
+	const bool add_do_apply = config.add_tags == KR_RULE_TAGS_ALL || add_tags_apply;
 	// _audit: we fill everything if we're the very first action
-	kr_rule_tags_t const rpz_tags_audit = config.rpz_tags & req->rule_tags_audit;
-	const bool rpz_do_audit = rpz_tags_audit && !req->rule.action;
+	kr_rule_tags_t const add_tags_audit = config.add_tags & req->rule_tags_audit;
+	const bool add_do_audit = add_tags_audit && !req->rule.action;
 
-	if (!det_do_apply && !det_do_audit && !rpz_do_apply && !rpz_do_audit)
+	if (!det_do_apply && !det_do_audit && !add_do_apply && !add_do_audit)
 		return; // we save the expensive computations
 
 	const uint32_t time_now = kr_now();
@@ -483,14 +485,14 @@ static void do_filter(kr_layer_t *ctx, knot_pkt_t *pkt)
 			}
 		}
 
-		if (registrable_ret == 0) {
+		if (registrable_ret == 0 && (add_do_apply || add_do_audit)) {
 			uint32_t hits = domain_hit_increment(registrable, kr_now());
 
 			if (hits >= config.hit_threshold) {
 				req->options.SUB_BLACKLIST = 1;
-				req_do_apply = rpz_do_apply;
-				req_do_audit = rpz_do_audit;
-				req_tags = rpz_do_apply ? rpz_tags_apply : rpz_tags_audit;
+				req_do_apply = add_do_apply;
+				req_do_audit = add_do_audit;
+				req_tags = add_do_apply ? add_tags_apply : add_tags_audit;
 				kr_log_info(TUNNEL, "Domain %s hit threshold with %u hits, blacklisting.\n", (char *)registrable, hits);
 			}
 		}
@@ -525,18 +527,22 @@ static int finish(kr_layer_t *ctx)
 	if (!req->options.SUB_BLACKLIST)
 		return ctx->state;
 
-	kr_rule_tags_t const tags_apply = config.tags & req->rule_tags_apply;
-	const bool do_apply = config.tags == KR_RULE_TAGS_ALL || tags_apply;
+	kr_rule_tags_t const tags_apply = config.rpz_tags & req->rule_tags_apply;
+	const bool do_apply = config.rpz_tags == KR_RULE_TAGS_ALL || tags_apply;
+
+	kr_rule_tags_t const tags_audit = config.rpz_tags & req->rule_tags_audit;
+	const bool do_audit = tags_audit && !req->rule.action;
 
 	// get the top most registrable domain, e.g. example.com from subdomain.example.com
 	knot_dname_t registrable[300];
-	if (!qname_to_registrable_dname(req, registrable, sizeof(registrable)))
+	if (qname_to_registrable_dname(req, registrable, sizeof(registrable)))
 		return ctx->state;
 
-	const kr_rule_opts_t opts = { .score = 9, .is_block = do_apply };
+	uint8_t score = do_apply ? KR_RULE_SCORE_APPLY : (do_audit ? KR_RULE_SCORE_LOG : 0);
+	const kr_rule_opts_t opts = { .score = score, .is_block = do_apply };
 	kr_rules_commit(true);
 	kr_rule_local_subtree(registrable, KR_RULE_SUB_NXDOMAIN,
-				KR_RULE_TTL_DEFAULT, config.tags, opts);
+				KR_RULE_TTL_DEFAULT, config.rpz_tags, opts);
 	kr_rules_commit(true);
 
 	return ctx->state;
