@@ -7,6 +7,10 @@ Improvements
 - packaging: rpm: provide user/group (!1837)
 - controller: improved error handling when sending commands to workers (!1834)
 
+Bugfixes
+--------
+- dns64: fix CNAME problems again (#797, !1840)
+
 
 Knot Resolver 6.3.0 (2026-04-27)
 ================================
