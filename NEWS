@@ -1,3 +1,11 @@
+Knot Resolver 6.5.0 (2026-mm-dd)
+================================
+
+Packaging
+---------
+- deb: migrate to sysusers and update packaging (!1857)
+
+
 Knot Resolver 6.4.1 (2026-mm-dd)
 ================================
 
