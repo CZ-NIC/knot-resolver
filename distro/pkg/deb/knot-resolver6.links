@@ -1,1 +1,0 @@
-usr/lib/systemd/system/knot-resolver.service usr/lib/systemd/system/multi-user.target.wants/knot-resolver.service

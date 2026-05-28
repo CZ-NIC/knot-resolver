@@ -1,4 +1,3 @@
 usr/lib/knot-resolver/kres_modules/etcd.lua
 usr/lib/knot-resolver/kres_modules/http/LICENSE
-usr/lib/sysusers.d/knot-resolver.conf
 usr/share/doc/knot-resolver/COPYING

@@ -1,9 +1,0 @@
-#!/bin/sh
-# SPDX-License-Identifier: GPL-3.0-or-later
-set -e
-
-if [ "$1" = "remove" ]; then
-    deb-systemd-invoke stop system-kresd.slice || true
-fi
-
-#DEBHELPER#
