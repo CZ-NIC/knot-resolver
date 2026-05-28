@@ -2,23 +2,25 @@ Source: knot-resolver
 Section: net
 Priority: optional
 Maintainer: Knot Resolver <knot-resolver@labs.nic.cz>
+Standards-Version: 4.7.3
+Homepage: https://www.knot-resolver.cz/
+Rules-Requires-Root: no
 Build-Depends:
- debhelper (>= 12~),
+ debhelper-compat (= 13),
  dh-python,
  dns-root-data,
  libcap-ng-dev,
- libcmocka-dev (>= 1.0.0),
+ libcmocka-dev,
  libfstrm-dev,
  libgnutls28-dev,
  libjemalloc-dev,
- libknot-dev (>= 3.0.2),
+ libknot-dev,
  liblmdb-dev,
  libluajit-5.1-dev,
  libnghttp2-dev,
  libprotobuf-c-dev,
- libpython3-dev,
  libssl-dev,
- libsystemd-dev (>= 227) [linux-any],
+ libsystemd-dev [linux-any],
  libuv1-dev,
  luajit,
  meson,
@@ -26,15 +28,11 @@ Build-Depends:
  pkgconf,
  protobuf-compiler,
  protobuf-c-compiler,
- python3-dev:any,
- python3-setuptools,
-Standards-Version: 4.7.3
-Homepage: https://www.knot-resolver.cz/
+ python3-dev:any
 
 Package: knot-resolver6
 Architecture: any
 Depends:
- adduser,
  dns-root-data,
  python3-aiohttp,
  python3-jinja2,
@@ -43,59 +41,43 @@ Depends:
  systemd,
  ${misc:Depends},
  ${python3:Depends},
- ${shlibs:Depends},
-Breaks:
- knot-resolver (<< 6),
- knot-resolver-core (<< 6.0.8),
- knot-resolver-manager (<< 6.0.8),
-Replaces:
- knot-resolver (<< 6),
- knot-resolver-core (<< 6.0.8),
- knot-resolver-manager (<< 6.0.8),
+ ${shlibs:Depends}
 Recommends:
  lua-basexx,
  lua-cqueues,
  lua-http,
  lua-psl,
  python3-prometheus-client,
- python3-watchdog,
+ python3-watchdog
 Suggests:
- knot-resolver6-module-http,
-Description: caching, DNSSEC-validating DNS resolver - binaries
- Knot Resolver is a caching full resolver implementation
- written in C and LuaJIT, including both a resolver library and a
- daemon. Modular architecture of the library keeps the core tiny and
- efficient, and provides a state-machine like API for
- extensions. There are three built-in modules - iterator, cache,
- validator, and many external.
+ knot-resolver6-module-http
+Breaks:
+ knot-resolver (<< 6)
+Replaces:
+ knot-resolver (<< 6)
+Description: recursive DNS resolver with DNSSEC validation
+ Knot Resolver is a caching full DNS resolver implemented in C, LuaJIT, and Python.
+ It consists of a resolver library, a resolving daemon, and a manager.
+ Its modular architecture keeps the core small and efficient while providing a
+ state-machine-like API for extensions.
  .
- The Lua modules, switchable and shareable cache, and fast FFI
- bindings makes it great to tap into resolution process, or be used
- for your recursive DNS service. It's the OpenResty of DNS.
+ The Lua-based module system, shared cache, and fast FFI bindings enable deep integration
+ into the resolution process and flexible deployment of recursive DNS services.
  .
- The server adopts a different scaling strategy than the rest of the
- DNS recursors - no threading, shared-nothing architecture (except
- MVCC cache that may be shared). You can start and stop additional
- nodes depending on the contention without downtime.
+ Unlike threaded resolvers, Knot Resolver uses a shared-nothing architecture with an
+ optional shared MVCC cache, enabling horizontal scaling through multiple independent workers.
  .
- Knot Resolver Manager hides the complexity of running several independent
- resolver processes while ensuring zero-downtime reconfiguration with YAML/JSON
- declarative configuration and an optional HTTP API for dynamic changes.
+ Knot Resolver Manager simplifies running multiple resolver workers with zero-downtime
+ reconfiguration via declarative YAML/JSON configuration and an optional HTTP API for dynamic changes.
 
 Package: knot-resolver6-dev
+Section: libdevel
 Architecture: any
 Depends:
  knot-resolver6 (= ${binary:Version}),
- ${misc:Depends},
-Section: libdevel
+ ${misc:Depends}
 Description: Knot Resolver development files
- Knot Resolver is a caching full resolver implementation
- written in C and LuaJIT, including both a resolver library and a
- daemon. Modular architecture of the library keeps the core tiny and
- efficient, and provides a state-machine like API for
- extensions.
- .
- This package provides the development headers for Knot Resolver.
+ This package provides development headers and libraries for Knot Resolver.
 
 Package: knot-resolver6-module-dnstap
 Architecture: any
@@ -104,17 +86,10 @@ Depends:
  libfstrm0,
  libprotobuf-c1,
  ${misc:Depends},
- ${shlibs:Depends},
+ ${shlibs:Depends}
 Description: dnstap module for Knot Resolver
- The Knot Resolver is a caching full resolver implementation
- written in C and LuaJIT, including both a resolver library and a
- daemon. Modular architecture of the library keeps the core tiny and
- efficient, and provides a state-machine like API for
- extensions. There are three built-in modules - iterator, cache,
- validator, and many external.
- .
- This package contains dnstap module for logging DNS responses
- to a unix socket in dnstap format.
+ Provides dnstap logging support for Knot Resolver, enabling DNS response
+ logging over a unix socket in structured dnstap format.
 
 Package: knot-resolver6-module-http
 Architecture: all
@@ -127,14 +102,6 @@ Depends:
  lua-http,
  lua-mmdb,
  systemd,
- ${misc:Depends},
+ ${misc:Depends}
 Description: HTTP module for Knot Resolver
- The Knot Resolver is a caching full resolver implementation
- written in C and LuaJIT, including both a resolver library and a
- daemon. Modular architecture of the library keeps the core tiny and
- efficient, and provides a state-machine like API for
- extensions. There are three built-in modules - iterator, cache,
- validator, and many external.
- .
- This package contains HTTP/2 module for local visualization of the
- resolver cache and queries.
+ Provides an HTTP/2 interface for local visualization of resolver cache and query activity.

@@ -6,20 +6,18 @@ export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 
 # see ENVIRONMENT in dpkg-buildflags(1)
 # package maintainers to append CFLAGS
-export DEB_CFLAGS_MAINT_APPEND  = -Wall -pedantic -fno-omit-frame-pointer
+export DEB_CFLAGS_MAINT_APPEND  = -Wall -Wextra -pedantic -fno-omit-frame-pointer
 # package maintainers to append LDFLAGS
 export DEB_LDFLAGS_MAINT_APPEND = -Wl,--as-needed
 
-# include python modules in main package
-export PYKRES_DESTDIR=debian/knot-resolver6/
-
-# see EXAMPLES in dpkg-buildflags(1) and read /usr/share/dpkg/*
-DPKG_EXPORT_BUILDFLAGS = 1
 include /usr/share/dpkg/default.mk
 
+# python payload destination
+export PYBUILD_NAME = knot_resolver
+export PYBUILD_DESTDIR = $(CURDIR)/debian/knot-resolver6
 
 %:
-	dh $@ --with python3 --buildsystem=meson
+	dh $@ --buildsystem=meson --with python3
 
 override_dh_auto_configure:
 	dh_auto_configure -- \
@@ -36,17 +34,16 @@ override_dh_auto_configure:
 
 override_dh_auto_build:
 	dh_auto_build
-	PYBUILD_NAME=knot_resolver PYBUILD_DESTDIR="$${PYKRES_DESTDIR}" \
-		dh_auto_build --buildsystem=pybuild
+	dh_auto_build --buildsystem=pybuild
 
 override_dh_auto_install:
 	dh_auto_install
-	PYBUILD_NAME=knot_resolver PYBUILD_DESTDIR="$${PYKRES_DESTDIR}" \
-		dh_auto_install --buildsystem=pybuild
+	dh_auto_install --buildsystem=pybuild
 	install -m 644 -D etc/config/config.yaml debian/tmp/etc/knot-resolver/config.yaml
 
 override_dh_auto_clean:
 	rm -rf .pybuild/
 	rm -rf build/
 	rm -rf python/knot_resolver.egg-info
+
 	dh_auto_clean
