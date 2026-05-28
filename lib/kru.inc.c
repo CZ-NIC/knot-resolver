@@ -233,6 +233,15 @@ static bool kru_initialize(struct kru *kru, int capacity_log, kru_price_t max_de
 
 	decay_initialize(&kru->decay, max_decay);
 
+	// We use atomic_ ops on uint16_t and uint32_t, but those don't have their own macros.
+	bool ok = ATOMIC_CHAR16_T_LOCK_FREE == 2 && ATOMIC_CHAR32_T_LOCK_FREE == 2;
+	static bool warned = false;
+	if (!ok && !warned) {
+		warned = true;
+		kr_log_warning(SYSTEM, "warning: KRU might be surprisingly slow\n");
+		// practically this happens on pre-ARMv7 systems
+	}
+
 	return true;
 }
 
@@ -493,7 +502,6 @@ static inline bool kru_limited_update(struct kru *kru, struct query_ctx *ctx, bo
 		load_at = (_Atomic uint16_t *)ctx->load;
 	}
 
-	static_assert(ATOMIC_CHAR16_T_LOCK_FREE == 2, "insufficient atomics");
 	const uint16_t price = ctx->price16;
 	const uint32_t limit = ctx->limit16;  // 2^16 has to be representable
 	uint16_t load_orig = atomic_load_explicit(load_at, memory_order_relaxed);
