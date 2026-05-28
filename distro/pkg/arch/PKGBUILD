@@ -1,9 +1,5 @@
-# Maintainer:	Knot Resolver team <knot-resolver@labs.nic.cz>
-# Maintainer:	Vladimír Čunát <vladimir.cunat@nic.cz>
-# Contributor:	Nicki Křížek <nicki@isc.org>
-# Contributor:	Ondřej Surý <ondrej@sury.org>
-# Contributor:	Oto Šťáva <oto.stava@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
+# Maintainer:   Knot Resolver team <knot-resolver@labs.nic.cz>
 
 pkgname=knot-resolver
 pkgver={{ version }}
@@ -11,7 +7,8 @@ pkgrel={{ release }}
 pkgdesc='Caching DNSSEC-validating DNS resolver'
 arch=('x86_64' 'armv7h')
 url='https://www.knot-resolver.cz/'
-license=('GPL3')
+license=('GPL-3.0-or-later')
+
 depends=(
     'dnssec-anchors'
     'gnutls'
@@ -30,16 +27,7 @@ depends=(
     'python-jinja'
     'supervisor'
 )
-makedepends=(
-    'cmocka'
-    'meson'
-    'pkgconfig'
-    'python-build'
-    'python-installer'
-    'python-poetry'
-    'python-wheel'
-    'systemd-libs'
-)
+
 optdepends=(
     'lua51-basexx: experimental_dot_auth module'
     'lua51-cqueues: http and dns64 module, policy.rpz() function'
@@ -48,43 +36,63 @@ optdepends=(
     'python-prometheus_client: stats and metrics in Prometheus format'
     'python-watchdog: files monitoring and reload on changes'
 )
+
+makedepends=(
+    'cmocka'
+    'meson'
+    'ninja'
+    'pkgconf'
+    'python-build'
+    'python-installer'
+    'python-poetry-core'
+    'python-wheel'
+)
+
 backup=('etc/knot-resolver/config.yaml')
-options=(debug strip)
+
+options=(debug)
+
 source=("knot-resolver-${pkgver}.tar.xz")
 sha256sums=('SKIP')
 
 build() {
-    cd "${srcdir}/${pkgname}-${pkgver}"
-    meson setup build \
-        --buildtype=release \
-        --prefix=/usr \
-        --sbindir=bin \
-        -D keyfile_default=/etc/trusted-key.key \
-        -D systemd_files=enabled \
-        -D malloc=jemalloc \
-        -D unit_tests=enabled
-    ninja -C build
-    python -Pm build --wheel --no-isolation
+    local meson_options=(
+        --buildtype=plain
+        --prefix=/usr
+        --sbindir=bin
+
+        -Dkeyfile_default=/etc/trusted-key.key
+        -Dsystemd_files=enabled
+        -Dmalloc=jemalloc
+        -Dunit_tests=enabled
+    )
+
+    arch-meson "${srcdir}/${pkgname}-${pkgver}" \
+        build "${meson_options[@]}"
+    meson compile -C build
+
+    # Build Python wheel
+    python -m build --wheel --no-isolation \
+        "${srcdir}/${pkgname}-${pkgver}"
 }
 
 check() {
-    cd "${srcdir}/${pkgname}-${pkgver}"
-    meson test -C build
+    meson test -C build --print-errorlogs
 }
 
 package() {
-    cd "${srcdir}/${pkgname}-${pkgver}"
-    DESTDIR=${pkgdir} ninja -C build install
+    meson install -C build --destdir "${pkgdir}"
 
-    # add knot-resolver.service to multi-user.target.wants to support enabling the service
-    install -d -m 0755 "${pkgdir}/usr/lib/systemd/system/multi-user.target.wants"
-    ln -s ../knot-resolver.service ${pkgdir}/usr/lib/systemd/system/multi-user.target.wants/knot-resolver.service
+    # Install Python wheel into pkgdir
+    python -m installer \
+        --destdir="${pkgdir}" \
+        ${srcdir}/${pkgname}-${pkgver}/dist/*.whl
 
-    # remove modules with missing dependencies
-    rm "${pkgdir}/usr/lib/knot-resolver/kres_modules/etcd.lua"
+    # Default configuration
+    install -Dm644 \
+        "${srcdir}/${pkgname}-${pkgver}/etc/config/config.yaml" \
+        "${pkgdir}/etc/knot-resolver/config.yaml"
 
-    # install knot-resolver Python module
-    python -Pm installer --destdir="$pkgdir" dist/*.whl
-
-    install -m 644 -D etc/config/config.yaml ${pkgdir}/etc/knot-resolver/config.yaml
+    # Remove optional module requiring unavailable deps
+    rm -f "${pkgdir}/usr/lib/knot-resolver/kres_modules/etcd.lua"
 }
