@@ -914,6 +914,7 @@ Throws lua exceptions when detecting something fishy.
       i.e. we trust their DNSSEC validation.
     - for auths this inserts a negative trust anchor
       Beware that setting .set_insecure() *later* would override that.
+  .tcp to force transport over TCP
 \param targets same format as policy.TLS_FORWARD() except that `tls = true`
                can be specified for each address (defaults to false)
 --]]
@@ -924,6 +925,7 @@ function policy.rule_forward_add(subtree, options, targets)
 			{
 				is_nods = options.dnssec == false,
 				is_auth = options.auth,
+				is_tcp  = options.tcp
 			},
 			targets_3
 		) == 0)
