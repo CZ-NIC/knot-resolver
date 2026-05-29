@@ -529,6 +529,10 @@ static int subtree_search(const size_t lf_start_i, const knot_db_val_t key,
 		}
 		if (ret == kr_error(EAGAIN))
 			goto shorten;
+
+		if (ret >= 0 && opts.ede_code)
+			kr_request_set_extended_error(req, 14 + opts.ede_code, NULL);
+
 		return ret;
 	} while (true);
 }
@@ -708,7 +712,10 @@ static int answer_exact_match(struct kr_query *qry, knot_pkt_t *pkt, uint16_t ty
 	qry->flags.EXPIRING = false;
 	qry->flags.CACHED = true;
 	qry->flags.NO_MINIMIZE = true;
+
 	qry_set_action(qry, is_nodata ? KREQ_ACTION_NODATA : KREQ_ACTION_LOCAL_DATA);
+	if (opts.ede_code)
+		kr_request_set_extended_error(qry->request, 14 + opts.ede_code, NULL);
 	return RET_ANSWERED;
 }
 

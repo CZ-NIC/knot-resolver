@@ -37,7 +37,7 @@ struct kr_rule_opts {
 	/// Log level: 0 = debug, 1 = info, ...
 	uint8_t log_level : 2;
 
-	/** Maybe 2 bits: (unset), blocked, censored, filtered
+	/** 2 bits: (unset), blocked, censored, filtered
 	    https://www.rfc-editor.org/rfc/rfc8914.html#name-extended-dns-error-code-15-
 	*/
 	uint8_t ede_code : 2;
