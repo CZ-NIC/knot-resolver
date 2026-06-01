@@ -1416,6 +1416,9 @@ static int worker_submit(struct session2 *session, struct comm_info *comm, knot_
 		}
 	}
 
+	if (ret && !is_outgoing)
+		the_worker->stats.dropped += 1;
+
 	/* Badly formed query when using DoH leads to a Bad Request */
 	if (session->custom_emalf_handling && !is_outgoing && ret) {
 		session2_event(session, PROTOLAYER_EVENT_MALFORMED, NULL);
@@ -1428,8 +1431,6 @@ static int worker_submit(struct session2 *session, struct comm_info *comm, knot_
 	if (ret) {
 		if (is_outgoing && qry) // unusuable response from somewhat validated IP
 			qry->server_selection.error(qry, task->transport, KR_SELECTION_MALFORMED);
-		if (!is_outgoing)
-			the_worker->stats.dropped += 1;
 		if (task_matched_id) // notify task that answer won't be coming anymore
 			qr_task_step(task, addr, NULL);
 		return kr_error(EILSEQ);
