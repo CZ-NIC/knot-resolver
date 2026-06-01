@@ -1,10 +1,10 @@
 /*
- *	UCW Library -- Memory Pools
+ *      UCW Library -- Memory Pools
  *
- *	(c) 1997--2015 Martin Mares <mj@ucw.cz>
- *	(c) 2007 Pavel Charvat <pchar@ucw.cz>
- *	SPDX-License-Identifier: LGPL-2.1-or-later
- *	Source: https://www.ucw.cz/libucw/
+ *      (c) 1997--2015 Martin Mares <mj@ucw.cz>
+ *      (c) 2007 Pavel Charvat <pchar@ucw.cz>
+ *      SPDX-License-Identifier: LGPL-2.1-or-later
+ *      Source: https://www.ucw.cz/libucw/
  */
 
 #ifndef _UCW_POOLS_H
@@ -61,9 +61,9 @@
  * You should use this one as an opaque handle only, the insides are internal.
  **/
 struct mempool_state {
-  size_t free[2];
-  void *last[2];
-  struct mempool_state *next;
+	size_t free[2];
+	void *last[2];
+	struct mempool_state *next;
 };
 
 /**
@@ -71,19 +71,19 @@ struct mempool_state {
  * You should use this one as an opaque handle only, the insides are internal.
  **/
 struct mempool {
-  struct ucw_allocator allocator;	// This must be the first element
-  struct mempool_state state;
-  void *unused, *last_big;
-  size_t chunk_size, threshold;
-  uint idx;
-  u64 total_size;
+	struct ucw_allocator allocator;       // This must be the first element
+	struct mempool_state state;
+	void *unused, *last_big;
+	size_t chunk_size, threshold;
+	uint idx;
+	u64 total_size;
 };
 
-struct mempool_stats {			/** Mempool statistics. See @mp_stats(). **/
-  u64 total_size;			/* Real allocated size in bytes */
-  u64 used_size;			/* Estimated size allocated from mempool to application */
-  uint chain_count[3];			/* Number of allocated chunks in small/big/unused chains */
-  u64 chain_size[3];			/* Size of allocated chunks in small/big/unused chains */
+struct mempool_stats {                  /** Mempool statistics. See @mp_stats(). **/
+	u64 total_size;                       /* Real allocated size in bytes */
+	u64 used_size;                        /* Estimated size allocated from mempool to application */
+	uint chain_count[3];                  /* Number of allocated chunks in small/big/unused chains */
+	u64 chain_size[3];                    /* Size of allocated chunks in small/big/unused chains */
 };
 
 /***
@@ -188,14 +188,12 @@ void *mp_alloc_zero(struct mempool *pool, size_t size);
  **/
 static inline void *mp_alloc_fast(struct mempool *pool, size_t size)
 {
-  size_t avail = pool->state.free[0] & ~(size_t)(CPU_STRUCT_ALIGN - 1);
-  if (size <= avail)
-    {
-      pool->state.free[0] = avail - size;
-      return (byte *)pool->state.last[0] - avail;
-    }
-  else
-    return mp_alloc_internal(pool, size);
+	size_t avail = pool->state.free[0] & ~(size_t)(CPU_STRUCT_ALIGN - 1);
+	if (size <= avail) {
+		pool->state.free[0] = avail - size;
+		return (byte *)pool->state.last[0] - avail;
+	} else
+		return mp_alloc_internal(pool, size);
 }
 
 /**
@@ -203,14 +201,12 @@ static inline void *mp_alloc_fast(struct mempool *pool, size_t size)
  **/
 static inline void *mp_alloc_fast_noalign(struct mempool *pool, size_t size)
 {
-  if (size <= pool->state.free[0])
-    {
-      void *ptr = (byte *)pool->state.last[0] - pool->state.free[0];
-      pool->state.free[0] -= size;
-      return ptr;
-    }
-  else
-    return mp_alloc_internal(pool, size);
+	if (size <= pool->state.free[0]) {
+		void *ptr = (byte *)pool->state.last[0] - pool->state.free[0];
+		pool->state.free[0] -= size;
+		return ptr;
+	} else
+		return mp_alloc_internal(pool, size);
 }
 
 /**
@@ -218,7 +214,7 @@ static inline void *mp_alloc_fast_noalign(struct mempool *pool, size_t size)
  **/
 static inline struct ucw_allocator *mp_get_allocator(struct mempool *mp)
 {
-  return &mp->allocator;
+	return &mp->allocator;
 }
 
 /***
@@ -240,7 +236,7 @@ void *mp_spread_internal(struct mempool *pool, void *p, size_t size);
 
 static inline uint mp_idx(struct mempool *pool, void *ptr)
 {
-  return ptr == pool->last_big;
+	return ptr == pool->last_big;
 }
 
 /**
@@ -264,15 +260,13 @@ void *mp_start_noalign(struct mempool *pool, size_t size);
  **/
 static inline void *mp_start_fast(struct mempool *pool, size_t size)
 {
-  size_t avail = pool->state.free[0] & ~(size_t)(CPU_STRUCT_ALIGN - 1);
-  if (size <= avail)
-    {
-      pool->idx = 0;
-      pool->state.free[0] = avail;
-      return (byte *)pool->state.last[0] - avail;
-    }
-  else
-    return mp_start_internal(pool, size);
+	size_t avail = pool->state.free[0] & ~(size_t)(CPU_STRUCT_ALIGN - 1);
+	if (size <= avail) {
+		pool->idx = 0;
+		pool->state.free[0] = avail;
+		return (byte *)pool->state.last[0] - avail;
+	} else
+		return mp_start_internal(pool, size);
 }
 
 /**
@@ -280,13 +274,11 @@ static inline void *mp_start_fast(struct mempool *pool, size_t size)
  **/
 static inline void *mp_start_fast_noalign(struct mempool *pool, size_t size)
 {
-  if (size <= pool->state.free[0])
-    {
-      pool->idx = 0;
-      return (byte *)pool->state.last[0] - pool->state.free[0];
-    }
-  else
-    return mp_start_internal(pool, size);
+	if (size <= pool->state.free[0]) {
+		pool->idx = 0;
+		return (byte *)pool->state.last[0] - pool->state.free[0];
+	} else
+		return mp_start_internal(pool, size);
 }
 
 /**
@@ -294,7 +286,7 @@ static inline void *mp_start_fast_noalign(struct mempool *pool, size_t size)
  **/
 static inline void *mp_ptr(struct mempool *pool)
 {
-  return (byte *)pool->state.last[pool->idx] - pool->state.free[pool->idx];
+	return (byte *)pool->state.last[pool->idx] - pool->state.free[pool->idx];
 }
 
 /**
@@ -303,7 +295,7 @@ static inline void *mp_ptr(struct mempool *pool)
  **/
 static inline size_t mp_avail(struct mempool *pool)
 {
-  return pool->state.free[pool->idx];
+	return pool->state.free[pool->idx];
 }
 
 /**
@@ -314,7 +306,7 @@ static inline size_t mp_avail(struct mempool *pool)
  * Multiple calls to mp_grow() have amortized linear cost wrt. the maximum value of @size. */
 static inline void *mp_grow(struct mempool *pool, size_t size)
 {
-  return (size <= mp_avail(pool)) ? mp_ptr(pool) : mp_grow_internal(pool, size);
+	return (size <= mp_avail(pool)) ? mp_ptr(pool) : mp_grow_internal(pool, size);
 }
 
 /**
@@ -322,7 +314,7 @@ static inline void *mp_grow(struct mempool *pool, size_t size)
  **/
 static inline void *mp_expand(struct mempool *pool)
 {
-  return mp_grow_internal(pool, mp_avail(pool) + 1);
+	return mp_grow_internal(pool, mp_avail(pool) + 1);
 }
 
 /**
@@ -331,7 +323,7 @@ static inline void *mp_expand(struct mempool *pool)
  **/
 static inline void *mp_spread(struct mempool *pool, void *p, size_t size)
 {
-  return (((size_t)((byte *)pool->state.last[pool->idx] - (byte *)p) >= size) ? p : mp_spread_internal(pool, p, size));
+	return (((size_t)((byte *)pool->state.last[pool->idx] - (byte *)p) >= size) ? p : mp_spread_internal(pool, p, size));
 }
 
 /**
@@ -341,9 +333,9 @@ static inline void *mp_spread(struct mempool *pool, void *p, size_t size)
  **/
 static inline char *mp_append_char(struct mempool *pool, char *p, uint c)
 {
-  p = (char *)mp_spread(pool, p, 1);
-  *p++ = c;
-  return p;
+	p = (char *)mp_spread(pool, p, 1);
+	*p++ = c;
+	return p;
 }
 
 /**
@@ -353,9 +345,9 @@ static inline char *mp_append_char(struct mempool *pool, char *p, uint c)
  **/
 static inline void *mp_append_block(struct mempool *pool, void *p, const void *block, size_t size)
 {
-  char *q = (char *)mp_spread(pool, p, size);
-  memcpy(q, block, size);
-  return q + size;
+	char *q = (char *)mp_spread(pool, p, size);
+	memcpy(q, block, size);
+	return q + size;
 }
 
 /**
@@ -365,7 +357,7 @@ static inline void *mp_append_block(struct mempool *pool, void *p, const void *b
  **/
 static inline void *mp_append_string(struct mempool *pool, void *p, const char *str)
 {
-  return mp_append_block(pool, p, str, strlen(str));
+	return mp_append_block(pool, p, str, strlen(str));
 }
 
 /**
@@ -375,9 +367,9 @@ static inline void *mp_append_string(struct mempool *pool, void *p, const char *
  **/
 static inline void *mp_end(struct mempool *pool, void *end)
 {
-  void *p = mp_ptr(pool);
-  pool->state.free[pool->idx] = (byte *)pool->state.last[pool->idx] - (byte *)end;
-  return p;
+	void *p = mp_ptr(pool);
+	pool->state.free[pool->idx] = (byte *)pool->state.last[pool->idx] - (byte *)end;
+	return p;
 }
 
 /**
@@ -385,8 +377,8 @@ static inline void *mp_end(struct mempool *pool, void *end)
  **/
 static inline char *mp_end_string(struct mempool *pool, void *end)
 {
-  end = mp_append_char(pool, (char *)end, 0);
-  return (char *)mp_end(pool, end);
+	end = mp_append_char(pool, (char *)end, 0);
+	return (char *)mp_end(pool, end);
 }
 
 /**
@@ -394,8 +386,8 @@ static inline char *mp_end_string(struct mempool *pool, void *end)
  **/
 static inline size_t mp_size(struct mempool *pool, void *ptr)
 {
-  uint idx = mp_idx(pool, ptr);
-  return ((byte *)pool->state.last[idx] - (byte *)ptr) - pool->state.free[idx];
+	uint idx = mp_idx(pool, ptr);
+	return ((byte *)pool->state.last[idx] - (byte *)ptr) - pool->state.free[idx];
 }
 
 /**
@@ -410,10 +402,10 @@ size_t mp_open(struct mempool *pool, void *ptr);
  **/
 static inline size_t mp_open_fast(struct mempool *pool, void *ptr)
 {
-  pool->idx = mp_idx(pool, ptr);
-  size_t size = ((byte *)pool->state.last[pool->idx] - (byte *)ptr) - pool->state.free[pool->idx];
-  pool->state.free[pool->idx] += size;
-  return size;
+	pool->idx = mp_idx(pool, ptr);
+	size_t size = ((byte *)pool->state.last[pool->idx] - (byte *)ptr) - pool->state.free[pool->idx];
+	pool->state.free[pool->idx] += size;
+	return size;
 }
 
 /**
@@ -433,10 +425,10 @@ void *mp_realloc_zero(struct mempool *pool, void *ptr, size_t size);
  **/
 static inline void *mp_realloc_fast(struct mempool *pool, void *ptr, size_t size)
 {
-  mp_open_fast(pool, ptr);
-  ptr = mp_grow(pool, size);
-  mp_end(pool, (byte *)ptr + size);
-  return ptr;
+	mp_open_fast(pool, ptr);
+	ptr = mp_grow(pool, size);
+	mp_end(pool, (byte *)ptr + size);
+	return ptr;
 }
 
 /***
@@ -454,8 +446,8 @@ static inline void *mp_realloc_fast(struct mempool *pool, void *ptr, size_t size
  **/
 static inline void mp_save(struct mempool *pool, struct mempool_state *state)
 {
-  *state = pool->state;
-  pool->state.next = state;
+	*state = pool->state;
+	pool->state.next = state;
 }
 
 /**
@@ -476,13 +468,12 @@ void mp_restore(struct mempool *pool, struct mempool_state *state);
  **/
 static inline void mp_restore_fast(struct mempool *pool, struct mempool_state *state)
 {
-  if (pool->state.last[0] != state->last[0] || pool->state.last[1] != state->last[1])
-    mp_restore(pool, state);
-  else
-    {
-      pool->state = *state;
-      pool->last_big = &pool->last_big;
-    }
+	if (pool->state.last[0] != state->last[0] || pool->state.last[1] != state->last[1])
+		mp_restore(pool, state);
+	else {
+		pool->state = *state;
+		pool->last_big = &pool->last_big;
+	}
 }
 
 /**
@@ -498,8 +489,8 @@ void mp_pop(struct mempool *pool);
  * -----------------
  ***/
 
-char *mp_strdup(struct mempool *, const char *) LIKE_MALLOC;		/** Makes a copy of a string on a mempool. Returns NULL for NULL string. **/
-void *mp_memdup(struct mempool *, const void *, size_t) LIKE_MALLOC;	/** Makes a copy of a memory block on a mempool. **/
+char *mp_strdup(struct mempool *, const char *) LIKE_MALLOC;            /** Makes a copy of a string on a mempool. Returns NULL for NULL string. **/
+void *mp_memdup(struct mempool *, const void *, size_t) LIKE_MALLOC;    /** Makes a copy of a memory block on a mempool. **/
 /**
  * Concatenates all passed strings. The last parameter must be NULL.
  * This will concatenate two strings:
@@ -512,7 +503,7 @@ char *mp_multicat(struct mempool *, ...) LIKE_MALLOC SENTINEL_CHECK;
  */
 static inline char *LIKE_MALLOC mp_strcat(struct mempool *mp, const char *x, const char *y)
 {
-  return mp_multicat(mp, x, y, NULL);
+	return mp_multicat(mp, x, y, NULL);
 }
 /**
  * Join strings and place @sep between each two neighboring.
