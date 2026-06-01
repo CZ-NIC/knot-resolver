@@ -285,6 +285,18 @@ docker:dockerhub:
   stage: deploy
   needs:
     - docker:test:cross-platform
+  before_script:
+    - git fetch --tags --force
+    - >
+      LATEST_TAG=$(git tag --sort=-v:refname | head -n 1)
+
+      echo "Latest tag: $LATEST_TAG"
+      echo "Current: $CI_COMMIT_REF_NAME"
+
+      if [ "$CI_COMMIT_REF_NAME" != "$LATEST_TAG" ]; then
+        echo "ERROR: not running on latest tag"
+        exit 1
+      fi
   script:
     - echo "$DOCKER_HUB_TOKEN" | docker login -u $DOCKER_HUB_USER --password-stdin
     - >
