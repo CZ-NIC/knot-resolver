@@ -292,6 +292,7 @@ docker:dockerhub:
     - echo "$DOCKER_HUB_TOKEN" | docker login -u $DOCKER_HUB_USER --password-stdin
     - >
       docker buildx imagetools create
+      -t ${DOCKER_HUB_REGISTRY}:${CI_COMMIT_REF_NAME}-$(date +%Y%m%d)
       -t ${DOCKER_HUB_REGISTRY}:${CI_COMMIT_REF_NAME}
       -t ${DOCKER_HUB_REGISTRY}:latest6
       -t ${DOCKER_HUB_REGISTRY}:latest
