@@ -200,6 +200,11 @@ static int process_uri_path(struct pl_http_sess_data *ctx, const char* path, int
 		kr_log_debug(DOH, "[%p] base64url decode failed %s\n", (void *)ctx->h2, kr_strerror(ret));
 		return ret;
 	}
+	if (ret < KNOT_WIRE_HEADER_SIZE) {
+		wire_buf_reset(wb);
+		kr_log_debug(DOH, "[%p] URL decoded into too short wire: %d B\n", (void *)ctx->h2, ret);
+		return kr_error(ERANGE);
+	}
 
 	wire_buf_consume(wb, ret);
 
@@ -1006,6 +1011,12 @@ static enum protolayer_event_cb_result pl_http_event_unwrap(
 	struct pl_http_sess_data *http = sess_data;
 
 	if (event == PROTOLAYER_EVENT_MALFORMED) {
+		// Pop the malformed stream, after a sanity check.
+		if (queue_len(http->streams) > 0
+				&& queue_head(http->streams).id == http->last_stream) {
+			http_free_headers(queue_head(http->streams).headers);
+			queue_pop(http->streams);
+		}
 		http_send_status(http, HTTP_STATUS_BAD_REQUEST);
 		return PROTOLAYER_EVENT_PROPAGATE;
 	}
