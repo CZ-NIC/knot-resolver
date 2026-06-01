@@ -260,8 +260,19 @@ docker:dockerhub:
   needs:
     - docker:test:cross-platform
   before_script:
-    - echo "$DOCKER_HUB_TOKEN" | docker login -u $DOCKER_HUB_USER --password-stdin
+    - git fetch --tags --force
+    - >
+      LATEST5_TAG=$(git tag --list 'v5*' --sort=-v:refname | head -n 1)
+
+      echo "Latest tag: $LATEST_TAG"
+      echo "Current: $CI_COMMIT_REF_NAME"
+
+      if [ "$CI_COMMIT_REF_NAME" != "$LATEST5_TAG" ]; then
+        echo "ERROR: not running on latest5 tag"
+        exit 1
+      fi
   script:
+    - echo "$DOCKER_HUB_TOKEN" | docker login -u $DOCKER_HUB_USER --password-stdin
     - >
       docker buildx imagetools create
       -t ${DOCKER_HUB_REGISTRY}:${CI_COMMIT_REF_NAME}-$(date +%Y%m%d)
