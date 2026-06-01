@@ -206,7 +206,7 @@ docker:build:cross-platform:
   before_script:
     - >
       docker buildx create
-      --name kres-builder
+      --name kres-builder-$CI_JOB_ID
       --driver docker-container
       --bootstrap --use
     - echo "$CI_REGISTRY_PASSWORD" | docker login $CI_REGISTRY -u $CI_REGISTRY_USER --password-stdin
@@ -221,7 +221,8 @@ docker:build:cross-platform:
       --tag ${GITLAB_REGISTRY}:${CI_COMMIT_REF_NAME}
       .
   after_script:
-    - docker buildx stop
+    - docker buildx rm kres-builder-$CI_JOB_ID
+
 
 docker:test:cross-platform:
   <<: *docker
