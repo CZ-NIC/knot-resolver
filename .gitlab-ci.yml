@@ -194,7 +194,7 @@ build:macOS:
   except: null
   image: docker:latest
   variables:
-    DOCKER_HUB_REGISTRY: cznic/knot-resolver
+    DOCKER_HUB_REGISTRY: knotcznic/knot-resolver-testing
     GITLAB_REGISTRY: ${CI_REGISTRY}/knot/knot-resolver/cross-platform
   tags:
     - amd64
@@ -218,9 +218,9 @@ docker:build:
 docker:build:cross-platform:
   <<: *docker
   stage: build
-  only:
-    - master@knot/knot-resolver
-    - tags
+  # only:
+  #   - master@knot/knot-resolver
+  #   - tags
   before_script:
     - >
       docker buildx create
@@ -246,9 +246,9 @@ docker:test:cross-platform:
   <<: *docker
   <<: *multi_platform
   stage: test
-  only:
-    - tags
-    - master@knot/knot-resolver
+  # only:
+  #   - tags
+  #   - master@knot/knot-resolver
   needs:
     - docker:build:cross-platform
   image:
