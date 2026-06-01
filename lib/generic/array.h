@@ -56,14 +56,10 @@
 /** Choose array length when it overflows.  Also see pool_next_count() */
 static inline size_t array_next_count(size_t elm_size, size_t want, size_t have)
 {
-	if (want >= have * 2) // We amortized enough and maybe more won't be needed.
-		return want;
-	const size_t want_b = want * elm_size;
-	if (want_b < 64) // Short arrays are cheap to copy; get just one extra.
-		return want + 1;
-	if (want_b < 1024) // 50% growth amortizes to roughly 3 copies per element.
-		return want + want / 2;
-	return want * 2; // Doubling growth amortizes to roughly 2 copies per element.
+	// round size to power of two
+	const size_t want_b = MAX(want, 4) * elm_size;
+	const size_t next_b =  1 << (8 * sizeof(unsigned int) - __builtin_clz(want_b - 1));
+	return next_b / elm_size;
 }
 
 /** @internal Incremental memory reservation.  Also see kr_memreserve() */
