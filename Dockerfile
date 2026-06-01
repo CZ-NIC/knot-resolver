@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 # Intermediate container for build
-FROM debian:12 AS build
+FROM debian:13 AS build
 
 ENV OBS_REPO=knot-resolver-latest
-ENV DISTROTEST_REPO=Debian_12
+ENV DISTROTEST_REPO=Debian_13
 
 RUN apt-get update -qq && \
 	apt-get -qqq -y install \
@@ -13,7 +13,7 @@ RUN apt-get update -qq && \
 	pipx install apkg
 
 RUN wget -O /usr/share/keyrings/cznic-labs-pkg.gpg https://pkg.labs.nic.cz/gpg && \
-	echo "deb [signed-by=/usr/share/keyrings/cznic-labs-pkg.gpg] https://pkg.labs.nic.cz/knot-resolver bookworm main" \
+	echo "deb [signed-by=/usr/share/keyrings/cznic-labs-pkg.gpg] https://pkg.labs.nic.cz/knot-resolver trixie main" \
 		> /etc/apt/sources.list.d/cznic-labs-knot-resolver.list && \
 	apt-get update -qq
 
@@ -38,10 +38,10 @@ RUN cd /source && \
 	/root/.local/bin/apkg build
 
 # Real container
-FROM debian:12-slim AS runtime
+FROM debian:13-slim AS runtime
 
 ENV OBS_REPO=knot-resolver-latest
-ENV DISTROTEST_REPO=Debian_12
+ENV DISTROTEST_REPO=Debian_13
 
 RUN apt-get update -qq && \
 	apt-get -qqq -y install apt-transport-https ca-certificates
@@ -56,7 +56,7 @@ COPY --from=build \
 RUN apt-get update -qq && \
 	apt-get upgrade -qq
 
-COPY --from=build /source/pkg/pkgs/debian-12 /pkg
+COPY --from=build /source/pkg/pkgs/debian-13 /pkg
 
 # install resolver, minimize image and prepare config directory
 RUN apt-get install -y /pkg/*/*.deb && \
