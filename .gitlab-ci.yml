@@ -267,6 +267,7 @@ docker:dockerhub:
   script:
     - >
       docker buildx imagetools create
+      -t ${DOCKER_HUB_REGISTRY}:${CI_COMMIT_REF_NAME}-$(date +%Y%m%d)
       -t ${DOCKER_HUB_REGISTRY}:${CI_COMMIT_REF_NAME}
       -t ${DOCKER_HUB_REGISTRY}:latest5
       ${GITLAB_REGISTRY}:${CI_COMMIT_REF_NAME}
