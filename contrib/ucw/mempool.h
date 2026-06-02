@@ -62,7 +62,6 @@ struct mempool {
 	void *unused, *last_big;
 	size_t chunk_size, threshold;
 	unsigned idx;
-	uint64_t total_size;
 };
 
 struct mempool_stats {          /** Mempool statistics. See @mp_stats(). **/
@@ -120,14 +119,13 @@ void mp_flush(struct mempool *pool);
 /**
  * Compute some statistics for debug purposes.
  * See the definition of the <<struct_mempool_stats,mempool_stats structure>>.
- * This function scans the chunk list, so it can be slow. If you are interested
- * in total memory consumption only, mp_total_size() is faster.
+ * This function scans the chunk list, so it can be slow.
  **/
 void mp_stats(struct mempool *pool, struct mempool_stats *stats);
 
 /**
  * Return how many bytes were allocated by the pool, including unused parts
- * of chunks. This function runs in constant time.
+ * of chunks. This function scans the chunk list, so it can be slow.
  **/
 uint64_t mp_total_size(struct mempool *pool);
 
