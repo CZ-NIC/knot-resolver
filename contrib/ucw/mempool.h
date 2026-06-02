@@ -62,7 +62,6 @@ struct mempool {
 	void *unused, *last_big;
 	size_t chunk_size, threshold;
 	unsigned idx;
-	uint64_t total_size;
 };
 
 struct mempool_stats {          /** Mempool statistics. See @mp_stats(). **/
@@ -120,20 +119,21 @@ void mp_flush(struct mempool *pool);
 /**
  * Compute some statistics for debug purposes.
  * See the definition of the <<struct_mempool_stats,mempool_stats structure>>.
- * This function scans the chunk list, so it can be slow. If you are interested
- * in total memory consumption only, mp_total_size() is faster.
+ * This function scans the chunk list, so it can be slow.
  **/
 void mp_stats(struct mempool *pool, struct mempool_stats *stats);
 
 /**
  * Return how many bytes were allocated by the pool, including unused parts
- * of chunks. This function runs in constant time.
+ * of chunks. This function scans the chunk list, so it can be slow
+ * (upstream contains constant-time version).
  **/
 uint64_t mp_total_size(struct mempool *pool);
 
 /**
  * Release unused chunks of memory reserved for further allocation
- * requests, but stop if mp_total_size() would drop below @min_total_size.
+ * requests, but stop if \ref mp_total_size() would drop below \p min_total_size.
+ * It calls \ref mp_total_size(), so all chunks are scanned (in upstream version only released ones).
  **/
 void mp_shrink(struct mempool *pool, uint64_t min_total_size);
 
@@ -370,7 +370,8 @@ char *mp_vprintf_append(struct mempool *mp, char *ptr, const char *fmt, va_list 
      * variants of methods returning zeroed memory,
      * restoring previous state of allocations,
      * concatenating and duplicating memory/strings on mempools,
-     * generic allocator interface spanning both malloc and mempools.
+     * generic allocator interface spanning both malloc and mempools,
+     * constant-time version of mp_total_size and mp_shrink scanning only deallocated chunks.
 */
 
 #endif
