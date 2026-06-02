@@ -17,7 +17,6 @@
 
 #ifdef CONFIG_UCW_CLEAN_ABI
 #define mp_alloc ucw_mp_alloc
-#define mp_alloc_internal ucw_mp_alloc_internal
 #define mp_alloc_noalign ucw_mp_alloc_noalign
 #define mp_delete ucw_mp_delete
 #define mp_flush ucw_mp_flush
@@ -31,7 +30,6 @@
 #define mp_shrink ucw_mp_shrink
 #define mp_spread_internal ucw_mp_spread_internal
 #define mp_start ucw_mp_start
-#define mp_start_internal ucw_mp_start_internal
 #define mp_start_noalign ucw_mp_start_noalign
 #define mp_stats ucw_mp_stats
 #define mp_total_size ucw_mp_total_size
@@ -145,9 +143,6 @@ void mp_shrink(struct mempool *pool, uint64_t min_total_size);
  * -------------------
  ***/
 
-/* For internal use only, do not call directly */
-void *mp_alloc_internal(struct mempool *pool, size_t size) LIKE_MALLOC;
-
 /**
  * The function allocates new @size bytes on a given memory pool.
  * If the @size is zero, the resulting pointer is undefined,
@@ -166,31 +161,6 @@ void *mp_alloc(struct mempool *pool, size_t size);
  **/
 void *mp_alloc_noalign(struct mempool *pool, size_t size);
 
-/**
- * Inlined version of @mp_alloc().
- **/
-static inline void *mp_alloc_fast(struct mempool *pool, size_t size)
-{
-	size_t avail = pool->state.free[0] & ~(size_t)(CPU_STRUCT_ALIGN - 1);
-	if (size <= avail) {
-		pool->state.free[0] = avail - size;
-		return (uint8_t *)pool->state.last[0] - avail;
-	} else
-		return mp_alloc_internal(pool, size);
-}
-
-/**
- * Inlined version of @mp_alloc_noalign().
- **/
-static inline void *mp_alloc_fast_noalign(struct mempool *pool, size_t size)
-{
-	if (size <= pool->state.free[0]) {
-		void *ptr = (uint8_t *)pool->state.last[0] - pool->state.free[0];
-		pool->state.free[0] -= size;
-		return ptr;
-	} else
-		return mp_alloc_internal(pool, size);
-}
 
 /***
  * [[gbuf]]
@@ -205,7 +175,6 @@ static inline void *mp_alloc_fast_noalign(struct mempool *pool, size_t size)
  ***/
 
 /* For internal use only, do not call directly */
-void *mp_start_internal(struct mempool *pool, size_t size) LIKE_MALLOC;
 void *mp_grow_internal(struct mempool *pool, size_t size);
 void *mp_spread_internal(struct mempool *pool, void *p, size_t size);
 
@@ -229,32 +198,6 @@ static inline unsigned mp_idx(struct mempool *pool, void *ptr)
  */
 void *mp_start(struct mempool *pool, size_t size);
 void *mp_start_noalign(struct mempool *pool, size_t size);
-
-/**
- * Inlined version of @mp_start().
- **/
-static inline void *mp_start_fast(struct mempool *pool, size_t size)
-{
-	size_t avail = pool->state.free[0] & ~(size_t)(CPU_STRUCT_ALIGN - 1);
-	if (size <= avail) {
-		pool->idx = 0;
-		pool->state.free[0] = avail;
-		return (uint8_t *)pool->state.last[0] - avail;
-	} else
-		return mp_start_internal(pool, size);
-}
-
-/**
- * Inlined version of @mp_start_noalign().
- **/
-static inline void *mp_start_fast_noalign(struct mempool *pool, size_t size)
-{
-	if (size <= pool->state.free[0]) {
-		pool->idx = 0;
-		return (uint8_t *)pool->state.last[0] - pool->state.free[0];
-	} else
-		return mp_start_internal(pool, size);
-}
 
 /**
  * Return start pointer of the growing buffer allocated by latest @mp_start() or a similar function.
@@ -373,33 +316,11 @@ static inline size_t mp_size(struct mempool *pool, void *ptr)
 size_t mp_open(struct mempool *pool, void *ptr);
 
 /**
- * Inlined version of @mp_open().
- **/
-static inline size_t mp_open_fast(struct mempool *pool, void *ptr)
-{
-	pool->idx = mp_idx(pool, ptr);
-	size_t size = ((uint8_t *)pool->state.last[pool->idx] - (uint8_t *)ptr) - pool->state.free[pool->idx];
-	pool->state.free[pool->idx] += size;
-	return size;
-}
-
-/**
  * Reallocate the last memory block (allocated with @mp_alloc() or @mp_end())
  * to the new @size. Behavior is similar to @mp_grow(), but the resulting
  * block is closed.
  **/
 void *mp_realloc(struct mempool *pool, void *ptr, size_t size);
-
-/**
- * Inlined version of @mp_realloc().
- **/
-static inline void *mp_realloc_fast(struct mempool *pool, void *ptr, size_t size)
-{
-	mp_open_fast(pool, ptr);
-	ptr = mp_grow(pool, size);
-	mp_end(pool, (uint8_t *)ptr + size);
-	return ptr;
-}
 
 /***
  * [[format]]
