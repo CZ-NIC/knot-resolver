@@ -213,7 +213,7 @@ mp_shrink(struct mempool *pool, uint64_t min_total_size)
 	}
 }
 
-void *
+static void *
 mp_alloc_internal(struct mempool *pool, size_t size)
 {
 	struct mempool_chunk *chunk;
@@ -250,16 +250,26 @@ mp_alloc_internal(struct mempool *pool, size_t size)
 void *
 mp_alloc(struct mempool *pool, size_t size)
 {
-	return mp_alloc_fast(pool, size);
+	size_t avail = pool->state.free[0] & ~(size_t)(CPU_STRUCT_ALIGN - 1);
+	if (size <= avail) {
+		pool->state.free[0] = avail - size;
+		return (uint8_t *)pool->state.last[0] - avail;
+	} else
+		return mp_alloc_internal(pool, size);
 }
 
 void *
 mp_alloc_noalign(struct mempool *pool, size_t size)
 {
-	return mp_alloc_fast_noalign(pool, size);
+	if (size <= pool->state.free[0]) {
+		void *ptr = (uint8_t *)pool->state.last[0] - pool->state.free[0];
+		pool->state.free[0] -= size;
+		return ptr;
+	} else
+		return mp_alloc_internal(pool, size);
 }
 
-void *
+static void *
 mp_start_internal(struct mempool *pool, size_t size)
 {
 	void *ptr = mp_alloc_internal(pool, size);
@@ -272,13 +282,23 @@ mp_start_internal(struct mempool *pool, size_t size)
 void *
 mp_start(struct mempool *pool, size_t size)
 {
-	return mp_start_fast(pool, size);
+	size_t avail = pool->state.free[0] & ~(size_t)(CPU_STRUCT_ALIGN - 1);
+	if (size <= avail) {
+		pool->idx = 0;
+		pool->state.free[0] = avail;
+		return (uint8_t *)pool->state.last[0] - avail;
+	} else
+		return mp_start_internal(pool, size);
 }
 
 void *
 mp_start_noalign(struct mempool *pool, size_t size)
 {
-	return mp_start_fast_noalign(pool, size);
+	if (size <= pool->state.free[0]) {
+		pool->idx = 0;
+		return (uint8_t *)pool->state.last[0] - pool->state.free[0];
+	} else
+		return mp_start_internal(pool, size);
 }
 
 void *
@@ -315,13 +335,19 @@ mp_grow_internal(struct mempool *pool, size_t size)
 size_t
 mp_open(struct mempool *pool, void *ptr)
 {
-	return mp_open_fast(pool, ptr);
+	pool->idx = mp_idx(pool, ptr);
+	size_t size = ((uint8_t *)pool->state.last[pool->idx] - (uint8_t *)ptr) - pool->state.free[pool->idx];
+	pool->state.free[pool->idx] += size;
+	return size;
 }
 
 void *
 mp_realloc(struct mempool *pool, void *ptr, size_t size)
 {
-	return mp_realloc_fast(pool, ptr, size);
+	mp_open(pool, ptr);
+	ptr = mp_grow(pool, size);
+	mp_end(pool, (uint8_t *)ptr + size);
+	return ptr;
 }
 
 void *
