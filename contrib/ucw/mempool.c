@@ -138,7 +138,7 @@ mp_new(size_t chunk_size)
 	chunk_size = mp_align_size(MAX(sizeof(struct mempool), chunk_size));
 	struct mempool_chunk *chunk = mp_new_chunk(NULL, chunk_size);
 	struct mempool *pool = (void *)chunk - chunk_size;
-	DBG("Creating mempool %p with %u bytes long chunks", pool, chunk_size);
+	DBG("Creating mempool %p with %zu bytes long chunks", pool, chunk_size);
 	chunk->next = NULL;
 #ifdef CONFIG_DEBUG
 	chunk->pool = pool;
@@ -206,14 +206,14 @@ mp_flush(struct mempool *pool)
 }
 
 static void
-mp_stats_chain(struct mempool *pool, struct mempool_chunk *chunk, struct mempool_stats *stats, uint idx)
+mp_stats_chain(struct mempool *pool, struct mempool_chunk *chunk, struct mempool_stats *stats, unsigned idx)
 {
 	while (chunk) {
 		stats->chain_size[idx] += chunk->size + MP_CHUNK_TAIL;
 		stats->chain_count[idx]++;
 		if (idx < 2) {
 			stats->used_size += chunk->size;
-			if ((byte *)pool == (byte *)chunk - chunk->size)
+			if ((uint8_t *)pool == (uint8_t *)chunk - chunk->size)
 				stats->used_size -= sizeof(*pool);
 		}
 		chunk = chunk->next;
@@ -233,14 +233,14 @@ mp_stats(struct mempool *pool, struct mempool_stats *stats)
 	ASSERT(stats->used_size <= stats->total_size);
 }
 
-u64
+uint64_t
 mp_total_size(struct mempool *pool)
 {
 	return pool->total_size;
 }
 
 void
-mp_shrink(struct mempool *pool, u64 min_total_size)
+mp_shrink(struct mempool *pool, uint64_t min_total_size)
 {
 	while (1) {
 		struct mempool_chunk *chunk = pool->unused;
@@ -435,14 +435,14 @@ mp_pop(struct mempool *pool)
 #include <time.h>
 
 static void
-fill(byte *ptr, uint len, uint magic)
+fill(uint8_t *ptr, unsigned len, unsigned magic)
 {
 	while (len--)
 		*ptr++ = (magic++ & 255);
 }
 
 static void
-check(byte *ptr, uint len, uint magic, uint align)
+check(uint8_t *ptr, unsigned len, unsigned magic, unsigned align)
 {
 	ASSERT(!((uintptr_t)ptr & (align - 1)));
 	while (len--)
@@ -458,21 +458,21 @@ int main(int argc, char **argv)
 	if (cf_getopt(argc, argv, CF_SHORT_OPTS, CF_NO_LONG_OPTS, NULL) >= 0 || argc != optind)
 		die("Invalid usage");
 
-	uint max = 1000, n = 0, m = 0, can_realloc = 0;
+	unsigned max = 1000, n = 0, m = 0, can_realloc = 0;
 	void *ptr[max];
 	struct mempool_state *state[max];
-	uint len[max], num[max], align[max];
+	unsigned len[max], num[max], align[max];
 	struct mempool *mp = mp_new(128), mp_static;
 
-	for (uint i = 0; i < 5000; i++) {
-		for (uint j = 0; j < n; j++)
+	for (unsigned i = 0; i < 5000; i++) {
+		for (unsigned j = 0; j < n; j++)
 			check(ptr[j], len[j], j, align[j]);
 #if 0
 		DBG("free_small=%u free_big=%u idx=%u chunk_size=%u last_big=%p", mp->state.free[0], mp->state.free[1], mp->idx, mp->chunk_size, mp->last_big);
 		for (struct mempool_chunk *ch = mp->state.last[0]; ch; ch = ch->next)
-			DBG("small %p %p %p %d", (byte *)ch - ch->size, ch, ch + 1, ch->size);
+			DBG("small %p %p %p %d", (uint8_t *)ch - ch->size, ch, ch + 1, ch->size);
 		for (struct mempool_chunk *ch = mp->state.last[1]; ch; ch = ch->next)
-			DBG("big %p %p %p %d", (byte *)ch - ch->size, ch, ch + 1, ch->size);
+			DBG("big %p %p %p %d", (uint8_t *)ch - ch->size, ch, ch + 1, ch->size);
 #endif
 		int r = random_max(100);
 		if ((r -= 1) < 0) {
@@ -511,9 +511,9 @@ int main(int argc, char **argv)
 				ASSERT(0);
 grow:
 			{
-				uint k = n - 1;
-				for (uint i = random_max(4); i--; ) {
-					uint l = len[k];
+				unsigned k = n - 1;
+				for (unsigned i = random_max(4); i--; ) {
+					unsigned l = len[k];
 					len[k] = random_max(0x2000);
 					DBG("grow(%u)", len[k]);
 					ptr[k] = mp_grow(mp, len[k]);
@@ -524,7 +524,7 @@ grow:
 				mp_end(mp, ptr[k] + len[k]);
 			}
 		} else if (can_realloc && n && (r -= 20) < 0) {
-			uint i = n - 1, l = len[i];
+			unsigned i = n - 1, l = len[i];
 			DBG("realloc(%p, %u)", ptr[i], len[i]);
 			ptr[i] = mp_realloc(mp, ptr[i], len[i] = random_max(0x2000));
 			DBG(" -> (%p, %u)", ptr[i], len[i]);
@@ -542,7 +542,7 @@ grow:
 			n = num[m];
 			can_realloc = 0;
 		} else if (m && (r -= 1) < 0) {
-			uint i = random_max(m);
+			unsigned i = random_max(m);
 			DBG("restore(%u)", i);
 			mp_restore(mp, state[i]);
 			n = num[m = i];
