@@ -75,15 +75,15 @@ struct mempool {
 	struct mempool_state state;
 	void *unused, *last_big;
 	size_t chunk_size, threshold;
-	uint idx;
-	u64 total_size;
+	unsigned idx;
+	uint64_t total_size;
 };
 
-struct mempool_stats {                  /** Mempool statistics. See @mp_stats(). **/
-	u64 total_size;                       /* Real allocated size in bytes */
-	u64 used_size;                        /* Estimated size allocated from mempool to application */
-	uint chain_count[3];                  /* Number of allocated chunks in small/big/unused chains */
-	u64 chain_size[3];                    /* Size of allocated chunks in small/big/unused chains */
+struct mempool_stats {          /** Mempool statistics. See @mp_stats(). **/
+	uint64_t total_size;            /** Real allocated size in bytes. */
+	uint64_t used_size;             /** Estimated size allocated from mempool to application. */
+	unsigned chain_count[3];        /** Number of allocated chunks in small/big/unused chains. */
+	uint64_t chain_size[3];         /** Size of allocated chunks in small/big/unused chains. */
 };
 
 /***
@@ -143,13 +143,13 @@ void mp_stats(struct mempool *pool, struct mempool_stats *stats);
  * Return how many bytes were allocated by the pool, including unused parts
  * of chunks. This function runs in constant time.
  **/
-u64 mp_total_size(struct mempool *pool);
+uint64_t mp_total_size(struct mempool *pool);
 
 /**
  * Release unused chunks of memory reserved for further allocation
  * requests, but stop if mp_total_size() would drop below @min_total_size.
  **/
-void mp_shrink(struct mempool *pool, u64 min_total_size);
+void mp_shrink(struct mempool *pool, uint64_t min_total_size);
 
 /***
  * [[alloc]]
@@ -191,7 +191,7 @@ static inline void *mp_alloc_fast(struct mempool *pool, size_t size)
 	size_t avail = pool->state.free[0] & ~(size_t)(CPU_STRUCT_ALIGN - 1);
 	if (size <= avail) {
 		pool->state.free[0] = avail - size;
-		return (byte *)pool->state.last[0] - avail;
+		return (uint8_t *)pool->state.last[0] - avail;
 	} else
 		return mp_alloc_internal(pool, size);
 }
@@ -202,7 +202,7 @@ static inline void *mp_alloc_fast(struct mempool *pool, size_t size)
 static inline void *mp_alloc_fast_noalign(struct mempool *pool, size_t size)
 {
 	if (size <= pool->state.free[0]) {
-		void *ptr = (byte *)pool->state.last[0] - pool->state.free[0];
+		void *ptr = (uint8_t *)pool->state.last[0] - pool->state.free[0];
 		pool->state.free[0] -= size;
 		return ptr;
 	} else
@@ -234,7 +234,7 @@ void *mp_start_internal(struct mempool *pool, size_t size) LIKE_MALLOC;
 void *mp_grow_internal(struct mempool *pool, size_t size);
 void *mp_spread_internal(struct mempool *pool, void *p, size_t size);
 
-static inline uint mp_idx(struct mempool *pool, void *ptr)
+static inline unsigned mp_idx(struct mempool *pool, void *ptr)
 {
 	return ptr == pool->last_big;
 }
@@ -264,7 +264,7 @@ static inline void *mp_start_fast(struct mempool *pool, size_t size)
 	if (size <= avail) {
 		pool->idx = 0;
 		pool->state.free[0] = avail;
-		return (byte *)pool->state.last[0] - avail;
+		return (uint8_t *)pool->state.last[0] - avail;
 	} else
 		return mp_start_internal(pool, size);
 }
@@ -276,7 +276,7 @@ static inline void *mp_start_fast_noalign(struct mempool *pool, size_t size)
 {
 	if (size <= pool->state.free[0]) {
 		pool->idx = 0;
-		return (byte *)pool->state.last[0] - pool->state.free[0];
+		return (uint8_t *)pool->state.last[0] - pool->state.free[0];
 	} else
 		return mp_start_internal(pool, size);
 }
@@ -286,7 +286,7 @@ static inline void *mp_start_fast_noalign(struct mempool *pool, size_t size)
  **/
 static inline void *mp_ptr(struct mempool *pool)
 {
-	return (byte *)pool->state.last[pool->idx] - pool->state.free[pool->idx];
+	return (uint8_t *)pool->state.last[pool->idx] - pool->state.free[pool->idx];
 }
 
 /**
@@ -323,7 +323,7 @@ static inline void *mp_expand(struct mempool *pool)
  **/
 static inline void *mp_spread(struct mempool *pool, void *p, size_t size)
 {
-	return (((size_t)((byte *)pool->state.last[pool->idx] - (byte *)p) >= size) ? p : mp_spread_internal(pool, p, size));
+	return (((size_t)((uint8_t *)pool->state.last[pool->idx] - (uint8_t *)p) >= size) ? p : mp_spread_internal(pool, p, size));
 }
 
 /**
@@ -331,7 +331,7 @@ static inline void *mp_spread(struct mempool *pool, void *p, size_t size)
  * the last byte in the buffer, returns a pointer after the last byte
  * of the new (possibly reallocated) buffer.
  **/
-static inline char *mp_append_char(struct mempool *pool, char *p, uint c)
+static inline char *mp_append_char(struct mempool *pool, char *p, unsigned c)
 {
 	p = (char *)mp_spread(pool, p, 1);
 	*p++ = c;
@@ -368,7 +368,7 @@ static inline void *mp_append_string(struct mempool *pool, void *p, const char *
 static inline void *mp_end(struct mempool *pool, void *end)
 {
 	void *p = mp_ptr(pool);
-	pool->state.free[pool->idx] = (byte *)pool->state.last[pool->idx] - (byte *)end;
+	pool->state.free[pool->idx] = (uint8_t *)pool->state.last[pool->idx] - (uint8_t *)end;
 	return p;
 }
 
@@ -386,8 +386,8 @@ static inline char *mp_end_string(struct mempool *pool, void *end)
  **/
 static inline size_t mp_size(struct mempool *pool, void *ptr)
 {
-	uint idx = mp_idx(pool, ptr);
-	return ((byte *)pool->state.last[idx] - (byte *)ptr) - pool->state.free[idx];
+	unsigned idx = mp_idx(pool, ptr);
+	return ((uint8_t *)pool->state.last[idx] - (uint8_t *)ptr) - pool->state.free[idx];
 }
 
 /**
@@ -403,7 +403,7 @@ size_t mp_open(struct mempool *pool, void *ptr);
 static inline size_t mp_open_fast(struct mempool *pool, void *ptr)
 {
 	pool->idx = mp_idx(pool, ptr);
-	size_t size = ((byte *)pool->state.last[pool->idx] - (byte *)ptr) - pool->state.free[pool->idx];
+	size_t size = ((uint8_t *)pool->state.last[pool->idx] - (uint8_t *)ptr) - pool->state.free[pool->idx];
 	pool->state.free[pool->idx] += size;
 	return size;
 }
@@ -427,7 +427,7 @@ static inline void *mp_realloc_fast(struct mempool *pool, void *ptr, size_t size
 {
 	mp_open_fast(pool, ptr);
 	ptr = mp_grow(pool, size);
-	mp_end(pool, (byte *)ptr + size);
+	mp_end(pool, (uint8_t *)ptr + size);
 	return ptr;
 }
 
@@ -510,7 +510,7 @@ static inline char *LIKE_MALLOC mp_strcat(struct mempool *mp, const char *x, con
  * @p is the mempool to provide memory, @a is array of strings and @n
  * tells how many there is of them.
  **/
-char *mp_strjoin(struct mempool *p, char **a, uint n, uint sep) LIKE_MALLOC;
+char *mp_strjoin(struct mempool *p, char **a, unsigned n, unsigned sep) LIKE_MALLOC;
 /**
  * Convert memory block to a string. Makes a copy of the given memory block
  * in the mempool @p, adding an extra terminating zero byte at the end.
