@@ -77,19 +77,3 @@ mp_printf_append(struct mempool *mp, char *ptr, const char *fmt, ...)
 	va_end(args);
 	return res;
 }
-
-#ifdef TEST
-
-int main(void)
-{
-	struct mempool *mp = mp_new(64);
-	char *x = mp_printf(mp, "<Hello, %s!>", "World");
-	fputs(x, stdout);
-	x = mp_printf_append(mp, x, "<Appended>");
-	fputs(x, stdout);
-	x = mp_printf(mp, "<Hello, %50s!>\n", "World");
-	fputs(x, stdout);
-	return 0;
-}
-
-#endif
