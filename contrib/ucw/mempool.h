@@ -11,7 +11,6 @@
 #define _UCW_POOLS_H
 
 #include "lib/defines.h"
-#include <ucw/alloc.h>
 #include <ucw/config.h>
 #include <ucw/lib.h>
 #include <string.h>
@@ -20,35 +19,26 @@
 #define mp_alloc ucw_mp_alloc
 #define mp_alloc_internal ucw_mp_alloc_internal
 #define mp_alloc_noalign ucw_mp_alloc_noalign
-#define mp_alloc_zero ucw_mp_alloc_zero
 #define mp_delete ucw_mp_delete
 #define mp_flush ucw_mp_flush
 #define mp_grow_internal ucw_mp_grow_internal
 #define mp_init ucw_mp_init
-#define mp_memdup ucw_mp_memdup
-#define mp_multicat ucw_mp_multicat
 #define mp_new ucw_mp_new
 #define mp_open ucw_mp_open
-#define mp_pop ucw_mp_pop
 #define mp_printf ucw_mp_printf
 #define mp_printf_append ucw_mp_printf_append
-#define mp_push ucw_mp_push
 #define mp_realloc ucw_mp_realloc
-#define mp_realloc_zero ucw_mp_realloc_zero
-#define mp_restore ucw_mp_restore
 #define mp_shrink ucw_mp_shrink
 #define mp_spread_internal ucw_mp_spread_internal
 #define mp_start ucw_mp_start
 #define mp_start_internal ucw_mp_start_internal
 #define mp_start_noalign ucw_mp_start_noalign
 #define mp_stats ucw_mp_stats
-#define mp_str_from_mem ucw_mp_str_from_mem
-#define mp_strdup ucw_mp_strdup
-#define mp_strjoin ucw_mp_strjoin
 #define mp_total_size ucw_mp_total_size
 #define mp_vprintf ucw_mp_vprintf
 #define mp_vprintf_append ucw_mp_vprintf_append
 #endif
+
 
 /***
  * [[defs]]
@@ -63,7 +53,6 @@
 struct mempool_state {
 	size_t free[2];
 	void *last[2];
-	struct mempool_state *next;
 };
 
 /**
@@ -71,7 +60,6 @@ struct mempool_state {
  * You should use this one as an opaque handle only, the insides are internal.
  **/
 struct mempool {
-	struct ucw_allocator allocator;       // This must be the first element
 	struct mempool_state state;
 	void *unused, *last_big;
 	size_t chunk_size, threshold;
@@ -179,11 +167,6 @@ void *mp_alloc(struct mempool *pool, size_t size);
 void *mp_alloc_noalign(struct mempool *pool, size_t size);
 
 /**
- * The same as @mp_alloc(), but fills the newly allocated memory with zeroes.
- **/
-void *mp_alloc_zero(struct mempool *pool, size_t size);
-
-/**
  * Inlined version of @mp_alloc().
  **/
 static inline void *mp_alloc_fast(struct mempool *pool, size_t size)
@@ -207,14 +190,6 @@ static inline void *mp_alloc_fast_noalign(struct mempool *pool, size_t size)
 		return ptr;
 	} else
 		return mp_alloc_internal(pool, size);
-}
-
-/**
- * Return a generic allocator representing the given mempool.
- **/
-static inline struct ucw_allocator *mp_get_allocator(struct mempool *mp)
-{
-	return &mp->allocator;
 }
 
 /***
@@ -416,11 +391,6 @@ static inline size_t mp_open_fast(struct mempool *pool, void *ptr)
 void *mp_realloc(struct mempool *pool, void *ptr, size_t size);
 
 /**
- * The same as @mp_realloc(), but fills the additional bytes (if any) with zeroes.
- **/
-void *mp_realloc_zero(struct mempool *pool, void *ptr, size_t size);
-
-/**
  * Inlined version of @mp_realloc().
  **/
 static inline void *mp_realloc_fast(struct mempool *pool, void *ptr, size_t size)
@@ -430,93 +400,6 @@ static inline void *mp_realloc_fast(struct mempool *pool, void *ptr, size_t size
 	mp_end(pool, (uint8_t *)ptr + size);
 	return ptr;
 }
-
-/***
- * [[store]]
- * Storing and restoring state
- * ---------------------------
- *
- * Mempools can remember history of what was allocated and return back
- * in time.
- ***/
-
-/**
- * Save the current state of a memory pool.
- * Do not call this function with an opened growing buffer.
- **/
-static inline void mp_save(struct mempool *pool, struct mempool_state *state)
-{
-	*state = pool->state;
-	pool->state.next = state;
-}
-
-/**
- * Save the current state to a newly allocated mempool_state structure.
- * Do not call this function with an opened growing buffer.
- **/
-struct mempool_state *mp_push(struct mempool *pool);
-
-/**
- * Restore the state saved by @mp_save() or @mp_push() and free all
- * data allocated after that point (including the state structure itself).
- * You can't reallocate the last memory block from the saved state.
- **/
-void mp_restore(struct mempool *pool, struct mempool_state *state);
-
-/**
- * Inlined version of @mp_restore().
- **/
-static inline void mp_restore_fast(struct mempool *pool, struct mempool_state *state)
-{
-	if (pool->state.last[0] != state->last[0] || pool->state.last[1] != state->last[1])
-		mp_restore(pool, state);
-	else {
-		pool->state = *state;
-		pool->last_big = &pool->last_big;
-	}
-}
-
-/**
- * Restore the state saved by the last call to @mp_push().
- * @mp_pop() and @mp_push() works as a stack so you can push more states safely.
- **/
-void mp_pop(struct mempool *pool);
-
-
-/***
- * [[string]]
- * String operations
- * -----------------
- ***/
-
-char *mp_strdup(struct mempool *, const char *) LIKE_MALLOC;            /** Makes a copy of a string on a mempool. Returns NULL for NULL string. **/
-void *mp_memdup(struct mempool *, const void *, size_t) LIKE_MALLOC;    /** Makes a copy of a memory block on a mempool. **/
-/**
- * Concatenates all passed strings. The last parameter must be NULL.
- * This will concatenate two strings:
- *
- *   char *message = mp_multicat(pool, "hello ", "world", NULL);
- **/
-char *mp_multicat(struct mempool *, ...) LIKE_MALLOC SENTINEL_CHECK;
-/**
- * Concatenates two strings and stores result on @mp.
- */
-static inline char *LIKE_MALLOC mp_strcat(struct mempool *mp, const char *x, const char *y)
-{
-	return mp_multicat(mp, x, y, NULL);
-}
-/**
- * Join strings and place @sep between each two neighboring.
- * @p is the mempool to provide memory, @a is array of strings and @n
- * tells how many there is of them.
- **/
-char *mp_strjoin(struct mempool *p, char **a, unsigned n, unsigned sep) LIKE_MALLOC;
-/**
- * Convert memory block to a string. Makes a copy of the given memory block
- * in the mempool @p, adding an extra terminating zero byte at the end.
- **/
-char *mp_str_from_mem(struct mempool *p, const void *mem, size_t len) LIKE_MALLOC;
-
 
 /***
  * [[format]]
@@ -559,5 +442,14 @@ char *mp_printf_append(struct mempool *mp, char *ptr, const char *fmt, ...) FORM
  **/
 char *mp_vprintf_append(struct mempool *mp, char *ptr, const char *fmt, va_list args);
 #define mp_append_vprintf mp_vprintf_append
+
+/*
+ * Some parts of mempools were removed in Knot projects,
+ * see upstream if you need:
+     * variants of methods returning zeroed memory,
+     * restoring previous state of allocations,
+     * concatenating and duplicating memory/strings on mempools,
+     * generic allocator interface spanning both malloc and mempools.
+*/
 
 #endif
