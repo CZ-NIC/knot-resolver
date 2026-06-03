@@ -233,8 +233,14 @@ void kr_quic_stream_ack_data(struct pl_quic_stream_sess_data *stream,
 static int pl_quic_stream_sess_deinit(struct session2 *session, void *sess_data)
 {
 	struct pl_quic_stream_sess_data *stream = sess_data;
-	if (stream->conn) {
-		ngtcp2_conn_shutdown_stream(stream->conn, 0, stream->stream_id, 0);
+
+	if (stream->ngtcp2_stream_active) {
+		if (!stream->conn) {
+			kr_log_debug(DOQ, "Stream missing connection pointer, cannot update ngtcp2 stream limits\n");
+		} else {
+			stream->ngtcp2_stream_active = false;
+			ngtcp2_conn_extend_max_streams_bidi(stream->conn, 1);
+		}
 	}
 
 	if (!session2_tasklist_is_empty(session)) {

@@ -267,8 +267,6 @@ static int stream_close_cb(ngtcp2_conn *ngconn, uint32_t flags,
 		int64_t stream_id, uint64_t app_error_code,
 		void *user_data, void *stream_user_data)
 {
-	ngtcp2_conn_extend_max_streams_bidi(ngconn, 1);
-
 	struct pl_quic_conn_sess_data *conn = user_data;
 	struct pl_quic_stream_sess_data *stream = stream_user_data;
 	session2_close(stream->h.session);
