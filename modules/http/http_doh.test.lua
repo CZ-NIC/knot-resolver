@@ -105,7 +105,7 @@ else
 		ok(server ~= nil, 'creates server instance')
 		_, host, port = server:localname()
 		ok(host and port, 'binds to an interface')
-		uri_templ = string.format('http://%s:%d/doh', host, port)
+		uri_templ = string.format('http://%s:%d/dns-query', host, port)
 		req_templ = assert(request.new_from_uri(uri_templ))
 		req_templ.headers:upsert('content-type', 'application/dns-message')
 	end
@@ -209,7 +209,7 @@ else
 		local desc = 'valid GET query which ends with SERVFAIL'
 		local req = req_templ:clone()
 		req.headers:upsert(':method', 'GET')
-		req.headers:upsert(':path', '/doh?dns='  -- servfail.test. A
+		req.headers:upsert(':path', '/dns-query?dns='  -- servfail.test. A
 			.. 'FZUBAAABAAAAAAAACHNlcnZmYWlsBHRlc3QAAAEAAQ')
 		local headers, pkt = check_ok(req, desc)
 		if not (headers and pkt) then
@@ -224,7 +224,7 @@ else
 		local desc = 'valid GET query which ends with NOERROR'
 		local req = req_templ:clone()
 		req.headers:upsert(':method', 'GET')
-		req.headers:upsert(':path', '/doh?dns='  -- noerror.test. A
+		req.headers:upsert(':path', '/dns-query?dns='  -- noerror.test. A
 			.. 'vMEBAAABAAAAAAAAB25vZXJyb3IEdGVzdAAAAQAB')
 		local headers, pkt = check_ok(req, desc)
 		if not (headers and pkt) then
@@ -242,7 +242,7 @@ else
 		local desc = 'valid GET query which ends with NXDOMAIN'
 		local req = req_templ:clone()
 		req.headers:upsert(':method', 'GET')
-		req.headers:upsert(':path', '/doh?dns='  -- nxdomain.test. A
+		req.headers:upsert(':path', '/dns-query?dns='  -- nxdomain.test. A
 			.. 'viABAAABAAAAAAAACG54ZG9tYWluBHRlc3QAAAEAAQ')
 		local headers, pkt = check_ok(req, desc)
 		if not (headers and pkt) then
@@ -258,7 +258,7 @@ else
                 local req = req_templ:clone()
                 req.headers:upsert(':method', 'GET')
                 req.headers:upsert(':path',
-		'/doh?other=something&another=something&dns=vMEBAAABAAAAAAAAB25vZXJyb3IEdGVzdAAAAQAB')
+		'/dns-query?other=something&another=something&dns=vMEBAAABAAAAAAAAB25vZXJyb3IEdGVzdAAAAQAB')
                 check_ok(req, desc)
         end
 
@@ -267,7 +267,7 @@ else
                 local req = req_templ:clone()
                 req.headers:upsert(':method', 'GET')
                 req.headers:upsert(':path',
-		'/doh?dns=vMEBAAABAAAAAAAAB25vZXJyb3IEdGVzdAAAAQAB&other=something&another=something')
+		'/dns-query?dns=vMEBAAABAAAAAAAAB25vZXJyb3IEdGVzdAAAAQAB&other=something&another=something')
                 check_ok(req, desc)
         end
 
@@ -276,7 +276,7 @@ else
                 local req = req_templ:clone()
                 req.headers:upsert(':method', 'GET')
                 req.headers:upsert(':path',
-		'/doh?other=something&dns=vMEBAAABAAAAAAAAB25vZXJyb3IEdGVzdAAAAQAB&another=something')
+		'/dns-query?other=something&dns=vMEBAAABAAAAAAAAB25vZXJyb3IEdGVzdAAAAQAB&another=something')
                 check_ok(req, desc)
         end
 
@@ -284,35 +284,35 @@ else
 		local function test_get_long_input()
 		local req = assert(req_templ:clone())
 		req.headers:upsert(':method', 'GET')
-		req.headers:upsert(':path', '/doh?dns=' .. basexx.to_url64(string.rep('\0', 1030)))
+		req.headers:upsert(':path', '/dns-query?dns=' .. basexx.to_url64(string.rep('\0', 1030)))
 		check_err(req, '414', 'too long GET finishes with 414')
 	end
 
 	local function test_get_no_dns_param()
 		local req = assert(req_templ:clone())
 		req.headers:upsert(':method', 'GET')
-		req.headers:upsert(':path', '/doh?notdns=' .. basexx.to_url64(string.rep('\0', 1024)))
+		req.headers:upsert(':path', '/dns-query?notdns=' .. basexx.to_url64(string.rep('\0', 1024)))
 		check_err(req, '400', 'GET without dns parameter finishes with 400')
 	end
 
 	local function test_get_unparseable()
                 local req = assert(req_templ:clone())
                 req.headers:upsert(':method', 'GET')
-                req.headers:upsert(':path', '/doh??dns=' .. basexx.to_url64(string.rep('\0', 1024)))
+                req.headers:upsert(':path', '/dns-query??dns=' .. basexx.to_url64(string.rep('\0', 1024)))
                 check_err(req, '400', 'unparseable GET finishes with 400')
         end
 
 	local function test_get_invalid_b64()
                 local req = assert(req_templ:clone())
                 req.headers:upsert(':method', 'GET')
-                req.headers:upsert(':path', '/doh?dns=thisisnotb64')
+                req.headers:upsert(':path', '/dns-query?dns=thisisnotb64')
                 check_err(req, '400', 'GET with invalid base64 finishes with 400')
         end
 
 	local function test_get_invalid_chars()
                 local req = assert(req_templ:clone())
                 req.headers:upsert(':method', 'GET')
-                req.headers:upsert(':path', '/doh?dns=' .. basexx.to_url64(string.rep('\0', 200)) .. '@#$%?!')
+                req.headers:upsert(':path', '/dns-query?dns=' .. basexx.to_url64(string.rep('\0', 200)) .. '@#$%?!')
                 check_err(req, '400', 'GET with invalid characters in b64 finishes with 400')
         end
 
