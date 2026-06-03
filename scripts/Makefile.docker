@@ -16,7 +16,7 @@ BRANCHTAG	= $(shell [ -n "${GITBRANCH}" ] && echo "-t ${BASETAG}:${GITBRANCH}" |
 RELTAG		= $(shell [ -n "${RELEASE}" ] && echo "-t ${BASETAG}:${RELEASE}" || echo "")
 DATETAG		= $(shell [ -n "${RELEASE}" ] && echo "-t ${BASETAG}:${RELEASE}-${DATE}" || echo "")
 EXTRATAG	= $(shell [ -n "${TAG}" ] && echo "-t ${BASETAG}:${TAG}" || echo "")
-LABEL		= $(shell [ -n "${GITHASH}" ] && echo "--label knot.git.hash=${GITHASH}" || echo "")
+LABEL		= $(shell [ -n "${GITHASH}" ] && echo "--label knot-resolver.git.hash=${GITHASH}" || echo "")
 
 
 BUILDXDETECT	= ${HOME}/.docker/cli-plugins/docker-buildx
