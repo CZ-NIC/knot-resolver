@@ -1,0 +1,55 @@
+# Based on https://netfuture.ch/2020/05/multi-arch-docker-image-easy/
+#
+# Example: make -f Makefile.docker docker-multiarch (TAG=latest)
+
+REGISTRY	= cznic
+BASETAG		= ${REGISTRY}/knot-resolver
+PLATFORMS	= linux/amd64,linux/arm/v7,linux/arm64/v8
+
+ARGS		= --build-arg FASTPARSER=enable --build-arg CHECK=disable
+
+GITHASH		= $(shell git rev-parse --short HEAD)
+GITBRANCH	= $(shell git rev-parse --abbrev-ref HEAD)
+RELEASE		= $(shell git describe --abbrev=0 --exact-match)
+DATE		= $(shell date +%Y%m%d)
+BRANCHTAG	= $(shell [ -n "${GITBRANCH}" ] && echo "-t ${BASETAG}:${GITBRANCH}" || echo "")
+RELTAG		= $(shell [ -n "${RELEASE}" ] && echo "-t ${BASETAG}:${RELEASE}" || echo "")
+DATETAG		= $(shell [ -n "${RELEASE}" ] && echo "-t ${BASETAG}:${RELEASE}-${DATE}" || echo "")
+EXTRATAG	= $(shell [ -n "${TAG}" ] && echo "-t ${BASETAG}:${TAG}" || echo "")
+LABEL		= $(shell [ -n "${GITHASH}" ] && echo "--label knot-resolver.git.hash=${GITHASH}" || echo "")
+
+
+BUILDXDETECT	= ${HOME}/.docker/cli-plugins/docker-buildx
+QEMUDETECT	= /proc/sys/fs/binfmt_misc/qemu-m68k
+
+docker-multiarch: qemu buildx docker-multiarch-builder
+	docker login
+	docker buildx build --no-cache --builder docker-multiarch --pull --push ${LABEL} \
+	                    --platform ${PLATFORMS} ${ARGS} ${BRANCHTAG} ${RELTAG} ${DATETAG} ${EXTRATAG} ..
+
+qemu: ${QEMUDETECT}
+${QEMUDETECT}:
+	docker pull multiarch/qemu-user-static
+	docker run --privileged multiarch/qemu-user-static --reset -p yes
+	docker ps -a | sed -n 's, *multiarch/qemu-user-static.*,,p' \
+	  | (xargs docker rm 2>&1 || \
+	    echo "Cannot remove docker container on ZFS; retry after next reboot") \
+	  | grep -v 'dataset is busy'
+
+buildx: ${BUILDXDETECT}
+${BUILDXDETECT}:
+	@echo
+# Output of `uname -m` is too different
+	@echo '*** `docker buildx` missing. Install binary for this machine architecture'
+	@echo '*** from `https://github.com/docker/buildx/releases/latest`'
+	@echo '*** to `~/.docker/cli-plugins/docker-buildx` and `chmod +x` it.'
+	@echo
+	@exit 1
+
+docker-multiarch-builder: qemu buildx
+	if ! docker buildx ls | grep -w docker-multiarch > /dev/null; then \
+		docker buildx create --name docker-multiarch && \
+		docker buildx inspect --builder docker-multiarch --bootstrap; \
+	fi
+
+.PHONY: qemu buildx docker-multiarch docker-multiarch-builder

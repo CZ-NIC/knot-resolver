@@ -206,7 +206,7 @@ docker:build:cross-platform:
   before_script:
     - >
       docker buildx create
-      --name kres-builder
+      --name kres-builder-$CI_JOB_ID
       --driver docker-container
       --bootstrap --use
     - echo "$CI_REGISTRY_PASSWORD" | docker login $CI_REGISTRY -u $CI_REGISTRY_USER --password-stdin
@@ -221,7 +221,8 @@ docker:build:cross-platform:
       --tag ${GITLAB_REGISTRY}:${CI_COMMIT_REF_NAME}
       .
   after_script:
-    - docker buildx stop
+    - docker buildx rm kres-builder-$CI_JOB_ID
+
 
 docker:test:cross-platform:
   <<: *docker
@@ -256,19 +257,36 @@ docker:test:cross-platform:
 docker:dockerhub:
   <<: *docker
   stage: deploy
-  when: manual
-  only:
-    - tags
   needs:
     - docker:test:cross-platform
   before_script:
-    - echo "$DOCKER_HUB_TOKEN" | docker login -u $DOCKER_HUB_USER --password-stdin
+    - git fetch --tags --force
+    - >
+      LATEST5_TAG=$(git tag --list 'v5*' --sort=-v:refname | head -n 1)
+
+      echo "Latest tag: $LATEST_TAG"
+      echo "Current: $CI_COMMIT_REF_NAME"
+
+      if [ "$CI_COMMIT_REF_NAME" != "$LATEST5_TAG" ]; then
+        echo "ERROR: not running on latest5 tag"
+        exit 1
+      fi
   script:
+    - echo "$DOCKER_HUB_TOKEN" | docker login -u $DOCKER_HUB_USER --password-stdin
     - >
       docker buildx imagetools create
+      -t ${DOCKER_HUB_REGISTRY}:${CI_COMMIT_REF_NAME}-$(date +%Y%m%d)
       -t ${DOCKER_HUB_REGISTRY}:${CI_COMMIT_REF_NAME}
       -t ${DOCKER_HUB_REGISTRY}:latest5
       ${GITLAB_REGISTRY}:${CI_COMMIT_REF_NAME}
+  rules:
+    # Deploy automatically from schedule when DOCKERHUB_AUTO_DEPLOY is set
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $DOCKERHUB_AUTO_DEPLOY == "true"'
+      when: on_success
+    # Otherwise make it manual
+    - if: '$CI_COMMIT_TAG'
+      when: manual
+    - when: never
 # }}}
 
 # sanity {{{
