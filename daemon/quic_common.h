@@ -60,13 +60,21 @@ typedef enum {
 #define MAX_QUIC_FRAME_SIZE 65536
 #define QUIC_MAX_SEND_PER_RECV	4
 
-#define QUIC_CONN_IDLE_TIMEOUT (5 * NGTCP2_SECONDS)
-#define QUIC_HS_IDLE_TIMEOUT   (5 * NGTCP2_SECONDS)
+/* The connection can reach a state when the internal ngtcp2 state machine is
+ * not waiting for any event. In such cases the ngtcp2_conn_get_expiry
+ * returns UINT64_MAX => meaining no timer event. If the peer abruptly
+ * stops communicating in such a state the connection would be active
+ * untill a new connection prompts a conn table sweep. Instead of waiting
+ * for a new connection we set the timer to the QUIC_MAX_TIMEOUT to assure
+ * that every connection will terminate within a reasonable time period
+ * regardless of the incoming traffic. This is just a cleanliness measure. */
+#define QUIC_MAX_IDLE_TIMEOUT (15 * NGTCP2_SECONDS)
+#define QUIC_CONN_IDLE_TIMEOUT (2 * NGTCP2_SECONDS)
+#define QUIC_HS_IDLE_TIMEOUT   (3 * NGTCP2_SECONDS)
 
-/* HACK adjust pointer of conn->streams head so it points to
- * struct pl_quic_stream_sess_data, this is hacky */
-#define container_of(ptr, type, member) \
-	((type *)((char *)(ptr) - offsetof(type, member)))
+#define container_of(ptr, type, member) ({ \
+	const typeof( ((type *)0)->member ) *__mptr = (ptr); \
+	(type *)((char *)__mptr - offsetof(type,member));})
 
 typedef enum {
 	KNOT_QUIC_TABLE_CLIENT_ONLY = (1 << 0),
@@ -131,6 +139,11 @@ int kr_quic_table_add(struct pl_quic_conn_sess_data *conn_sess,
 bool init_unique_cid(ngtcp2_cid *cid, size_t len, kr_quic_table_t *table);
 void init_random_cid(ngtcp2_cid *cid, size_t len);
 uint64_t quic_timestamp(void);
+
+void quic_hs_timeout(uv_timer_t *timer);
+void quic_idle_timeout(uv_timer_t *timer);
+void quic_reset_expiry(struct pl_quic_conn_sess_data *conn);
+
 kr_quic_cid_t **kr_quic_table_lookup2(const ngtcp2_cid *cid,
 		kr_quic_table_t *table);
 struct pl_quic_conn_sess_data *kr_quic_table_lookup(const ngtcp2_cid *cid,

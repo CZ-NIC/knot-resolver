@@ -1,7 +1,9 @@
 /*  Copyright (C) CZ.NIC, z.s.p.o. <knot-resolver@labs.nic.cz>
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
+
 #include <ngtcp2/ngtcp2.h>
+#include <uv.h>
 #include "contrib/openbsd/siphash.h"
 #include "lib/dnssec.h"
 
@@ -62,6 +64,78 @@ bool kr_quic_conn_timeout(struct pl_quic_conn_sess_data *conn, uint64_t *now)
 		*now = quic_timestamp();
 	}
 	return *now > ngtcp2_conn_get_expiry(conn->conn);
+}
+
+void quic_hs_timeout(uv_timer_t *timer)
+{
+	struct session2 *s = timer->data;
+	session2_timer_stop(s);
+
+	struct pl_quic_conn_sess_data *conn =
+		protolayer_sess_data_get_proto(s, PROTOLAYER_TYPE_QUIC_CONN);
+	session2_event(conn->h.session, PROTOLAYER_EVENT_CONNECT_TIMEOUT, NULL);
+}
+
+void quic_idle_timeout(uv_timer_t *timer)
+{
+	struct session2 *s = timer->data;
+	struct pl_quic_conn_sess_data *conn =
+		protolayer_sess_data_get_proto(s, PROTOLAYER_TYPE_QUIC_CONN);
+	uint64_t now = quic_timestamp();
+	int ret = ngtcp2_conn_handle_expiry(conn->conn, now);
+	if (ret != 0) {
+		kr_log_debug(DOQ, "Result of ngtcp2_conn_handle_expiry: %s (%d)\n",
+				ngtcp2_strerror(ret), ret);
+	}
+	if (ret == NGTCP2_ERR_IDLE_CLOSE) {
+		/* idle equal max_idle_timeout, don't send CONNECTION_CLOSE */
+		session2_force_close(s);
+	} else if (ret < 0) {
+		session2_close(s);
+	} else {
+		quic_flush_streams(conn);
+		/* let the connection itself send whatever data it needs to */
+		session2_wrap(s, protolayer_payload_wire_buf(&s->wire_buf, true),
+				&conn->comm_storage, NULL, NULL, NULL);
+	}
+}
+
+int quic_set_timeout(struct session2 *s, uint64_t ms, uv_timer_cb timeout_cb)
+{
+	uv_timer_stop(&s->timer);
+	return uv_timer_start(&s->timer, timeout_cb, ms, 0);
+}
+
+int quic_set_hs_timeout(struct session2 *s, uint64_t ms)
+{
+	return quic_set_timeout(s, ms, quic_hs_timeout);
+}
+
+int quic_set_idle_timeout(struct session2 *s, uint64_t ms)
+{
+	return quic_set_timeout(s, ms, quic_idle_timeout);
+}
+
+void quic_reset_expiry(struct pl_quic_conn_sess_data *conn)
+{
+	kr_require(conn);
+	struct session2 *s = conn->h.session;
+	ngtcp2_tstamp expiry = ngtcp2_conn_get_expiry(conn->conn);
+
+	uv_timer_stop(&s->timer);
+	if (expiry == UINT64_MAX) {
+		uv_timer_start(&s->timer, quic_idle_timeout,
+				QUIC_MAX_IDLE_TIMEOUT, 0);
+		return;
+	}
+	uint64_t now = quic_timestamp();
+	if (expiry > now) {
+		uint64_t ceil_delay_ns = expiry - now + NGTCP2_MILLISECONDS - 1;
+		uint64_t delay_ms = ceil_delay_ns / NGTCP2_MILLISECONDS;
+		uv_timer_start(&s->timer, quic_idle_timeout, delay_ms, 0);
+	} else {
+		uv_timer_start(&s->timer, quic_idle_timeout, 0, 0);
+	}
 }
 
 void init_random_cid(ngtcp2_cid *cid, size_t len)
@@ -150,7 +224,9 @@ int set_application_error(struct pl_quic_conn_sess_data *conn,
 	if (kr_fails_assert(conn && msglen < 128))
 		return kr_error(EINVAL);
 
-	memcpy(&conn->err_msg_buffer, msg, msglen);
+	if (msg && msglen > 0) {
+		memcpy(&conn->err_msg_buffer, msg, msglen);
+	}
 	ngtcp2_ccerr_set_application_error(&conn->ccerr, error_code,
 			conn->err_msg_buffer, msglen);
 

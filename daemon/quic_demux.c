@@ -7,6 +7,8 @@
 #include "quic_conn.h"
 #include "quic_demux.h"
 #include "lib/dnssec.h"
+#include "session2.h"
+#include "worker.h"
 #include <stdlib.h>
 
 /* Toggle sending retry for new connections. This is a way to validate the
@@ -18,15 +20,14 @@ void kr_quic_table_rem(struct pl_quic_conn_sess_data *conn, kr_quic_table_t *tab
 
 static int cmp_expiry_heap_nodes(void *c1, void *c2)
 {
-	if (((struct pl_quic_conn_sess_data *)c1)->h.heap_value <
-			((struct pl_quic_conn_sess_data *)c2)->h.heap_value)
-		return -1;
-
 	if (((struct pl_quic_conn_sess_data *)c1)->h.heap_value >
 			((struct pl_quic_conn_sess_data *)c2)->h.heap_value)
 		return 1;
 
-	return 0;
+	/* If the heap_values equal stop the swapping subroutine as there is
+	 * no clear hierarchy. This also protects new connections from being
+	 * terminated by kr_quic_table_sweep right after initialisation. */
+	return -1;
 }
 
 static void conn_heap_reschedule(struct pl_quic_conn_sess_data *conn,
@@ -131,9 +132,9 @@ void kr_quic_table_sweep(struct kr_quic_table *table,
 		 * This is to prevent closing brand new connections which has
 		 * crippling effects on the number of answered queries when
 		 * conn limits are reached. */
-		} else if (table->usage >= table->max_conns &&
-				// c->streams_count <= 0 &&
-				c->finished_streams > 0) {
+		} else if (table->usage >= table->max_conns
+				&& c->finished_streams > 0
+				&& !c->disconnected) {
 			quic_doq_error_t doq_error = DOQ_EXCESSIVE_LOAD;
 			send_special(&c->dec_cids, c->table_ref, ctx,
 					QUIC_SEND_CONN_CLOSE, c, c->h.session,
@@ -493,8 +494,7 @@ static enum protolayer_event_cb_result pl_quic_demux_event_unwrap(
 			struct pl_quic_conn_sess_data *c =
 				*(struct pl_quic_conn_sess_data **)HHEAD(
 						demux->conn_table->expiry_heap);
-			kr_quic_table_rem(c, demux->conn_table);
-			session2_close(c->h.session);
+			session2_force_close(c->h.session);
 		}
 
 		session2_dec_refs(session);
@@ -524,13 +524,35 @@ static enum protolayer_event_cb_result pl_quic_demux_event_unwrap(
 
 	if (event == PROTOLAYER_EVENT_DISCONNECT ||
 			event == PROTOLAYER_EVENT_CONNECT_TIMEOUT) {
-		kr_quic_table_rem(conn, demux->conn_table);
 		session2_close(conn->h.session);
 		return PROTOLAYER_EVENT_CONSUME;
 	}
 
 	return PROTOLAYER_EVENT_PROPAGATE;
 }
+
+static enum protolayer_event_cb_result pl_quic_demux_event_wrap(
+		enum protolayer_event_type event, void **baton,
+		struct session2 *session, void *sess_data)
+{
+	if (event == PROTOLAYER_EVENT_FORCE_CLOSE
+			|| event == PROTOLAYER_EVENT_CLOSE
+			|| event == PROTOLAYER_EVENT_GENERAL_TIMEOUT
+			|| event == PROTOLAYER_EVENT_CONNECT_TIMEOUT) {
+		kr_require(baton && *baton);
+		struct pl_quic_demux_sess_data *demux = sess_data;
+		struct pl_quic_conn_sess_data *conn = *baton;
+		kr_quic_table_rem(conn, demux->conn_table);
+
+		kr_require(EMPTY_LIST(conn->streams));
+		session2_dec_refs(conn->h.session);
+
+		return PROTOLAYER_EVENT_CONSUME;
+	}
+
+	return PROTOLAYER_EVENT_PROPAGATE;
+}
+
 
 __attribute__((constructor))
 static void quic_demux_protolayers_init(void)
@@ -542,5 +564,6 @@ static void quic_demux_protolayers_init(void)
 		.sess_deinit = pl_quic_demux_sess_deinit,
 		.unwrap = pl_quic_demux_unwrap,
 		.event_unwrap = pl_quic_demux_event_unwrap,
+		.event_wrap = pl_quic_demux_event_wrap,
 	};
 }

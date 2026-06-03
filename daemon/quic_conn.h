@@ -102,6 +102,7 @@ struct pl_quic_conn_sess_data {
 	kr_quic_table_t *table_ref;
 };
 
+int quic_flush_streams(struct pl_quic_conn_sess_data *conn);
 int send_special(ngtcp2_version_cid *dec_cids,
 		kr_quic_table_t *table,
 		struct protolayer_iter_ctx *ctx, int action,

@@ -3,10 +3,12 @@
  */
 
 #include "quic_conn.h"
+#include "lib/proto.h"
 #include "network.h"
 #include "quic_common.h"
 #include "quic_stream.h"
 #include "lib/dnssec.h"
+#include "session2.h"
 #include "worker.h"
 #include <gnutls/gnutls.h>
 #include <libknot/wire.h>
@@ -94,8 +96,16 @@ static struct tls_credentials *tls_credentials_reserve(
 
 static int handshake_completed_cb(ngtcp2_conn *ngconn, void *user_data)
 {
-	(void)ngconn;
-	QUIC_SET_HS_COMPLETED((struct pl_quic_conn_sess_data *)user_data);
+	struct pl_quic_conn_sess_data *conn = user_data;
+	QUIC_SET_HS_COMPLETED(conn);
+
+	/* Notify worker that waiting tasks can be sent out */
+	if (conn->h.session->outgoing) {
+		// pass
+	} else {
+		quic_reset_expiry(conn);
+	}
+
 	return kr_ok();
 }
 
@@ -193,6 +203,7 @@ finished:
 					msg, sizeof(msg) - 1);
 			return NGTCP2_ERR_CALLBACK_FAILURE;
 		}
+		session2_inc_refs(stream->h.session);
 		queue_push(conn->pending_unwrap, stream);
 	}
 
@@ -247,6 +258,8 @@ static int stream_open_cb(ngtcp2_conn *ngconn,
 	++conn->streams_count;
 	ngtcp2_conn_set_stream_user_data(ngconn, stream_id, stream);
 
+	session2_event(stream->h.session, PROTOLAYER_EVENT_CONNECT, NULL);
+
 	return NGTCP2_NO_ERROR;
 }
 
@@ -255,9 +268,9 @@ static int stream_close_cb(ngtcp2_conn *ngconn, uint32_t flags,
 		void *user_data, void *stream_user_data)
 {
 	ngtcp2_conn_extend_max_streams_bidi(ngconn, 1);
+
 	struct pl_quic_conn_sess_data *conn = user_data;
 	struct pl_quic_stream_sess_data *stream = stream_user_data;
-	rem_node(&stream->list_node);
 	session2_close(stream->h.session);
 	--conn->streams_count;
 	++conn->finished_streams;
@@ -601,6 +614,33 @@ int quic_init_server_conn(struct pl_quic_conn_sess_data *conn,
 	return ret;
 }
 
+int quic_flush_streams(struct pl_quic_conn_sess_data *conn)
+{
+	kr_require(conn);
+	node_t *s_node;
+	WALK_LIST(s_node, conn->streams) {
+		struct pl_quic_stream_sess_data *s =
+			container_of(s_node, struct pl_quic_stream_sess_data,
+					list_node);
+		/* Skip streams that have no data to send */
+		if (s->unsent_obuf == NULL)
+			continue;
+
+		if (session2_wrap_after(s->h.session,
+				PROTOLAYER_TYPE_DNS_SINGLE_STREAM,
+				protolayer_payload_wire_buf(
+					&s->h.session->wire_buf, true),
+				&conn->comm_storage,
+				NULL,
+				NULL) < 0) {
+			/* Either closing or invalid */
+			session2_close(s->h.session);
+		}
+	}
+
+	return kr_ok();
+}
+
 static void copy_comm_storage(
 		 struct pl_quic_conn_sess_data *conn,
 		 struct comm_info *comm)
@@ -640,7 +680,7 @@ int send_special(ngtcp2_version_cid *dec_cids, kr_quic_table_t *table,
 		.size = NGTCP2_MAX_UDP_PAYLOAD_SIZE,
 		.start = 0,
 	};
-	struct wire_buf *save = ctx->payload.wire_buf;
+	struct wire_buf *save_wb = ctx->payload.wire_buf;
 	ctx->payload.wire_buf = &err_wb;
 
 	uint64_t now = quic_timestamp();
@@ -663,6 +703,7 @@ int send_special(ngtcp2_version_cid *dec_cids, kr_quic_table_t *table,
 			dec_cids->dcid, dec_cids->dcidlen, supported_quic,
 			sizeof(supported_quic) / sizeof(*supported_quic)
 		);
+		break;
 	case QUIC_SEND_RETRY:
 		kr_require(dec_cids);
 		ret = write_retry_packet(ctx->payload.wire_buf,
@@ -710,7 +751,7 @@ int send_special(ngtcp2_version_cid *dec_cids, kr_quic_table_t *table,
 	}
 
 	mm_free(&ctx->pool, ctx->payload.wire_buf);
-	ctx->payload.wire_buf = save;
+	ctx->payload.wire_buf = save_wb;
 
 	return ret;
 }
@@ -736,24 +777,21 @@ static enum protolayer_iter_cb_result pl_quic_conn_unwrap(void *sess_data,
 
 		if ((ret = quic_init_server_conn(conn, ctx)) != kr_ok()) {
 			kr_log_error(DOQ, "Failed to initiate quic connection (%d)\n", ret);
-			session2_force_close(conn->h.session);
+			QUIC_SET_DRAINING(conn);
 			return protolayer_break(ctx, ret);
 		}
 	}
 
 	quic_doq_error_t doq_error;
-	uv_timer_again(&conn->h.session->timer);
 	ret = handle_packet(conn, ctx, &doq_error);
 	if (ret != kr_ok()) {
-		ret = send_special(&conn->dec_cids,
+		(void)send_special(&conn->dec_cids,
 				conn->table_ref, ctx, ret, conn,
 				conn->h.session, &doq_error);
-		if (ret == kr_ok()) {
-			ngtcp2_conn_update_pkt_tx_time(conn->conn,
-					quic_timestamp());
-		}
 		return protolayer_break(ctx, kr_ok());
 	}
+
+	quic_reset_expiry(conn);
 
 	if (queue_len(conn->pending_unwrap) == 0) {
 		ret = session2_wrap(conn->h.session,
@@ -767,11 +805,13 @@ static enum protolayer_iter_cb_result pl_quic_conn_unwrap(void *sess_data,
 	}
 
 	while (queue_len(conn->pending_unwrap) > 0) {
-		session2_unwrap(queue_head(conn->pending_unwrap)->h.session,
+		struct session2 *s = queue_head(conn->pending_unwrap)->h.session;
+		session2_unwrap(s,
 				ctx->payload,
 				NULL /* &conn->comm_storage */,
 				ctx->finished_cb,
 				ctx->finished_cb_baton);
+		session2_dec_refs(s);
 		queue_pop(conn->pending_unwrap);
 	}
 
@@ -786,6 +826,8 @@ static enum protolayer_iter_cb_result pl_quic_conn_wrap(void *sess_data,
 	if (!QUIC_CAN_SEND(conn)) {
 		return protolayer_break(ctx, kr_ok());
 	}
+
+	kr_quic_set_addrs(ctx, &conn->path);
 
 	if (ctx->payload.type != PROTOLAYER_PAYLOAD_IOVEC) {
 		ngtcp2_ssize sent = 0;
@@ -804,24 +846,27 @@ static enum protolayer_iter_cb_result pl_quic_conn_wrap(void *sess_data,
 				&sent, NGTCP2_WRITE_STREAM_FLAG_NONE, -1, NULL,
 				0, quic_timestamp());
 
+		if (nwrite > 0)
+			ngtcp2_conn_update_pkt_tx_time(conn->conn, quic_timestamp());
+		if (nwrite == 0)
+			quic_reset_expiry(conn);
+
 		if (nwrite <= 0) {
 			if (nwrite == NGTCP2_ERR_NOMEM) {
-				 size_t inc = MIN(ctx->payload.wire_buf->size, 1024);
-				char *new_buf = realloc(ctx->payload.wire_buf->buf, inc);
+				size_t new_size = ctx->payload.wire_buf->size + 1024;
+				char *new_buf = realloc(ctx->payload.wire_buf->buf, new_size);
 				kr_require(new_buf);
-
 				ctx->payload.wire_buf->buf = new_buf;
-				ctx->payload.wire_buf->end += inc;
-				ctx->payload.wire_buf->size += inc;
+				ctx->payload.wire_buf->size = new_size;
+				ctx->payload.wire_buf->end = new_size;
 			}
 
-			return protolayer_break(ctx, kr_error(EINVAL));
+			return protolayer_break(ctx, kr_ok());
 		}
 
 		wire_buf_consume(ctx->payload.wire_buf, nwrite);
 	}
 
-	ngtcp2_conn_update_pkt_tx_time(conn->conn, quic_timestamp());
 	if (conn->state & QUIC_STATE_CLOSING) {
 		QUIC_SET_DRAINING(conn);
 	}
@@ -905,9 +950,7 @@ static int pl_quic_conn_sess_init(struct session2 *session, void *sess_data, voi
 		return kr_error(EINVAL);
 	}
 
-	session2_timer_start(session, PROTOLAYER_EVENT_CONNECT_TIMEOUT,
-			QUIC_CONN_IDLE_TIMEOUT / NGTCP2_MILLISECONDS,
-			QUIC_CONN_IDLE_TIMEOUT / NGTCP2_MILLISECONDS);
+	quic_set_hs_timeout(session, QUIC_CONN_IDLE_TIMEOUT / NGTCP2_MILLISECONDS);
 
 	return kr_ok();
 }
@@ -919,16 +962,6 @@ static int pl_quic_conn_sess_deinit(struct session2 *session, void *sess_data)
 
 	session2_timer_stop(session);
 	struct pl_quic_stream_sess_data *s_node;
-	WALK_LIST_FIRST(s_node, conn->streams) {
-		struct pl_quic_stream_sess_data *s =
-			container_of(s_node, struct pl_quic_stream_sess_data, list_node);
-		rem_node(&s->list_node);
-		session2_close(s->h.session);
-		/* These streams die with the connection, stream_close_cb
-		 * will not be called so adjust counters here. */
-		--conn->streams_count;
-		++conn->finished_streams;
-	}
 
 	kr_log_debug(DOQ, "Closing connection, %s useful, served %zu streams\n",
 			conn->finished_streams ? "was" : "wasn't",
@@ -967,23 +1000,102 @@ static enum protolayer_event_cb_result pl_quic_conn_event_unwrap(
 		struct session2 *session, void *sess_data)
 {
 	struct pl_quic_conn_sess_data *conn = sess_data;
-	if (event == PROTOLAYER_EVENT_CONNECT_TIMEOUT) {
-		session2_event(conn->h.session->transport.parent, event, conn);
-		return PROTOLAYER_EVENT_CONSUME;
+	if (event == PROTOLAYER_EVENT_DISCONNECT
+			|| event == PROTOLAYER_EVENT_CLOSE
+			|| event == PROTOLAYER_EVENT_FORCE_CLOSE
+			|| event == PROTOLAYER_EVENT_GENERAL_TIMEOUT
+			|| event == PROTOLAYER_EVENT_CONNECT_TIMEOUT) {
+		while (queue_len(conn->pending_unwrap) > 0) {
+			struct session2 *s =
+				queue_head(conn->pending_unwrap)->h.session;
+			session2_dec_refs(s);
+		}
+
+		node_t *s_node;
+		uint64_t last_stream_id = -1;
+		bool forced = false;
+		WALK_LIST_FIRST(s_node, conn->streams) {
+			struct pl_quic_stream_sess_data *s =
+				container_of(s_node,
+						struct pl_quic_stream_sess_data,
+						list_node);
+
+			/* stream has a pending task to finish. If force
+			 * try force_close, otherwise defer conn termination */
+			if (s->stream_id == last_stream_id) {
+				if (event == PROTOLAYER_EVENT_FORCE_CLOSE
+						&& !forced) {
+					session2_force_close(s->h.session);
+					forced = true;
+					continue;
+				}
+
+				session2_touch(session);
+				session2_timer_restart(session);
+				return PROTOLAYER_EVENT_CONSUME;
+			}
+
+			last_stream_id = s->stream_id;
+
+			(void)ngtcp2_conn_shutdown_stream(s->conn, 0, s->stream_id, 0);
+
+			session2_close(s->h.session);
+			/* These streams die with the connection, stream_close_cb
+			 * will not be called so adjust counters here. */
+			--conn->streams_count;
+			++conn->finished_streams;
+		}
+
+		if (!EMPTY_LIST(conn->streams)) {
+			return PROTOLAYER_EVENT_CONSUME;
+		}
+
+		if (!conn->disconnected) {
+			if (event == PROTOLAYER_EVENT_CLOSE) {
+				QUIC_SET_CLOSING(conn);
+			} else {
+				QUIC_SET_DRAINING(conn);
+			}
+			conn->disconnected = true;
+		}
+		return PROTOLAYER_EVENT_PROPAGATE;
 	}
 
-	if (event == PROTOLAYER_EVENT_DISCONNECT ||
-			event == PROTOLAYER_EVENT_CLOSE ||
-			event == PROTOLAYER_EVENT_FORCE_CLOSE) {
-		if (!conn->disconnected) {
-			conn->disconnected = true;
-			session2_dec_refs(session);
+	return PROTOLAYER_EVENT_PROPAGATE;
+}
+
+static enum protolayer_event_cb_result pl_quic_conn_event_wrap(
+		enum protolayer_event_type event, void **baton,
+		struct session2 *session, void *sess_data)
+{
+	struct pl_quic_conn_sess_data *conn = sess_data;
+	if (event == PROTOLAYER_EVENT_FORCE_CLOSE
+			|| event == PROTOLAYER_EVENT_CLOSE
+			|| event == PROTOLAYER_EVENT_GENERAL_TIMEOUT
+			|| event == PROTOLAYER_EVENT_CONNECT_TIMEOUT) {
+		if (baton && *baton) {
+			struct pl_quic_stream_sess_data *stream = *baton;
+			rem_node(&stream->list_node);
+			session2_dec_refs(stream->h.session);
 		}
+
+		if (EMPTY_LIST(conn->streams) && conn->disconnected) {
+			/* Connection can be terminated */
+			*baton = conn;
+			return PROTOLAYER_EVENT_PROPAGATE;
+		}
+
+		/* Close terminates the timer. We failed to close
+		 * due to a stream waiting for a task to finish
+		 * so we restart the timer and try again */
+		session2_touch(session);
+		session2_timer_restart(session);
 		return PROTOLAYER_EVENT_CONSUME;
 	}
 
 	return PROTOLAYER_EVENT_PROPAGATE;
 }
+
 
 __attribute__((constructor))
 static void quic_conn_protolayers_init(void)
@@ -995,5 +1107,6 @@ static void quic_conn_protolayers_init(void)
 		.unwrap = pl_quic_conn_unwrap,
 		.wrap = pl_quic_conn_wrap,
 		.event_unwrap = pl_quic_conn_event_unwrap,
+		.event_wrap = pl_quic_conn_event_wrap,
 	};
 }
