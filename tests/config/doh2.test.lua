@@ -49,13 +49,15 @@ function parse_pkt(input, desc)
 	return pkt
 end
 
-local function check_ok(req, desc)
-	local headers, stream, errno = req:go(16)
-	if errno then
-		local errmsg = stream
-		nok(errmsg, desc .. ': ' .. errmsg)
-		return
+local TIMEOUT = 5
+
+local function check_ok_stream(stream, desc, headers)
+	if headers == nil then
+		local errmsg
+		headers, errmsg = stream:get_headers(TIMEOUT)
+		if not headers then nok(errmsg, desc .. ': get_headers():' .. errmsg) return end
 	end
+
 	same(tonumber(headers:get(':status')), 200, desc .. ': status 200')
 	same(headers:get('content-type'), 'application/dns-message', desc .. ': content-type')
 	local body = assert(stream:get_body_as_string())
@@ -63,8 +65,25 @@ local function check_ok(req, desc)
 	return headers, pkt
 end
 
+local function check_ok(req, desc)
+	local headers, stream, errno = req:go(TIMEOUT)
+	if errno then
+		local errmsg = stream
+		nok(errmsg, desc .. ': ' .. errmsg)
+		return
+	end
+	return check_ok_stream(stream, desc, headers)
+end
+
+local function check_err_stream(stream, exp_status, desc)
+	local headers, errmsg = stream:get_headers(TIMEOUT)
+	if not headers then nok(errmsg, desc .. ': get_headers():' .. errmsg) return end
+	local got_status = headers:get(':status')
+	same(got_status, exp_status, desc)
+end
+
 local function check_err(req, exp_status, desc)
-	local headers, errmsg, errno = req:go(16)
+	local headers, errmsg, errno = req:go(TIMEOUT)
 	if errno then
 		nok(errmsg, desc .. ': ' .. errmsg)
 		return
@@ -489,6 +508,81 @@ else
 --		check_err(req, '406', 'unsupported Accept type finishes with 406')
 --	end
 
+
+	---- Now section which uses a different approach,
+	---- allowing multiple requests in a single connection.
+
+	local headers_base = require('http.headers').new()
+		headers_base:upsert(':authority', host)
+		headers_base:upsert(':scheme', 'https')
+		headers_base:upsert(':method', 'GET')
+		headers_base:upsert(':path', '/dns-query')
+		headers_base:upsert('content-type', 'application/dns-message')
+
+	local function make_connection()
+		local ssl_ctx = require('openssl.ssl.context')
+		ctx = ssl_ctx.new()
+		ctx:setVerify(ssl_ctx.VERIFY_NONE)
+		local conn, errmsg = require('http.client').connect(
+			{
+				host = host,
+				port = port,
+				tls = true,
+				ctx = ctx,
+			},
+			TIMEOUT)
+		if not conn then nok(errmsg, 'connect(): ' .. errmsg) return end
+		return conn
+	end
+
+	local function send_stream(conn, headers, body)
+		local stream, errmsg = conn:new_stream()
+		if not stream then nok(errmsg, 'new_stream(): ' .. errmsg) return end
+		local ok
+		ok, errmsg = stream:write_headers(headers, body == nil, TIMEOUT)
+		if not ok then nok(errmsg, 'write_headers(): ' .. errmsg) return end
+		if body ~= nil then
+			stream:write_body_from_string(body, TIMEOUT)
+		end
+		return stream
+	end
+
+	local function test_get_multi_p(path) return function() -- you can specify the URL/path
+		local desc = 'Second GET succeeds on the same connection after a failed GET'
+		local conn = make_connection()
+		local headers = headers_base:clone()
+		headers:upsert(':path', path)
+		check_err_stream(
+			send_stream(conn, headers),
+			'400', 'GET with invalid dns parameter finishes with 400'
+		)
+
+		headers = headers_base:clone()
+		headers:upsert(':path', '/dns-query?dns='  -- noerror.test. A
+			.. 'vMEBAAABAAAAAAAAB25vZXJyb3IEdGVzdAAAAQAB')
+		check_ok_stream(send_stream(conn, headers), desc)
+	end end
+
+	local function test_post_multi()
+		local desc = 'Second POST succeeds on the same connection after a failed POST'
+		local conn = make_connection()
+		local headers = headers_base:clone()
+		headers:upsert(':method', 'POST')
+		check_err_stream(
+			send_stream(conn, headers, 'garbage'),
+			'400', 'POST with invalid body finishes with 400'
+		)
+
+		-- reusing unchanged `headers`
+		local body = basexx.from_base64(  -- noerror.test. A
+				'vMEBAAABAAAAAAAAB25vZXJyb3IEdGVzdAAAAQAB')
+		check_ok_stream(
+			send_stream(conn, headers, body),
+			desc
+		)
+	end
+
+
 	-- plan tests
 	local tests = {
 		start_server,
@@ -517,7 +611,10 @@ else
 		test_unsupp_method,
 		test_dstaddr,
 		test_srcaddr,
-		test_headers
+		test_headers,
+		test_get_multi_p('/dns-query?dns=4546'),
+		test_get_multi_p('/dns-query?dns='),
+		test_post_multi,
 	}
 
 	return tests
