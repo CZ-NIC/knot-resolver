@@ -2,11 +2,24 @@
 local condition = require('cqueues.condition')
 
 -- setup resolver
-modules = { 'hints', 'dns64' }
-hints.use_nodata(true) -- Respond NODATA to AAAA query
-hints.ttl(60)
-hints['dns64.example'] = '192.168.1.1'
+modules = { 'dns64' }
 dns64.config('fe80::21b:77ff:0:0')
+
+local ffi = require('ffi')
+local C = ffi.C
+-- this is a bit hacky, basically copy&paste from Lua converted from YAML
+-- kresctl convert t/conf/tmp.yaml --type policy-loader
+rrs = ffi.new('struct kr_rule_zonefile_config')
+rrs.ttl = 60
+rrs.nodata = true
+rrs.is_rpz = false
+rrs.input_str = [[
+dns64.example.  A  192.168.1.1
+dns64-cname.example.  CNAME  dns64.example.
+]]
+rrs.opts = C.KR_RULE_OPTS_DEFAULT
+assert(C.kr_rule_zonefile(rrs)==0)
+
 
 -- helper to wait for query resolution
 local function wait_resolve(qname, qtype)
@@ -35,13 +48,17 @@ end
 
 -- test builtin rules
 local function test_builtin_rules()
-	local rcode, answers = wait_resolve('dns64.example', kres.type.AAAA)
-	same(rcode, kres.rcode.NOERROR, 'dns64.example returns NOERROR')
-	same(#answers, 1, 'dns64.example synthesised answer')
-	local expect = {'dns64.example.', '60', 'AAAA', 'fe80::21b:77ff:c0a8:101'}
-	if #answers > 0 then
-		local rr = {kres.rr2str(answers[1]):match('(%S+)%s+(%S+)%s+(%S+)%s+(%S+)')}
-		same(rr, expect, 'dns64.example synthesised correct AAAA record')
+	local names = {"dns64.example", "dns64-cname.example"}
+	for i, name in ipairs(names) do
+		local rcode, answers = wait_resolve(name, kres.type.AAAA)
+		same(rcode, kres.rcode.NOERROR, name .. ' returns NOERROR')
+		-- Note hacky: the count `i` and the constant 'dns64.example.' here.
+		same(#answers, i, name .. ' synthesised answer')
+		local expect = {'dns64.example.', '60', 'AAAA', 'fe80::21b:77ff:c0a8:101'}
+		if #answers > 0 then
+			local rr = {kres.rr2str(answers[#answers]):match('(%S+)%s+(%S+)%s+(%S+)%s+(%S+)')}
+			same(rr, expect, name .. ' synthesised correct AAAA record')
+		end
 	end
 end
 
