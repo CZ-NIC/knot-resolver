@@ -11,6 +11,7 @@ Improvements
   configuration during installation (GH#130).
 - make DoH cache-control header respect our cache's TTL limits (!1832)
 - support libdnssec merged into libknot, as planned for knot >= 3.6 (!1833)
+- update IANA's certificate for root trust anchor bootstrapping (!1862)
 
 
 Bugfixes
