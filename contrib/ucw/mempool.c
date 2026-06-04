@@ -23,6 +23,36 @@
 #define MP_CHUNK_TAIL ALIGN_TO(sizeof(struct mempool_chunk), CPU_STRUCT_ALIGN)
 #define MP_SIZE_MAX (SIZE_MAX - MP_CHUNK_TAIL - CPU_PAGE_SIZE)
 
+/** \note Imported MMAP backend from bigalloc.c */
+//#define CONFIG_UCW_POOL_IS_MMAP
+#ifdef CONFIG_UCW_POOL_IS_MMAP
+#include <sys/mman.h>
+static void *
+page_alloc(uint64_t len)
+{
+	if (!len) {
+		return NULL;
+	}
+	if (len > SIZE_MAX) {
+		return NULL;
+	}
+	assert(!(len & (CPU_PAGE_SIZE-1)));
+	uint8_t *p = mmap(NULL, len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+	if (p == (uint8_t*) MAP_FAILED) {
+		return NULL;
+	}
+	return p;
+}
+
+static void
+page_free(void *start, uint64_t len)
+{
+	assert(!(len & (CPU_PAGE_SIZE-1)));
+	assert(!((uintptr_t) start & (CPU_PAGE_SIZE-1)));
+	munmap(start, len);
+}
+#endif
+
 struct mempool_chunk {
 #ifdef CONFIG_DEBUG
 	struct mempool *pool;         // Can be useful when analysing coredump for memory leaks
