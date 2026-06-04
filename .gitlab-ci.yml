@@ -772,6 +772,28 @@ pkg:alma-10:
   <<: *pkg_test
   image: $CI_REGISTRY/packaging/apkg/full/alma-10
 
+# Leap 15.6 would need more work due to *default* python being old
+# pkg:opensuse-15.6:
+#   <<: *pkg_test
+#   image: $CI_REGISTRY/packaging/apkg/full/opensuse-15.6
+#   before_script:
+#     - zypper refresh
+#     # busybox-less and less are declared as conflicting packages
+#     - zypper install -y --force-resolution less
+#     # prometheus and watchdog are optional dependencies, but our `apkg test` needs them
+#     - zypper install -y python3-prometheus_client python3-watchdog
+#  allow_failure: true  # SUSE is always special
+
+pkg:opensuse-tumbleweed:
+  <<: *pkg_test
+  image: $CI_REGISTRY/packaging/apkg/full/opensuse-tumbleweed
+  before_script:
+    # openSUSE excludes docs installation by default
+    - echo "rpm.install.excludedocs = no" > /etc/zypp/zypp.conf.d/no-excludedocs.conf
+    # prometheus and watchdog are optional dependencies, but our `apkg test` needs them
+    - zypper refresh
+    - zypper install -y python3-prometheus_client python3-watchdog
+
 pkg:arch:
   <<: *pkg_test_user
   image: $CI_REGISTRY/packaging/apkg/full/arch
@@ -779,17 +801,6 @@ pkg:arch:
     # prometheus and watchdog are optional dependencies, but our `apkg test` needs them
     - pacman -Syu --noconfirm python-prometheus_client python-watchdog
 
-# RHEL 8 derivatives would need more work due to *default* python being old
-#pkg:rocky-8:
-#  <<: *pkg_test
-#  image: $CI_REGISTRY/packaging/apkg/full/rocky-8
-
-# Leap 15.4 would need more work due to *default* python being old
-#pkg:opensuse-15.4:
-#  <<: *pkg_test
-#  <<: *enable_repo_build
-#  image: $CI_REGISTRY/packaging/apkg/full/opensuse-15.4
-#  allow_failure: true  # SUSE is always special
 # }}}
 
 # docs: {{{
