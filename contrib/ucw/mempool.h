@@ -15,28 +15,6 @@
 #include <ucw/lib.h>
 #include <string.h>
 
-#ifdef CONFIG_UCW_CLEAN_ABI
-#define mp_alloc ucw_mp_alloc
-#define mp_alloc_noalign ucw_mp_alloc_noalign
-#define mp_delete ucw_mp_delete
-#define mp_flush ucw_mp_flush
-#define mp_grow_internal ucw_mp_grow_internal
-#define mp_init ucw_mp_init
-#define mp_new ucw_mp_new
-#define mp_open ucw_mp_open
-#define mp_printf ucw_mp_printf
-#define mp_printf_append ucw_mp_printf_append
-#define mp_realloc ucw_mp_realloc
-#define mp_shrink ucw_mp_shrink
-#define mp_spread_internal ucw_mp_spread_internal
-#define mp_start ucw_mp_start
-#define mp_start_noalign ucw_mp_start_noalign
-#define mp_stats ucw_mp_stats
-#define mp_total_size ucw_mp_total_size
-#define mp_vprintf ucw_mp_vprintf
-#define mp_vprintf_append ucw_mp_vprintf_append
-#endif
-
 
 /***
  * [[defs]]
