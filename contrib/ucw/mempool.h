@@ -1,10 +1,12 @@
 /*
- *      UCW Library -- Memory Pools
+ *  UCW Library -- Memory Pools
  *
- *      (c) 1997--2015 Martin Mares <mj@ucw.cz>
- *      (c) 2007 Pavel Charvat <pchar@ucw.cz>
- *      SPDX-License-Identifier: LGPL-2.1-or-later
- *      Source: https://www.ucw.cz/libucw/
+ *  (c) 1997--2015 Martin Mares <mj@ucw.cz>
+ *  (c) 2007 Pavel Charvat <pchar@ucw.cz>
+ *  (c) 2015, 2017, 2026 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+ *
+ *  SPDX-License-Identifier: LGPL-2.1-or-later
+ *  Source: https://www.ucw.cz/libucw/
  */
 
 #ifndef _UCW_POOLS_H
