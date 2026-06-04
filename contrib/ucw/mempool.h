@@ -23,7 +23,7 @@
  ***/
 
 /**
- * Memory pool state (see @mp_push(), ...).
+ * Memory pool state (see mp_push(), ...).
  * You should use this one as an opaque handle only, the insides are internal.
  **/
 struct mempool_state {
@@ -42,7 +42,7 @@ struct mempool {
 	unsigned idx;
 };
 
-struct mempool_stats {          /** Mempool statistics. See @mp_stats(). **/
+struct mempool_stats {          /** Mempool statistics. See mp_stats(). **/
 	uint64_t total_size;            /** Real allocated size in bytes. */
 	uint64_t used_size;             /** Estimated size allocated from mempool to application. */
 	unsigned chain_count[3];        /** Number of allocated chunks in small/big/unused chains. */
@@ -57,7 +57,7 @@ struct mempool_stats {          /** Mempool statistics. See @mp_stats(). **/
 
 /**
  * Initialize a given mempool structure.
- * @chunk_size must be in the interval `[1, SIZE_MAX / 2]`.
+ * \p chunk_size must be in the interval `[1, SIZE_MAX / 2]`.
  * It will allocate memory by this large chunks and take
  * memory to satisfy requests from them.
  *
@@ -68,7 +68,7 @@ void mp_init(struct mempool *pool, size_t chunk_size);
 
 /**
  * Allocate and initialize a new memory pool.
- * See @mp_init() for @chunk_size limitations.
+ * See \ref mp_init() for \p chunk_size limitations.
  *
  * The new mempool structure is allocated on the new mempool.
  *
@@ -80,7 +80,7 @@ struct mempool *mp_new(size_t chunk_size);
 /**
  * Cleanup mempool initialized by mp_init or mp_new.
  * Frees all the memory allocated by this mempool and,
- * if created by @mp_new(), the @pool itself.
+ * if created by \ref mp_new(), the \p pool itself.
  **/
 KR_EXPORT
 void mp_delete(struct mempool *pool);
@@ -88,8 +88,8 @@ void mp_delete(struct mempool *pool);
 /**
  * Frees all data on a memory pool, but leaves it working.
  * It can keep some of the chunks allocated to serve
- * further allocation requests. Leaves the @pool alive,
- * even if it was created with @mp_new().
+ * further allocation requests. Leaves the \p pool alive,
+ * even if it was created with \ref mp_new().
  **/
 KR_EXPORT
 void mp_flush(struct mempool *pool);
@@ -109,7 +109,7 @@ uint64_t mp_total_size(struct mempool *pool);
 
 /**
  * Release unused chunks of memory reserved for further allocation
- * requests, but stop if mp_total_size() would drop below @min_total_size.
+ * requests, but stop if mp_total_size() would drop below \p min_total_size.
  **/
 void mp_shrink(struct mempool *pool, uint64_t min_total_size);
 
@@ -120,8 +120,8 @@ void mp_shrink(struct mempool *pool, uint64_t min_total_size);
  ***/
 
 /**
- * The function allocates new @size bytes on a given memory pool.
- * If the @size is zero, the resulting pointer is undefined,
+ * The function allocates new \p size bytes on a given memory pool.
+ * If the \p size is zero, the resulting pointer is undefined,
  * but it may be safely reallocated or used as the parameter
  * to other functions below.
  *
@@ -133,7 +133,7 @@ KR_EXPORT
 void *mp_alloc(struct mempool *pool, size_t size);
 
 /**
- * The same as @mp_alloc(), but the result may be unaligned.
+ * The same as \ref mp_alloc(), but the result may be unaligned.
  **/
 void *mp_alloc_noalign(struct mempool *pool, size_t size);
 
@@ -160,8 +160,8 @@ static inline unsigned mp_idx(struct mempool *pool, void *ptr)
 }
 
 /**
- * Open a new growing buffer (at least @size bytes long).
- * If the @size is zero, the resulting pointer is undefined,
+ * Open a new growing buffer (at least \p size bytes long).
+ * If the \p size is zero, the resulting pointer is undefined,
  * but it may be safely reallocated or used as the parameter
  * to other functions below.
  *
@@ -170,13 +170,13 @@ static inline unsigned mp_idx(struct mempool *pool, void *ptr)
  * after future reallocations. There is an unaligned version as well.
  *
  * Keep in mind that you can't make any other pool allocations
- * before you "close" the growing buffer with @mp_end().
+ * before you "close" the growing buffer with \ref mp_end().
  */
 void *mp_start(struct mempool *pool, size_t size);
 void *mp_start_noalign(struct mempool *pool, size_t size);
 
 /**
- * Return start pointer of the growing buffer allocated by latest @mp_start() or a similar function.
+ * Return start pointer of the growing buffer allocated by latest \ref mp_start() or a similar function.
  **/
 static inline void *mp_ptr(struct mempool *pool)
 {
@@ -193,18 +193,18 @@ static inline size_t mp_avail(struct mempool *pool)
 }
 
 /**
- * Grow the buffer allocated by @mp_start() to be at least @size bytes long
- * (@size may be less than @mp_avail(), even zero). Reallocated buffer may
+ * Grow the buffer allocated by \ref mp_start() to be at least \p size bytes long
+ * (\p size may be less than \ref mp_avail(), even zero). Reallocated buffer may
  * change its starting position. The content will be unchanged to the minimum
  * of the old and new sizes; newly allocated memory will be uninitialized.
- * Multiple calls to mp_grow() have amortized linear cost wrt. the maximum value of @size. */
+ * Multiple calls to mp_grow() have amortized linear cost wrt. the maximum value of \p size. */
 static inline void *mp_grow(struct mempool *pool, size_t size)
 {
 	return (size <= mp_avail(pool)) ? mp_ptr(pool) : mp_grow_internal(pool, size);
 }
 
 /**
- * Grow the buffer by at least one byte -- equivalent to <<mp_grow(),`mp_grow`>>`(@pool, @mp_avail(pool) + 1)`.
+ * Grow the buffer by at least one byte -- equivalent to <<mp_grow(),`mp_grow`>>`(pool, mp_avail(pool) + 1)`.
  **/
 static inline void *mp_expand(struct mempool *pool)
 {
@@ -212,8 +212,8 @@ static inline void *mp_expand(struct mempool *pool)
 }
 
 /**
- * Ensure that there is at least @size bytes free after @p,
- * if not, reallocate and adjust @p.
+ * Ensure that there is at least \p size bytes free after \p p,
+ * if not, reallocate and adjust \p p.
  **/
 static inline void *mp_spread(struct mempool *pool, void *p, size_t size)
 {
@@ -221,7 +221,7 @@ static inline void *mp_spread(struct mempool *pool, void *p, size_t size)
 }
 
 /**
- * Append a character to the growing buffer. Called with @p pointing after
+ * Append a character to the growing buffer. Called with \p p pointing after
  * the last byte in the buffer, returns a pointer after the last byte
  * of the new (possibly reallocated) buffer.
  **/
@@ -233,7 +233,7 @@ static inline char *mp_append_char(struct mempool *pool, char *p, unsigned c)
 }
 
 /**
- * Append a memory block to the growing buffer. Called with @p pointing after
+ * Append a memory block to the growing buffer. Called with \p p pointing after
  * the last byte in the buffer, returns a pointer after the last byte
  * of the new (possibly reallocated) buffer.
  **/
@@ -245,7 +245,7 @@ static inline void *mp_append_block(struct mempool *pool, void *p, const void *b
 }
 
 /**
- * Append a string to the growing buffer. Called with @p pointing after
+ * Append a string to the growing buffer. Called with \p p pointing after
  * the last byte in the buffer, returns a pointer after the last byte
  * of the new (possibly reallocated) buffer.
  **/
@@ -255,8 +255,8 @@ static inline void *mp_append_string(struct mempool *pool, void *p, const char *
 }
 
 /**
- * Close the growing buffer. The @end must point just behind the data, you want to keep
- * allocated (so it can be in the interval `[@mp_ptr(@pool), @mp_ptr(@pool) + @mp_avail(@pool)]`).
+ * Close the growing buffer. The \p end must point just behind the data, you want to keep
+ * allocated (so it can be in the interval `[mp_ptr(pool), mp_ptr(pool) + mp_avail(pool)]`).
  * Returns a pointer to the beginning of the just closed block.
  **/
 static inline void *mp_end(struct mempool *pool, void *end)
@@ -276,7 +276,7 @@ static inline char *mp_end_string(struct mempool *pool, void *end)
 }
 
 /**
- * Return size in bytes of the last allocated memory block (with @mp_alloc() or @mp_end()).
+ * Return size in bytes of the last allocated memory block (with \ref mp_alloc() or \ref mp_end()).
  **/
 static inline size_t mp_size(struct mempool *pool, void *ptr)
 {
@@ -285,15 +285,15 @@ static inline size_t mp_size(struct mempool *pool, void *ptr)
 }
 
 /**
- * Open the last memory block (allocated with @mp_alloc() or @mp_end())
+ * Open the last memory block (allocated with \ref mp_alloc() or \ref mp_end())
  * for growing and return its size in bytes. The contents and the start pointer
- * remain unchanged. Do not forget to call @mp_end() to close it.
+ * remain unchanged. Do not forget to call \ref mp_end() to close it.
  **/
 size_t mp_open(struct mempool *pool, void *ptr);
 
 /**
- * Reallocate the last memory block (allocated with @mp_alloc() or @mp_end())
- * to the new @size. Behavior is similar to @mp_grow(), but the resulting
+ * Reallocate the last memory block (allocated with \ref mp_alloc() or \ref mp_end())
+ * to the new \p size. Behavior is similar to \ref mp_grow(), but the resulting
  * block is closed.
  **/
 void *mp_realloc(struct mempool *pool, void *ptr, size_t size);
@@ -310,12 +310,12 @@ void *mp_realloc(struct mempool *pool, void *ptr, size_t size);
 KR_EXPORT
 char *mp_printf(struct mempool *mp, const char *fmt, ...) FORMAT_CHECK(printf,2,3) LIKE_MALLOC;
 /**
- * Like @mp_printf(), but uses `va_list` for parameters.
+ * Like \ref mp_printf(), but uses `va_list` for parameters.
  **/
 char *mp_vprintf(struct mempool *mp, const char *fmt, va_list args) LIKE_MALLOC;
 /**
- * Like @mp_printf(), but it appends the data at the end of string
- * pointed to by @ptr. The string is @mp_open()ed, so you have to
+ * Like \ref mp_printf(), but it appends the data at the end of string
+ * pointed to by \p ptr. The string is \ref mp_open()ed, so you have to
  * provide something that can be.
  *
  * Returns pointer to the beginning of the string (the pointer may have
@@ -330,7 +330,7 @@ KR_EXPORT
 char *mp_printf_append(struct mempool *mp, char *ptr, const char *fmt, ...) FORMAT_CHECK(printf,3,4);
 #define mp_append_printf mp_printf_append
 /**
- * Like @mp_printf_append(), but uses `va_list` for parameters.
+ * Like \ref mp_printf_append(), but uses `va_list` for parameters.
  *
  * In some versions of LibUCW, this function was called mp_append_vprintf(). However,
  * this name turned out to be confusing -- unlike other appending functions, this one is
