@@ -3,6 +3,7 @@
  *
  *  (c) 2005 Martin Mares <mj@ucw.cz>
  *  (c) 2007 Pavel Charvat <pchar@ucw.cz>
+ *
  *  SPDX-License-Identifier: LGPL-2.1-or-later
  *  Source: https://www.ucw.cz/libucw/
  */
