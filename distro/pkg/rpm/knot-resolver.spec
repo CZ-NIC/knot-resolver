@@ -57,9 +57,11 @@ Requires:       python3
 Requires:       python3-aiohttp
 Requires:       supervisor
 %if 0%{?suse_version}
+Requires:       python3-Jinja2
 Requires:       python3-PyYAML
 Requires:       python3-typing_extensions
 %else
+Requires:       python3-jinja2
 Requires:       python3-pyyaml
 Requires:       python3-typing-extensions
 %endif
