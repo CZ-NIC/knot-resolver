@@ -1,11 +1,12 @@
 /*
- *      UCW Library -- Memory Pools (One-Time Allocation)
+ *  UCW Library -- Memory Pools (One-Time Allocation)
  *
- *      (c) 1997--2014 Martin Mares <mj@ucw.cz>
- *      (c) 2007--2015 Pavel Charvat <pchar@ucw.cz>
+ *  (c) 1997--2014 Martin Mares <mj@ucw.cz>
+ *  (c) 2007--2015 Pavel Charvat <pchar@ucw.cz>
+ *  (c) 2015, 2017, 2026 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
  *
- *      SPDX-License-Identifier: LGPL-2.1-or-later
- *      Source: https://www.ucw.cz/libucw/
+ *  SPDX-License-Identifier: LGPL-2.1-or-later
+ *  Source: https://www.ucw.cz/libucw/
  */
 
 #undef LOCAL_DEBUG
