@@ -6,6 +6,7 @@ Improvements
 - packaging: rpm: require python3-setuptools (!1830, #952)
 - packaging: rpm: provide user/group (!1837)
 - controller: improved error handling when sending commands to workers (!1834)
+- update IANA's certificate for root trust anchor bootstrapping (!1845)
 
 Bugfixes
 --------
