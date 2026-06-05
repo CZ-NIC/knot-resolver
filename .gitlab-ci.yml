@@ -761,6 +761,11 @@ pkg:fedora-44:
   <<: *pkg_test
   image: $CI_REGISTRY/packaging/apkg/full/fedora-44
 
+pkg:fedora-rawhide:
+  <<: *pkg_test
+  image: $CI_REGISTRY/packaging/apkg/full/fedora-rawhide
+  allow_failure: true
+
 pkg:alma-9:
   <<: *pkg_test
   image: $CI_REGISTRY/packaging/apkg/full/alma-9
