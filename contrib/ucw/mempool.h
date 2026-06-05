@@ -12,6 +12,7 @@
 #ifndef _UCW_POOLS_H
 #define _UCW_POOLS_H
 
+#include <asan.h>
 #include "lib/defines.h"
 #include <ucw/config.h>
 #include <ucw/lib.h>
@@ -265,6 +266,7 @@ static inline void *mp_end(struct mempool *pool, void *end)
 {
 	void *p = mp_ptr(pool);
 	pool->state.free[pool->idx] = (uint8_t *)pool->state.last[pool->idx] - (uint8_t *)end;
+	ASAN_POISON_MEMORY_REGION(end, pool->state.free[pool->idx]);
 	return p;
 }
 
