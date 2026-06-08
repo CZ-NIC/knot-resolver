@@ -52,9 +52,11 @@ struct {
 	TorchModule net;
 	uint8_t sensitivity;
 	uint8_t threshold;
-	uint16_t hit_time_window_ms;
-	uint16_t hit_threshold;
 	kr_rule_tags_t tags;
+
+	bool rpz_builder_enabled;
+	uint16_t hit_threshold;
+	uint16_t hit_time_window_ms;
 	kr_rule_tags_t add_tags;
 	kr_rule_tags_t rpz_tags;
 } config = {0};
@@ -88,16 +90,29 @@ static uint32_t domain_hit_increment(const knot_dname_t *registrable, uint32_t t
 }
 
 KR_EXPORT
-int dns_tunnel_filter_setup(const char *nn_file, const char *mmap_file, kr_rule_tags_t tags, kr_rule_tags_t add_tags, kr_rule_tags_t rpz_tags,
-		uint8_t sensitivity, uint8_t threshold, uint16_t hit_time_window_ms, uint16_t hit_threshold,
+int dns_tunnel_rpz_builder_setup(kr_rule_tags_t add_tags, kr_rule_tags_t rpz_tags, uint16_t hit_threshold, uint16_t hit_time_window_ms)
+{
+	if (config.rpz_builder_enabled)
+		return kr_error(EALREADY); // we don't support reconfiguration for now
+
+	config.rpz_builder_enabled = true;
+	config.hit_threshold = hit_threshold;
+	config.hit_time_window_ms = hit_time_window_ms;
+	config.add_tags = add_tags;
+	config.rpz_tags = rpz_tags;
+
+	return kr_ok();
+}
+
+KR_EXPORT
+int dns_tunnel_filter_setup(const char *nn_file, const char *mmap_file, kr_rule_tags_t tags,
+		uint8_t sensitivity, uint16_t threshold,
 		size_t capacity, uint32_t instant_limit, uint32_t rate_limit)
 {
 	if (dns_tunnel_filter)
 		return kr_error(EALREADY); // we don't support reconfiguration for now
 
 	config.tags = tags;
-	config.add_tags = add_tags;
-	config.rpz_tags = rpz_tags;
 
 	int ret;
 	config.net = load_model(nn_file);
@@ -107,9 +122,6 @@ int dns_tunnel_filter_setup(const char *nn_file, const char *mmap_file, kr_rule_
 	}
 	config.sensitivity = sensitivity;
 	config.threshold = threshold;
-
-	config.hit_time_window_ms = hit_time_window_ms;
-	config.hit_threshold = hit_threshold;
 
 	size_t capacity_log = 0;
 	for (size_t c = capacity - 1; c > 0; c >>= 1) capacity_log++;
@@ -187,8 +199,8 @@ static bool ensure_loaded(void)
 
 	kr_log_warning(TUNNEL, "Tunneling filter not initialized from Lua, using hardcoded default.\n");
 	int ret = dns_tunnel_filter_setup("/home/blcnn.pt", // FIXME TMP
-					"dns_tunnel_filter", KR_RULE_TAGS_ALL, KR_RULE_TAGS_ALL, KR_RULE_TAGS_ALL,
-					10, 95, 60000, 10,
+					"dns_tunnel_filter", KR_RULE_TAGS_ALL,
+					10, 95,
 					(1 << 20), (1 << 8), (1 << 17));
 	return ret == kr_ok();
 }
@@ -395,6 +407,11 @@ static void do_filter(kr_layer_t *ctx, knot_pkt_t *pkt)
 
 	req->options.TUNNEL_CHECKED = 1;
 
+	if (config.rpz_tags && (req->rule.tags & config.rpz_tags)) {
+		kr_log_debug(TUNNEL, "Auditing request with tags from RPZ builder policy.\n");
+		return; // don't consider requests already modified by a tunneling RPZ
+	}
+
 // this logic comes from kr_rule_consume_tags()
 	// Per-packet detection
 	// _apply tags take precendence, and we store the last one
@@ -404,15 +421,7 @@ static void do_filter(kr_layer_t *ctx, knot_pkt_t *pkt)
 	kr_rule_tags_t const det_tags_audit = config.tags & req->rule_tags_audit;
 	const bool det_do_audit = det_tags_audit && !req->rule.action;
 
-	// RPZ modification
-	// _apply tags take precendence, and we store the last one
-	kr_rule_tags_t const add_tags_apply = config.add_tags & req->rule_tags_apply;
-	const bool add_do_apply = config.add_tags == KR_RULE_TAGS_ALL || add_tags_apply;
-	// _audit: we fill everything if we're the very first action
-	kr_rule_tags_t const add_tags_audit = config.add_tags & req->rule_tags_audit;
-	const bool add_do_audit = add_tags_audit && !req->rule.action;
-
-	if (!det_do_apply && !det_do_audit && !add_do_apply && !add_do_audit)
+	if (!det_do_apply && !det_do_audit)
 		return; // we save the expensive computations
 
 	const uint32_t time_now = kr_now();
@@ -485,22 +494,36 @@ static void do_filter(kr_layer_t *ctx, knot_pkt_t *pkt)
 			}
 		}
 
-		if (registrable_ret == 0 && (add_do_apply || add_do_audit)) {
-			uint32_t hits = domain_hit_increment(registrable, kr_now());
+		if (config.rpz_builder_enabled && registrable_ret == 0) {
+			const uint32_t hits = domain_hit_increment(registrable, kr_now());
 
 			if (hits >= config.hit_threshold) {
+				// RPZ modification
+				// _apply tags take precendence, and we store the last one
+				kr_rule_tags_t const add_tags_apply = config.add_tags & req->rule_tags_apply;
+				const bool add_do_apply = config.add_tags == KR_RULE_TAGS_ALL || add_tags_apply;
+				// _audit: we fill everything if we're the very first action
+				kr_rule_tags_t const add_tags_audit = config.add_tags & req->rule_tags_audit;
+				const bool add_do_audit = add_tags_audit && !req->rule.action;
+
 				req->options.SUB_BLACKLIST = 1;
 				req_do_apply = add_do_apply;
 				req_do_audit = add_do_audit;
 				req_tags = add_do_apply ? add_tags_apply : add_tags_audit;
-				kr_log_info(TUNNEL, "Domain %s hit threshold with %u hits, blacklisting.\n", (char *)registrable, hits);
+				kr_log_info(TUNNEL, "Domain %s hit threshold with %u/%u hits, blacklisting.\n", (char *)registrable, hits, config.hit_threshold);
 			}
 		}
 
-		kr_log_debug(TUNNEL, "Malicious packet detected! (%f %%) %s\n",
-				(tunnel_prob),
-				(req_do_apply ? "Blocking." : "Auditing.")
-		);
+		if (tunnel_prob >= 0) {
+			kr_log_debug(TUNNEL, "Malicious packet detected! (%f %%) %s\n",
+					(tunnel_prob),
+					(req_do_apply ? "Blocking." : "Auditing.")
+			);
+		} else {
+			kr_log_debug(TUNNEL, "Malicious packet detected! (NULL RR Type) %s\n",
+					(req_do_apply ? "Blocking." : "Auditing.")
+			);
+		}
 	}
 
 	update_stats(STATS_M, tunnel_prob, qry);

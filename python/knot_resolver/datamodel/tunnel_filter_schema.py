@@ -9,16 +9,22 @@ class RpzBuilderSchema(ConfigSchema):
     Create an RPZ from domains, which are frequently classified as tunneling.
 
     ---
+    enable: enable/disable this RPZ builder
     time_window_ms: time between subsequent tunneling classifications of the same registrable domain
     threshold: number of malicious queries from a registrable domain needed for automatic blacklisting
     add_tags: set of tags when to add the RPZ record for the registrable domain
     rpz_tags: set of tags when to apply the filtering using the created RPZ
     """
 
+    enable: bool = False
     time_window_ms: Int0_65535 = Int0_65535(60000)
     threshold: Int0_65535 = Int0_65535(10)
     add_tags: Optional[List[IDPattern]] = None
     rpz_tags: Optional[List[IDPattern]] = None
+
+    def _validate(self) -> None:
+        if not self.enable:
+            return
 
 
 class TunnelFilterSchema(ConfigSchema):

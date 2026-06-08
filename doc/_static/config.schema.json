@@ -1224,6 +1224,11 @@
                     "description": "Create an RPZ from domains, which are frequently classified as tunneling",
                     "type": "object",
                     "properties": {
+                        "enable": {
+                            "type": "boolean",
+                            "description": "enable/disable this RPZ builder",
+                            "default": false
+                        },
                         "time-window-ms": {
                             "type": "integer",
                             "minimum": 0,
@@ -1264,6 +1269,7 @@
                         }
                     },
                     "default": {
+                        "enable": false,
                         "time_window_ms": 60000,
                         "threshold": 10,
                         "add_tags": null,
@@ -1278,6 +1284,7 @@
                 "threshold": 95,
                 "tags": null,
                 "rpz_builder": {
+                    "enable": false,
                     "time_window_ms": 60000,
                     "threshold": 10,
                     "add_tags": null,
