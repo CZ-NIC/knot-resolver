@@ -9,14 +9,14 @@
  *  Source: https://www.ucw.cz/libucw/
  */
 
-#ifndef _UCW_POOLS_H
-#define _UCW_POOLS_H
+#pragma once
 
 #include <asan.h>
 #include "lib/defines.h"
 #include <ucw/config.h>
 #include <ucw/lib.h>
 #include <string.h>
+#include <stdint.h>
 
 
 /***
@@ -355,5 +355,3 @@ char *mp_vprintf_append(struct mempool *mp, char *ptr, const char *fmt, va_list 
      * generic allocator interface spanning both malloc and mempools,
      * constant-time version of mp_total_size and mp_shrink scanning only deallocated chunks.
 */
-
-#endif

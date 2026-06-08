@@ -14,12 +14,11 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <assert.h>
 #include <ucw/config.h>
 #include <ucw/lib.h>
 #include <ucw/mempool.h>
 
-
-/* FIXME: migrate to Knot DNS version of mempools. */
 #pragma GCC diagnostic ignored "-Wpointer-arith"
 
 #define MP_CHUNK_TAIL ALIGN_TO(sizeof(struct mempool_chunk), CPU_STRUCT_ALIGN)
@@ -182,6 +181,9 @@ mp_free_big_chain(struct mempool_chunk *chunk)
 void
 mp_delete(struct mempool *pool)
 {
+	if (pool == NULL) {
+		return;
+	}
 	DBG("Deleting mempool %p", pool);
 	mp_free_big_chain(pool->state.last[1]);
 	mp_free_chain(pool->unused);
@@ -244,7 +246,7 @@ mp_stats(struct mempool *pool, struct mempool_stats *stats)
 	mp_stats_chain(pool, pool->state.last[1], stats, 1);
 	mp_stats_chain(pool, pool->unused, stats, 2);
 	stats->used_size -= pool->state.free[0] + pool->state.free[1];
-	ASSERT(stats->used_size <= stats->total_size);
+	assert(stats->used_size <= stats->total_size);
 }
 
 uint64_t
