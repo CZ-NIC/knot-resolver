@@ -385,6 +385,7 @@ lint:coverity:
       --form file=@cov-int.tar.gz --form version="`git describe --tags`"
       --form description="`git describe --tags` / $CI_COMMIT_TITLE / $CI_COMMIT_REF_NAME:$CI_PIPELINE_ID"
       --fail-with-body
+  allow_failure: true
 
 .kres-gen: &kres-gen
   <<: *sanity
