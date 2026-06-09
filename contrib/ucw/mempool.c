@@ -65,11 +65,11 @@ struct mempool_chunk {
 static size_t
 mp_align_size(size_t size)
 {
-#ifdef CONFIG_UCW_POOL_IS_MMAP
 	size = MAX(size, 64 + MP_CHUNK_TAIL);
+#ifdef CONFIG_UCW_POOL_IS_MMAP
 	return ALIGN_TO(size, CPU_PAGE_SIZE) - MP_CHUNK_TAIL;
 #else
-	return ALIGN_TO(size, CPU_STRUCT_ALIGN);
+	return ALIGN_TO(size, CPU_STRUCT_ALIGN) - MP_CHUNK_TAIL;
 #endif
 }
 
