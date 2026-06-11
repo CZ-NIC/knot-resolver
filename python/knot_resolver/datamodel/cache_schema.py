@@ -17,6 +17,7 @@ from knot_resolver.datamodel.types import (
 )
 from knot_resolver.utils.modeling import ConfigSchema
 from knot_resolver.utils.modeling.base_schema import lazy_default
+from os import memfd_create, getpid, symlink, unlink
 
 _CACHE_CLEAR_TEMPLATE = template_from_str(
     "{% from 'macros/cache_macros.lua.j2' import cache_clear %} {{ cache_clear(params) }}"
@@ -115,6 +116,8 @@ class PrefetchSchema(ConfigSchema):
     prediction: PredictionSchema = PredictionSchema()
 
 
+cache_memfd = None  # already open memfd for cache, if any
+
 class CacheSchema(ConfigSchema):
     """
     DNS resolver cache configuration.
@@ -142,3 +145,19 @@ class CacheSchema(ConfigSchema):
     def _validate(self) -> None:
         if self.ttl_min.seconds() > self.ttl_max.seconds():
             raise ValueError("'ttl-max' can't be smaller than 'ttl-min'")
+
+        #FIXME: make this configurable, also _validate is a bad place even with this condition
+        if self.storage.strict_validation:
+            global cache_memfd
+            if cache_memfd is None:
+                # python>= 3.8
+                ret = memfd_create("cache data.mdb for kresd")
+                if ret < 0:  # TODO: or is this automatic?
+                    raise OSError(ret)
+                cache_memfd = ret
+            mdb_path = self.storage.to_path() / "data.mdb"
+            unlink(mdb_path)
+            symlink(
+                "/proc/" + str(getpid()) + "/fd/" + str(cache_memfd),
+                mdb_path
+            )

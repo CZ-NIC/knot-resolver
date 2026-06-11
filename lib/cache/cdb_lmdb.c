@@ -322,6 +322,17 @@ static void cdb_close_env(struct lmdb_env *env, struct kr_cdb_stats *stats)
 	memset(env, 0, sizeof(*env));
 }
 
+// Return whether a path is (a symlink to) a memfd; or estimate at least.
+static bool is_memfd(const char *path)
+{
+	char buf[PATH_MAX];
+	int len = readlink(path, buf, sizeof(buf) - 1);
+	if (kr_fails_assert(len >= 0))
+		return false;
+	buf[len] = '\0';
+	return buf == strstr(buf, "/proc/"); // lazy to do anything more efficient
+}
+
 /** We assume that *env is zeroed (except for env->is_cache) and we return it zeroed on errors. */
 static int cdb_open_env(struct lmdb_env *env, const char *path, const size_t mapsize,
 		struct kr_cdb_stats *stats)
@@ -398,7 +409,8 @@ static int cdb_open_env(struct lmdb_env *env, const char *path, const size_t map
 	}
 
 #if !defined(__MACOSX__) && !(defined(__APPLE__) && defined(__MACH__))
-	if (size_requested && env->is_cache) { // prealloc makes no sense for rules
+	if (size_requested && env->is_cache && !is_memfd(env->mdb_data_path)) {
+		// prealloc makes no sense for rules or memfd
 		ret = posix_fallocate(fd, 0, MAX(env->mapsize, env->st_size));
 	} else {
 		ret = 0;
