@@ -1,16 +1,14 @@
 from typing import Literal, Optional, Union
 
-from knot_resolver.constants import KAFKA_LIB, WORK_DIR
+from knot_resolver.constants import KAFKA_LIB
 from knot_resolver.datamodel.types import (
     DomainNameOptionalPort,
     EscapedStr,
     IPAddressOptionalPort,
     ListOrItem,
     ReadableFile,
-    WritableDir,
 )
 from knot_resolver.utils.modeling import ConfigSchema
-from knot_resolver.utils.modeling.base_schema import lazy_default
 
 
 class KafkaSchema(ConfigSchema):
@@ -23,7 +21,6 @@ class KafkaSchema(ConfigSchema):
     server: Kafka server(s) to connect.
     group_id: Optional, Kafka consumer group identifier.
     zone_id: Identifier for determining the recipient(s) using a the key (zone-id) of the Kafka message.
-    files_dir: Directory for storing files received via Kafka.
     security_protocol: Protocol used to communicate with server(broker).
     cert_file: Optional, the client's certificate file in PEM format.
     key_file: Optional, the client's private key file.
@@ -37,7 +34,6 @@ class KafkaSchema(ConfigSchema):
     )
     group_id: Optional[EscapedStr] = None
     zone_id: Optional[EscapedStr] = None
-    files_dir: WritableDir = lazy_default(WritableDir, str(WORK_DIR))
     security_protocol: Literal["plaintext", "ssl"] = "plaintext"
     cert_file: Optional[ReadableFile] = None
     key_file: Optional[ReadableFile] = None

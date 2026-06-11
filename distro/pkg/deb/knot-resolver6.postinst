@@ -4,6 +4,13 @@ set -e
 
 if [ "$1" = "configure" ]; then
     adduser --quiet --system --group --no-create-home --home /var/cache/knot-resolver knot-resolver
+
+    install -d -o knot-resolver -g knot-resolver -m 755 /var/lib/knot-resolver
+    if [ ! -e /var/lib/knot-resolver/config.json ]; then
+        echo '{}' > /var/lib/knot-resolver/config.json
+        chown knot-resolver:knot-resolver /var/lib/knot-resolver/config.json
+        chmod 644 /var/lib/knot-resolver/config.json
+    fi
 fi
 
 if [ "$1" = "configure" ] || [ "$1" = "abort-upgrade" ] || [ "$1" = "abort-deconfigure" ] || [ "$1" = "abort-remove" ] ; then

@@ -4,7 +4,7 @@ import shutil
 from pathlib import Path
 from typing import Any, List, Mapping, Optional, Tuple
 
-from knot_resolver.constants import KAFKA_LIB
+from knot_resolver.constants import KAFKA_LIB, WORK_DIR
 from knot_resolver.datamodel import KresConfig
 from knot_resolver.manager.config_store import ConfigStore
 from knot_resolver.manager.exceptions import KresKafkaClientError
@@ -97,7 +97,7 @@ if KAFKA_LIB:
                 f"'chunk-index' value cannot be bigger than 'total-chunks' value '{index} > {total}'"
             )
 
-    def cleanup_files_dir(config_file_path: Path, files_dir: Path) -> None:
+    def cleanup_files_dir(config_file_path: Path) -> None:
         config_file_backup_path = Path(f"{config_file_path}.backup")
         used_files: List[Path] = [config_file_path, config_file_backup_path]
 
@@ -125,7 +125,7 @@ if KAFKA_LIB:
                     used_files.append(Path(f"{backup_rpz.file.to_path()}.backup").resolve())
 
         # delete unused files from current and backup config
-        for path in files_dir.iterdir():
+        for path in WORK_DIR.iterdir():
             if path.is_file() and path.resolve() not in used_files:
                 logger.debug(f"Cleaned up file '{path}'")
                 path.unlink()
@@ -161,7 +161,7 @@ if KAFKA_LIB:
         file_path = Path(headers.file_name)
         file_extension = file_path.suffix
         if not file_path.is_absolute():
-            file_path = config.kafka.files_dir.to_path() / file_path
+            file_path = WORK_DIR / file_path
         file_tmp_path = create_file_tmp_path(file_path)
 
         index = headers.chunk_index
@@ -219,7 +219,7 @@ if KAFKA_LIB:
                 backup_and_replace(file_tmp_path, file_path)
 
                 # cleanup old files
-                cleanup_files_dir(file_path, config.kafka.files_dir.to_path())
+                cleanup_files_dir(file_path)
 
                 # trigger reload
                 trigger_reload(config)

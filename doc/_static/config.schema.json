@@ -2020,11 +2020,6 @@
                     "description": "Identifier for determining the recipient(s) using a the key (zone-id) of the Kafka message.",
                     "default": null
                 },
-                "files-dir": {
-                    "type": "string",
-                    "description": "Directory for storing files received via Kafka.",
-                    "default": "/var/lib/knot-resolver"
-                },
                 "security-protocol": {
                     "type": "string",
                     "enum": [
@@ -2067,7 +2062,6 @@
                 ],
                 "group_id": null,
                 "zone_id": null,
-                "files_dir": "/var/lib/knot-resolver",
                 "security_protocol": "plaintext",
                 "cert_file": null,
                 "key_file": null,
