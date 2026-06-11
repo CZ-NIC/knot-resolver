@@ -42,8 +42,8 @@ Source1:        knot-resolver-%{version}.tar.xz.asc
 # PGP keys used to sign upstream releases
 # Export with --armor using command from https://fedoraproject.org/wiki/PackagingDrafts:GPGSignatures
 # Don't forget to update %%prep section when adding/removing keys
-# This key is from: https://secure.nic.cz/files/knot-resolver/knot-resolver-keyblock.asc
-Source2:        knot-resolver-keyblock.asc
+# This key is from: https://secure.nic.cz/files/knot-resolver/kresd-keyblock.asc
+Source2:        kresd-keyblock.asc
 BuildRequires:  gnupg2
 %endif
 
@@ -69,7 +69,6 @@ BuildRequires:  pkgconfig(libuv)
 BuildRequires:  pkgconfig(luajit) >= 2.0
 BuildRequires:  jemalloc-devel
 BuildRequires:  python3-devel
-BuildRequires:  python3-setuptools
 
 BuildRequires:  systemd-rpm-macros
 Requires:       systemd
@@ -169,6 +168,9 @@ gpg2 --verify %{SOURCE1} %{SOURCE0}
 %endif
 %autosetup -p1 -n %{name}-%{version}
 
+%generate_buildrequires
+%pyproject_buildrequires
+
 %build
 %meson \
     -Dsystemd_files=enabled \
@@ -183,7 +185,7 @@ gpg2 --verify %{SOURCE1} %{SOURCE0}
 
 %meson_build
 
-%py3_build
+%pyproject_wheel
 
 %install
 %meson_install
@@ -204,7 +206,8 @@ mv %{buildroot}%{_datadir}/doc/%{name}/* %{buildroot}%{_docdir}/%{name}/
 %endif
 
 # install knot_resolver python module
-%py3_install
+%pyproject_install
+%pyproject_save_files
 install -Dm 0644 etc/config/config.yaml %{buildroot}%{_sysconfdir}/knot-resolver/config.yaml
 
 %post
@@ -217,7 +220,7 @@ install -Dm 0644 etc/config/config.yaml %{buildroot}%{_sysconfdir}/knot-resolver
 %systemd_postun_with_restart knot-resolver.service
 %ldconfig_scriptlet
 
-%files
+%files -f %{pyproject_files}
 %dir %{_docdir}/%{name}
 %license %{_docdir}/%{name}/COPYING
 %doc %{_docdir}/%{name}/AUTHORS
@@ -273,7 +276,6 @@ install -Dm 0644 etc/config/config.yaml %{buildroot}%{_sysconfdir}/knot-resolver
 %{_libdir}/knot-resolver/kres_modules/view.lua
 %{_libdir}/knot-resolver/kres_modules/watchdog.lua
 %{_libdir}/knot-resolver/kres_modules/workarounds.lua
-%{python3_sitearch}/knot_resolver*
 %{_mandir}/man8/kresd.8.gz
 %{_mandir}/man8/kresctl.8.gz
 %{_datadir}/bash-completion/completions/kresctl
