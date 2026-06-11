@@ -493,6 +493,8 @@ int rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt)
 			case KR_RULE_SUB_DNAME_FLAT:
 				ret = answer_zla_dname(ztype, qry, pkt, zla_lf, ttl, &val);
 				break;
+			case KR_RULE_SUB_PASSTHRU:
+				return RET_CONT_CACHE; // skip all local rules, fall through to recursion
 			default:
 				return kr_error(EILSEQ);
 			}
@@ -634,6 +636,7 @@ int local_data_ins(knot_db_val_t key, const knot_rrset_t *rrs, const knot_rdatas
 	rdataset_dematerialize(sig_rds, data);
 
 	knot_db_val_t val = { .data = buf, .len = val_len };
+	ruledb_op(remove, &key, 1); // ignore error — key may not exist yet
 	int ret = ruledb_op(write, &key, &val, 1); // TODO: overwriting on ==tags?
 	// ENOSPC seems to be the only expectable error.
 	kr_assert(ret == 0 || ret == kr_error(ENOSPC));
@@ -782,7 +785,7 @@ static int answer_zla_dname(val_zla_type_t type, struct kr_query *qry, knot_pkt_
 {
 	if (kr_fails_assert(type == KR_RULE_SUB_DNAME || type == KR_RULE_SUB_DNAME_FLAT))
 		return kr_error(EINVAL);
-	
+
 	const knot_dname_t *dname_target = val->data;
 	// Theoretically this check could overread the val->len, but that's OK,
 	// as the policy DB contents wouldn't be directly written by a malicious party.
@@ -952,6 +955,8 @@ int rule_local_subtree(const knot_dname_t *apex, enum kr_rule_sub_t type,
 	case KR_RULE_SUB_NODATA:
 	case KR_RULE_SUB_REDIRECT:
 		break;
+	case KR_RULE_SUB_PASSTHRU:
+ 		break;
 	default:
 		kr_assert(false);
 		return kr_error(EINVAL);
