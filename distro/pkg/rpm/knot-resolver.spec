@@ -69,6 +69,7 @@ BuildRequires:  pkgconfig(libuv)
 BuildRequires:  pkgconfig(luajit) >= 2.0
 BuildRequires:  jemalloc-devel
 BuildRequires:  python3-devel
+BuildRequires: python3-poetry-core
 
 BuildRequires:  systemd-rpm-macros
 Requires:       systemd
