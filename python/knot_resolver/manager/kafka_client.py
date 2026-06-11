@@ -222,7 +222,7 @@ if KAFKA_LIB:
                 cleanup_files_dir(file_path, config.kafka.files_dir.to_path())
 
                 # trigger reload
-                trigger_reload(config, force=True)
+                trigger_reload(config)
 
             # other files (.rpz, .pt, ...)
             else:
