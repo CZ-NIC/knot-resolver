@@ -321,7 +321,8 @@ if KAFKA_LIB:
                     if not self._consumer:
                         # connect to brokers
                         self._consumer_connect()
-                        logger.info("Starting to consume messages every 10 seconds")
+                        logger.info("Starting to consume messages every 5 seconds")
+                        await asyncio.sleep(5)
                     else:
                         # ready to consume messages
                         try:
