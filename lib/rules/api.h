@@ -207,6 +207,8 @@ enum kr_rule_sub_t {
 	KR_RULE_SUB_DNAME,
 	/// Like _SUB_DNAME but the CNAMEs do not get prefixed.
 	KR_RULE_SUB_DNAME_FLAT,
+	/// Passthru: skip local rules for this subtree, recurse normally (RPZ rpz-passthru).
+	KR_RULE_SUB_PASSTHRU,
 };
 /** Insert a simple sub-tree rule.
  *
