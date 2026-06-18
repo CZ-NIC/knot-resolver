@@ -25,7 +25,7 @@
 #define MP_SIZE_MAX (SIZE_MAX - MP_CHUNK_TAIL - CPU_PAGE_SIZE)
 
 /** \note Imported MMAP backend from bigalloc.c */
-//#define CONFIG_UCW_POOL_IS_MMAP
+#define CONFIG_UCW_POOL_IS_MMAP
 #ifdef CONFIG_UCW_POOL_IS_MMAP
 #include <sys/mman.h>
 static void *
