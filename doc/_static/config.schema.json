@@ -930,6 +930,14 @@
                     },
                     "description": "List of Response Policy Zones and its configuration.",
                     "default": null
+                },
+                "tmp-db-dir": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "description": "directory for storing temporary ruledb; optional, reduces RAM usage with lots of rules",
+                    "default": null
                 }
             },
             "default": {
@@ -939,7 +947,8 @@
                 "addresses_files": null,
                 "records": null,
                 "rules": null,
-                "rpz": null
+                "rpz": null,
+                "tmp_db_dir": null
             }
         },
         "forward": {

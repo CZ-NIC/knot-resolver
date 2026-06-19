@@ -30,6 +30,13 @@ log_groups({
 })
 {% endif %}
 
+{% if cfg.local_data.tmp_db_dir %}
+local tmp_ruledb_dir = '{{ cfg.local_data.tmp_db_dir }}'
+os.remove(tmp_ruledb_dir .. '/data.mdb')
+os.remove(tmp_ruledb_dir .. '/lock.mdb')
+assert(C.kr_rules_init(tmp_ruledb_dir, 0, true) == 0)
+{% endif %}
+
 -- Config required for the cache opening
 cache.open({{ cfg.cache.size_max.bytes() }}, 'lmdb://{{ cfg.cache.storage }}')
 
@@ -61,6 +68,15 @@ cache.open({{ cfg.cache.size_max.bytes() }}, 'lmdb://{{ cfg.cache.storage }}')
 {{ cfg.lua.policy_script }}
 {% endif %}
 
+{% if cfg.local_data.tmp_db_dir %}
+assert(C.kr_rules_commit(true) == 0)
+C.kr_rules_deinit()
+os.remove(tmp_ruledb_dir .. '/lock.mdb')
+os.remove('ruledb/data.mdb')
+os.remove('ruledb/lock.mdb')
+-- os.execute isn't nice, but a normal os.rename() / rename.2 won't work here.
+assert(os.execute('mv "' .. tmp_ruledb_dir .. '/data.mdb" ./ruledb/data.mdb') == 0)
+{% endif %}
 
 -- exit policy-loader properly
 quit()
