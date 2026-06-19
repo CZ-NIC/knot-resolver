@@ -225,11 +225,10 @@ int kr_rules_init(const char *path, size_t maxsize, bool overwrite)
 	struct kr_cdb_opts opts = {
 		.is_cache = false,
 		.path = path ? path : "ruledb", // under current workdir
-		// FIXME: the file will be sparse, but we still need to choose its size somehow.
-		// Later we might improve it to auto-resize in case of running out of space.
 		// Caveat: mdb_env_set_mapsize() can only be called without transactions open.
+		// Note that this value does not affect file size thanks to not using MDB_WRITEMAP.
 		.maxsize = !overwrite ? 0 :
-			(maxsize ? maxsize : (size_t)(sizeof(size_t) > 4 ? 3 * 1024 : 500) * 1024*1024),
+			(maxsize ? maxsize : (size_t)(sizeof(size_t) > 4 ? 128 * 1024 : 500) * 1024*1024),
 	};
 	int ret = the_rules->api->open(&the_rules->db, &the_rules->stats, &opts);
 
