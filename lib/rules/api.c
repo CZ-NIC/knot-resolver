@@ -277,7 +277,12 @@ int kr_rules_commit(bool accept)
 int kr_rules_reset(void)
 {
 	if (!the_rules) return kr_error(EINVAL);
-	return ruledb_op(commit, false, true);
+	int ret = ruledb_op(check_health);
+	switch (ret) {
+		case 0: return ruledb_op(commit, false, true);
+		case 1: return kr_ok(); // could return 1, but let's only propagate errors
+		default:return kr_error(ret);
+	}
 }
 
 /** Eat and process tags from *val.

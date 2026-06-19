@@ -526,8 +526,9 @@ static int cdb_check_health(kr_cdb_pt db, struct kr_cdb_stats *stats)
 	}
 
 	/* Cache check through file size works OK without reopening,
-	 * contrary to methods based on mdb_env_info(). */
-	if (st.st_size == env->st_size)
+	 * contrary to methods based on mdb_env_info().
+	 * For ruledb the size isn't constant (anymore). */
+	if (!env->is_cache || st.st_size == env->st_size)
 		return kr_ok();
 	kr_log_info(MDB, "detected size change (by another instance?) of file '%s'"
 			": file size %zu -> file size %zu\n",
