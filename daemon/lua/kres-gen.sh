@@ -316,6 +316,7 @@ ${CDEFS} ${LIBKRES} functions <<-EOF
 # New policy
 	kr_rules_init
 	kr_rules_commit
+	kr_rules_deinit
 	kr_rules_reset
 	kr_view_insert_action
 	kr_view_select_action

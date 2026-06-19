@@ -9,6 +9,7 @@ from knot_resolver.datamodel.types import (
     ListOrItem,
     ReadableFile,
     TimeUnit,
+    WritableDir,
 )
 from knot_resolver.utils.modeling import ConfigSchema
 
@@ -105,6 +106,7 @@ class LocalDataSchema(ConfigSchema):
     records: Direct addition of records in DNS zone file format.
     rules: Local data rules.
     rpz: List of Response Policy Zones and its configuration.
+    tmp_db_dir: directory for storing temporary ruledb; optional, reduces RAM usage with lots of rules
     """  # noqa: E501
 
     ttl: Optional[TimeUnit] = None
@@ -115,3 +117,4 @@ class LocalDataSchema(ConfigSchema):
     rules: Optional[List[RuleSchema]] = None
     rpz: Optional[List[RPZSchema]] = None
     # root_fallback_addresses*: removed, rarely useful
+    tmp_db_dir: Optional[WritableDir] = None

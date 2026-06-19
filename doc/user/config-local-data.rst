@@ -154,6 +154,16 @@ It provides various input formats described in following subsections.
    * wildcard support is limited to left-hand side of CNAME:
      ``*.some.name. CNAME .`` or ``*.some.name. CNAME *.`` or ``*.some.name. CNAME block.page.``
 
+   .. option:: tmp_db_dir: <path>
+
+      Optionally you can specify a path to a writable directory which is not kept
+      exclusively in RAM, e.g. ``/var/lib/knot-resolver``.
+      Doing so will decrease RAM usage of ruledb, residing by default in ``/run/knot-resolver/ruledb``.
+
+      This makes a significant difference after repeated reloads with many local-data rules (typically via RPZs).
+      The resulting slow-down of startup and reloads should not be noticeable in typical setups.
+
+
    Advanced rules
    --------------
 
