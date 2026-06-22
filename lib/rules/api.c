@@ -254,7 +254,13 @@ int kr_rules_init(const char *path, size_t maxsize, bool overwrite)
 failure:
 	free(the_rules);
 	the_rules = NULL;
-	auto_free const char *path_abs = kr_absolutize_path(".", opts.path);
+	auto_free const char *str_to_free = NULL;
+	const char *path_abs;
+	if (opts.path[0] == '/') {
+ 		path_abs = opts.path;
+	} else {
+		path_abs = str_to_free = kr_absolutize_path(".", opts.path);
+	}
 	kr_log_error(RULES, "failed while opening or initializing rule DB %s/\n", path_abs);
 	return ret;
 }
