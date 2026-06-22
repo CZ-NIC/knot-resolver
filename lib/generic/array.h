@@ -57,8 +57,9 @@
 static inline size_t array_next_count(size_t elm_size, size_t want, size_t have)
 {
 	// round size to power of two
-	const size_t want_b = MAX(want, 4) * elm_size;
-	const size_t next_b =  1 << (8 * sizeof(unsigned int) - __builtin_clz(want_b - 1));
+	const size_t want_b = MAX(want * elm_size, 32);
+	const size_t msb_index = 8 * sizeof(unsigned int) - __builtin_clz(want_b - 1);
+	const size_t next_b = (((want_b - 1) >> (msb_index - 3)) + 1) << (msb_index - 3);
 	return next_b / elm_size;
 }
 
