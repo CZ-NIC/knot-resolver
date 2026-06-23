@@ -80,6 +80,7 @@ static const enum protolayer_type protolayer_grp_doq_conn[] = {
 
 static const enum protolayer_type protolayer_grp_doq_demux[] = {
 	PROTOLAYER_TYPE_UDP,
+	PROTOLAYER_TYPE_PROXYV2_STREAM,
 	PROTOLAYER_TYPE_QUIC_DEMUX,
 	PROTOLAYER_TYPE_NULL,
 };
@@ -1740,7 +1741,7 @@ static void on_session2_handle_close(uv_handle_t *handle)
 	io_free(handle);
 }
 
-static void on_session2_timer_close(uv_handle_t *handle)
+void on_session2_timer_close(uv_handle_t *handle)
 {
 	session2_dec_refs(handle->data);
 }

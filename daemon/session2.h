@@ -1197,3 +1197,6 @@ static inline void session2_touch(struct session2 *session)
 {
 	session->last_activity = kr_now();
 }
+
+/* Decrements the session ref_count, used as a function parameter of uv_close. */
+void on_session2_timer_close(uv_handle_t *handle);

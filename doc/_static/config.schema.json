@@ -375,7 +375,7 @@
                             "type": "integer",
                             "minimum": 1,
                             "maximum": 4096,
-                            "description": "Maximum number of concurrent streams a connection is allowed to open.",
+                            "description": "Maximum number of concurrent streams each connection is allowed to open. Each stream allocates > 64 KB of memory, setting this value too high might quicly consume a lot of memory. We recommend between 4 and 64.",
                             "default": 1024
                         },
                         "require-retry": {

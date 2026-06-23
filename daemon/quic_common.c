@@ -30,19 +30,16 @@ int quic_configuration_set(void)
 	the_network->quic_params = quic_params;
 	/* Default values */
 	the_network->quic_params->require_retry = false;
-	the_network->quic_params->max_streams = 1024;
+	the_network->quic_params->max_streams = 16;
 	the_network->quic_params->max_conns = 1024;
 	return kr_ok();
 }
 
 int quic_configuration_free(struct net_quic_params *quic_params)
 {
-	if (quic_params == NULL){
-		return kr_ok();
+	if (quic_params) {
+		free(quic_params);
 	}
-
-	free(quic_params);
-
 	return kr_ok();
 }
 
@@ -66,6 +63,17 @@ bool kr_quic_conn_timeout(struct pl_quic_conn_sess_data *conn, uint64_t *now)
 	return *now > ngtcp2_conn_get_expiry(conn->conn);
 }
 
+inline uint64_t quic_ns_to_ms_ceil(uint64_t ns)
+{
+	return (ns + NGTCP2_MILLISECONDS - 1) / NGTCP2_MILLISECONDS;
+}
+
+inline uint64_t quic_get_closing_timeout(uint64_t pto_ns)
+{
+	/* see: https://nghttp2.org/ngtcp2/programmers-guide.html#the-closing-and-draining-state */
+	return 3 * quic_ns_to_ms_ceil(pto_ns);
+}
+
 void quic_hs_timeout(uv_timer_t *timer)
 {
 	struct session2 *s = timer->data;
@@ -76,11 +84,20 @@ void quic_hs_timeout(uv_timer_t *timer)
 	session2_event(conn->h.session, PROTOLAYER_EVENT_CONNECT_TIMEOUT, NULL);
 }
 
-void quic_idle_timeout(uv_timer_t *timer)
+void quic_handle_timeout(uv_timer_t *timer)
 {
 	struct session2 *s = timer->data;
 	struct pl_quic_conn_sess_data *conn =
 		protolayer_sess_data_get_proto(s, PROTOLAYER_TYPE_QUIC_CONN);
+
+	if (conn->state & QUIC_STATE_CLOSING) {
+		session2_close(conn->h.session);
+		return;
+	} else if (conn->state & QUIC_STATE_DRAINING) {
+		session2_force_close(conn->h.session);
+		return;
+	}
+
 	uint64_t now = quic_timestamp();
 	int ret = ngtcp2_conn_handle_expiry(conn->conn, now);
 	if (ret != 0) {
@@ -88,9 +105,9 @@ void quic_idle_timeout(uv_timer_t *timer)
 				ngtcp2_strerror(ret), ret);
 	}
 	if (ret == NGTCP2_ERR_IDLE_CLOSE) {
-		/* idle equal max_idle_timeout, don't send CONNECTION_CLOSE */
 		session2_force_close(s);
 	} else if (ret < 0) {
+		QUIC_SET_CLOSING(conn);
 		session2_close(s);
 	} else {
 		quic_flush_streams(conn);
@@ -113,7 +130,7 @@ int quic_set_hs_timeout(struct session2 *s, uint64_t ms)
 
 int quic_set_idle_timeout(struct session2 *s, uint64_t ms)
 {
-	return quic_set_timeout(s, ms, quic_idle_timeout);
+	return quic_set_timeout(s, ms, quic_handle_timeout);
 }
 
 void quic_reset_expiry(struct pl_quic_conn_sess_data *conn)
@@ -124,27 +141,35 @@ void quic_reset_expiry(struct pl_quic_conn_sess_data *conn)
 
 	uv_timer_stop(&s->timer);
 	if (expiry == UINT64_MAX) {
-		uv_timer_start(&s->timer, quic_idle_timeout,
+		uv_timer_start(&s->timer, quic_handle_timeout,
 				QUIC_MAX_IDLE_TIMEOUT, 0);
 		return;
 	}
 	uint64_t now = quic_timestamp();
 	if (expiry > now) {
-		uint64_t ceil_delay_ns = expiry - now + NGTCP2_MILLISECONDS - 1;
-		uint64_t delay_ms = ceil_delay_ns / NGTCP2_MILLISECONDS;
-		uv_timer_start(&s->timer, quic_idle_timeout, delay_ms, 0);
+		uv_timer_start(&s->timer, quic_handle_timeout,
+				quic_ns_to_ms_ceil(expiry - now), 0);
 	} else {
-		uv_timer_start(&s->timer, quic_idle_timeout, 0, 0);
+		uv_timer_start(&s->timer, quic_handle_timeout, 0, 0);
 	}
 }
 
-void init_random_cid(ngtcp2_cid *cid, size_t len)
+int init_random_cid(ngtcp2_cid *cid, size_t len)
 {
 	if (len == 0)
 		len = SERVER_DEFAULT_SCIDLEN;
 
-	cid->datalen = dnssec_random_buffer(cid->data, len) ==
-		/* DNSSEC_EOK */0 ? len : 0;
+	uint8_t buf[32];
+	if (len > sizeof(buf)) {
+		len = sizeof(buf);
+	}
+
+	int ret;
+	if ((ret = dnssec_random_buffer(buf, len)) == 0) {
+		ngtcp2_cid_init(cid, buf, len);
+	}
+
+	return ret;
 }
 
 uint64_t cid2hash(const ngtcp2_cid *cid, kr_quic_table_t *table)
@@ -157,19 +182,22 @@ uint64_t cid2hash(const ngtcp2_cid *cid, kr_quic_table_t *table)
 	return ret;
 }
 
-kr_quic_cid_t **kr_quic_table_lookup2(const ngtcp2_cid *cid, kr_quic_table_t *table)
+kr_quic_cid_t **kr_quic_table_lookup2(const ngtcp2_cid *cid,
+		kr_quic_table_t *table)
 {
 	uint64_t hash = cid2hash(cid, table);
 
 	kr_quic_cid_t **res = table->conns + (hash % table->size);
-	while (*res != NULL && !ngtcp2_cid_eq(cid, (const ngtcp2_cid *)(*res)->cid_placeholder)) {
+	while (*res != NULL && !ngtcp2_cid_eq(cid,
+				(const ngtcp2_cid *)(*res)->cid_placeholder)) {
 		res = &(*res)->next;
 	}
 
 	return res;
 }
 
-struct pl_quic_conn_sess_data *kr_quic_table_lookup(const ngtcp2_cid *cid, kr_quic_table_t *table)
+struct pl_quic_conn_sess_data *kr_quic_table_lookup(const ngtcp2_cid *cid,
+		kr_quic_table_t *table)
 {
 	kr_quic_cid_t **pcid = kr_quic_table_lookup2(cid, table);
 	return *pcid == NULL ? NULL : (*pcid)->conn_sess;
@@ -178,6 +206,10 @@ struct pl_quic_conn_sess_data *kr_quic_table_lookup(const ngtcp2_cid *cid, kr_qu
 kr_quic_cid_t **kr_quic_table_insert(struct pl_quic_conn_sess_data *conn,
 		const ngtcp2_cid *cid, kr_quic_table_t *table)
 {
+	if (kr_fails_assert(conn && cid && table)) {
+		return NULL;
+	}
+
 	uint64_t hash = cid2hash(cid, table);
 
 	kr_quic_cid_t *cidobj = malloc(sizeof(*cidobj));
@@ -199,7 +231,7 @@ kr_quic_cid_t **kr_quic_table_insert(struct pl_quic_conn_sess_data *conn,
 int kr_quic_table_add(struct pl_quic_conn_sess_data *conn_sess,
 		const ngtcp2_cid *cid, kr_quic_table_t *table)
 {
-	if (!conn_sess || !cid || !table) {
+	if (kr_fails_assert(conn_sess && cid && table)) {
 		return kr_error(EINVAL);
 	}
 
@@ -210,11 +242,46 @@ int kr_quic_table_add(struct pl_quic_conn_sess_data *conn_sess,
 
 	kr_quic_cid_t **addto = kr_quic_table_insert(conn_sess, cid, table);
 	if (addto == NULL) {
-		heap_delete(table->expiry_heap, heap_find(table->expiry_heap, (heap_val_t *)conn_sess));
+		heap_delete(table->expiry_heap, heap_find(table->expiry_heap,
+					(heap_val_t *)conn_sess));
 		return kr_error(ENOMEM);
 	}
 
 	table->usage++;
+	return kr_ok();
+}
+
+int kr_quic_table_rem2(kr_quic_cid_t **pcid, kr_quic_table_t *table)
+{
+	kr_quic_cid_t *cid = *pcid;
+	*pcid = cid->next;
+	cid->conn_sess->cid_pointers--;
+	free(cid);
+	table->pointers--;
+
+	return kr_ok();
+}
+
+int set_tls_error(struct pl_quic_conn_sess_data *conn,
+		quic_doq_error_t *error_code,
+		const uint8_t *msg, size_t msglen)
+{
+	if (kr_fails_assert(conn && msglen < 128))
+		return kr_error(EINVAL);
+
+	/* Not redundant! ngtcp2 doesn't memcpy the message.
+	 * msgs on the stack could therefore cause stack use after return
+	 * once ngtcp2_conn_writev_stream is called. */
+	if (msg && msglen > 0) {
+		memcpy(&conn->err_msg_buffer, msg, msglen);
+	}
+
+	*error_code = 0x100 | ngtcp2_conn_get_tls_alert(conn->conn);
+
+	ngtcp2_ccerr_set_tls_alert(&conn->ccerr,
+			ngtcp2_conn_get_tls_alert(conn->conn),
+			conn->err_msg_buffer, msglen);
+
 	return kr_ok();
 }
 
@@ -224,40 +291,42 @@ int set_application_error(struct pl_quic_conn_sess_data *conn,
 	if (kr_fails_assert(conn && msglen < 128))
 		return kr_error(EINVAL);
 
+	/* Not redundant! ngtcp2 doesn't memcpy the message.
+	 * msgs on the stack could therefore cause stack use after return
+	 * once ngtcp2_conn_writev_stream is called. */
 	if (msg && msglen > 0) {
 		memcpy(&conn->err_msg_buffer, msg, msglen);
 	}
+
 	ngtcp2_ccerr_set_application_error(&conn->ccerr, error_code,
 			conn->err_msg_buffer, msglen);
 
 	return kr_ok();
 }
 
-bool init_unique_cid(ngtcp2_cid *cid, size_t len, kr_quic_table_t *table)
+int init_unique_cid(ngtcp2_cid *cid, size_t len, kr_quic_table_t *table)
 {
 	do {
-		if (init_random_cid(cid, len), cid->datalen == 0)
-			return false;
+		if (init_random_cid(cid, len) != 0)
+			return -1;
 
 	} while (kr_quic_table_lookup(cid, table) != NULL);
 
-	return true;
+	return 0;
 }
 
 int write_retry_packet(struct wire_buf *dest, kr_quic_table_t *table,
 		ngtcp2_version_cid *dec_cids,
-		const struct sockaddr *src_addr,
-		uint8_t *secret, size_t secret_len)
+		const struct sockaddr *src_addr)
 {
-	ngtcp2_cid dcid;
-	ngtcp2_cid scid;
-	ngtcp2_cid new_dcid;
+	ngtcp2_cid odcid;
+	ngtcp2_cid oscid;
+	ngtcp2_cid retry_scid;
 
-	ngtcp2_cid_init(&dcid, dec_cids->dcid, dec_cids->dcidlen);
-	ngtcp2_cid_init(&scid, dec_cids->scid, dec_cids->scidlen);
-
-	init_random_cid(&new_dcid, 0);
-	if (!init_unique_cid(&new_dcid, 0, table)) {
+	ngtcp2_cid_init(&odcid, dec_cids->dcid, dec_cids->dcidlen);
+	ngtcp2_cid_init(&oscid, dec_cids->scid, dec_cids->scidlen);
+	init_random_cid(&retry_scid, 0);
+	if (init_unique_cid(&retry_scid, 0, table) != 0) {
 		kr_log_debug(DOQ, "Failed to initialize unique cid for Retry packet\n");
 		return -1;
 	}
@@ -266,10 +335,10 @@ int write_retry_packet(struct wire_buf *dest, kr_quic_table_t *table,
 	uint64_t now = quic_timestamp();
 
 	int ret = ngtcp2_crypto_generate_retry_token2(
-		retry_token, (const uint8_t *)secret,
-		secret_len, dec_cids->version,
+		retry_token, (const uint8_t *)table->hash_secret,
+		sizeof(table->hash_secret), dec_cids->version,
 		src_addr, kr_sockaddr_len(src_addr),
-		&new_dcid, &dcid, now);
+		&retry_scid, &odcid, now);
 
 	if (ret < 0) {
 		kr_log_debug(DOQ, "Failed to generate retry token\n");
@@ -279,8 +348,8 @@ int write_retry_packet(struct wire_buf *dest, kr_quic_table_t *table,
 	ret = ngtcp2_crypto_write_retry(
 		wire_buf_free_space(dest),
 		wire_buf_free_space_length(dest),
-		dec_cids->version, &scid,
-		&new_dcid, &dcid,
+		dec_cids->version, &oscid,
+		&retry_scid, &odcid,
 		retry_token, ret
 	);
 

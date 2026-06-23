@@ -19,7 +19,7 @@ static enum protolayer_iter_cb_result pl_quic_stream_unwrap(void *sess_data,
 {
 	struct pl_quic_stream_sess_data *stream = sess_data;
 
-	if (!(stream->incflags & NGTCP2_STREAM_DATA_FLAG_FIN)) {
+	if (unlikely(!(stream->incflags & NGTCP2_STREAM_DATA_FLAG_FIN))) {
 		return protolayer_break(ctx, kr_error(EINVAL));
 	}
 
@@ -60,7 +60,7 @@ uint8_t *kr_quic_stream_add_data(struct pl_quic_stream_sess_data *s,
 	}
 
 	list_t *list = (list_t *)&s->outbufs;
-	if (EMPTY_LIST(*list)) {
+	if (EMPTY_LIST(*list)) { // NOLINT(bugprone-casting-through-void)
 		s->unsent_obuf = obuf;
 	}
 	add_tail((list_t *)&s->outbufs, (node_t *)obuf);
@@ -79,7 +79,7 @@ static enum protolayer_iter_cb_result pl_quic_stream_wrap(void *sess_data,
 	if (likely(ctx->payload.type == PROTOLAYER_PAYLOAD_IOVEC)) {
 		if (unlikely(kr_quic_stream_add_data(stream, ctx->payload.iovec.iov[1].iov_base,
 				ctx->payload.iovec.iov[1].iov_len) == NULL)) {
-			return kr_error(ENOMEM);
+			return protolayer_break(ctx, kr_error(ENOMEM));
 		}
 
 		ctx->payload = protolayer_payload_wire_buf(&stream->outbuf,
@@ -97,11 +97,7 @@ static enum protolayer_iter_cb_result pl_quic_stream_wrap(void *sess_data,
 		size_t uf = stream->unsent_offset;
 		struct kr_quic_obuf *uo = stream->unsent_obuf;
 		if (uo == NULL) {
-			if (sent_msgs > 0) {
-				break;
-			}
-
-			protolayer_break(ctx, kr_ok());
+			break;
 		}
 
 		if (wire_buf_data_length(ctx->payload.wire_buf) != 0) {
@@ -114,6 +110,8 @@ static enum protolayer_iter_cb_result pl_quic_stream_wrap(void *sess_data,
 		if (nwrite < 0) {
 			if (nwrite == NGTCP2_ERR_NOMEM) {
 				kr_log_error(DOQ, "Insufficient memory available\n");
+			} else if (nwrite == NGTCP2_ERR_STREAM_SHUT_WR) {
+				stream->write_closed = true;
 			}
 
 			return protolayer_break(ctx, kr_ok());
@@ -126,8 +124,8 @@ static enum protolayer_iter_cb_result pl_quic_stream_wrap(void *sess_data,
 
 		protolayer_finished_cb finished_cb = NULL;
 		void *finished_baton = NULL;
-		if (sent > 0 && stream->unsent_obuf == NULL && stream->h.session->outgoing
-				&& false) {
+		if (sent > 0 && stream->unsent_obuf == NULL
+				&& stream->h.session->outgoing) {
 			finished_cb = ctx->finished_cb;
 			finished_baton = ctx->finished_cb_baton;
 		}
@@ -140,6 +138,11 @@ static enum protolayer_iter_cb_result pl_quic_stream_wrap(void *sess_data,
 				finished_baton);
 	} while (sent > 0 && sent_msgs < QUIC_MAX_SEND_PER_RECV);
 
+	if (!stream->skip_update_time) {
+		ngtcp2_conn_update_pkt_tx_time(stream->conn_ref->conn,
+				quic_timestamp());
+	}
+
 	return protolayer_break(ctx, kr_ok());
 }
 
@@ -148,7 +151,7 @@ static int send_stream(struct pl_quic_stream_sess_data *stream,
 		size_t len, bool fin, ngtcp2_ssize *sent)
 {
 	if (!stream->conn_ref || !QUIC_CAN_SEND(stream->conn_ref)) {
-		return 0;
+		return kr_error(ENODATA);
 	}
 
 	int64_t stream_id = stream->stream_id;
@@ -198,9 +201,11 @@ static int pl_quic_stream_sess_init(struct session2 *session,
 
 	struct kr_quic_stream_param *p = param;
 	stream->conn = p->conn;
+	stream->closed = false;
 	stream->stream_id = p->stream_id;
+	stream->write_closed = false;
+	stream->skip_update_time = false;
 	session->comm_storage = p->comm_storage;
-
 	if (stream->obufs_size == 0) {
 		init_list(&stream->outbufs);
 	} else {
@@ -216,14 +221,16 @@ void kr_quic_stream_ack_data(struct pl_quic_stream_sess_data *stream,
 	struct list *obs = &stream->outbufs;
 	struct kr_quic_obuf *first;
 
+	// NOLINTNEXTLINE(bugprone-casting-through-void)
 	while (!EMPTY_LIST(*obs) && end_acked >=
 			(first = HEAD(*obs))->len + stream->first_offset) {
 		rem_node(&first->node);
 		stream->obufs_size -= first->len;
 		stream->first_offset += first->len;
 		if (stream->unsent_obuf == first) {
-			stream->unsent_obuf =
-				EMPTY_LIST(*obs) == 0 ? NULL : HEAD(*obs);
+			// NOLINTNEXTLINE(bugprone-casting-through-void)
+			stream->unsent_obuf = EMPTY_LIST(*obs)
+				? NULL : HEAD(*obs);
 			stream->unsent_offset = 0;
 		}
 		free(first);
@@ -233,19 +240,6 @@ void kr_quic_stream_ack_data(struct pl_quic_stream_sess_data *stream,
 static int pl_quic_stream_sess_deinit(struct session2 *session, void *sess_data)
 {
 	struct pl_quic_stream_sess_data *stream = sess_data;
-
-	if (stream->ngtcp2_stream_active) {
-		if (!stream->conn) {
-			kr_log_debug(DOQ, "Stream missing connection pointer, cannot update ngtcp2 stream limits\n");
-		} else {
-			stream->ngtcp2_stream_active = false;
-			ngtcp2_conn_extend_max_streams_bidi(stream->conn, 1);
-		}
-	}
-
-	if (!session2_tasklist_is_empty(session)) {
-		session2_tasklist_finalize_expired(session);
-	}
 	kr_quic_stream_ack_data(stream, stream->stream_id, SIZE_MAX, false);
 	wire_buf_deinit(&stream->pers_inbuf);
 	wire_buf_deinit(&stream->outbuf);
@@ -265,11 +259,7 @@ static enum protolayer_event_cb_result pl_quic_stream_event_unwrap(
 				stream->stream_id,
 				SIZE_MAX,
 				false);
-
-		stream->conn = NULL;
-		stream->conn_ref = NULL;
 	}
-
 	return PROTOLAYER_EVENT_PROPAGATE;
 }
 
@@ -279,13 +269,9 @@ static enum protolayer_event_cb_result pl_quic_stream_event_wrap(
 {
 	if (event == PROTOLAYER_EVENT_CLOSE
 			|| event == PROTOLAYER_EVENT_FORCE_CLOSE) {
-		if (session2_is_empty(session)) {
-			*baton = sess_data;
-			return PROTOLAYER_EVENT_PROPAGATE;
-		}
-		return PROTOLAYER_EVENT_CONSUME;
+		kr_require(session2_is_empty(session));
+		*baton = sess_data;
 	}
-
 	return PROTOLAYER_EVENT_PROPAGATE;
 }
 
