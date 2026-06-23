@@ -52,7 +52,6 @@ docs = { cmd = "scripts/poe-tasks/docs", help = "Build Knot Resolver's HTML docu
 # Tasks to generate files
 gen-constantspy = { cmd = "scripts/poe-tasks/gen-constantspy", help = "Generate 'constants.py' module using Meson configured options." }
 gen-schema = { cmd = "scripts/poe-tasks/gen-schema", help = "Generate a JSON schema of Knot Resolver's declarative configuration."}
-gen-setuppy = { cmd = "scripts/poe-tasks/gen-setuppy", help = "Generate 'setup.py' file for backwards compatibility." }
 # Tasks to fix, check and test
 fix-format = { cmd = "scripts/poe-tasks/fix-format", help = "Check and fix code formatting using Ruff." }
 check-code = { cmd = "scripts/poe-tasks/check-code", help = "Check code format, run static code analysis (Ruff) and typing checker (Mypy)." }
@@ -66,7 +65,6 @@ clean = { cmd = "scripts/poe-tasks/clean", help="Cleanup build directories and f
 [tool.ruff]
 line-length = 120
 target-version = "py311"
-exclude = ["setup.py"]
 
 [tool.ruff.lint]
 select = ["ALL"]
