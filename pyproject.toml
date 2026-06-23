@@ -1,78 +1,46 @@
-[tool.poetry]
+[project]
 name = "knot-resolver"
 version = "6.4.0"
-description = "Knot Resolver Manager - a Python program that automatically manages the other components of the resolver"
-license = "GPL-3.0-or-later"
-authors = [
-    "Aleš Mrázek <ales.mrazek@nic.cz>",
-    "Václav Šraier <vaclav.sraier@nic.cz>"
+requires-python = ">=3.11"
+
+dependencies = [
+    "aiohttp",
+    "jinja2",
+    "pyyaml",
+    "supervisor",
 ]
-maintainers = [
-    "Aleš Mrázek <ales.mrazek@nic.cz>"
-]
-readme = "README.md"
-homepage = "https://www.knot-resolver.cz"
-repository = "https://gitlab.nic.cz/knot/knot-resolver"
-documentation = "https://www.knot-resolver.cz/documentation"
 
-packages = [
-    {include = "knot_resolver", from = "python"}
-]
-exclude = ["**/*.in", "**/meson.build"]
-
-# See currently open issue about building C extensions here:
-# https://github.com/python-poetry/poetry/issues/2740
-[tool.poetry.build]
-script = "build_c_extensions.py"
-generate-setup-file = true
-
-[tool.poetry.dependencies]
-python = "^3.8"
-aiohttp = "*"
-jinja2 = "*"
-pyyaml = "*"
-supervisor = "*"
-typing-extensions = "*"
-prometheus-client = { version = "*", optional = true }
-watchdog = { version = "*", optional = true }
-
-[tool.poetry.extras]
+[project.optional-dependencies]
 prometheus = ["prometheus-client"]
 watchdog = ["watchdog"]
+dev = [
+    "pyparsing",
+    "poethepoet",
+    "debugpy",
+]
+test = [
+    "pytest",
+    "pytest-cov",
+    "pytest-asyncio",
+]
+lint = [
+    "ruff",
+    "mypy",
+    "types-pyyaml",
+]
+docs = [
+    "sphinx",
+    "sphinx-rtd-theme",
+    "breathe",
+    # 'imghdr' was removed from a standard library in Python 3.13 (https://peps.python.org/pep-0594/).
+    # 'standard-imghdr' is a replacement for missing 'imghdr' module for projects that depend on it.
+    # https://pypi.org/project/standard-imghdr/
+    "standard-imghdr",
+]
 
-[tool.poetry.group.build.dependencies]
-poetry-core = ">=1.9.1"
-setuptools = ">=75.3.2"
-
-[tool.poetry.group.dev.dependencies]
-poetry = "^1.8.5"
-pyparsing = "^3.1.4"
-poethepoet = "^0.24.4"
-debugpy = "^1.8.18"
-
-[tool.poetry.group.test.dependencies]
-pytest = "^8.3.5"
-pytest-cov = "^4.1.0"
-pytest-asyncio = "^0.23.8"
-toml = "^0.10.2"
-
-[tool.poetry.group.lint.dependencies]
-ruff = "^0.6.9"
-mypy = "^1.14.1"
-types-pyyaml = "^6.0.12.20241230"
-
-[tool.poetry.group.docs.dependencies]
-sphinx = "^5.3.0"
-sphinx-rtd-theme = "^2.0.0"
-breathe = "^4.35.0"
-# 'imghdr' was removed from a standard library in Python 3.13 (https://peps.python.org/pep-0594/).
-# 'standard-imghdr' is a replacement for missing 'imghdr' module for projects that depend on it.
-# https://pypi.org/project/standard-imghdr/
-standard-imghdr = "*"
-
-[tool.poetry.scripts]
-kresctl = 'knot_resolver.client.main:main'
-knot-resolver = 'knot_resolver.manager.main:main'
+[project.scripts]
+kresctl = "knot_resolver.client.main:main"
+knot-resolver = "knot_resolver.manager.main:main"
 
 [tool.poe.tasks]
 # Tasks to configure, build and run
@@ -97,7 +65,7 @@ clean = { cmd = "scripts/poe-tasks/clean", help="Cleanup build directories and f
 
 [tool.ruff]
 line-length = 120
-target-version = "py38"
+target-version = "py311"
 exclude = ["setup.py"]
 
 [tool.ruff.lint]
@@ -223,7 +191,7 @@ skip-magic-trailing-comma = false
 line-ending = "auto"
 
 [tool.mypy]
-python_version = "3.8"
+python_version = "3.11"
 disallow_any_generics = true
 disallow_subclassing_any = true
 disallow_untyped_calls = false
@@ -239,8 +207,17 @@ implicit_reexport = false
 no_implicit_optional = true
 
 [build-system]
-requires = [
-    "poetry-core",
-    "setuptools"
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "python"}
+ext-modules = [
+    {name = "knot_resolver.controller.supervisord.plugin.notify", sources = ["python/knot_resolver/controller/supervisord/plugin/notifymodule.c"]}
 ]
-build-backend = "poetry.core.masonry.api"
+
+[tool.setuptools.package-data]
+knot_resolver = ["datamodel/templates/**/*.j2", "controller/supervisord/*.j2"]
+
+[tool.setuptools.packages.find]
+where = ["python"]
