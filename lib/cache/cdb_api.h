@@ -117,8 +117,8 @@ struct kr_cdb_api {
 
 	/** Start iterating; return the first *val with *key.
 	 *
-	 * This only makes sense if !is_cache.
-	 * TODO: it only works inside RO transactions for now.
+	 * - in cache: ensures a RO transaction (and commits the RW txn if any)
+	 * - in ruledb: transaction is preserved if exists, otherwise RO txn gets opened
 	 */
 	int (*it_first)(kr_cdb_pt db, struct kr_cdb_stats *stat,
 			const knot_db_val_t *key, knot_db_val_t *val);

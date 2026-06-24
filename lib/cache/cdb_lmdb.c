@@ -38,12 +38,13 @@ struct lmdb_env
 	 *
 	 * - only one of (ro,rw) may be active at once
 	 * - non-NULL .ro may be active or reset
-	 * - non-NULL .rw is always active
+	 * - ro_curs can survive an RW transaction and renewed later in an RO txn
+	 * - non-NULL .rw is always active, non-NULL rw_curs is always active
 	 */
 	struct {
 		bool ro_active, ro_curs_active;
 		MDB_txn *ro, *rw;
-		MDB_cursor *ro_curs;
+		MDB_cursor *ro_curs, *rw_curs;
 	} txn;
 
 	bool is_cache; /**< cache vs. rules; from struct kr_cdb_opts::is_cache */
@@ -236,6 +237,7 @@ static int cdb_commit(kr_cdb_pt db, struct kr_cdb_stats *stats, bool accept_rw, 
 			mdb_txn_abort(env->txn.rw);
 		}
 		env->txn.rw = NULL; /* the transaction got freed even in case of errors */
+		env->txn.rw_curs = NULL; /* auto-closed with txn if existed */
 	} else if (reset_ro && env->txn.ro && env->txn.ro_active) {
 		mdb_txn_reset(env->txn.ro);
 		env->txn.ro_active = false;
@@ -251,20 +253,31 @@ static int cdb_txn_open_rw(kr_cdb_pt db, struct kr_cdb_stats *stat/*unused*/)
 	return txn_get(env, &txn, false);
 }
 
-/** Obtain a read-only cursor (and a read-only transaction).
- * TODO: allow RW transaction (for ruledb iterator) */
+/** Obtain a cursor (and a transaction).
+ *
+ * - for cache these are read only
+ * - for policy the RW transaction gets preserved if open */
 static int txn_curs_get(struct lmdb_env *env, MDB_cursor **curs, struct kr_cdb_stats *stats)
 {
 	if (kr_fails_assert(env && curs))
 		return kr_error(EINVAL);
 	if (env->txn.ro_curs_active)
-		goto success;
-	/* Only in a read-only txn; TODO: it's a bit messy/coupled
-	 * At least for rules we don't do the auto-commit feature. */
-	if (env->txn.rw) {
-		if (!env->is_cache) return kr_error(EINPROGRESS);
+		goto success_ro;
+	/* Only in a read-only txn if for cache; TODO: it's a bit messy/coupled */
+	if (env->txn.rw && env->is_cache) {
 		int ret = cdb_commit(env2db(env), stats, true, false);
 		if (ret) return ret;
+	}
+	if (env->txn.rw && !env->is_cache) {
+		if (!env->txn.rw_curs) {
+			MDB_txn *txn = env->txn.rw;
+			int ret = mdb_cursor_open(txn, env->dbi, &env->txn.rw_curs);
+			if (ret) return lmdb_error(env, ret);
+		}
+		if (kr_fails_assert(env->txn.rw_curs))
+			return kr_error(EINVAL);
+		*curs = env->txn.rw_curs;
+		return kr_ok();
 	}
 	MDB_txn *txn = NULL;
 	int ret = txn_get(env, &txn, true);
@@ -277,7 +290,7 @@ static int txn_curs_get(struct lmdb_env *env, MDB_cursor **curs, struct kr_cdb_s
 	}
 	if (ret) return lmdb_error(env, ret);
 	env->txn.ro_curs_active = true;
-success:
+success_ro:
 	kr_assert(env->txn.ro_curs_active && env->txn.ro && env->txn.ro_active
 			 && !env->txn.rw);
 	*curs = env->txn.ro_curs;
@@ -308,6 +321,7 @@ static void txn_abort(struct lmdb_env *env)
 	if (env->txn.rw) {
 		mdb_txn_abort(env->txn.rw);
 		env->txn.rw = NULL; /* the transaction got freed even in case of errors */
+		env->txn.rw_curs = NULL; /* auto-closed with txn if existed */
 	}
 }
 
@@ -947,7 +961,7 @@ static int cdb_it_next(kr_cdb_pt db, struct kr_cdb_stats *stats, knot_db_val_t *
 	if (kr_fails_assert(db && val))
 		return kr_error(EINVAL);
 	struct lmdb_env *env = db2env(db);
-	if (kr_fails_assert(!env->is_cache && env->txn.ro_curs_active))
+	if (kr_fails_assert(!env->is_cache && (env->txn.ro_curs_active || env->txn.rw_curs)))
 		return kr_error(EINVAL);
 
 	MDB_cursor *curs = NULL;
