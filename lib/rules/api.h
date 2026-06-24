@@ -144,10 +144,8 @@ const uint32_t KR_RULE_TTL_DEFAULT;
 KR_EXPORT
 int kr_rule_local_data_ins(const knot_rrset_t *rrs, const knot_rdataset_t *sig_rds,
 				kr_rule_tags_t tags, kr_rule_opts_t opts);
-/** Merge RRs into a local data rule.
+/** Merge RRs into a local data rule with the same set of tags.
  *
- * - FIXME: with multiple tags variants for the same name-type pair,
- *     you typically end up with a single RR per RRset
  * - RRSIGs get dropped, if any were attached.
  * - We assume that this is called with a RW transaction open already,
  *   which is always true in normal usage (long RW txn covering whole config).

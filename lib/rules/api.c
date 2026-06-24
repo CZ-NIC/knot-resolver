@@ -663,21 +663,27 @@ int kr_rule_local_data_merge(const knot_rrset_t *rrs, const kr_rule_tags_t tags,
 	uint8_t key_data[KEY_MAXLEN];
 	knot_db_val_t key = local_data_key(rrs, key_data, RULESET_DEFAULT);
 	knot_db_val_t val;
+	int ret = ruledb_op(txn_open_rw);
+	if (ret)
+		return kr_error(ret);
 	// Transaction: we assume that we're in a RW transaction already,
 	// so that here we already "have a lock" on the last version.
-	// FIXME: iterate over multiple tags, once iterator supports RW TXN
-	int ret = ruledb_op(read, &key, &val, 1);
+	// Multiple variants are possible, with different tags.
+	for (ret = ruledb_op(it_first, &key, &val); ret == 0; ret = ruledb_op(it_next, &val)) {
+		// we're looking for the same tag-set
+		kr_rule_tags_t tags_old;
+		if (deserialize_fails_assert(&val, &tags_old) || tags_old != tags)
+			continue;
+		kr_rule_opts_t opts_old;
+		if (deserialize_fails_assert(&val, &opts_old))
+			continue;
+		break;
+	}
 	if (abs(ret) == abs(ENOENT))
 		goto fallback;
 	if (ret)
 		return kr_error(ret);
-	// check tags
-	kr_rule_tags_t tags_old;
-	if (deserialize_fails_assert(&val, &tags_old) || tags_old != tags)
-		goto fallback;
-	kr_rule_opts_t opts_old;
-	if (deserialize_fails_assert(&val, &opts_old))
-		goto fallback;
+
 	// merge TTLs
 	uint32_t ttl;
 	if (deserialize_fails_assert(&val, &ttl))
@@ -700,6 +706,10 @@ int kr_rule_local_data_merge(const knot_rrset_t *rrs, const kr_rule_tags_t tags,
 		mm_ctx_delete(mm);
 		return kr_error(ret);
 	}
+	// ATM ruledb does not overwrite, so we `remove` before `write`.
+	ret = ruledb_op(it_del);
+	if (ret)
+		return kr_error(ret);
 	// everything is ready to insert the merged RRset
 	ret = local_data_ins(key, &rrs_new, NULL, tags, opts);
 	mm_ctx_delete(mm);
