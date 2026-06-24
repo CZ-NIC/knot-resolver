@@ -1,6 +1,10 @@
 Knot Resolver 6.5.0 (2026-mm-dd)
 ================================
 
+Packaging
+---------
+- systemd: use unit's {Runtime,State,Cache}Directory directives instead of tmpfiles.d (!1853)
+
 Incompatible changes
 --------------------
 - remove legacy systemd unit files (kresd@.service, kres-cache-gc.service) (!1853)
