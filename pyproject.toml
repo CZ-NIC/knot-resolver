@@ -1,6 +1,6 @@
 [project]
 name = "knot-resolver"
-version = "6.4.0"
+dynamic = ["version"]
 requires-python = ">=3.11"
 
 dependencies = [
@@ -219,3 +219,6 @@ knot_resolver = ["datamodel/templates/**/*.j2", "controller/supervisord/*.j2"]
 
 [tool.setuptools.packages.find]
 where = ["python"]
+
+[tool.setuptools.dynamic]
+version = {file = ["VERSION"]}

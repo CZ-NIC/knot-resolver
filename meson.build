@@ -4,9 +4,9 @@ project(
   'knot-resolver',
   ['c', 'cpp'],
   license: 'GPLv3+',
-  version: '6.4.0',
+  version: files('VERSION'),
   default_options: ['c_std=gnu11', 'b_ndebug=true'],
-  meson_version: '>=0.53',
+  meson_version: '>=0.57',
 )
 
 
@@ -377,7 +377,7 @@ if clangtidy.found()
       clangtidy,
       '-quiet',
       '-extra-arg=-Wno-unknown-warning-option', # version in CI is weird in this
-      '-p', meson.build_root(),
+      '-p', meson.project_build_root(),
     ] + c_src_lint
   )
 endif
