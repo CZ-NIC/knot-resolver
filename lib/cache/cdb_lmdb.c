@@ -973,6 +973,21 @@ static int cdb_it_next(kr_cdb_pt db, struct kr_cdb_stats *stats, knot_db_val_t *
 	*val = val_mdb2knot(val2_m);
 	return kr_ok();
 }
+static int cdb_it_del(kr_cdb_pt db, struct kr_cdb_stats *stats)
+{
+	if (kr_fails_assert(db))
+		return kr_error(EINVAL);
+	struct lmdb_env *env = db2env(db);
+	if (kr_fails_assert(!env->is_cache && env->txn.rw_curs))
+		return kr_error(EINVAL);
+
+	MDB_cursor *curs = NULL;
+	int ret = txn_curs_get(env, &curs, stats);
+	if (ret) return ret;
+	ret = mdb_cursor_del(curs, 0);
+	if (ret) return lmdb_error(env, ret);
+	return kr_ok();
+}
 
 
 const struct kr_cdb_api *kr_cdb_lmdb(void)
@@ -986,7 +1001,7 @@ const struct kr_cdb_api *kr_cdb_lmdb(void)
 		cdb_read_leq, cdb_read_less,
 		cdb_usage_percent, cdb_get_maxsize,
 		cdb_check_health,
-		cdb_it_first, cdb_it_next,
+		cdb_it_first, cdb_it_next, cdb_it_del,
 	};
 	return &api;
 }

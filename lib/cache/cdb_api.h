@@ -115,13 +115,19 @@ struct kr_cdb_api {
 	int (*check_health)(kr_cdb_pt db, struct kr_cdb_stats *stat);
 
 
-	/** Start iterating; return the first *val with *key.
+	/** Start iterating: get the first *val with *key + return error code.
 	 *
 	 * - in cache: ensures a RO transaction (and commits the RW txn if any)
 	 * - in ruledb: transaction is preserved if exists, otherwise RO txn gets opened
 	 */
 	int (*it_first)(kr_cdb_pt db, struct kr_cdb_stats *stat,
 			const knot_db_val_t *key, knot_db_val_t *val);
-	/** Advance to the next *val with the same key. */
+	/** Advance to the next *val with the same key.  Return error code. */
 	int (*it_next)(kr_cdb_pt db, struct kr_cdb_stats *stat, knot_db_val_t *val);
+	/** Delete the current *val + return error code.
+	 *
+	 * You can it_next() to continue.
+	 * This assumed that you got it_first() in a RW txn.
+	 */
+	int (*it_del)(kr_cdb_pt db, struct kr_cdb_stats *stat);
 };
