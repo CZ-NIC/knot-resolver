@@ -21,7 +21,7 @@ variables:
   # IMAGE_TAG is a Git branch/tag name from https://gitlab.nic.cz/knot/knot-resolver-ci
   # In general, keep it pointing to a tag - use a branch only for development.
   # More info in the knot-resolver-ci repository.
-  IMAGE_TAG: 'v20260514-1'
+  IMAGE_TAG: 'remove-poetry'
   IMAGE_PREFIX: '$CI_REGISTRY/knot/knot-resolver-ci'
 
 image: $IMAGE_PREFIX/debian13-knot_3_5:$IMAGE_TAG
@@ -881,34 +881,35 @@ docs:website:
   <<: *nodep
   stage: sanity
   before_script:
-    - poetry --version
-    - poetry env use python${PYTHON_VERSION}
-    - poetry env info
+    - python${PYTHON_VERSION} -m venv .venv
+    - source .venv/bin/activate
+    - pip install --upgrade pip
+    - python --version
 
 python:check:files:
   <<: *python
   script:
-    - poetry install --all-extras --only main,build,dev,lint
+    - pip install -e .[prometheus,watchdog,dev,test,lint,docs]
     - poe check-files
 
 python:check:code:
   <<: *python
   script:
-    - poetry install --all-extras --only main,dev,lint
+    - pip install -e ".[prometheus,watchdog,dev,lint]"
     - poe check-code
 
 python:test:examples:
   <<: *python
   stage: test
   script:
-    - poetry install --all-extras --only main,dev
+    - pip install -e ".[prometheus,watchdog,dev]"
     - poe test-examples
 
 python:test:migrate:
   <<: *python
   stage: test
   script:
-    - poetry install --all-extras --only main,dev
+    - pip install -e ".[prometheus,watchdog,dev]"
     - poe test-migrate
 
 python:test:run:
@@ -924,7 +925,7 @@ python:test:run:
           - config.test-rate-limiting.yaml
   script:
     - touch etc/config/blocklist.rpz
-    - poetry install --all-extras --only main,dev
+    - pip install -e ".[prometheus,watchdog,dev]"
     - poe configure
     # return code 124 is also OK
     - timeout 1m poe run etc/config/${ADD_CONFIG_FILE_NAME} || ( [[ $? -eq 124 ]] )
@@ -935,25 +936,25 @@ python:test:unit:
   parallel:
     matrix:
       - PYTHON_VERSION:
-          - '3.8'
-          - '3.9'
-          - '3.10'
           - '3.11'
           - '3.12'
           - '3.13'
           - '3.14'
   script:
-    - poetry install --all-extras --only main,dev,test
+    - pip install -e ".[prometheus,watchdog,dev,test]"
     - poe test-unit
-    # the following command makes sure that the source root of the coverage file is at $gitroot
-    - poetry run bash -c "coverage combine .coverage; coverage xml"
+    # ensure consistent coverage file handling (no accidental stale artifacts)
+    - coverage combine || true
+    - coverage xml -o coverage.xml
   artifacts:
+    when: always
     reports:
       coverage_report:
         coverage_format: cobertura
         path: coverage.xml
       junit: unit.junit.xml
     paths:
+      - coverage.xml
       - unit.junit.xml
 
 # }}}
