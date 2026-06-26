@@ -4,7 +4,7 @@ Cache
 =====
 
 Cache in Knot Resolver is stored on disk and also shared between
-:ref:`systemd-multiple-instances` so resolver doesn't lose the cached data on
+multiple workers, so resolver doesn't lose the cached data on
 restart or crash.
 
 To improve performance even further the resolver implements so-called aggressive caching
@@ -51,9 +51,7 @@ to leave some free space for special files, such as locks.:
 
    cache.size = cache.fssize() - 10*MB
 
-.. note:: The `cache garbage collector <../deployment-advanced-no-systemd-processes.html#garbage-collector>`_
-   can be used to periodically trim the cache. It is enabled and configured by
-   default when running kresd with systemd integration.
+.. note:: The cache garbage collector runs periodically to trim the cache.
 
 .. _`cache_persistence`:
 

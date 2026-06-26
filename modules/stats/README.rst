@@ -14,7 +14,8 @@ as described in chapter :ref:`async-events`.
 .. note:: Please remember that each Knot Resolver instance keeps its own
    statistics, and instances can be started and stopped dynamically. This might
    affect your data postprocessing procedures if you are using
-   :ref:`systemd-multiple-instances`.
+   multiple workers.
+   The manager component will aggregate and expose them for you since v6.0.0.
 
 .. _mod-stats-list:
 

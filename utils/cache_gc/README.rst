@@ -5,10 +5,7 @@
 Garbage Collector
 -----------------
 
-.. note:: When using systemd, ``kres-cache-gc.service`` is enabled by default
-   and does not need any manual configuration.
-
-Knot Resolver employs a separate garbage collector daemon which periodically
+Knot Resolver employs a separate garbage collector process which periodically
 trims the cache to keep its size below size limit configured using
 :envvar:`cache.size`.
 
