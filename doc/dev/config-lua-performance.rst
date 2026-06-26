@@ -13,7 +13,7 @@ Generally the higher cache hit rate the better.
 Performance tuning should start with cache :ref:`cache_sizing`
 and :ref:`cache_persistence`.
 
-It is also recommended to run :ref:`systemd-multiple-instances` (even on a
+It is also recommended to run multiple workers (even on a
 single machine!) because it allows to utilize multiple CPU threads and
 increases overall resiliency.
 

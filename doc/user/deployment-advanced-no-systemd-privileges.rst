@@ -2,11 +2,27 @@
 
 .. include:: deployment-warning.rst
 
+.. _deployment-no-systemd:
+
+*********************
+Usage without systemd
+*********************
+
+This page is meant for experienced users, primarily packagers for a deployment without systemd.
+
+.. TODO: we could make this page more detailed, but there won't be many users for it, probably.
+
+Sice version 6.0.0 there is a ``knot-resolver`` process which (indirectly) takes care
+of coordinating individual processes of the service,
+so that deployments without systemd can be run very similarly to deployments with systemd.
+
+
 Privileges and capabilities
 ===========================
 
 The kresd daemon requires privileges when it is configured to bind to
 well-known ports. There are multiple ways to achieve this.
+(In a container you typically do not need to address this problem.)
 
 Using capabilities
 ^^^^^^^^^^^^^^^^^^
@@ -24,6 +40,7 @@ Running as non-privileged user
 
 Another possibility is to start the process as privileged user and then switch
 to a non-privileged user after binding to network interfaces.
+On Lua level there's command:
 
 .. function:: user(name, [group])
 
