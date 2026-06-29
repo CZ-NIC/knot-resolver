@@ -20,14 +20,6 @@ if test "$aggregated_rv" -ne "0"; then
 	exit 1
 fi
 
-# check that setup.py is not behind pyproject.toml
-echo -e "${yellow}Checking setup.py${reset}"
-python scripts/poe-tasks/utils/create_setup.py | diff - setup.py
-check_rv $?
-python setup.py --help > /dev/null
-check_rv $?
-echo
-
 # check python/knot_resolver/constants.py
 echo -e "${yellow}python/knot_resolver/constants.py${reset}"
 meson_setup_configure > /dev/null

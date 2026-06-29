@@ -8,7 +8,7 @@ source $src_dir/utils/_env.sh
 set +e
 
 # dirs to check
-dirs="python/knot_resolver/ tests/manager scripts/poe-tasks/utils/create_setup.py"
+dirs="python/knot_resolver/ tests/manager"
 
 # check imports
 echo -e "${yellow}Checking Python imports using Ruff...${reset}"
