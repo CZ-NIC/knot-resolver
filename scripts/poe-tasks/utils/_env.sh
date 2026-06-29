@@ -122,7 +122,6 @@ function fancy_message {
 		echo -e "${red}Failure.${reset}"
 		echo -e "${red}These commands might help you:${reset}"
 		echo -e "${red}\tpoe fix-format${reset}"
-		echo -e "${red}\tpoe gen-setuppy${reset}"
 		echo -e "${red}\tpoe gen-constantspy${reset}"
 		echo -e "${red}\tpoe gen-schema${reset}"
 		echo -e "${red}That's not great. Could you please fix that?${reset} 😲😟"
