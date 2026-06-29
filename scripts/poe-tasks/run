@@ -13,23 +13,12 @@ echo Creating missing runtime directories
 echo ------------------------------------
 mkdir -vp $KRES_DEV_INSTALL_DIR/run/knot-resolver $KRES_DEV_INSTALL_DIR/var/cache/knot-resolver
 echo
-echo ---------------------------------------
-echo Building Python komponents using Poetry
-echo ---------------------------------------
-poetry build
-# copy native modules from build directory to source directory
-shopt -s globstar
-shopt -s nullglob
-for d in build/lib*; do
-    for f in "python/$d/"**/*.so; do
-        cp -v "$f" ${f#"python/$d/"}
-    done
-done
-shopt -u globstar
-shopt -u nullglob
-
+echo ------------------------------------------------------
+echo Building/installing Python components using setuptools
+echo ------------------------------------------------------
+python -m pip install -e .
 echo
-echo --------------------------------------
-echo Starting Knot Resolver wit the Manager
-echo --------------------------------------
-python3 -m knot_resolver.manager --config "$KRES_DEV_CONFIG_FILE" "$@"
+echo ----------------------
+echo Starting Knot Resolver
+echo ----------------------
+knot-resolver --config "$KRES_DEV_CONFIG_FILE" "$@"
