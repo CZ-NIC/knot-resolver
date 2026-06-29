@@ -4,7 +4,7 @@
 src_dir="$(dirname "$(realpath "$0")")"
 source $src_dir/utils/_env.sh
 
-dirs="python/knot_resolver/ tests/manager"
+dirs="python/knot_resolver/ tests/python/knot_resolver"
 
 # sort python import
 echo -e "${yellow}Sorting Python imports using ruff...${reset}"

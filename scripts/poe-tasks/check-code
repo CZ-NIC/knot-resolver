@@ -8,7 +8,7 @@ source $src_dir/utils/_env.sh
 set +e
 
 # dirs to check
-dirs="python/knot_resolver/ tests/manager"
+dirs="python/knot_resolver/ tests/python/knot_resolver"
 
 # check imports
 echo -e "${yellow}Checking Python imports using Ruff...${reset}"
