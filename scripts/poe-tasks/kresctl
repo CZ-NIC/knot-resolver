@@ -9,4 +9,4 @@ is_build_dev_dir_configured
 echo
 
 # run knot-resolver client
-python3 -m knot_resolver.client --config "$KRES_DEV_CONFIG_FILE" "$@"
+kresctl --config "$KRES_DEV_CONFIG_FILE" "$@"

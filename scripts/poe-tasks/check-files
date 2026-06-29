@@ -9,14 +9,14 @@ set +e
 
 # check that all dependencies are installed correctly
 echo -e "${yellow}Checking that all dependencies are properly installed...${reset}"
-poetry install --dry-run --only main,dev,lint | grep "0 install" > /dev/null
+! python -m pip install --dry-run ".[prometheus,watchdog,dev,test,lint,docs]" | grep -qE "^Would install .{20,}$"
 check_rv $?
 echo
 
 # early exit when dependencies are not installed
 if test "$aggregated_rv" -ne "0"; then
 	echo -e "${red}Dependencies are not properly installed. Run this command to fix it:${reset}"
-	echo -e "  ${red}poetry install${reset}"
+	echo -e "  ${red}python -m pip install ".[prometheus,watchdog,dev,test,lint,docs]"${reset}"
 	exit 1
 fi
 

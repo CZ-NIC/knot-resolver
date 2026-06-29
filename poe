@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 
 script_dir="$(dirname "$(readlink -f "$0")")"
-exec poetry --directory "$script_dir" run -- poe --root "$script_dir" "$@"
+poe --root "$script_dir" "$@"
