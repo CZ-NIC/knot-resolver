@@ -10,12 +10,9 @@ import sphinx_rtd_theme
 # General information about the project.
 project = u'Knot Resolver'
 copyright = u'CZ.NIC labs'
-with open('../../meson.build') as f:
-    for line in f:
-        match = re.match(r"\s*version\s*:\s*'([^']+)'.*", line)
-        if match is not None:
-            version = match.groups()[0]
-release = version
+
+with open('../../VERSION') as version_file:
+    release = version_file.read().strip()
 
 # Add any Sphinx extension module names here, as strings.
 extensions = [
