@@ -208,17 +208,22 @@ skip-magic-trailing-comma = false
 line-ending = "auto"
 
 [tool.mypy]
-python_version = "3.8"
-disallow_any_generics = true
-disallow_subclassing_any = true
-disallow_untyped_calls = false
-disallow_untyped_decorators = true
+mypy_path = ["python"]
+python_version = "3.11"
+strict = true
+
+# Output
 pretty = true
 show_error_codes = true
-allow_redefinition = true
-disallow_untyped_defs = false
-strict_equality = true
-disallow_incomplete_defs = true
-check_untyped_defs = true
-implicit_reexport = false
-no_implicit_optional = true
+show_column_numbers = true
+show_error_context = true
+
+# Extra diagnostics
+warn_unused_configs = true
+warn_unreachable = true
+
+# Project layout
+namespace_packages = true
+explicit_package_bases = true
+
+enable_error_code = ["ignore-without-code"]
