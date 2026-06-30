@@ -62,6 +62,11 @@ class FloatNonNegative(FloatRangeBase):
     _min: float = 0.0
 
 
+class Float0_65535(FloatRangeBase):  # noqa: N801
+    _min: float = 0.0
+    _max: float = 65535.0
+
+
 class SizeUnit(UnitBase):
     _units = {"B": 1, "K": 1024, "M": 1024**2, "G": 1024**3}
 

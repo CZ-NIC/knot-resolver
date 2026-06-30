@@ -27,7 +27,7 @@ The limits can be adjusted for different packet origins using :option:`price-fac
 
   Enable rate limiting.
   
-  To start using rate limiting, you need to set at least the :option: `rate-limit <rate-limiting/rate-limit: <int>>`, which has no default value.
+  To start using rate limiting, you need to set at least the :option:`rate-limit <rate-limiting/rate-limit: <int>>`, which has no default value.
 
 
 .. option:: rate-limiting/rate-limit: <int>

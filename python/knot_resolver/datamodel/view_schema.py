@@ -1,6 +1,6 @@
 from typing import List, Literal, Optional
 
-from knot_resolver.datamodel.types import FloatNonNegative, IDPattern, IPNetwork
+from knot_resolver.datamodel.types import Float0_65535, IDPattern, IPNetwork
 from knot_resolver.utils.modeling import ConfigSchema
 
 
@@ -17,7 +17,7 @@ class ViewOptionsSchema(ConfigSchema):
 
     minimize: bool = True
     dns64: bool = True
-    price_factor: FloatNonNegative = FloatNonNegative(1.0)
+    price_factor: Float0_65535 = Float0_65535(1.0)
     fallback: bool = True
 
 

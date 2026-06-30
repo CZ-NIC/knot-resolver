@@ -150,6 +150,10 @@ function M.layer.consume(state, req, pkt)
 				qry.uid,
 				req.pool)
 		end
+		-- Also mark CNAMEs to be included.
+		if orig.qry_uid == qry.uid and orig.rr.type == kres.type.CNAME then
+			orig.to_wire = true
+		end
 	end
 	ffi.C.kr_ranked_rrarray_finalize(req.answ_selected, qry.uid, req.pool)
 	req:set_extended_error(kres.extended_error.SYNTHESIZED, "BHD4: from DNS64")
