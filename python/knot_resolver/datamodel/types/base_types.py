@@ -194,7 +194,7 @@ class FloatRangeBase(FloatBase):
 
     Just inherit the class and set the values for '_min' and '_max'.
 
-    class FloatNonNegative(IntRangeBase):
+    class FloatNonNegative(FloatRangeBase):
         _min: float = 0.0
     """
 

@@ -32,6 +32,17 @@ typedef struct {
 /// Process scanned RR of other types, gather RRsets in a map.
 static void rr_scan2trie(zs_scanner_t *s, const struct kr_rule_zonefile_config *c)
 {
+	// Warn if a wildcard.
+	static bool warned = false;
+	if (!warned && s->r_owner[0] == '\1' && s->r_owner[1] == '*') {
+		KR_DNAME_GET_STR(owner_str, s->r_owner);
+		kr_log_warning(RULES,
+			"configured a non-CNAME wildcard, which is not supported yet ('%s'); "
+		 	"reporting this type of issue only once per reload\n",
+		 	owner_str);
+		warned = true;
+	}
+
 	s_data_t *s_data = s->process.data;
 	uint8_t key_data[KEY_MAXLEN];
 	knot_rrset_t rrs_for_key = {

@@ -29,9 +29,21 @@ async def command_single_registered_worker(cmd: str) -> "Tuple[KresID, object]":
 
 async def command_registered_workers(cmd: str) -> "Dict[KresID, object]":
     async def single_pair(sub: "Subprocess") -> "Tuple[KresID, object]":
-        return sub.id, await sub.command(cmd)
+        try:
+            return sub.id, await sub.command(cmd)
+        except BaseException as e:
+            logger.error(
+                "failed to command '%s' worker: %s",
+                sub.id,
+                e,
+            )
+            return sub.id, None
 
-    pairs = await asyncio.gather(*(single_pair(inst) for inst in _REGISTERED_WORKERS.values()))
+    pairs = await asyncio.gather(
+        *(single_pair(inst) for inst in list(_REGISTERED_WORKERS.values())),
+        return_exceptions=False,
+    )
+
     return dict(pairs)
 
 
