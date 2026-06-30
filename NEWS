@@ -5,6 +5,10 @@ Bugfixes
 --------
 - views: fix "unused tags" error when repeating a tag in views (!1883)
 
+Packaging
+---------
+- arch: updates and cleanup (!1858)
+
 
 Knot Resolver 6.4.2 (2026-08-05)
 ================================
