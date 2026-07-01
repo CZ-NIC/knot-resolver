@@ -10,6 +10,8 @@
 #include "contrib/ucw/mempool.h"
 #include "lib/log.h"
 #include "lib/resolve.h"
+#include <execinfo.h>
+#include <string.h>
 
 #if ENABLE_LIBSYSTEMD
 #include <stdlib.h>
@@ -330,4 +332,82 @@ void kr_log_q1(const struct kr_query * const qry,
 	kr_vlog_req(req, qry_uid, ind, group, tag, fmt, args);
 	va_end(args);
 }
+
+#ifdef __linux__
+char *kr_log_get_trace(char *buf, size_t buf_size, int first_level, int last_level, const char *sep)
+{
+	const size_t sep_size = strlen(sep);
+	void *addresses[last_level + 2];
+
+	int cnt = backtrace(addresses, last_level + 2);
+	char **symbols = backtrace_symbols(addresses, cnt);
+	/* Sample lines in symbols:
+	 *   /home/user/knot-resolver/.install_dev/sbin/kresd(mp_alloc+0x55) [0x557f35457185]
+	 *   /usr/lib/libluajit-5.1.so.2(lua_pcall+0xcf) [0x7f5ad672b96f]
+	 * Function name is empty for static functions.
+	 */
+	char *str = buf; *str = '\0';
+	int i = first_level;
+	for (; i < MIN(cnt, last_level + 1); i++) {
+		char *start = symbols[i];
+		char *par1 = NULL, *par2 = NULL, *plus = NULL;
+		par1 = strchr(start, '(');
+		if (par1) par2 = strchr(par1, ')');
+		if (par2) {
+			plus = memchr(par1, '+', par2 - par1);
+			if (!plus) plus = par2;
+		} else {
+			par1 = par2 = plus = strchr(start, '\0');
+		}
+		char *bin = memrchr(start, '/', par1 - start);
+		if (!bin) bin = start - 1;
+		bin++;
+		char *bin_end = bin;
+		while ((*bin_end >= 'a') && (*bin_end <= 'z')) bin_end++;
+		
+		char *name = bin;
+		char *name_end = bin_end;
+		char *offset = "\0";
+		char *offset_end = offset;
+		if (
+				(strncmp("kresd", bin, bin_end - bin) == 0)   ||
+				(strncmp("libkres", bin, bin_end - bin) == 0) ||
+				(strncmp("libknot", bin, bin_end - bin) == 0)) {
+			if (plus - par1 > 1) {
+				name = par1 + 1;
+				name_end = plus;
+			}
+			if (par2 > plus) {
+				offset = plus;
+				offset_end = par2;
+			}
+		} else {
+			i = MIN(cnt, last_level + 1); // last to show, outside of our code
+		}
+
+		int max_size = name_end - name + offset_end - offset + sep_size;
+		if (str + max_size + sep_size + 4 >= buf + buf_size) break;
+		if (i > first_level) str = memcpy(str, sep, sep_size) + sep_size;
+		str = memcpy(str, name, name_end - name) + (name_end - name);
+		str = memcpy(str, offset, offset_end - offset) + (offset_end - offset);
+		*str = '\0';
+	}
+	if (i < cnt) {
+		str = memcpy(str, sep, sep_size) + sep_size;
+		str = memcpy(str, "...", 3) + 3;
+		*str = '\0';
+	}
+	free(symbols);
+	return str;
+}
+#else
+char *kr_log_get_trace(char *buf, size_t buf_size, int first_level, int last_level, const char *sep)
+{
+	// return just final dots on non-linux systems
+	char *str = buf; *str = '\0';
+	str = (char *)memcpy(str, "...", 3) + 3;
+	*str = '\0';
+	return str;
+}
+#endif
 
