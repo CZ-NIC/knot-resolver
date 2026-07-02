@@ -201,12 +201,16 @@ malloc = meson.get_compiler('c').find_library(
   # Fortunately it seems unlikely that dynamic wouldn't be found and static would be.
 )
 
+### Valgrind
+valgrind = get_option('valgrind') == 'enabled'
+
 summary({'sendmmsg': sendmmsg,
          'XDP (in libknot)': xdp,
          'doh2 (serving)': nghttp2.found(),
          'DoQ': [enable_quic, quic_sumstr],
          'capabilities': capng.found(),
          'malloc': malloc.found() ? malloc_name : 'libc default',
+         'valgrind': valgrind,
         }, section: 'Features', bool_yn: true)
 
 ### Systemd; most is in systemd/meson.build
@@ -289,6 +293,7 @@ conf_data.set('ENABLE_SENDMMSG', sendmmsg.to_int())
 conf_data.set('ENABLE_XDP', xdp.to_int())
 conf_data.set('ENABLE_CAP_NG', capng.found().to_int())
 conf_data.set('ENABLE_JEMALLOC', malloc.found().to_int())
+conf_data.set('ENABLE_VALGRIND', valgrind.to_int())
 conf_data.set('ENABLE_DOH2', nghttp2.found().to_int())
 conf_data.set('ENABLE_QUIC', enable_quic.to_int())
 conf_data.set('DBG_ASSERTION_ABORT', get_option('debug').to_int())

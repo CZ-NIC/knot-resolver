@@ -125,7 +125,7 @@ build-arch:
 build-stable:
   <<: *build
   script:
-    - meson build_ci_stable --prefix=$PREFIX -Dmalloc=disabled -Dwerror=true -Dextra_tests=enabled -Dbench=enabled
+    - meson build_ci_stable --prefix=$PREFIX -Dmalloc=disabled -Dvalgrind=enabled -Dwerror=true -Dextra_tests=enabled -Dbench=enabled
     - ninja -C build_ci_stable
     - ninja -C build_ci_stable install >/dev/null
     - ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite snowflake
@@ -158,7 +158,6 @@ build-stable-asan-gcc:
     - ninja -C build_ci_asan_gcc install >/dev/null
     - MESON_TESTTHREADS=1 ${MESON_TEST} --suite unit --suite dnstap --no-suite skip_asan --no-suite snowflake
     - MESON_TESTTHREADS=1 ASAN_OPTIONS=detect_leaks=0 ${MESON_TEST} --suite config --no-suite skip_asan --no-suite snowflake
-
 
 # TODO: Clang sanitizer seems to be broken in the current version of Debian. Use
 # GCC above and maybe re-enable the Clang one once we update at some point.
