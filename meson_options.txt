@@ -162,6 +162,17 @@ option(
 )
 
 option(
+  'valgrind',
+  type: 'combo',
+  choices: [
+    'disabled',
+    'enabled',
+  ],
+  value: 'disabled',
+  description: 'annotate custom allocators for use with Valgrind',
+)
+
+option(
   'quic',
   type: 'combo',
   choices: [

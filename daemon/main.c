@@ -460,6 +460,7 @@ static void drop_capabilities(void)
 
 int main(int argc, char **argv)
 {
+	//sleep(10);
 	kr_log_group_reset();
 	if (setvbuf(stdout, NULL, _IONBF, 0) || setvbuf(stderr, NULL, _IONBF, 0)) {
 		kr_log_error(SYSTEM, "failed to set output buffering (ignored): %s\n",
@@ -654,6 +655,8 @@ int main(int argc, char **argv)
 		ret = EXIT_FAILURE;
 		goto cleanup;
 	}
+
+	VALGRIND_PRINTF("Mempool annotations enabled.\n");  // void if disabled
 
 	/* Starting everything succeeded, so commit rule DB changes. */
 	kr_rules_commit(true);
