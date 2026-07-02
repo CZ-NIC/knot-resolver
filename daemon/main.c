@@ -655,6 +655,8 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
+	VALGRIND_PRINTF("Mempool annotations enabled.\n");  // void if disabled
+
 	/* Starting everything succeeded, so commit rule DB changes. */
 	kr_rules_commit(true);
 
