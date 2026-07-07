@@ -46,10 +46,10 @@ struct mempool {
 };
 
 struct mempool_stats {          /** Mempool statistics. See mp_stats(). **/
-	uint64_t total_size;            /** Real allocated size in bytes. */
-	uint64_t used_size;             /** Estimated size allocated from mempool to application. */
+	size_t total_size;              /** Real allocated size in bytes. */
+	size_t used_size;               /** Estimated size allocated from mempool to application. */
 	unsigned chain_count[3];        /** Number of allocated chunks in small/big/unused chains. */
-	uint64_t chain_size[3];         /** Size of allocated chunks in small/big/unused chains. */
+	size_t chain_size[3];           /** Size of allocated chunks in small/big/unused chains. */
 };
 
 /***
@@ -109,14 +109,14 @@ void mp_stats(struct mempool *pool, struct mempool_stats *stats);
  * of chunks. This function scans the chunk list, so it can be slow
  * (upstream contains constant-time version).
  **/
-uint64_t mp_total_size(struct mempool *pool);
+size_t mp_total_size(struct mempool *pool);
 
 /**
  * Release unused chunks of memory reserved for further allocation
  * requests, but stop if \ref mp_total_size() would drop below \p min_total_size.
  * It calls \ref mp_total_size(), so all chunks are scanned (in upstream version only released ones).
  **/
-void mp_shrink(struct mempool *pool, uint64_t min_total_size);
+void mp_shrink(struct mempool *pool, size_t min_total_size);
 
 /***
  * [[alloc]]
