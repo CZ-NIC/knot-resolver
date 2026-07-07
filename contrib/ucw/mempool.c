@@ -337,20 +337,6 @@ mp_alloc(struct mempool *pool, size_t size)
 	return ptr;
 }
 
-void *
-mp_alloc_noalign(struct mempool *pool, size_t size)
-{
-	void *ptr = NULL;
-	if (size <= pool->state.free[0]) {
-		ptr = (uint8_t *)pool->state.last[0] - pool->state.free[0];
-		pool->state.free[0] -= size;
-	} else {
-		ptr = mp_alloc_internal(pool, size);
-	}
-	MEMCHECK_UNDEFINED(ptr, size);
-	return ptr;
-}
-
 static void *
 mp_start_internal(struct mempool *pool, size_t size)
 {
@@ -370,20 +356,6 @@ mp_start(struct mempool *pool, size_t size)
 		pool->idx = 0;
 		pool->state.free[0] = avail;
 		ptr = (uint8_t *)pool->state.last[0] - avail;
-	} else {
-		ptr = mp_start_internal(pool, size);
-	}
-	MEMCHECK_UNDEFINED(ptr, pool->state.free[pool->idx]);
-	return ptr;
-}
-
-void *
-mp_start_noalign(struct mempool *pool, size_t size)
-{
-	void *ptr = NULL;
-	if (size <= pool->state.free[0]) {
-		pool->idx = 0;
-		ptr = (uint8_t *)pool->state.last[0] - pool->state.free[0];
 	} else {
 		ptr = mp_start_internal(pool, size);
 	}
