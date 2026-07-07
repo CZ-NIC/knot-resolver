@@ -262,7 +262,10 @@ docker:dockerhub:
   before_script:
     - git fetch --tags --force
     - >
-      LATEST5_TAG=$(git tag --list 'v5*' --sort=-v:refname | head -n 1)
+      LATEST_TAG=$(git for-each-ref \
+        --sort=-version:refname \
+        --count=1 \
+        --format='%(refname:short)' refs/tags)
 
       echo "Latest tag: $LATEST_TAG"
       echo "Current: $CI_COMMIT_REF_NAME"
