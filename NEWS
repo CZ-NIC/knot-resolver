@@ -5,6 +5,10 @@ Bugfixes
 --------
 - cache: avoid excessive logging introduced in the last release (!1871)
 
+Improvements
+------------
+- cache: deal with LMDB 1.0.0 switching format (!1872)
+
 
 Knot Resolver 5.7.7 (2026-07-22)
 ================================

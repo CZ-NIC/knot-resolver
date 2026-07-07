@@ -425,6 +425,17 @@ static int cdb_init(kr_cdb_pt *db, struct kr_cdb_stats *stats,
 		return kr_error(ENOMEM);
 	}
 	int ret = cdb_open_env(env, opts->path, opts->maxsize, stats);
+	/* Uh, LMDB 1.0 is incompatible with LMDB 0.y.  Hack-retry. */
+	if (abs(ret) == abs(MDB_INVALID)) {
+		kr_log_error(CACHE, "found incompatible data after LMDB version change, probably; "
+	       			"clearing and retrying\n");
+		auto_free char *mdb_datafile = kr_strcatdup(2, opts->path, "/data.mdb");
+		auto_free char *mdb_lockfile = kr_strcatdup(2, opts->path, "/lock.mdb");
+		unlink(mdb_datafile); /* we ignore errors; e.g. either might not exist */
+		unlink(mdb_lockfile);
+
+		ret = cdb_open_env(env, opts->path, opts->maxsize, stats);
+	}
 	if (ret != 0) {
 		free(env);
 		return ret;
