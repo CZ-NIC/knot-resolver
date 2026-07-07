@@ -137,12 +137,6 @@ void mp_shrink(struct mempool *pool, size_t min_total_size);
 KR_EXPORT
 void *mp_alloc(struct mempool *pool, size_t size);
 
-/**
- * The same as \ref mp_alloc(), but the result may be unaligned.
- **/
-void *mp_alloc_noalign(struct mempool *pool, size_t size);
-
-
 /***
  * [[gbuf]]
  * Growing buffers
@@ -178,7 +172,6 @@ static inline unsigned mp_idx(struct mempool *pool, void *ptr)
  * before you "close" the growing buffer with \ref mp_end().
  */
 void *mp_start(struct mempool *pool, size_t size);
-void *mp_start_noalign(struct mempool *pool, size_t size);
 
 /**
  * Return start pointer of the growing buffer allocated by latest \ref mp_start() or a similar function.
@@ -349,7 +342,7 @@ char *mp_vprintf_append(struct mempool *mp, char *ptr, const char *fmt, va_list 
 /*
  * Some parts of mempools were removed in Knot projects,
  * see upstream if you need:
-     * variants of methods returning zeroed memory,
+     * variants of methods returning zeroed or unaligned memory,
      * restoring previous state of allocations,
      * concatenating and duplicating memory/strings on mempools,
      * generic allocator interface spanning both malloc and mempools,
