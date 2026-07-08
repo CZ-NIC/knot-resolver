@@ -284,7 +284,26 @@ static void check_tls_capable(struct address_state *address_state,
 		req->selection_context.is_tls_capable ?
 			      req->selection_context.is_tls_capable(address) :
 			      false;
+	address_state->doq_capable =
+		address_state->tls_capable && !req->options.TCP;
+	/* Should be false if doq_capable, but unaltered if !doq_capable */
+	address_state->tls_capable =
+		address_state->doq_capable ? 0 : address_state->tls_capable;
 }
+
+// static void check_doq_capable(struct address_state *address_state,
+// 			      struct kr_request *req, struct sockaddr *address)
+// {
+// 	address_state->doq_capable = 
+// 		req->selection_context.is_tls_capable ?
+// 			      req->selection_context.is_tls_capable(address) :
+// 			      false &&
+// 			!req->options.TCP;
+// 		// req->ctx
+// 		// req->selection_context.is_doq_capable ?
+// 		// 	      req->selection_context.is_doq_capable(address) :
+// 		// 	      false;
+// }
 
 #if 0
 /* TODO: uncomment these once we actually use the information it collects. */
@@ -500,6 +519,8 @@ struct kr_transport *select_transport(const struct choice choices[], int choices
 	enum kr_transport_protocol protocol;
 	if (chosen->address_state->tls_capable) {
 		protocol = KR_TRANSPORT_TLS;
+	} else if (chosen->address_state->doq_capable) {
+		protocol = KR_TRANSPORT_DOQ;
 	} else if (tcp ||
 		   chosen->address_state->errors[KR_SELECTION_QUERY_TIMEOUT] >= TCP_TIMEOUT_THRESHOLD ||
 		   timeout > TCP_RTT_THRESHOLD) {
@@ -518,6 +539,7 @@ struct kr_transport *select_transport(const struct choice choices[], int choices
 	if (!port) {
 		switch (transport->protocol) {
 		case KR_TRANSPORT_TLS:
+		case KR_TRANSPORT_DOQ:
 			port = KR_DNS_TLS_PORT;
 			break;
 		case KR_TRANSPORT_UDP:

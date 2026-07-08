@@ -3,7 +3,10 @@
  */
 
 #include "kresconfig.h"
+#include "lib/generic/trie.h"
 #include "lib/proto.h"
+#include "network.h"
+#include "quic_stream.h"
 
 #include <ucw/lib.h>
 #include <sys/socket.h>
@@ -81,6 +84,7 @@ static const enum protolayer_type protolayer_grp_doq_stream[] = {
 };
 
 static const enum protolayer_type protolayer_grp_doq_conn[] = {
+	PROTOLAYER_TYPE_PROXYV2_STREAM,
 	PROTOLAYER_TYPE_DEFER,
 	PROTOLAYER_TYPE_QUIC_CONN,
 	PROTOLAYER_TYPE_NULL,
@@ -1578,7 +1582,9 @@ static int session2_transport_pushv(struct session2 *s,
 						ctx);
 				return kr_ok();
 			} else {
-				bool conn = s->outgoing && the_network->enable_connect_udp;
+				bool conn = s->outgoing && the_network->enable_connect_udp
+					/* FIXME: Verify this */
+					&& s->proto != KR_PROTO_DOQ;
 				int ret = uv_udp_try_send((uv_udp_t*)handle, (uv_buf_t *)iov, iovcnt,
 								conn ? NULL : comm->comm_addr);
 				if (ret > 0) // equals buffer size, only confuses us
@@ -1794,6 +1800,12 @@ static int session2_transport_event(struct session2 *s,
 	bool is_close_event = (event == PROTOLAYER_EVENT_CLOSE ||
 			event == PROTOLAYER_EVENT_FORCE_CLOSE);
 	if (is_close_event) {
+		if (!session2_is_empty(s)) {
+			kr_log_debug(DEVEL, "failed empty s->proto: %d\n",
+					s->proto);
+		}
+		session2_waitinglist_finalize(s, KR_STATE_FAIL);
+		session2_tasklist_finalize(s, KR_STATE_FAIL);
 		session2_timer_stop(s);
 		s->closing = true;
 	}
@@ -1830,10 +1842,20 @@ void session2_kill_ioreq(struct session2 *session, struct qr_task *task)
 	if (!session || session->closing)
 		return;
 	if (kr_fails_assert(session->outgoing
-				&& session->transport.type == SESSION2_TRANSPORT_IO
-				&& session->transport.io.handle))
+				&& ((session->transport.type == SESSION2_TRANSPORT_IO
+				&& session->transport.io.handle) ||
+					session->proto == KR_PROTO_DOQ_STREAM
+					|| session->proto == KR_PROTO_DOQ_CONN))) {
 		return;
+	}
+
 	session2_tasklist_del(session, task);
-	if (session->transport.io.handle->type == UV_UDP)
+	/* for DoQ forwarding */
+	if (session->proto == KR_PROTO_DOQ_STREAM) {
 		session2_close(session);
+	}
+
+	if (session->transport.io.handle->type == UV_UDP) {
+		session2_close(session);
+	}
 }

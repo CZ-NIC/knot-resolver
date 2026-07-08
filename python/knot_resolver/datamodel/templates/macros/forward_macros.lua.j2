@@ -10,8 +10,13 @@
 {'{{ addr }}',
 {%- if server.transport == 'tls' -%}
 tls=true,
+quic=false,
+{%- elif server.transport == 'quic' -%}
+tls=false,
+quic=true,
 {%- else -%}
 tls=false,
+quic=false,
 {%- endif -%}
 {%- if server.hostname -%}
 hostname='{{ server.hostname }}',

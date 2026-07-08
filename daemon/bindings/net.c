@@ -843,7 +843,8 @@ static int net_tls_client(lua_State *L)
 	/* check that only allowed keys are present */
 	{
 		const char *bad_key = lua_table_checkindices(L, (const char *[])
-			{ "1", "hostname", "ca_file", "pin_sha256", "insecure", "tls", NULL });
+			{ "1", "hostname", "ca_file", "pin_sha256",
+			"insecure", "tls", "quic", NULL });
 		if (bad_key)
 			lua_error_p(L, "found unexpected key '%s'", bad_key);
 	}
@@ -1174,6 +1175,211 @@ static int net_tls_sticket_secret_file(lua_State *L)
 	return 1;
 }
 
+static int net_quic_client(lua_State *L)
+{
+	/* TODO idea: allow starting the lua table with *multiple* IP targets,
+	 * meaning the authentication config should be applied to each.
+	 */
+	if (lua_gettop(L) == 0)
+		return tls_params2lua(L, the_network->tls_client_params);
+	/* Various basic sanity-checking. */
+	if (lua_gettop(L) != 1 || !lua_istable(L, 1))
+		lua_error_maybe(L, EINVAL);
+	/* check that only allowed keys are present */
+	{
+		const char *bad_key = lua_table_checkindices(L, (const char *[])
+			{ "1", "hostname", "ca_file", "pin_sha256",
+			"insecure", "tls", "quic", NULL });
+		if (bad_key)
+			lua_error_p(L, "found unexpected key '%s'", bad_key);
+	}
+
+	/**** Phase 1: get the parameter into a C struct, incl. parse of CA files,
+	 * 	 regardless of the address-pair having an entry already. */
+
+	/* The only difference between net_[doq|tls]_client, this is however
+	 * neccesary because the client_verify_certificate function cannot be
+	 * shared between DoT and DoQ. */
+	tls_client_param_t *newcfg = doq_client_param_new();
+	if (!newcfg)
+		lua_error_p(L, "out of memory or something like that :-/");
+	/* Shortcut for cleanup actions needed from now on. */
+	#define ERROR(...) do { \
+		free(newcfg); \
+		lua_error_p(L, __VA_ARGS__); \
+	} while (false)
+
+	/* .hostname - always accepted. */
+	lua_getfield(L, 1, "hostname");
+	if (!lua_isnil(L, -1)) {
+		const char *hn_str = lua_tostring(L, -1);
+		/* Convert to lower-case dname and back, for checking etc. */
+		knot_dname_t dname[KNOT_DNAME_MAXLEN];
+		if (!hn_str || !knot_dname_from_str(dname, hn_str, sizeof(dname)))
+			ERROR("invalid hostname");
+		knot_dname_to_lower(dname);
+		char *h = knot_dname_to_str_alloc(dname);
+		if (!h)
+			ERROR("%s", kr_strerror(ENOMEM));
+		/* Strip the final dot produced by knot_dname_*() */
+		h[strlen(h) - 1] = '\0';
+		newcfg->hostname = h;
+	}
+	lua_pop(L, 1);
+
+	/* .ca_file - it can be a list of paths, contrary to the name. */
+	bool has_ca_file = false;
+	lua_getfield(L, 1, "ca_file");
+	if (!lua_isnil(L, -1)) {
+		if (!newcfg->hostname)
+			ERROR("missing hostname but specifying ca_file");
+		lua_listify(L);
+		array_init(newcfg->ca_files); /*< placate apparently confused scan-build */
+		if (array_reserve(newcfg->ca_files, lua_objlen(L, -1)) != 0) /*< optim. */
+			ERROR("%s", kr_strerror(ENOMEM));
+		/* Iterate over table at the top of the stack.
+		 * http://www.lua.org/manual/5.1/manual.html#lua_next */
+		for (lua_pushnil(L); lua_next(L, -2); lua_pop(L, 1)) {
+			has_ca_file = true; /* deferred here so that {} -> false */
+			const char *ca_file = lua_tostring(L, -1);
+			if (!ca_file)
+				ERROR("ca_file contains a non-string");
+			/* Let gnutls process it immediately, so garbage gets detected. */
+			int ret = gnutls_certificate_set_x509_trust_file(
+					newcfg->credentials, ca_file, GNUTLS_X509_FMT_PEM);
+			if (ret < 0) {
+				ERROR("failed to import certificate file '%s': %s - %s\n",
+					ca_file, gnutls_strerror_name(ret),
+					gnutls_strerror(ret));
+			} else {
+				kr_log_debug(TLSCLIENT, "imported %d certs from file '%s'\n",
+					ret, ca_file);
+			}
+
+			ca_file = strdup(ca_file);
+			if (!ca_file || array_push(newcfg->ca_files, ca_file) < 0)
+				ERROR("%s", kr_strerror(ENOMEM));
+		}
+		/* Sort the strings for easier comparison later. */
+		if (newcfg->ca_files.len) {
+			qsort(&newcfg->ca_files.at[0], newcfg->ca_files.len,
+				array_member_size(newcfg->ca_files), strcmp_p);
+		}
+	}
+	lua_pop(L, 1);
+
+	/* .pin_sha256 */
+	lua_getfield(L, 1, "pin_sha256");
+	if (!lua_isnil(L, -1)) {
+		if (has_ca_file)
+			ERROR("mixing pin_sha256 with ca_file is not supported");
+		lua_listify(L);
+		array_init(newcfg->pins); /*< placate apparently confused scan-build */
+		if (array_reserve(newcfg->pins, lua_objlen(L, -1)) != 0) /*< optim. */
+			ERROR("%s", kr_strerror(ENOMEM));
+		/* Iterate over table at the top of the stack. */
+		for (lua_pushnil(L); lua_next(L, -2); lua_pop(L, 1)) {
+			const char *pin = lua_tostring(L, -1);
+			if (!pin)
+				ERROR("pin_sha256 is not a string");
+			uint8_t *pin_raw = malloc(TLS_SHA256_RAW_LEN);
+			/* Push the string early to simplify error processing. */
+			if (kr_fails_assert(pin_raw && array_push(newcfg->pins, pin_raw) >= 0)) {
+				free(pin_raw);
+				ERROR("%s", kr_strerror(ENOMEM));
+			}
+			int ret = kr_base64_decode((const uint8_t *)pin, strlen(pin),
+						pin_raw, TLS_SHA256_RAW_LEN + 8);
+			if (ret < 0) {
+				ERROR("not a valid pin_sha256: '%s' (length %d), %s\n",
+					pin, (int)strlen(pin), knot_strerror(ret));
+			} else if (ret != TLS_SHA256_RAW_LEN) {
+				ERROR("not a valid pin_sha256: '%s', "
+						"raw length %d instead of "
+						STR(TLS_SHA256_RAW_LEN)"\n",
+					pin, ret);
+			}
+		}
+		/* Sort the raw strings for easier comparison later. */
+		if (newcfg->pins.len) {
+			qsort(&newcfg->pins.at[0], newcfg->pins.len,
+				array_member_size(newcfg->pins), cmp_sha256);
+		}
+	}
+	lua_pop(L, 1);
+
+	/* .insecure */
+	lua_getfield(L, 1, "insecure");
+	if (lua_isnil(L, -1)) {
+		if (!newcfg->hostname && !newcfg->pins.len)
+			ERROR("no way to authenticate and not set as insecure");
+	} else if (lua_isboolean(L, -1) && lua_toboolean(L, -1)) {
+		newcfg->insecure = true;
+		if (has_ca_file || newcfg->pins.len)
+			ERROR("set as insecure but provided authentication config");
+	} else {
+		ERROR("incorrect value in the 'insecure' field");
+	}
+	lua_pop(L, 1);
+
+	/* Init CAs from system trust store, if needed. */
+	if (!newcfg->insecure && !newcfg->pins.len && !has_ca_file) {
+		int ret = gnutls_certificate_set_x509_system_trust(newcfg->credentials);
+		if (ret <= 0) {
+			ERROR("failed to use system CA certificate store: %s",
+				ret ? gnutls_strerror(ret) : kr_strerror(ENOENT));
+		} else {
+			kr_log_debug(TLSCLIENT, "imported %d certs from system store\n",
+				ret);
+		}
+	}
+	#undef ERROR
+
+	/**** Phase 2: deal with the C authentication "table". */
+	/* Parse address and port. */
+	lua_pushinteger(L, 1);
+	lua_gettable(L, 1);
+	const char *addr_str = lua_tostring(L, -1);
+	if (!addr_str)
+		lua_error_p(L, "address is not a string");
+	char buf[INET6_ADDRSTRLEN + 1];
+	uint16_t port = 853;
+	const struct sockaddr *addr = NULL;
+	if (kr_straddr_split(addr_str, buf, &port) == kr_ok())
+		addr = kr_straddr_socket(buf, port, NULL);
+	/* Add newcfg into the C map, saving the original into oldcfg. */
+	if (!addr)
+		lua_error_p(L, "address '%s' could not be converted", addr_str);
+	tls_client_param_t **oldcfgp = tls_client_param_getptr(
+			&the_network->tls_client_params, addr, true);
+	free_const(addr);
+	if (!oldcfgp)
+		lua_error_p(L, "internal error when extending tls_client_params map");
+	tls_client_param_t *oldcfg = *oldcfgp;
+	*oldcfgp = newcfg;  /* replace old config in trie with the new one */
+	/* If there was no original entry, it's easy! */
+	if (!oldcfg)
+		return 0;
+
+	/* Check for equality (newcfg vs. oldcfg), and print a warning if not equal.*/
+	const bool ok_h = (!newcfg->hostname && !oldcfg->hostname)
+		|| (newcfg->hostname && oldcfg->hostname && strcmp(newcfg->hostname, oldcfg->hostname) == 0);
+	bool ok_ca = newcfg->ca_files.len == oldcfg->ca_files.len;
+	for (int i = 0; ok_ca && i < newcfg->ca_files.len; ++i)
+		ok_ca = strcmp(newcfg->ca_files.at[i], oldcfg->ca_files.at[i]) == 0;
+	bool ok_pins = newcfg->pins.len == oldcfg->pins.len;
+	for (int i = 0; ok_pins && i < newcfg->pins.len; ++i)
+		ok_ca = memcmp(newcfg->pins.at[i], oldcfg->pins.at[i], TLS_SHA256_RAW_LEN) == 0;
+	const bool ok_insecure = newcfg->insecure == oldcfg->insecure;
+	if (!(ok_h && ok_ca && ok_pins && ok_insecure)) {
+		kr_log_warning(DOQCLIENT,
+			"warning: re-defining TLS authentication parameters for %s\n",
+			addr_str);
+	}
+	tls_client_param_unref(oldcfg);
+	return 0;
+}
+
 static int net_outgoing(lua_State *L, int family)
 {
 	union kr_sockaddr *addr;
@@ -1361,6 +1567,7 @@ int kr_bindings_net(lua_State *L)
 		{ "quic_max_conns", net_quic_max_conns },
 		{ "quic_max_streams", net_quic_max_streams },
 		{ "quic_require_retry", net_quic_reqire_retry },
+		{ "quic_client",   net_quic_client },
 		{ "outgoing_v4",  net_outgoing_v4 },
 		{ "outgoing_v6",  net_outgoing_v6 },
 		{ "tcp_in_idle",  net_tcp_in_idle },

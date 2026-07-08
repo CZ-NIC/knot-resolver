@@ -62,6 +62,7 @@ enum kr_transport_protocol {
 	KR_TRANSPORT_UDP,
 	KR_TRANSPORT_TCP,
 	KR_TRANSPORT_TLS,
+	KR_TRANSPORT_DOQ,
 };
 
 /**
@@ -174,6 +175,7 @@ struct address_state {
 	struct rtt_state rtt_state;
 	knot_dname_t *ns_name;
 	bool tls_capable : 1;
+	bool doq_capable : 1;
 	/* TODO: uncomment these once we actually use this information in selection
 	bool tcp_waiting : 1;
 	bool tcp_connected : 1;

@@ -988,7 +988,8 @@
                                                 "null"
                                             ],
                                             "enum": [
-                                                "tls"
+                                                "tls",
+                                                "quic"
                                             ],
                                             "description": "Transport protocol for a forward server.",
                                             "default": null
@@ -1108,7 +1109,8 @@
                                             "null"
                                         ],
                                         "enum": [
-                                            "tls"
+                                            "tls",
+                                            "quic"
                                         ],
                                         "description": "Transport protocol for a forward server.",
                                         "default": null

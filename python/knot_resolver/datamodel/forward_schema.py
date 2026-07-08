@@ -17,7 +17,7 @@ class ForwardServerSchema(ConfigSchema):
     """
 
     address: ListOrItem[IPAddressOptionalPort]
-    transport: Optional[Literal["tls"]] = None
+    transport: Optional[Literal["tls", "quic"]] = None
     pin_sha256: Optional[ListOrItem[PinSha256]] = None
     hostname: Optional[DomainName] = None
     ca_file: Optional[ReadableFile] = None
@@ -69,11 +69,20 @@ class ForwardSchema(ConfigSchema):
                     return server.transport == "tls"
             return False
 
+        def is_transport_quic(servers: List[Any]) -> bool:
+            for server in servers:
+                if isinstance(server, ForwardServerSchema):
+                    return server.transport == "quic"
+            return False
+
         if self.options.authoritative and is_port_custom(self.servers):
             raise ValueError("Forwarding to authoritative servers on a custom port is currently not supported.")
 
         if self.options.authoritative and is_transport_tls(self.servers):
             raise ValueError("Forwarding to authoritative servers using TLS protocol is not supported.")
+
+        if self.options.authoritative and is_transport_quic(self.servers):
+            raise ValueError("Forwarding to authoritative servers using QUIC protocol is not supported.")
 
 
 class FallbackSchema(ConfigSchema):

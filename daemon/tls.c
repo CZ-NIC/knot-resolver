@@ -23,6 +23,7 @@
 #include "daemon/tls.h"
 #include "daemon/worker.h"
 #include "daemon/session2.h"
+#include "daemon/quic_conn.h"
 
 #define EPHEMERAL_CERT_EXPIRATION_SECONDS_RENEW_BEFORE ((time_t)60*60*24*7)
 #define GNUTLS_PIN_MIN_VERSION  0x030400
@@ -68,6 +69,7 @@ struct pl_tls_sess_data {
 struct tls_credentials * tls_get_ephemeral_credentials(void);
 void tls_credentials_log_pins(struct tls_credentials *tls_credentials);
 static int client_verify_certificate(gnutls_session_t tls_session);
+static int quic_client_verify_certificate(gnutls_session_t tls_session);
 static struct tls_credentials *tls_credentials_reserve(struct tls_credentials *tls_credentials);
 
 /**
@@ -641,6 +643,28 @@ tls_client_param_t * tls_client_param_new(void)
 	return e;
 }
 
+tls_client_param_t * doq_client_param_new(void)
+{
+	tls_client_param_t *e = calloc(1, sizeof(*e));
+	if (kr_fails_assert(e))
+		return NULL;
+	/* Note: those array_t don't need further initialization. */
+	e->refs = 1;
+	int ret = gnutls_certificate_allocate_credentials(&e->credentials);
+	if (ret != GNUTLS_E_SUCCESS) {
+		kr_log_error(TLSCLIENT, "error: gnutls_certificate_allocate_credentials() fails (%s)\n",
+			     gnutls_strerror_name(ret));
+		free(e);
+		return NULL;
+	}
+
+	/* DoQ uses a different verify function because ngtcp2 requires
+	 * a specific type to be used as user data of the gnutls_session */
+	gnutls_certificate_set_verify_function(e->credentials,
+			quic_client_verify_certificate);
+	return e;
+}
+
 /**
  * Convert an IP address and port number to binary key.
  *
@@ -835,6 +859,44 @@ static int client_verify_certchain(struct pl_tls_sess_data *tls, const char *hos
 	return GNUTLS_E_CERTIFICATE_ERROR;
 }
 
+static int quic_client_verify_certchain(struct pl_quic_conn_sess_data *conn,
+		const char *hostname)
+{
+	if (kr_fails_assert(hostname)) {
+		kr_log_error(TLSCLIENT, "internal config inconsistency: no hostname set\n");
+		return GNUTLS_E_CERTIFICATE_ERROR;
+	}
+
+	unsigned int status;
+	int ret = gnutls_certificate_verify_peers3(conn->tls_session, hostname, &status);
+	if ((ret == GNUTLS_E_SUCCESS) && (status == 0)) {
+		return GNUTLS_E_SUCCESS;
+	}
+
+	const char *addr_str = kr_straddr(session2_get_peer(conn->h.session));
+	if (ret == GNUTLS_E_SUCCESS) {
+		gnutls_datum_t msg;
+		ret = gnutls_certificate_verification_status_print(
+			status, gnutls_certificate_type_get(conn->tls_session), &msg, 0);
+		if (ret == GNUTLS_E_SUCCESS) {
+			kr_log_error(TLSCLIENT, "failed to verify peer certificate of %s: "
+					"%s\n", addr_str, msg.data);
+			gnutls_free(msg.data);
+		} else {
+			kr_log_error(TLSCLIENT, "failed to verify peer certificate of %s: "
+					"unable to print reason: %s (%s)\n",
+					addr_str,
+					gnutls_strerror(ret), gnutls_strerror_name(ret));
+		} /* gnutls_certificate_verification_status_print end */
+	} else {
+		kr_log_error(TLSCLIENT, "failed to verify peer certificate of %s: "
+			     "gnutls_certificate_verify_peers3 error: %s (%s)\n",
+			     addr_str,
+			     gnutls_strerror(ret), gnutls_strerror_name(ret));
+	} /* gnutls_certificate_verify_peers3 end */
+	return GNUTLS_E_CERTIFICATE_ERROR;
+}
+
 /**
  * Verify that actual TLS security parameters of \param tls_session
  * match requirements provided by user in tls_session->params.
@@ -869,6 +931,39 @@ static int client_verify_certificate(gnutls_session_t tls_session)
 		return client_verify_pin(cert_list_size, cert_list, tls->client_params);
 	else
 		return client_verify_certchain(tls, tls->client_params->hostname);
+}
+
+static int quic_client_verify_certificate(gnutls_session_t tls_session)
+{
+	nc_conn_ref_placeholder_t *conn_ref = gnutls_session_get_ptr(tls_session);
+	struct pl_quic_conn_sess_data *conn = conn_ref->user_data;
+
+	if (kr_fails_assert(conn->client_params))
+		return GNUTLS_E_CERTIFICATE_ERROR;
+
+	if (conn->client_params->insecure) {
+		return GNUTLS_E_SUCCESS;
+	}
+
+	gnutls_certificate_type_t cert_type = gnutls_certificate_type_get(tls_session);
+	if (cert_type != GNUTLS_CRT_X509) {
+		kr_log_error(TLSCLIENT, "invalid certificate type %i has been received\n",
+			     cert_type);
+		return GNUTLS_E_CERTIFICATE_ERROR;
+	}
+	unsigned int cert_list_size = 0;
+	const gnutls_datum_t *cert_list =
+		gnutls_certificate_get_peers(tls_session, &cert_list_size);
+	if (cert_list == NULL || cert_list_size == 0) {
+		kr_log_error(TLSCLIENT, "empty certificate list\n");
+		return GNUTLS_E_CERTIFICATE_ERROR;
+	}
+
+	if (conn->client_params->pins.len > 0)
+		/* check hash of the certificate but ignore everything else */
+		return client_verify_pin(cert_list_size, cert_list, conn->client_params);
+	else
+		return quic_client_verify_certchain(conn, conn->client_params->hostname);
 }
 
 static int tls_pull_timeout_func(gnutls_transport_ptr_t h, unsigned int ms)

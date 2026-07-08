@@ -7,7 +7,7 @@
 #include "daemon/engine.h"
 #include "lib/generic/array.h"
 #include "lib/generic/trie.h"
-
+#include "daemon/quic_conn.h"
 
 /** Query resolution task (opaque). */
 struct qr_task;
@@ -89,6 +89,11 @@ bool worker_task_finished(struct qr_task *task);
 /** To be called after sending a DNS message.  It mainly deals with cleanups. */
 int qr_task_on_send(struct qr_task *task, struct session2 *s, int status);
 
+/* similar to on connect used by TCP */
+void doq_on_connect(struct pl_quic_conn_sess_data *conn, int status);
+
+void worker_remove_quic_conn(struct session2 *session, const struct sockaddr *addr);
+
 /** Various worker statistics.  Sync with wrk_stats() */
 struct worker_stats {
 	size_t queries;     /**< Total number of requests (from clients and internal ones). */
@@ -100,6 +105,7 @@ struct worker_stats {
 	size_t udp;  /**< Number of outbound queries over UDP. */
 	size_t tcp;  /**< Number of outbound queries over TCP (excluding TLS). */
 	size_t tls;  /**< Number of outbound queries over TLS. */
+	size_t quic; /**< Number of outbound queries over quic. */
 	size_t ipv4; /**< Number of outbound queries over IPv4.*/
 	size_t ipv6; /**< Number of outbound queries over IPv6. */
 
@@ -107,6 +113,7 @@ struct worker_stats {
 	size_t err_tcp;  /**< Total number of write errors for TCP transport. */
 	size_t err_tls;  /**< Total number of write errors for TLS transport. */
 	size_t err_http;  /**< Total number of write errors for HTTP(S) transport. */
+	size_t err_quic;  /**< Total number of write errors for QUIC transport. */
 };
 
 /** @cond internal */
@@ -146,10 +153,17 @@ struct worker_ctx {
 	trie_t *tcp_connected;
 	/** List of outbound TCP sessions waiting to be accepted */
 	trie_t *tcp_waiting;
+	/** List of active outbound QUIC sessions */
+	trie_t *quic_connected;
+	/** List of outbound QUIC sessions waiting to be accepted */
+	trie_t *quic_waiting;
 	/** Subrequest leaders (struct qr_task*), indexed by qname+qtype+qclass. */
 	trie_t *subreq_out;
 	knot_mm_t pkt_pool;
 	unsigned int next_request_uid;
+
+	/* session for all outgoing DoQ requests. */
+	struct session2 *doq_out_session;
 
 	/* HTTP Headers for DoH. */
 	doh_headerlist_t doh_qry_headers;
