@@ -509,15 +509,37 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 		return kr_error(EINVAL);
 
 	int ret = kr_ok();
-	if (rrset_has_min_range_or_weird(rr, qry))
+	if (rrset_has_min_range_or_weird(rr, qry)) {
+		ret = kr_error(ERANGE);
 		goto return_needs_pkt;
+	}
+
 	const int wild_labels = rr_sigs == NULL ? 0 :
 	       knot_dname_labels(rr->owner, NULL) - knot_rrsig_labels(rr_sigs->rrs.rdata);
-	if (wild_labels < 0)
+	if (wild_labels < 0) {
+		ret = kr_error(ERANGE);
 		goto return_needs_pkt;
+	}
 	const knot_dname_t *encloser = rr->owner; /**< the closest encloser name */
 	for (int i = 0; i < wild_labels; ++i) {
 		encloser = knot_dname_next_label(encloser);
+	}
+
+	/* Sanity-check that encloser didn't get too short,
+	 * in particular not outside the zone which signed it.
+	 * As we don't know which RRSIG succeeded, we take the maximum to be safe. */
+	if (rr_sigs && wild_labels) {
+		int signer_labels = 0;
+		const int count = rr_sigs->rrs.count;
+		knot_rdata_t *rd = rr_sigs->rrs.rdata;
+		for (int i = 0; i < count; ++i, rd = knot_rdataset_next(rd)) {
+			int l = knot_dname_labels(knot_rrsig_signer_name(rd), NULL);
+			signer_labels = MAX(signer_labels, l);
+		}
+		if (knot_dname_labels(encloser, NULL) < signer_labels) {
+			ret = kr_error(ERANGE);
+			goto return_needs_pkt;
+		}
 	}
 
 	/* Construct the key under which RRs will be stored,

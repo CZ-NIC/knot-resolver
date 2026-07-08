@@ -84,6 +84,11 @@ static int validate_rrsig_rr(int *flags, int cov_labels,
 		if (rrsig_labels < cov_labels) {
 			*flags |= FLG_WILDCARD_EXPANSION;
 		}
+		/* Also refuse if RRSIG claims rrsig_labels outside the zone. */
+		if (rrsig_labels < knot_dname_labels(signer_name, NULL)) {
+			vctx->rrs_counters.labels_invalid++;
+			return kr_error(EINVAL);
+		}
 	}
 
 	/* bullet 7
