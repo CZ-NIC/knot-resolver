@@ -34,9 +34,6 @@ page_alloc(size_t len)
 	if (!len) {
 		return NULL;
 	}
-	if (len > SIZE_MAX) {
-		return NULL;
-	}
 	assert(!(len & (CPU_PAGE_SIZE-1)));
 	uint8_t *p = mmap(NULL, len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
 	if (p == (uint8_t*) MAP_FAILED) {
@@ -229,8 +226,9 @@ mp_stats_chain(struct mempool *pool, struct mempool_chunk *chunk, struct mempool
 		stats->chain_count[idx]++;
 		if (idx < 2) {
 			stats->used_size += chunk->size;
-			if ((uint8_t *)pool == (uint8_t *)chunk - chunk->size)
+			if ((uint8_t *)pool == (uint8_t *)chunk - chunk->size) {
 				stats->used_size -= sizeof(*pool);
+			}
 		}
 		next = chunk->next;
 		MEMCHECK_NOACCESS(chunk, MP_CHUNK_TAIL);

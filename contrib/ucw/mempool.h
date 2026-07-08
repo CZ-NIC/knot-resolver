@@ -1,5 +1,5 @@
 /*
- *  UCW Library -- Memory Pools
+ *  UCW Library -- Memory Pools (One-Time Allocation)
  *
  *  (c) 1997--2015 Martin Mares <mj@ucw.cz>
  *  (c) 2007 Pavel Charvat <pchar@ucw.cz>
@@ -46,10 +46,10 @@ struct mempool {
 };
 
 struct mempool_stats {          /** Mempool statistics. See mp_stats(). **/
-	size_t total_size;              /** Real allocated size in bytes. */
-	size_t used_size;               /** Estimated size allocated from mempool to application. */
-	unsigned chain_count[3];        /** Number of allocated chunks in small/big/unused chains. */
-	size_t chain_size[3];           /** Size of allocated chunks in small/big/unused chains. */
+	size_t total_size;          /** Real allocated size in bytes. */
+	size_t used_size;           /** Estimated size allocated from mempool to application. */
+	unsigned chain_count[3];    /** Number of allocated chunks in small/big/unused chains. */
+	size_t chain_size[3];       /** Size of allocated chunks in small/big/unused chains. */
 };
 
 /***
@@ -342,7 +342,7 @@ char *mp_vprintf_append(struct mempool *mp, char *ptr, const char *fmt, va_list 
 /*
  * Some parts of mempools were removed in Knot projects,
  * see upstream if you need:
-     * variants of methods returning zeroed or unaligned memory,
+     * variants of methods returning zeroed memory and/or unaligned memory,
      * restoring previous state of allocations,
      * concatenating and duplicating memory/strings on mempools,
      * generic allocator interface spanning both malloc and mempools,
