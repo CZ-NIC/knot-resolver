@@ -191,6 +191,49 @@ function policy.TLS_FORWARD(targets)
 	end
 end
 
+function policy.DOQ_FORWARD(targets)
+	if type(targets) ~= 'table' or #targets < 1 then
+		error('DOQ_FORWARD argument must be a non-empty table' .. type(targets) ~= 'table')
+	end
+
+	local sockaddr_c_set = {}
+	local nslist = {} -- to persist in closure of the returned function
+	for idx, target in pairs(targets) do
+		if type(target) ~= 'table' or type(target[1]) ~= 'string' then
+			error(string.format('DOQ_FORWARD configuration at position ' ..
+			'%d must be a table starting with an IP address', idx))
+		end
+		-- Note: some functions have checks with error() calls inside.
+		local sockaddr_c = addr2sock(target[1], 853)
+
+		-- Refuse repeated addresses in the same set.
+		local sockaddr_lua = ffi.string(sockaddr_c, ffi.C.kr_sockaddr_len(sockaddr_c))
+		if sockaddr_c_set[sockaddr_lua] then
+			error('DOQ_FORWARD configuration cannot declare two configs for IP address '
+					.. target[1])
+		else
+			sockaddr_c_set[sockaddr_lua] = true;
+		end
+
+		table.insert(nslist, sockaddr_c)
+		net.quic_client(target)
+	end
+
+	return function(state, req)
+		local qry = req:current()
+		req.options.FORWARD = true
+		req.options.NO_MINIMIZE = true
+		qry.flags.FORWARD = true
+		qry.flags.ALWAYS_CUT = false
+		qry.flags.NO_MINIMIZE = true
+		qry.flags.AWAIT_CUT = true
+		req.options.TCP = false
+		qry.flags.TCP = false
+		set_nslist(req, nslist)
+		return state
+	end
+end
+
 -- Rewrite records in packet
 function policy.REROUTE(tbl, names)
 	-- Import renumbering rules
@@ -883,11 +926,15 @@ function policy.forward_convert_targets(options, targets)
 	local targets_2 = {}
 	for _, target in ipairs(targets) do
 		local port_default = 53
+		-- .tls has to be false (or nil) when DoQ forward is requested
 		if target.tls or false then
 			port_default = 853
 			-- lots of code; easiest to just call it this way; checks and throws
 			-- The extra .tls field gets ignored.
 			policy.TLS_FORWARD({target})
+		elseif target.quic or false then
+			port_default = 853
+			policy.DOQ_FORWARD({target})
 		end
 
 		-- this also throws on failure

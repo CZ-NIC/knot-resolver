@@ -291,6 +291,7 @@ struct kr_request {
 		addr_info_f is_tls_capable;
 		addr_info_f is_tcp_connected;
 		addr_info_f is_tcp_waiting;
+		// addr_info_f is_doq_capable;
 		kr_sockaddr_array_t forwarding_targets; /**< When forwarding, possible targets are put here */
 	} selection_context;
 	unsigned int count_no_nsaddr;

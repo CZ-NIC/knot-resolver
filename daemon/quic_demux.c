@@ -6,6 +6,8 @@
 #include "quic_common.h"
 #include "quic_conn.h"
 #include "quic_demux.h"
+#include "session2.h"
+#include "worker.h"
 #include "lib/dnssec.h"
 #include "session2.h"
 #include "worker.h"
@@ -46,7 +48,7 @@ void quic_conn_mark_used(struct pl_quic_conn_sess_data *conn,
 		return;
 	}
 
-	conn->h.heap_value = ngtcp2_conn_get_expiry(conn->conn) * QUIC_CAN_SEND(conn);
+	conn->h.heap_value = ngtcp2_conn_get_expiry(conn->conn) * quic_not_draining(conn);
 	conn_heap_reschedule(conn, table);
 }
 
@@ -88,7 +90,7 @@ void kr_quic_table_rem(struct pl_quic_conn_sess_data *conn,
 	} else {
 		kr_quic_table_rem2(podcid, table);
 	}
-	
+
 	int pos = heap_find(table->expiry_heap, (heap_val_t *)conn);
 	if (pos != 0) {
 		heap_delete(table->expiry_heap, pos);
@@ -389,8 +391,15 @@ static int pl_quic_demux_sess_init(struct session2 *session, void *sess_data, vo
 
 static int pl_quic_demux_sess_deinit(struct session2 *session, void *data)
 {
+	if (session->outgoing && the_worker->doq_out_session == session) {
+		the_worker->doq_out_session = NULL;
+	}
+
 	struct pl_quic_demux_sess_data *quic = data;
 	kr_quic_table_free(quic->conn_table);
+	if (session->outgoing) {
+		the_worker->doq_out_session = NULL;
+	}
 	return kr_ok();
 }
 

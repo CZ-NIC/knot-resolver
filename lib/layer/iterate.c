@@ -1129,7 +1129,8 @@ static int resolve(kr_layer_t *ctx, knot_pkt_t *pkt)
 		VERBOSE_MSG("<= truncated response, failover to TCP\n");
 		if (query) {
 			/* Fail if already on TCP. */
-			if (req->upstream.transport->protocol != KR_TRANSPORT_UDP) {
+			if (req->upstream.transport->protocol != KR_TRANSPORT_UDP
+					&& req->upstream.transport->protocol != KR_TRANSPORT_DOQ) {
 				VERBOSE_MSG("<= TC=1 with TCP, bailing out\n");
 				query->server_selection.error(query, req->upstream.transport, KR_SELECTION_TRUNCATED);
 				return KR_STATE_FAIL;

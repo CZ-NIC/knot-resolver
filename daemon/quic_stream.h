@@ -15,6 +15,22 @@ struct kr_quic_obuf {
 	uint8_t buf[];
 };
 
+/* stated that might overlap for the current state of the stream
+ * this enum exists to simplify handling of forcefull stream termination.
+ * QUIC streams have quite complex reference_counting, this
+ * enum and the pl_quic_stream_sess_data::state should hopefully simplify
+ * termination of the session */
+typedef enum {
+	/* Timer is running, holds one ref */
+	QUIC_STREAM_HAS_TIMER      = (1 << 0),
+	/* ngtcp2_bidi stream is open on this stream, holds one ref */
+	QUIC_STREAM_BIDI_OPEN      = (1 << 1),
+	/* sent data is not acked yet, holds one ref */
+	QUIC_STREAM_ACK_PENDING    = (1 << 2),
+	/* sent query has not been answered yer (client side only) */
+	QUIC_STREAM_ANSWER_PENDING = (1 << 4),
+} quic_stream_state;
+
 struct pl_quic_stream_sess_data {
 	struct protolayer_data h;
 
@@ -29,6 +45,11 @@ struct pl_quic_stream_sess_data {
 	struct list outbufs;
 	size_t obufs_size;
 
+	/* Parent connection was closed, but this stream's death was
+	 * defered to finish a leading task. */
+	bool orphan;
+	bool terminated_gracefully;
+	uint32_t state;
 	struct kr_quic_obuf *unsent_obuf;
 	size_t first_offset;
 	size_t unsent_offset;

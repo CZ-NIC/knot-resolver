@@ -8,9 +8,36 @@
 #include "lib/dnssec.h"
 
 #include "quic_common.h"
+#include "lib/proto.h"
 #include "quic_conn.h"
 #include "session2.h"
 #include "network.h"
+
+void inline quic_set_draining(struct pl_quic_conn_sess_data *conn)
+{
+	conn->state |= QUIC_STATE_DRAINING;
+}
+
+void inline quic_set_closing(struct pl_quic_conn_sess_data *conn)
+{
+	conn->state |= QUIC_STATE_CLOSING;
+}
+
+void inline quic_set_hs_completed(struct pl_quic_conn_sess_data *conn)
+{
+	conn->state |= QUIC_STATE_HANDSHAKE_DONE;
+}
+
+bool inline quic_not_draining(struct pl_quic_conn_sess_data *conn)
+{
+	return conn->state < QUIC_STATE_DRAINING;
+}
+
+bool inline quic_can_send(struct pl_quic_conn_sess_data *conn)
+{
+	return conn->state >= QUIC_STATE_HANDSHAKE_DONE
+		&& conn->state < QUIC_STATE_DRAINING;
+}
 
 int quic_configuration_set(void)
 {
@@ -52,16 +79,73 @@ uint64_t quic_timestamp(void)
 	return ((uint64_t)ts.tv_sec * NGTCP2_SECONDS) + (uint64_t)ts.tv_nsec;
 }
 
-bool kr_quic_conn_timeout(struct pl_quic_conn_sess_data *conn, uint64_t *now)
-{
-	if (!conn || !conn->conn)
-		return false;
-
-	if (*now == 0) {
-		*now = quic_timestamp();
-	}
-	return *now > ngtcp2_conn_get_expiry(conn->conn);
-}
+// void quic_hs_timeout(uv_timer_t *timer)
+// {
+// 	struct session2 *s = timer->data;
+// 	session2_timer_stop(s);
+//
+// 	struct session2 *root = session2_get_root(s);
+// 	struct pl_quic_conn_sess_data *conn =
+// 		protolayer_sess_data_get_proto(s, PROTOLAYER_TYPE_QUIC_CONN);
+// 	session2_event(root, PROTOLAYER_EVENT_CONNECT_TIMEOUT, conn);
+// }
+//
+// static void quic_idle_timeout(uv_timer_t *timer)
+// {
+// 	struct session2 *s = timer->data;
+// 	struct pl_quic_conn_sess_data *conn =
+// 		protolayer_sess_data_get_proto(s, PROTOLAYER_TYPE_QUIC_CONN);
+// 	struct session2 *demux = session2_get_root(s);
+// 	uint64_t now = quic_timestamp();
+// 	int ret = ngtcp2_conn_handle_expiry(conn->conn, now);
+// 	if (ret == NGTCP2_ERR_IDLE_CLOSE) {
+// 		/* idle equal max_idle_timeout, don't send CONNECTION_CLOSE */
+// 		quic_set_draining(conn);
+// 		session2_event(demux, PROTOLAYER_EVENT_GENERAL_TIMEOUT, conn);
+// 	} else if (ret < 0) {
+// 		quic_set_closing(conn);
+// 		session2_event(demux, PROTOLAYER_EVENT_GENERAL_TIMEOUT, conn);
+// 	} else {
+// 		/* ngtcp2_conn_writev_stream should be scheduled
+// 		 * see https://nghttp2.org/ngtcp2/ngtcp2_conn_handle_expiry.html#c.ngtcp2_conn_handle_expiry */
+// 	}
+// }
+//
+// int quic_set_timeout(struct session2 *s, uint64_t ms, uv_timer_cb timeout_cb)
+// {
+// 	uv_timer_stop(&s->timer);
+// 	return uv_timer_start(&s->timer, timeout_cb, ms, ms);
+// }
+//
+// int quic_set_hs_timeout(struct session2 *s, uint64_t ms)
+// {
+// 	return quic_set_timeout(s, ms, quic_hs_timeout);
+// }
+//
+// int quic_set_idle_timeout(struct session2 *s, uint64_t ms)
+// {
+// 	return quic_set_timeout(s, ms, quic_idle_timeout);
+// }
+//
+// void quic_reset_expiry(struct pl_quic_conn_sess_data *conn)
+// {
+// 	kr_require(conn);
+// 	struct session2 *s = conn->h.session;
+// 	ngtcp2_tstamp expiry = ngtcp2_conn_get_expiry(conn->conn);
+//
+// 	/* In case timeout is set to 0 and the peer agrees => no timeout */
+// 	if (expiry == UINT64_MAX) {
+// 		uv_timer_stop(&s->timer);
+// 		/* In QUICv1 the max_idle_timeout cat NOT be
+// 		 * changed after initial negotiation. */
+// 		return;
+// 	}
+//
+// 	/* only fails if UV_HANDLE_CLOSING or the handle->cb == NULL */
+// 	if (uv_timer_again(&s->timer) != 0) {
+// 		session2_event(s, PROTOLAYER_EVENT_FORCE_CLOSE, conn);
+// 	}
+// }
 
 inline uint64_t quic_ns_to_ms_ceil(uint64_t ns)
 {

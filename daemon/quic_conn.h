@@ -72,6 +72,7 @@ struct pl_quic_conn_sess_data {
 	 * terminated. To avoid decreasing the refcount more than once in
 	 * quic_conn:pl_quic_event_unwrap this boolean value is used. */
 	bool disconnected;
+	enum protolayer_event_type term_event;
 	ngtcp2_cid dcid;
 	ngtcp2_cid scid;
 	ngtcp2_cid odcid;
@@ -100,6 +101,8 @@ struct pl_quic_conn_sess_data {
 	list_t streams;
 	// number of allocated streams structures
 	int16_t streams_count;
+	/* only used by client side */
+	int64_t next_stream_id;
 	uint64_t finished_streams;
 	quic_conn_state_t state;
 	size_t cid_pointers;
@@ -144,3 +147,4 @@ int send_special(ngtcp2_version_cid *dec_cids,
 		struct protolayer_iter_ctx *ctx, int action,
 		struct pl_quic_conn_sess_data *conn,
 		struct session2 *session, quic_doq_error_t *doq_error);
+struct session2 *setup_quic_stream(struct pl_quic_conn_sess_data *conn);

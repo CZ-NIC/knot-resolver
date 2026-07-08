@@ -632,8 +632,9 @@ knot_pkt_t *kr_request_ensure_answer(struct kr_request *request)
 	const struct kr_request_qsource_flags *qs_cflags = &request->qsource.comm_flags;
 	if (kr_fails_assert(!(qs_flags->tls || qs_cflags->tls) || qs_flags->tcp || qs_cflags->http))
 		goto fail;
-	if (!request->qsource.addr || qs_flags->tcp || qs_cflags->tcp) {
-		// not on UDP
+	if (!request->qsource.addr || qs_flags->tcp || qs_cflags->tcp
+			|| qs_flags->quic || qs_cflags->quic) {
+		// not on plain UDP
 		answer_max = KNOT_WIRE_MAX_PKTSIZE;
 	} else if (knot_pkt_has_edns(qs_pkt)) {
 		// UDP with EDNS
@@ -872,6 +873,7 @@ int kr_resolve_checkout(struct kr_request *request, const struct sockaddr *src,
 	int type = -1;
 	switch(transport->protocol) {
 	case KR_TRANSPORT_UDP:
+	case KR_TRANSPORT_DOQ:
 		type = SOCK_DGRAM;
 		break;
 	case KR_TRANSPORT_TCP:

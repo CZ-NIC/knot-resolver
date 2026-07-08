@@ -123,10 +123,16 @@ struct kr_quic_stream_param {
 	struct comm_info comm_storage;
 };
 
+void quic_set_draining(struct pl_quic_conn_sess_data *conn);
+void quic_set_closing(struct pl_quic_conn_sess_data *conn);
+void quic_set_hs_completed(struct pl_quic_conn_sess_data *conn);
+/* check that connection is not in DRAINING state */
+bool quic_not_draining(struct pl_quic_conn_sess_data *conn);
+/* check that handshake has finished and connection is not in DRAINING state */
+bool quic_can_send(struct pl_quic_conn_sess_data *conn);
 int quic_configuration_set(void);
 
 int quic_configuration_free(struct net_quic_params *quic_params);
-
 bool kr_quic_conn_timeout(struct pl_quic_conn_sess_data *conn, uint64_t *now);
 
 uint64_t cid2hash(const ngtcp2_cid *cid, kr_quic_table_t *table);
@@ -188,16 +194,19 @@ int init_random_cid(ngtcp2_cid *cid, size_t len);
 
 uint64_t quic_timestamp(void);
 
-void quic_hs_timeout(uv_timer_t *timer);
-
-void quic_handle_timeout(uv_timer_t *timer);
+// void quic_hs_timeout(uv_timer_t *timer);
+//
+// void quic_handle_timeout(uv_timer_t *timer);
 
 kr_quic_cid_t **kr_quic_table_lookup2(const ngtcp2_cid *cid,
 		kr_quic_table_t *table);
 
 struct pl_quic_conn_sess_data *kr_quic_table_lookup(const ngtcp2_cid *cid,
 		kr_quic_table_t *table);
-
+// kr_quic_cid_t **kr_quic_table_insert(struct pl_quic_conn_sess_data *conn,
+// 		const ngtcp2_cid *cid, kr_quic_table_t *table);
+// int kr_quic_table_add(struct pl_quic_conn_sess_data *conn_sess,
+// 		const ngtcp2_cid *cid, kr_quic_table_t *table);
 int write_retry_packet(struct wire_buf *dest, kr_quic_table_t *table,
 		ngtcp2_version_cid *dec_cids,
 		const struct sockaddr *src_addr);
