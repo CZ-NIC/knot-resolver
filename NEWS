@@ -18,6 +18,7 @@ Improvements
 Bugfixes
 --------
 - /local-data/addresses*: make multiple addresses work (#808, #954)
+- views: fix protocol-based matching for DoQ
 
 
 Knot Resolver 6.4.0 (2026-06-17)
