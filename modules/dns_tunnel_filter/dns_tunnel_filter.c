@@ -205,10 +205,9 @@ static bool ensure_loaded(void)
 	return ret == kr_ok();
 }
 
-static void write_stats_line(FILE *f, uint64_t *stats_counts, float tunnel_prob, struct kr_query *qry)
+static void write_stats_line(FILE *f, float tunnel_prob, struct kr_query *qry)
 {
 	struct tm *tm_info = localtime(&qry->timestamp.tv_sec);
-
 	(void)fprintf(f, "|%04d-%02d-%02d %02d:%02d:%02d",
 		tm_info->tm_year + 1900,
 		tm_info->tm_mon + 1,
@@ -217,85 +216,35 @@ static void write_stats_line(FILE *f, uint64_t *stats_counts, float tunnel_prob,
 		tm_info->tm_min,
 		tm_info->tm_sec);
 
-	(void)fprintf(f, "|%d,%d", config.sensitivity, config.threshold);
+	const char *tags_str = kr_rule_tags2str(qry->request->rule.tags);
+	if (strcmp(tags_str, "") == 0)
+		(void)fprintf(f, "|-");
+	else
+		(void)fprintf(f, "|%s", tags_str);
+	free((void *)tags_str);
 
-	for (int i = 0; i < STATS_CNT; i++)
-		(void)fprintf(f, "|%lu", stats_counts[i]);
-
-	(void)fprintf(f, "|%f", tunnel_prob);
+	if (tunnel_prob < 10) {
+		(void)fprintf(f, "| %f", tunnel_prob);
+	} else {
+		(void)fprintf(f, "|%f", tunnel_prob);
+	}
 
 	char buf[KNOT_DNAME_MAXLEN];
 	if (knot_dname_to_str(buf, qry->sname, sizeof(buf)))
 		(void)fprintf(f, "|%s|\n", buf);
 }
 
-static bool read_last_counters(FILE *f, unsigned long out[STATS_CNT])
+static void update_stats(float tunnel_prob, struct kr_query *qry)
 {
-	char line[1024] = {0};
-	long pos;
-
-	if (fseek(f, 0, SEEK_END) != 0 || (pos = ftell(f)) <= 0)
-		return false;
-
-	int bar_count = 0;
-	for (long i = pos - 1; i > 0; i--) {
-		if (fseek(f, i, SEEK_SET))
-			return false;
-		int ch = fgetc(f);
-		if (ch == '|') {
-			if (++bar_count > 5)
-				break;
-		} else if (ch == EOF) {
-			return false;
-		}
-	}
-
-	if (!fgets(line, sizeof(line), f))
-		return false;
-
-	char sname[256];
-	char *p = line;
-	char *end;
-
-	for (int i = 0; i < 3; i++) {
-		errno = 0;
-		out[i] = strtoul(p, &end, 10);
-		if (end == p || errno != 0)
-			return false;
-		p = end;
-		if (*p == '|')
-			p++;
-	}
-
-	if (sscanf(p, "%255[^|]", sname) != 1)
-		return false;
-
-	return true;
-}
-
-static void update_stats(uint8_t stat_index, float tunnel_prob, struct kr_query *qry)
-{
-	uint64_t stats_counts[STATS_CNT] = {0};
 	FILE *f = fopen(STAT_FILE, "a+");
-	if (!f)
-		return;
+	if (!f) return;
 
 	int fd = fileno(f);
 	if (flock(fd, LOCK_EX) == -1) {
 		(void)fclose(f);
 		return;
 	}
-
-	unsigned long last[STATS_CNT] = {0};
-	if (read_last_counters(f, last)) {
-		for (int i = 0; i < STATS_CNT; i++)
-			stats_counts[i] = last[i];
-	}
-
-	stats_counts[stat_index]++;
-
-	if (!fseek(f, 0, SEEK_END))
-		write_stats_line(f, stats_counts, tunnel_prob, qry);
+	write_stats_line(f, tunnel_prob, qry);
 
 	(void)fflush(f);
 	flock(fd, LOCK_UN);
@@ -489,7 +438,7 @@ static void do_filter(kr_layer_t *ctx, knot_pkt_t *pkt)
 			}
 
 			if (tunnel_prob <= config.threshold) {
-				update_stats(STATS_B, tunnel_prob, qry);
+				update_stats(tunnel_prob, qry);
 				return;
 			}
 		}
@@ -526,8 +475,6 @@ static void do_filter(kr_layer_t *ctx, knot_pkt_t *pkt)
 		}
 	}
 
-	update_stats(STATS_M, tunnel_prob, qry);
-
 	if (req_do_apply) {
 		req->rule.tags = req_tags; // .action is filled by _do_answer()
 		kr_rule_do_answer(KR_RULE_SUB_NXDOMAIN, qry, pkt, qry->sname);
@@ -536,6 +483,8 @@ static void do_filter(kr_layer_t *ctx, knot_pkt_t *pkt)
 		req->rule.tags = req_tags;
 		req->rule.action = KREQ_ACTION_AUDIT;
 	}
+
+	update_stats(tunnel_prob, qry);
 }
 
 static int produce(kr_layer_t *ctx, knot_pkt_t *pkt)
