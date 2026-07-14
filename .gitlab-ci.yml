@@ -727,90 +727,121 @@ pkg:debian-12:
   <<: *enable_repo_build
   image: $CI_REGISTRY/packaging/apkg/full/debian-12
 
-pkg:debian-11:
-  <<: *pkg_test_deb
-  <<: *enable_repo_build
-  image: $CI_REGISTRY/packaging/apkg/full/debian-11
+# pkg:debian-11:
+#   <<: *pkg_test_deb
+#   <<: *enable_repo_build
+#   image: $CI_REGISTRY/packaging/apkg/full/debian-11
 
-pkg:ubuntu-26.04:
-  <<: *pkg_test_deb
-  image: $CI_REGISTRY/packaging/apkg/full/ubuntu-26.04
+# pkg:ubuntu-26.04:
+#   <<: *pkg_test_deb
+#   image: $CI_REGISTRY/packaging/apkg/full/ubuntu-26.04
 
-pkg:ubuntu-25.10:
-  <<: *pkg_test_deb
-  image: $CI_REGISTRY/packaging/apkg/full/ubuntu-25.10
+# pkg:ubuntu-25.10:
+#   <<: *pkg_test_deb
+#   image: $CI_REGISTRY/packaging/apkg/full/ubuntu-25.10
 
-pkg:ubuntu-24.04:
-  <<: *pkg_test_deb
-  image: $CI_REGISTRY/packaging/apkg/full/ubuntu-24.04
+# pkg:ubuntu-24.04:
+#   <<: *pkg_test_deb
+#   image: $CI_REGISTRY/packaging/apkg/full/ubuntu-24.04
 
-pkg:ubuntu-22.04:
-  <<: *pkg_test_deb
-  <<: *enable_repo_build
-  image: $CI_REGISTRY/packaging/apkg/full/ubuntu-22.04
+# pkg:ubuntu-22.04:
+#   <<: *pkg_test_deb
+#   <<: *enable_repo_build
+#   image: $CI_REGISTRY/packaging/apkg/full/ubuntu-22.04
 
-pkg:ubuntu-20.04:
-  <<: *pkg_test_deb
-  <<: *enable_repo_build
-  image: $CI_REGISTRY/packaging/apkg/full/ubuntu-20.04
+# pkg:ubuntu-20.04:
+#   <<: *pkg_test_deb
+#   <<: *enable_repo_build
+#   image: $CI_REGISTRY/packaging/apkg/full/ubuntu-20.04
 
-pkg:fedora-42:
-  <<: *pkg_test
-  image: $CI_REGISTRY/packaging/apkg/full/fedora-42
+# pkg:fedora-42:
+#   <<: *pkg_test
+#   image: $CI_REGISTRY/packaging/apkg/full/fedora-42
 
-pkg:fedora-43:
-  <<: *pkg_test
-  image: $CI_REGISTRY/packaging/apkg/full/fedora-43
+# pkg:fedora-43:
+#   <<: *pkg_test
+#   image: $CI_REGISTRY/packaging/apkg/full/fedora-43
 
-pkg:fedora-44:
-  <<: *pkg_test
-  image: $CI_REGISTRY/packaging/apkg/full/fedora-44
+# pkg:fedora-44:
+#   <<: *pkg_test
+#   image: $CI_REGISTRY/packaging/apkg/full/fedora-44
 
-pkg:fedora-rawhide:
-  <<: *pkg_test
-  image: $CI_REGISTRY/packaging/apkg/full/fedora-rawhide
-  allow_failure: true
+# pkg:fedora-rawhide:
+#   <<: *pkg_test
+#   image: $CI_REGISTRY/packaging/apkg/full/fedora-rawhide
+#   allow_failure: true
 
-pkg:alma-9:
-  <<: *pkg_test
-  image: $CI_REGISTRY/packaging/apkg/full/alma-9
+# pkg:alma-9:
+#   <<: *pkg_test
+#   image: $CI_REGISTRY/packaging/apkg/full/alma-9
+#   before_script:
+#     # python-watchdog is not included in the official Alma 9 packages
+#     # install it using PyPi just for testing
+#     - pip3 install watchdog
+
+# pkg:alma-10:
+#   <<: *pkg_test
+#   image: $CI_REGISTRY/packaging/apkg/full/alma-10
+
+# pkg:opensuse-16.0:
+#   <<: *pkg_test
+#   image: $CI_REGISTRY/packaging/apkg/full/opensuse-16.0
+#   before_script:
+#     # openSUSE excludes docs installation by default
+#     - echo "rpm.install.excludedocs = no" > /etc/zypp/zypp.conf.d/no-excludedocs.conf
+#     # add the Python development repository to fetch Supervisor
+#     - zypper addrepo https://download.opensuse.org/repositories/devel:languages:python/16.0/devel:languages:python.repo
+#     # prometheus and watchdog are optional dependencies, but our `apkg test` needs them
+#     - zypper --non-interactive --gpg-auto-import-keys refresh
+#     - zypper install -y python313-prometheus_client python313-watchdog
+
+# pkg:opensuse-tumbleweed:
+#   <<: *pkg_test
+#   image: $CI_REGISTRY/packaging/apkg/full/opensuse-tumbleweed
+#   before_script:
+#     # openSUSE excludes docs installation by default
+#     - echo "rpm.install.excludedocs = no" > /etc/zypp/zypp.conf.d/no-excludedocs.conf
+#     # prometheus and watchdog are optional dependencies, but our `apkg test` needs them
+#     - zypper refresh
+#     - zypper install -y python3-prometheus_client python3-watchdog
+
+# pkg:arch:
+#   <<: *pkg_test_user
+#   image: $CI_REGISTRY/packaging/apkg/full/arch
+#   before_script:
+#     # prometheus and watchdog are optional dependencies, but our `apkg test` needs them
+#     - pacman -Syu --noconfirm python-prometheus_client python-watchdog
+
+
+pkg:arepo:build:
+  stage: pkg
+  image: $CI_REGISTRY/packaging/apkg/test/debian-13
+  when: manual
+  needs:
+    - job: archive
+      artifacts: true
   before_script:
-    # python-watchdog is not included in the official Alma 9 packages
-    # install it using PyPi just for testing
-    - pip3 install watchdog
-
-pkg:alma-10:
-  <<: *pkg_test
-  image: $CI_REGISTRY/packaging/apkg/full/alma-10
-
-pkg:opensuse-16.0:
-  <<: *pkg_test
-  image: $CI_REGISTRY/packaging/apkg/full/opensuse-16.0
-  before_script:
-    # openSUSE excludes docs installation by default
-    - echo "rpm.install.excludedocs = no" > /etc/zypp/zypp.conf.d/no-excludedocs.conf
-    # add the Python development repository to fetch Supervisor
-    - zypper addrepo https://download.opensuse.org/repositories/devel:languages:python/16.0/devel:languages:python.repo
-    # prometheus and watchdog are optional dependencies, but our `apkg test` needs them
-    - zypper --non-interactive --gpg-auto-import-keys refresh
-    - zypper install -y python313-prometheus_client python313-watchdog
-
-pkg:opensuse-tumbleweed:
-  <<: *pkg_test
-  image: $CI_REGISTRY/packaging/apkg/full/opensuse-tumbleweed
-  before_script:
-    # openSUSE excludes docs installation by default
-    - echo "rpm.install.excludedocs = no" > /etc/zypp/zypp.conf.d/no-excludedocs.conf
-    # prometheus and watchdog are optional dependencies, but our `apkg test` needs them
-    - zypper refresh
-    - zypper install -y python3-prometheus_client python3-watchdog
-
-pkg:arch:
-  <<: *pkg_test_user
-  image: $CI_REGISTRY/packaging/apkg/full/arch
-  before_script:
-    # prometheus and watchdog are optional dependencies, but our `apkg test` needs them
-    - pacman -Syu --noconfirm python-prometheus_client python-watchdog
+    - apt update
+    - apt install -y pipx
+    - apt install -y distro-info-data devscripts wget gnupg
+    # install arepo and apkg
+    - pipx install apkg
+    - pipx install git+https://gitlab.nic.cz/packaging/arepo
+    - wget -O /etc/arepo.toml https://gitlab.nic.cz/packaging/arepo/-/raw/master/arepo.toml
+    - /root/.local/bin/arepo config
+    - /root/.local/bin/apkg info apkg-deps
+  script:
+    - /root/.local/bin/apkg system-setup
+    # source package
+    - /root/.local/bin/apkg srcpkg -a pkg/archives/dev/knot-resolver-6.*.tar.xz
+    - mkdir -p pkg/arepo/knot-resolver-jezek
+    - cd pkg/arepo/knot-resolver-jezek
+    - >
+      /root/.local/bin/arepo prep all -r knot-resolver-jezek
+      -s ../../srcpkgs/debian-13/knot-resolver-6.*/knot-resolver_6.*-cznic.1.dsc
+  artifacts:
+    paths:
+      - pkg/
 
 # }}}
 
