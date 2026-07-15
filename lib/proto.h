@@ -26,6 +26,7 @@
     XX(TCP53, tcp53, "DNS TCP") \
     XX(DOT, dot, "DNS-over-TLS") \
     XX(DOH, doh, "DNS-over-HTTPS") \
+    XX(DOH_INSECURE, doh_insecure, "Insecure DNS-over-HTTP") \
     XX(DOQ, doq_demux, "DNS-over-QUIC-demux") \
     XX(DOQ_CONN, doq_conn, "DNS-over-QUIC-conn") \
     XX(DOQ_STREAM, doq_stream, "DNS-over-QUIC-stream") \
