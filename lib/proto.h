@@ -51,5 +51,5 @@ KR_EXPORT
 const char *kr_proto_name(enum kr_proto p);
 
 /** Bitmap of enum kr_proto options. */
-typedef uint8_t kr_proto_set;
+typedef uint16_t kr_proto_set;
 static_assert(sizeof(kr_proto_set) * 8 >= KR_PROTO_COUNT, "bad combination of type sizes");
