@@ -11,6 +11,7 @@ Improvements
   configuration during installation (GH#130).
 - make DoH cache-control header respect our cache's TTL limits (!1832)
 - support libdnssec merged into libknot, as planned for knot >= 3.6 (!1833)
+- update IANA's certificate for root trust anchor bootstrapping (!1862)
 
 
 Bugfixes
@@ -18,6 +19,7 @@ Bugfixes
 - respect disablement of QNAME case randomization even after TCP issues
 - cache: fix wrong TTL in some cases, typically 32768
 - reduce excessive caching of some uncommon failed answers (!1832)
+- dns64: fix CNAME problems again (#797, !1862)
 
 
 Knot Resolver 5.7.6 (2025-07-17)
