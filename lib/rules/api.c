@@ -366,6 +366,33 @@ static void log_rule(kr_rule_opts_t opts, const struct kr_query *qry)
 		LOG_GRP_RULES_TAG, s1a, s1b, s2a, s2b, s3a, s3b);
 }
 
+/// Set EDE in kr_request as appropriate.
+static void req_set_ede(struct kr_request *req, const kr_rule_opts_t opts, const knot_dname_t *name)
+{
+	if (!opts.ede_code)
+		return;
+	// Let's not override this set of EDE codes if present already:
+	switch (req->extended_error.info_code) {
+		case KNOT_EDNS_EDE_FORGED:
+		case KNOT_EDNS_EDE_FILTERED:
+		case KNOT_EDNS_EDE_PROHIBITED:
+		case KNOT_EDNS_EDE_BLOCKED:
+		case KNOT_EDNS_EDE_CENSORED:
+			return;
+	}
+	// kr_rule_consume_tags() set req->rule.tags shortly before this call
+	const kr_rule_tags_t tags = req->rule.tags;
+	auto_free const char *tags_str_to_free = NULL;
+	const char *tags_str = "*";
+	if (tags != KR_RULE_TAGS_ALL)
+	 	tags_str = tags_str_to_free = kr_rule_tags2str(tags);
+
+	KR_DNAME_GET_STR(name_str, name);
+	char *msg = kr_strcatdup_pool(&req->pool, 4, "U6CQ: tag ", tags_str,
+					" triggers on ", name_str);
+	kr_request_set_extended_error(req, 14 + opts.ede_code, msg);
+}
+
 /** Add name lookup format on the fixed end-position inside key_data.
  *
  * Note: key_data[KEY_DNAME_END_OFFSET] = '\0' even though
@@ -540,8 +567,8 @@ static int subtree_search(const size_t lf_start_i, const knot_db_val_t key,
 		if (ret == kr_error(EAGAIN))
 			goto shorten;
 
-		if (ret >= 0 && opts.ede_code)
-			kr_request_set_extended_error(req, 14 + opts.ede_code, NULL);
+		if (ret >= 0)
+			req_set_ede(req, opts, apex_name);
 
 		return ret;
 	} while (true);
@@ -724,8 +751,7 @@ static int answer_exact_match(struct kr_query *qry, knot_pkt_t *pkt, uint16_t ty
 	qry->flags.NO_MINIMIZE = true;
 
 	qry_set_action(qry, is_nodata ? KREQ_ACTION_NODATA : KREQ_ACTION_LOCAL_DATA);
-	if (opts.ede_code)
-		kr_request_set_extended_error(qry->request, 14 + opts.ede_code, NULL);
+	req_set_ede(qry->request, opts, qry->sname);
 	return RET_ANSWERED;
 }
 
