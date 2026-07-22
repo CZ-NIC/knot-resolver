@@ -262,12 +262,12 @@ docker:dockerhub:
   before_script:
     - git fetch --tags --force
     - >
-      LATEST_TAG=$(git for-each-ref \
+      LATEST5_TAG=$(git for-each-ref \
         --sort=-version:refname \
         --count=1 \
-        --format='%(refname:short)' refs/tags)
+        --format='%(refname:short)' refs/tags/v5*)
 
-      echo "Latest tag: $LATEST_TAG"
+      echo "Latest v5 tag: $LATEST5_TAG"
       echo "Current: $CI_COMMIT_REF_NAME"
 
       if [ "$CI_COMMIT_REF_NAME" != "$LATEST5_TAG" ]; then
