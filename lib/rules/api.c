@@ -1159,10 +1159,12 @@ static enum kr_proto req_proto(const struct kr_request *req)
 	const struct kr_request_qsource_flags fl = req->qsource.flags;
 	if (fl.http)
 		return KR_PROTO_DOH;
+	if (fl.quic)
+		return KR_PROTO_DOQ;
 	if (fl.tcp)
 		return fl.tls ? KR_PROTO_DOT : KR_PROTO_TCP53;
-	// UDP in some form
-	return fl.tls ? KR_PROTO_DOQ : KR_PROTO_UDP53;
+	kr_assert(!fl.tls);
+	return KR_PROTO_UDP53;
 }
 static bool req_proto_matches(const struct kr_request *req, kr_proto_set proto_set)
 {

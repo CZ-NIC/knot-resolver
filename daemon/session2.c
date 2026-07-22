@@ -80,6 +80,7 @@ static const enum protolayer_type protolayer_grp_doq_conn[] = {
 
 static const enum protolayer_type protolayer_grp_doq_demux[] = {
 	PROTOLAYER_TYPE_UDP,
+	PROTOLAYER_TYPE_PROXYV2_STREAM,
 	PROTOLAYER_TYPE_QUIC_DEMUX,
 	PROTOLAYER_TYPE_NULL,
 };
@@ -1000,6 +1001,16 @@ uv_handle_t *session2_get_handle(struct session2 *s)
 		: NULL;
 }
 
+struct session2 *session2_get_root(struct session2 *s)
+{
+	while (s && s->transport.type == SESSION2_TRANSPORT_PARENT)
+		s = s->transport.parent;
+
+	return (s && s->transport.type == SESSION2_TRANSPORT_IO)
+		? s
+		: NULL;
+}
+
 static void session2_on_timeout(uv_timer_t *timer)
 {
 	struct session2 *s = timer->data;
@@ -1730,7 +1741,7 @@ static void on_session2_handle_close(uv_handle_t *handle)
 	io_free(handle);
 }
 
-static void on_session2_timer_close(uv_handle_t *handle)
+void on_session2_timer_close(uv_handle_t *handle)
 {
 	session2_dec_refs(handle->data);
 }
@@ -1774,8 +1785,6 @@ static int session2_transport_event(struct session2 *s,
 	bool is_close_event = (event == PROTOLAYER_EVENT_CLOSE ||
 			event == PROTOLAYER_EVENT_FORCE_CLOSE);
 	if (is_close_event) {
-		session2_waitinglist_finalize(s, KR_STATE_FAIL);
-		session2_tasklist_finalize(s, KR_STATE_FAIL);
 		session2_timer_stop(s);
 		s->closing = true;
 	}
@@ -1792,7 +1801,13 @@ static int session2_transport_event(struct session2 *s,
 		return kr_ok();
 
 	case SESSION2_TRANSPORT_PARENT:;
-		session2_event_wrap(s, event, baton);
+		/* Pass the event along to the parent session. So far only DoQ uses
+		 * subsessions. These events are used to remove references
+		 * to terminating sessions in the parent session. */
+		if (kr_fails_assert(s->transport.parent)) {
+			return kr_error(EINVAL);
+		}
+		session2_event_wrap(s->transport.parent, event, baton);
 		return kr_ok();
 
 	default:
