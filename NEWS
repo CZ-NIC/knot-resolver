@@ -1,5 +1,12 @@
-Knot Resolver 5.7.7 (2026-0m-dd)
+Knot Resolver 5.7.7 (2026-07-22)
 ================================
+
+Security
+--------
+- DNSSEC correctness issues, acting mainly through the aggressive cache:
+  * dealing with Labels field in RRSIGs being smaller than the signer's
+  * dealing with NSEC's next-name pointing outside of the zone
+Special thanks to Qifan Zhang from Palo Alto Networks.
 
 Improvements
 ------------
