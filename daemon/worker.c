@@ -1956,6 +1956,9 @@ static enum protolayer_event_cb_result pl_dns_stream_connected(
 		return PROTOLAYER_EVENT_PROPAGATE;
 
 	stream->connected = true;
+	if (session->proto == KR_PROTO_DOQ_STREAM) {
+		return PROTOLAYER_EVENT_CONSUME;
+	}
 
 	struct sockaddr *peer = session2_get_peer(session);
 	if (session->outgoing && worker_del_tcp_waiting(peer) != 0) {
@@ -2031,8 +2034,10 @@ static enum protolayer_event_cb_result pl_dns_stream_disconnected(
 		struct session2 *session, struct pl_dns_stream_sess_data *stream)
 {
 	struct sockaddr *peer = session2_get_peer(session);
-	worker_del_tcp_waiting(peer);
-	worker_del_tcp_connected(peer);
+	if (session->proto != KR_PROTO_DOQ_STREAM) {
+		worker_del_tcp_waiting(peer);
+		worker_del_tcp_connected(peer);
+	}
 
 	if (!stream->connected)
 		return PROTOLAYER_EVENT_PROPAGATE;

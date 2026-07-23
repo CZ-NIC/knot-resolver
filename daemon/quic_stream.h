@@ -32,8 +32,10 @@ struct pl_quic_stream_sess_data {
 	struct kr_quic_obuf *unsent_obuf;
 	size_t first_offset;
 	size_t unsent_offset;
-
+	bool closed;
+	bool write_closed;
 	uint32_t incflags;
+	bool skip_update_time;
 	uint64_t sdata_offset;
 
 	struct pl_quic_conn_sess_data *conn_ref;
@@ -41,3 +43,5 @@ struct pl_quic_stream_sess_data {
 
 void kr_quic_stream_ack_data(struct pl_quic_stream_sess_data *stream,
 		int64_t stream_id, size_t end_acked, bool keep_stream);
+uint8_t *kr_quic_stream_add_data(struct pl_quic_stream_sess_data *s,
+		   uint8_t *data, size_t len);

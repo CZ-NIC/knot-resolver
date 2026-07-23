@@ -1,3 +1,26 @@
+Knot Resolver 6.4.1 (2026-07-22)
+================================
+
+Security
+--------
+- DNS-over-QUIC (DoQ) had severe issues, allowing even RCE
+  Many people reported (some of) these issues to us.
+- DNSSEC correctness issues, acting mainly through the aggressive cache:
+  * dealing with Labels field in RRSIGs being smaller than the signer's
+  * dealing with NSEC's next-name pointing outside of the zone
+Special thanks to Qifan Zhang from Palo Alto Networks.
+
+Improvements
+------------
+- docker: upgrade to Debian 13 (!1856)
+- update IANA's certificate for root trust anchor bootstrapping (!1845)
+
+Bugfixes
+--------
+- /local-data/addresses*: make multiple addresses work (#808, #954)
+- views: fix protocol-based matching for DoQ
+
+
 Knot Resolver 6.4.0 (2026-06-17)
 ================================
 

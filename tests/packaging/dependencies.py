@@ -3,9 +3,12 @@
 import importlib
 import importlib.util
 import sys
+from importlib.metadata import distributions
 from types import ModuleType
 
-import pkg_resources
+from packaging.requirements import Requirement
+from packaging.utils import canonicalize_name
+
 
 # replace imports with mocks
 dummy = ModuleType("dummy")
@@ -21,10 +24,17 @@ spec.loader.exec_module(mod)
 install_requires = mod.install_requires
 
 # strip version codes
-deps = set((x[: x.index(">")].lower() if ">" in x else x.lower() for x in install_requires))
+deps = {
+    canonicalize_name(Requirement(req).name)
+    for req in install_requires
+}
 
 # find out which packages are missing
-installed = {pkg.key for pkg in pkg_resources.working_set}
+installed = {
+    canonicalize_name(name)
+    for dist in distributions()
+    if (name := dist.metadata.get("Name"))
+}
 missing = deps - installed
 
 # fail if there are some missing

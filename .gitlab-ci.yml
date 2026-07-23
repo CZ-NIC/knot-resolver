@@ -290,7 +290,10 @@ docker:dockerhub:
   before_script:
     - git fetch --tags --force
     - >
-      LATEST_TAG=$(git tag --sort=-v:refname | head -n 1)
+      LATEST_TAG=$(git for-each-ref \
+        --sort=-version:refname \
+        --count=1 \
+        --format='%(refname:short)' refs/tags)
 
       echo "Latest tag: $LATEST_TAG"
       echo "Current: $CI_COMMIT_REF_NAME"
@@ -918,6 +921,10 @@ docs:website:
   stage: sanity
   before_script:
     - poetry --version
+    - >
+      if [[ "$PYTHON_VERSION" == "3.8" ]]; then
+        pipx inject --force poetry "virtualenv<20.30"
+      fi
     - poetry env use python${PYTHON_VERSION}
     - poetry env info
 

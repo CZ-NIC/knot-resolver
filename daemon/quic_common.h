@@ -20,6 +20,9 @@
 #include "session2.h"
 #include "network.h"
 
+/* option to turn of ngtcp2 log which is by default enabled for log_level = debug */
+#define DEBUG_NGTCP2 false
+
 /** RFC 9250 4.3 DoQ Error Codes for use as application protocol error codes */
 typedef enum {
 	/*! No error.  This is used when the connection or stream needs to be
@@ -41,7 +44,7 @@ typedef enum {
 	     error code. */
 	DOQ_UNSPECIFIED_ERROR = 0x5,
 	/*! Alternative error code, can be used for tests. */
-	//DOQ_ERROR_RESERVED = 0xd098ea5e
+	// DOQ_ERROR_RESERVED = 0xd098ea5e
 } quic_doq_error_t;
 
 // Macros from knot quic impl
@@ -51,18 +54,28 @@ typedef enum {
 #define QUIC_SEND_RETRY                  NGTCP2_ERR_RETRY
 #define QUIC_SEND_STATELESS_RESET        (-NGTCP2_STATELESS_RESET_TOKENLEN)
 #define QUIC_SEND_CONN_CLOSE             (-2000)
+/* Returning this value from handle_packet has to be accompanied
+ * by timer startup (if not already running). Otherwise the connection
+ * might linger in the table until the DoQ endpoint terminates.
+ * see NGTCP2_ERR_DROP_CONN switch case in handle_packet */
+#define QUIC_SEND_NONE                   (-2001)
 
+/* maximum message length for messages used in ccerr */
+#define MAX_REASONLEN 128
 #define BUCKETS_PER_CONNS 8
-
 #define MAX_QUIC_PKT_SIZE 65536
 #define MAX_QUIC_FRAME_SIZE 65536
 #define QUIC_MAX_SEND_PER_RECV	4
-
-#define QUIC_CONN_IDLE_TIMEOUT (5 * NGTCP2_SECONDS)
+/* A connection can reach a state where the internal ngtcp2 state machine is
+ * not waiting for any event. In such a case the ngtcp2_conn_get_expiry
+ * returns UINT64_MAX => meaning no timer event. If the peer abruptly
+ * stops communicating in such a state the connection remain in the table/
+ * We set the timer to the QUIC_MAX_TIMEOUT to assure
+ * that every connection will terminate within a reasonable time period */
+#define QUIC_MAX_IDLE_TIMEOUT (15 * NGTCP2_SECONDS)
+#define QUIC_CONN_IDLE_TIMEOUT (8 * NGTCP2_SECONDS)
 #define QUIC_HS_IDLE_TIMEOUT   (5 * NGTCP2_SECONDS)
 
-/* HACK adjust pointer of conn->streams head so it points to
- * struct pl_quic_stream_sess_data, this is hacky */
 #define container_of(ptr, type, member) \
 	((type *)((char *)(ptr) - offsetof(type, member)))
 
@@ -111,19 +124,82 @@ struct kr_quic_stream_param {
 };
 
 int quic_configuration_set(void);
+
 int quic_configuration_free(struct net_quic_params *quic_params);
+
 bool kr_quic_conn_timeout(struct pl_quic_conn_sess_data *conn, uint64_t *now);
+
 uint64_t cid2hash(const ngtcp2_cid *cid, kr_quic_table_t *table);
-bool init_unique_cid(ngtcp2_cid *cid, size_t len, kr_quic_table_t *table);
-void init_random_cid(ngtcp2_cid *cid, size_t len);
+
+/* ngtcp2 operates with ns whilst libuv uses ms. Simple inline ceil converter. */
+uint64_t quic_ns_to_ms_ceil(uint64_t ns);
+
+/* Closing/draining state PTO based timeout recommended by ngtcp2. The returned
+ * value is the time in ms that the connection state should be available for.
+ * Combine with quic_set_idle_timeout to take care of conn state
+ * teardown once the closing/draining state is reached. */
+uint64_t quic_get_closing_timeout(uint64_t pto_ns);
+
+/* start uv_timer with timeout equal to ms, this timer is to be used
+ * only during the handshake, after that the negotiated max_idle_timeout
+ * will be used. Returns 0 or EINVAL */
+int quic_set_hs_timeout(struct session2 *s, uint64_t ms);
+
+/* Only used when the connection entered closing/draining state
+ * and we have to wait 3 * PTO before freeing the connection (e.g. session). */
+int quic_set_idle_timeout(struct session2 *s, uint64_t ms);
+
+/* Call this every time a bunch of writes are executed.
+ * The next expiry is retrieved and the connection timer is reset
+ * so ngtcp2 library can schedule next event */
+void quic_reset_expiry(struct pl_quic_conn_sess_data *conn);
+
+int kr_quic_table_rem2(kr_quic_cid_t **pcid, kr_quic_table_t *table);
+
+/* Set the connection ccerr to type TRANSPORT with the error code
+ * containing the tls alert. The error code is calculated as
+ * 0x100 | <the tls alert>  (see RFC 9001 4.8. TLS Errors). */
+int set_tls_error(struct pl_quic_conn_sess_data *conn,
+		quic_doq_error_t *error_code,
+		const uint8_t *msg, size_t msglen);
+
+/* This function sets the ccerr type to APPLICATION and the error_code to
+ * the provided error_code. msg can be NULL, if so set mgslen to 0.
+ * see RFC 9250 4.3 DoQ Error Codes */
+int set_application_error(struct pl_quic_conn_sess_data *conn,
+		quic_doq_error_t error_code, const uint8_t *msg, size_t msglen);
+
+/* Inserts another cid into the table. This cid will point
+ * to the connection provided via the conn parameter. Can be called
+ * multiple times on the same connection (i.e. use when new cid for an
+ * existing connection is required). */
+kr_quic_cid_t **kr_quic_table_insert(struct pl_quic_conn_sess_data *conn,
+		const ngtcp2_cid *cid, kr_quic_table_t *table);
+
+/* Registeres a new connection in the table and expiry heap.
+ * Only call once when the connection is created. Calls kr_quic_table_insert
+ * to add a reference from cid to the connection. */
+int kr_quic_table_add(struct pl_quic_conn_sess_data *conn_sess,
+		const ngtcp2_cid *cid, kr_quic_table_t *table);
+
+int init_unique_cid(ngtcp2_cid *cid, size_t len, kr_quic_table_t *table);
+
+int init_random_cid(ngtcp2_cid *cid, size_t len);
+
 uint64_t quic_timestamp(void);
+
+void quic_hs_timeout(uv_timer_t *timer);
+
+void quic_handle_timeout(uv_timer_t *timer);
+
 kr_quic_cid_t **kr_quic_table_lookup2(const ngtcp2_cid *cid,
 		kr_quic_table_t *table);
+
 struct pl_quic_conn_sess_data *kr_quic_table_lookup(const ngtcp2_cid *cid,
 		kr_quic_table_t *table);
+
 int write_retry_packet(struct wire_buf *dest, kr_quic_table_t *table,
 		ngtcp2_version_cid *dec_cids,
-		const struct sockaddr *src_addr,
-		uint8_t *secret, size_t secret_len);
+		const struct sockaddr *src_addr);
 
 #endif

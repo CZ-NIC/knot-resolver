@@ -831,22 +831,26 @@ int kr_rule_local_data_merge(const knot_rrset_t *rrs, const kr_rule_tags_t tags,
 	uint8_t key_data[KEY_MAXLEN];
 	knot_db_val_t key = local_data_key(rrs, key_data, RULESET_DEFAULT);
 	knot_db_val_t val;
-	// Transaction: we assume that we're in a RW transaction already,
-	// so that here we already "have a lock" on the last version.
-	// FIXME: iterate over multiple tags, once iterator supports RW TXN
-	int ret = ruledb_op(read, &key, &val, 1);
+	int ret = ruledb_op(txn_open_rw); // "get a lock" on the last DB version
+	if (ret)
+		return kr_error(ret);
+	// Multiple variants are possible, with different tags.
+	for (ret = ruledb_op(it_first, &key, &val); ret == 0; ret = ruledb_op(it_next, &val)) {
+		// we're looking for the same tag-set
+		kr_rule_tags_t tags_old;
+		if (deserialize_fails_assert(&val, &tags_old) || tags_old != tags)
+			continue;
+		kr_rule_opts_t opts_old;
+		if (deserialize_fails_assert(&val, &opts_old))
+			continue;
+		break;
+	}
 	if (abs(ret) == abs(ENOENT))
 		goto fallback;
 	if (ret)
 		return kr_error(ret);
-	// check tags
-	kr_rule_tags_t tags_old;
-	if (deserialize_fails_assert(&val, &tags_old) || tags_old != tags)
-		goto fallback;
-	kr_rule_opts_t opts_old;
-	if (deserialize_fails_assert(&val, &opts_old))
-		goto fallback;
-	// merge TTLs
+
+	// we found a match; first merge TTLs
 	uint32_t ttl;
 	if (deserialize_fails_assert(&val, &ttl))
 		goto fallback;
@@ -868,6 +872,10 @@ int kr_rule_local_data_merge(const knot_rrset_t *rrs, const kr_rule_tags_t tags,
 		mm_ctx_delete(mm);
 		return kr_error(ret);
 	}
+	// ATM ruledb does not overwrite, so we `remove` before `write`.
+	ret = ruledb_op(it_del);
+	if (ret)
+		return kr_error(ret);
 	// everything is ready to insert the merged RRset
 	ret = local_data_ins(key, &rrs_new, NULL, tags, opts);
 	mm_ctx_delete(mm);
@@ -1396,10 +1404,12 @@ static enum kr_proto req_proto(const struct kr_request *req)
 	const struct kr_request_qsource_flags fl = req->qsource.flags;
 	if (fl.http)
 		return KR_PROTO_DOH;
+	if (fl.quic)
+		return KR_PROTO_DOQ;
 	if (fl.tcp)
 		return fl.tls ? KR_PROTO_DOT : KR_PROTO_TCP53;
-	// UDP in some form
-	return fl.tls ? KR_PROTO_DOQ : KR_PROTO_UDP53;
+	kr_assert(!fl.tls);
+	return KR_PROTO_UDP53;
 }
 static bool req_proto_matches(const struct kr_request *req, kr_proto_set proto_set)
 {
