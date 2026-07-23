@@ -35,29 +35,18 @@ struct mempool_chunk {
 };
 
 /**
- * Memory pool state (see mp_push(), ...).
- * You should use this one as an opaque handle only, the insides are internal.
- **/
-struct mempool_state {
-	struct mempool_chunk *last[2];
-};
-
-/**
  * Memory pool.
  * You should use this one as an opaque handle only, the insides are internal.
  **/
 struct mempool {
-	struct mempool_state state;
-	void *last_big;
-	size_t chunk_size, threshold;
-	unsigned idx;
+	struct mempool_chunk *last;
+	size_t chunk_size;
 };
 
 struct mempool_stats {          /** Mempool statistics. See mp_stats(). **/
 	size_t total_size;          /** Real allocated size in bytes. */
-	size_t used_size;           /** Estimated size allocated from mempool to application. */
-	unsigned chain_count[2];    /** Number of allocated chunks in small/big chains. */
-	size_t chain_size[2];       /** Size of allocated chunks in small/big chains. */
+	size_t used_size;           /** Size allocated from mempool to application. */
+	unsigned chunks_count;      /** Number of allocated chunks. */
 };
 
 /***
@@ -154,11 +143,6 @@ void *mp_alloc(struct mempool *pool, size_t size);
 void *mp_grow_internal(struct mempool *pool, size_t size);
 void *mp_spread_internal(struct mempool *pool, void *p, size_t size);
 
-static inline unsigned mp_idx(struct mempool *pool, void *ptr)
-{
-	return ptr == pool->last_big;
-}
-
 /**
  * Open a new growing buffer (at least \p size bytes long).
  * If the \p size is zero, the resulting pointer is undefined,
@@ -179,7 +163,7 @@ void *mp_start(struct mempool *pool, size_t size);
  **/
 static inline void *mp_ptr(struct mempool *pool)
 {
-	return (uint8_t *)pool->state.last[pool->idx] - pool->state.last[pool->idx]->free;
+	return (uint8_t *)pool->last - pool->last->free;
 }
 
 /**
@@ -188,7 +172,7 @@ static inline void *mp_ptr(struct mempool *pool)
  **/
 static inline size_t mp_avail(struct mempool *pool)
 {
-	return pool->state.last[pool->idx]->free;
+	return pool->last->free;
 }
 
 /**
@@ -216,7 +200,7 @@ static inline void *mp_expand(struct mempool *pool)
  **/
 static inline void *mp_spread(struct mempool *pool, void *p, size_t size)
 {
-	return (((size_t)((uint8_t *)pool->state.last[pool->idx] - (uint8_t *)p) >= size) ? p : mp_spread_internal(pool, p, size));
+	return (((size_t)((uint8_t *)pool->last - (uint8_t *)p) >= size) ? p : mp_spread_internal(pool, p, size));
 }
 
 /**
@@ -261,8 +245,8 @@ static inline void *mp_append_string(struct mempool *pool, void *p, const char *
 static inline void *mp_end(struct mempool *pool, void *end)
 {
 	void *p = mp_ptr(pool);
-	pool->state.last[pool->idx]->free = (uint8_t *)pool->state.last[pool->idx] - (uint8_t *)end;
-	MEMCHECK_NOACCESS(end, pool->state.last[pool->idx]->free);
+	pool->last->free = (uint8_t *)pool->last - (uint8_t *)end;
+	MEMCHECK_NOACCESS(end, pool->last->free);
 	return p;
 }
 
@@ -280,8 +264,7 @@ static inline char *mp_end_string(struct mempool *pool, void *end)
  **/
 static inline size_t mp_size(struct mempool *pool, void *ptr)
 {
-	unsigned idx = mp_idx(pool, ptr);
-	return ((uint8_t *)pool->state.last[idx] - (uint8_t *)ptr) - pool->state.last[idx]->free;
+	return ((uint8_t *)pool->last - (uint8_t *)ptr) - pool->last->free;
 }
 
 /**
