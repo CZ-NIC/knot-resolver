@@ -26,3 +26,9 @@
 	#define VALGRIND_PRINTF(...)
 	#define RUNNING_ON_VALGRIND 0
 #endif
+
+#if __has_feature(address_sanitizer) || defined(__SANITIZE_ADDRESS__)
+	#define MEMCHECK_ACTIVE 1
+#else
+	#define MEMCHECK_ACTIVE RUNNING_ON_VALGRIND
+#endif
