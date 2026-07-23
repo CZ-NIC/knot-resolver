@@ -25,13 +25,21 @@
  * -----------
  ***/
 
+struct mempool_chunk {
+#ifdef CONFIG_DEBUG
+	struct mempool *pool;         // Can be useful when analysing coredump for memory leaks
+#endif
+	struct mempool_chunk *next;
+	uint32_t size;
+	uint32_t free;
+};
+
 /**
  * Memory pool state (see mp_push(), ...).
  * You should use this one as an opaque handle only, the insides are internal.
  **/
 struct mempool_state {
-	size_t free[2];
-	void *last[2];
+	struct mempool_chunk *last[2];
 };
 
 /**
@@ -171,7 +179,7 @@ void *mp_start(struct mempool *pool, size_t size);
  **/
 static inline void *mp_ptr(struct mempool *pool)
 {
-	return (uint8_t *)pool->state.last[pool->idx] - pool->state.free[pool->idx];
+	return (uint8_t *)pool->state.last[pool->idx] - pool->state.last[pool->idx]->free;
 }
 
 /**
@@ -180,7 +188,7 @@ static inline void *mp_ptr(struct mempool *pool)
  **/
 static inline size_t mp_avail(struct mempool *pool)
 {
-	return pool->state.free[pool->idx];
+	return pool->state.last[pool->idx]->free;
 }
 
 /**
@@ -253,8 +261,8 @@ static inline void *mp_append_string(struct mempool *pool, void *p, const char *
 static inline void *mp_end(struct mempool *pool, void *end)
 {
 	void *p = mp_ptr(pool);
-	pool->state.free[pool->idx] = (uint8_t *)pool->state.last[pool->idx] - (uint8_t *)end;
-	MEMCHECK_NOACCESS(end, pool->state.free[pool->idx]);
+	pool->state.last[pool->idx]->free = (uint8_t *)pool->state.last[pool->idx] - (uint8_t *)end;
+	MEMCHECK_NOACCESS(end, pool->state.last[pool->idx]->free);
 	return p;
 }
 
@@ -273,7 +281,7 @@ static inline char *mp_end_string(struct mempool *pool, void *end)
 static inline size_t mp_size(struct mempool *pool, void *ptr)
 {
 	unsigned idx = mp_idx(pool, ptr);
-	return ((uint8_t *)pool->state.last[idx] - (uint8_t *)ptr) - pool->state.free[idx];
+	return ((uint8_t *)pool->state.last[idx] - (uint8_t *)ptr) - pool->state.last[idx]->free;
 }
 
 /**
