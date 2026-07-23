@@ -132,12 +132,14 @@ mp_free_chunk(struct mempool_chunk *chunk)
 // --- reusable chunks ---
 #ifdef  CONFIG_UCW_POOL_IS_REUSABLE
 const uint32_t mp_reusable_sizes[] = { 4 * 1024 - MP_CHUNK_TAIL, 16 * 1024 - MP_CHUNK_TAIL, 68 * 1024 - MP_CHUNK_TAIL};
+#define MP_REUSABLE_CNT ARRAY_SIZE(mp_reusable_sizes)
 struct mp_reusable {
+	size_t unused_cnt, total_cnt;
 	struct mempool_chunk *chunk;
-} mp_reusable[ARRAY_SIZE(mp_reusable_sizes)] = {0};
+} mp_reusable[MP_REUSABLE_CNT] = {0};
 
 struct mp_reusable *mp_get_reusable(uint32_t *size) {
-	for (int i = 0; i < ARRAY_SIZE(mp_reusable_sizes); i++) {
+	for (int i = 0; i < MP_REUSABLE_CNT; i++) {
 		if (*size <= mp_reusable_sizes[i]) {
 			*size = mp_reusable_sizes[i];
 			return mp_reusable + i;
@@ -153,9 +155,11 @@ mp_new_reusable_chunk(uint32_t size) {
 	if (reusable) {
 		chunk = reusable->chunk;
 		if (chunk) {
+			reusable->unused_cnt--;
 			reusable->chunk = chunk->next;
 			return chunk;
 		}
+		reusable->total_cnt++;
 	}
 	return mp_new_chunk(size);
 }
@@ -165,6 +169,7 @@ mp_free_reusable_chunk(struct mempool_chunk *chunk) {
 	uint32_t size = chunk->size;
 	struct mp_reusable *reusable = mp_get_reusable(&chunk->size);
 	if (reusable) {
+		reusable->unused_cnt++;
 		chunk->next = reusable->chunk;
 		reusable->chunk = chunk;
 	} else {
@@ -176,6 +181,9 @@ mp_free_reusable_chunk(struct mempool_chunk *chunk) {
 #define mp_free_chunk      mp_free_reusable_chunk
 #define mp_new_big_chunk   mp_new_reusable_chunk
 #define mp_free_big_chunk  mp_free_reusable_chunk
+#define CONFIG_UCW_POOL_ACTIVE_CHUNKS (ARRAY_SIZE(mp_reusable) + 1)
+#else
+#define CONFIG_UCW_POOL_ACTIVE_CHUNKS 2
 #endif
 // ------
 
@@ -225,22 +233,25 @@ mp_delete(struct mempool *pool)
 void
 mp_flush(struct mempool *pool)
 {
-	struct mempool_chunk *chunk = pool->last, *next;
+	struct mempool_chunk *chunk = pool->last, *next, *poolchunk = NULL;
 	while (chunk) {
 		MEMCHECK_DEFINED(chunk, MP_CHUNK_TAIL);
-		if ((uint8_t *)chunk - chunk->size == (uint8_t *)pool) {
-			break;
-		}
 		next = chunk->next;
-		mp_free_chunk(chunk);
+		if ((uint8_t *)chunk - chunk->size == (uint8_t *)pool) {
+			poolchunk = chunk;
+			chunk->next = NULL;
+		} else {
+			mp_free_chunk(chunk);
+		}
 		chunk = next;
 	}
-	pool->last = chunk;
-	if (chunk) {
+	if (poolchunk) {
+		chunk = poolchunk;
 		chunk->free = chunk->size - sizeof(*pool);
 		MEMCHECK_NOACCESS((uint8_t *)chunk - chunk->size + sizeof(struct mempool),
 				chunk->size - sizeof(struct mempool) + MP_CHUNK_TAIL);
 	}
+	pool->last = chunk;
 }
 
 static void
@@ -279,9 +290,49 @@ mp_total_size(struct mempool *pool)
 static void *
 mp_alloc_internal(struct mempool *pool, size_t size)
 {
-	struct mempool_chunk *chunk;
 	if (likely(size <= MP_SIZE_MAX)) {
-		chunk = mp_new_chunk(size <= pool->chunk_size ? pool->chunk_size : mp_align_size(size));
+		// try finding space within CONFIG_UCW_POOL_ACTIVE_CHUNKS chunks (excl. the first one)
+		if (pool->last) {
+			struct mempool_chunk **pchunk, **pfullest;
+			pfullest = pchunk = &pool->last;
+			MEMCHECK_DEFINED(*pchunk, MP_CHUNK_TAIL);
+			for (int i = 1; *(pchunk = &(*pchunk)->next) && (i < CONFIG_UCW_POOL_ACTIVE_CHUNKS) ; i++) {
+				MEMCHECK_DEFINED(*pchunk, MP_CHUNK_TAIL);
+				size_t avail = (*pchunk)->free & ~(size_t)(CPU_STRUCT_ALIGN - 1);
+				if (size <= avail) {
+					struct mempool_chunk *chunk = *pchunk;
+					chunk->free = avail - size;
+					uint8_t *ptr = (uint8_t *)chunk - avail;
+
+					// make pchunk the last one
+					*pchunk = chunk->next;
+					chunk->next = pool->last;
+					pool->last = chunk;
+
+					for (struct mempool_chunk *c = pool->last; MEMCHECK_ACTIVE && c != *pchunk; c = c->next) {
+						MEMCHECK_NOACCESS(c, MP_CHUNK_TAIL);
+					}
+					MEMCHECK_UNDEFINED(ptr, size);
+					return ptr;
+				}
+				if ((*pchunk)->free < (*pfullest)->free) {
+					pfullest = pchunk;
+				}
+			}
+
+			// make pfullest the farthest chunk out of the active ones (no-op if satisfied); it becomes inactive shortly
+			struct mempool_chunk *chunk = *pchunk, *fullest = *pfullest;
+			*pchunk = fullest;
+			*pfullest = fullest->next;
+			fullest->next = chunk;
+
+			for (struct mempool_chunk *c = pool->last; MEMCHECK_ACTIVE && c != chunk; c = c->next) {
+				MEMCHECK_NOACCESS(c, MP_CHUNK_TAIL);
+			}
+		}
+
+		// allocate a new chunk
+		struct mempool_chunk *chunk = mp_new_chunk(size <= pool->chunk_size ? pool->chunk_size : mp_align_size(size));
 		if (!chunk) {
 			return NULL;
 		}
@@ -304,14 +355,15 @@ mp_alloc_internal(struct mempool *pool, size_t size)
 void *
 mp_alloc(struct mempool *pool, size_t size)
 {
+	MEMCHECK_DEFINED(pool->last, MP_CHUNK_TAIL);
 	size_t avail = pool->last ? pool->last->free & ~(size_t)(CPU_STRUCT_ALIGN - 1) : 0;
 	void *ptr = NULL;
 	if (size <= avail) {
-		MEMCHECK_DEFINED(pool->last, MP_CHUNK_TAIL);
 		pool->last->free = avail - size;
 		ptr = (uint8_t *)pool->last - avail;
 		MEMCHECK_NOACCESS(pool->last, MP_CHUNK_TAIL);
 	} else {
+		MEMCHECK_NOACCESS(pool->last, MP_CHUNK_TAIL);
 		ptr = mp_alloc_internal(pool, size);
 	}
 	if (ptr) MEMCHECK_UNDEFINED(ptr, size);
