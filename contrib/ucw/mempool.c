@@ -74,8 +74,6 @@ mp_init(struct mempool *pool, size_t chunk_size)
 	chunk_size = mp_align_size(MAX(sizeof(struct mempool), chunk_size));
 	*pool = (struct mempool) {
 		.chunk_size = chunk_size,
-		.threshold = chunk_size >> 1,
-		.last_big = &pool->last_big
 	};
 }
 
@@ -208,10 +206,8 @@ mp_new(size_t chunk_size)
 	chunk->free = chunk_size - sizeof(*pool);
 	MEMCHECK_NOACCESS(chunk, MP_CHUNK_TAIL);
 	*pool = (struct mempool) {
-		.state = { .last = { chunk } },
+		.last = chunk,
 		.chunk_size = chunk_size,
-		.threshold = chunk_size >> 1,
-		.last_big = &pool->last_big
 	};
 	return pool;
 }
@@ -227,17 +223,6 @@ mp_free_chain(struct mempool_chunk *chunk)
 	}
 }
 
-static void
-mp_free_big_chain(struct mempool_chunk *chunk)
-{
-	while (chunk) {
-		MEMCHECK_DEFINED(chunk, MP_CHUNK_TAIL);
-		struct mempool_chunk *next = chunk->next;
-		mp_free_big_chunk(chunk);
-		chunk = next;
-	}
-}
-
 void
 mp_delete(struct mempool *pool)
 {
@@ -245,15 +230,13 @@ mp_delete(struct mempool *pool)
 		return;
 	}
 	DBG("Deleting mempool %p", pool);
-	mp_free_big_chain(pool->state.last[1]);
-	mp_free_chain(pool->state.last[0]); // can contain the mempool structure
+	mp_free_chain(pool->last); // can contain the mempool structure
 }
 
 void
 mp_flush(struct mempool *pool)
 {
-	mp_free_big_chain(pool->state.last[1]);
-	struct mempool_chunk *chunk = pool->state.last[0], *next;
+	struct mempool_chunk *chunk = pool->last, *next;
 	while (chunk) {
 		MEMCHECK_DEFINED(chunk, MP_CHUNK_TAIL);
 		if ((uint8_t *)chunk - chunk->size == (uint8_t *)pool) {
@@ -263,24 +246,22 @@ mp_flush(struct mempool *pool)
 		mp_free_chunk(chunk);
 		chunk = next;
 	}
-	pool->state.last[0] = chunk;
+	pool->last = chunk;
 	if (chunk) {
 		chunk->free = chunk->size - sizeof(*pool);
 		MEMCHECK_NOACCESS((uint8_t *)chunk - chunk->size + sizeof(struct mempool),
 				chunk->size - sizeof(struct mempool) + MP_CHUNK_TAIL);
 	}
-	pool->state.last[1] = NULL;
-	pool->last_big = &pool->last_big;
 }
 
 static void
-mp_stats_chain(struct mempool *pool, struct mempool_chunk *chunk, struct mempool_stats *stats, unsigned idx)
+mp_stats_chain(struct mempool *pool, struct mempool_chunk *chunk, struct mempool_stats *stats)
 {
 	struct mempool_chunk *next;
 	while (chunk) {
 		MEMCHECK_DEFINED(chunk, MP_CHUNK_TAIL);
-		stats->chain_size[idx] += chunk->size + MP_CHUNK_TAIL;
-		stats->chain_count[idx]++;
+		stats->total_size += chunk->size + MP_CHUNK_TAIL;
+		stats->chunks_count++;
 		stats->used_size += chunk->size - chunk->free;
 		if ((uint8_t *)pool == (uint8_t *)chunk - chunk->size)
 			stats->used_size -= sizeof(*pool);
@@ -288,15 +269,13 @@ mp_stats_chain(struct mempool *pool, struct mempool_chunk *chunk, struct mempool
 		MEMCHECK_NOACCESS(chunk, MP_CHUNK_TAIL);
 		chunk = next;
 	}
-	stats->total_size += stats->chain_size[idx];
 }
 
 void
 mp_stats(struct mempool *pool, struct mempool_stats *stats)
 {
 	bzero(stats, sizeof(*stats));
-	mp_stats_chain(pool, pool->state.last[0], stats, 0);
-	mp_stats_chain(pool, pool->state.last[1], stats, 1);
+	mp_stats_chain(pool, pool->last, stats);
 	assert(stats->used_size <= stats->total_size);
 }
 
@@ -312,37 +291,20 @@ static void *
 mp_alloc_internal(struct mempool *pool, size_t size)
 {
 	struct mempool_chunk *chunk;
-	if (size <= pool->threshold) {
-		pool->idx = 0;
-		chunk = mp_new_chunk(pool->chunk_size);
+	if (likely(size <= MP_SIZE_MAX)) {
+		chunk = mp_new_chunk(size <= pool->chunk_size ? pool->chunk_size : mp_align_size(size));
 		if (!chunk) {
 			return NULL;
 		}
 #ifdef CONFIG_DEBUG
 		chunk->pool = pool;
 #endif
-		chunk->next = pool->state.last[0];
-		void *ret = (uint8_t *)chunk - chunk->size;
+		chunk->next = pool->last;
+		chunk->free = chunk->size - size;
+		void *ptr = (uint8_t *)chunk - chunk->size;
 		MEMCHECK_NOACCESS(chunk, MP_CHUNK_TAIL);
-		pool->state.last[0] = chunk;
-		return ret;
-	} else if (likely(size <= MP_SIZE_MAX)) {
-		pool->idx = 1;
-		size_t aligned = ALIGN_TO(size, CPU_STRUCT_ALIGN);
-		//char trace[150]; kr_log_get_shorttrace(trace);
-		// printf("NEW_BIG_CHUNK: requested %8zu, aligned %8zu, threshold %8zu\n  %s\n",
-		// 		size, aligned, pool->threshold, trace);
-		chunk = mp_new_big_chunk(aligned);
-		if (!chunk) {
-			return NULL;
-		}
-		chunk->next = pool->state.last[1];
-#ifdef CONFIG_DEBUG
-		chunk->pool = pool;
-#endif
-		MEMCHECK_NOACCESS(chunk, MP_CHUNK_TAIL);
-		pool->state.last[1] = chunk;
-		return pool->last_big = (uint8_t *)chunk - chunk->size;
+		pool->last = chunk;
+		return ptr;
 	} else {
 		fprintf(stderr, "Cannot allocate %zu bytes from a mempool", size);
 		assert(0);
@@ -353,11 +315,13 @@ mp_alloc_internal(struct mempool *pool, size_t size)
 void *
 mp_alloc(struct mempool *pool, size_t size)
 {
-	size_t avail = pool->state.last[0] ? pool->state.last[0]->free & ~(size_t)(CPU_STRUCT_ALIGN - 1) : 0;
+	size_t avail = pool->last ? pool->last->free & ~(size_t)(CPU_STRUCT_ALIGN - 1) : 0;
 	void *ptr = NULL;
 	if (size <= avail) {
-		pool->state.last[0]->free = avail - size;
-		ptr = (uint8_t *)pool->state.last[0] - avail;
+		MEMCHECK_DEFINED(pool->last, MP_CHUNK_TAIL);
+		pool->last->free = avail - size;
+		ptr = (uint8_t *)pool->last - avail;
+		MEMCHECK_NOACCESS(pool->last, MP_CHUNK_TAIL);
 	} else {
 		ptr = mp_alloc_internal(pool, size);
 	}
@@ -371,23 +335,24 @@ mp_start_internal(struct mempool *pool, size_t size)
 	void *ptr = mp_alloc_internal(pool, size);
 	if (!ptr)
 		return NULL;
-	pool->state.last[pool->idx]->free += size;
+	pool->last->free += size;
 	return ptr;
 }
 
 void *
 mp_start(struct mempool *pool, size_t size)
 {
-	size_t avail = pool->state.last[0] ? pool->state.last[0]->free & ~(size_t)(CPU_STRUCT_ALIGN - 1) : 0;
+	size_t avail = pool->last ? pool->last->free & ~(size_t)(CPU_STRUCT_ALIGN - 1) : 0;
 	void *ptr = NULL;
 	if (size <= avail) {
-		pool->idx = 0;
-		pool->state.last[0]->free = avail;
-		ptr = (uint8_t *)pool->state.last[0] - avail;
+		pool->last->free = avail;
+		ptr = (uint8_t *)pool->last - avail;
 	} else {
 		ptr = mp_start_internal(pool, size);
 	}
-	MEMCHECK_UNDEFINED(ptr, pool->state.last[pool->idx]->free);
+	MEMCHECK_DEFINED(pool->last, MP_CHUNK_TAIL);
+	MEMCHECK_UNDEFINED(ptr, pool->last->free);
+	MEMCHECK_NOACCESS(pool->last, MP_CHUNK_TAIL);
 	return ptr;
 }
 
@@ -398,41 +363,22 @@ mp_grow_internal(struct mempool *pool, size_t size)
 		return NULL;
 	size_t avail = mp_avail(pool);
 	void *ptr = mp_ptr(pool);
-	if (pool->idx) {
-		size_t amortized = likely(avail <= MP_SIZE_MAX / 2) ? avail * 2 : MP_SIZE_MAX;
-		amortized = MAX(amortized, size);
-		amortized = ALIGN_TO(amortized, CPU_STRUCT_ALIGN);
-		struct mempool_chunk *old_chunk = pool->state.last[1];
-		MEMCHECK_DEFINED(old_chunk, MP_CHUNK_TAIL);
-		struct mempool_chunk *next = old_chunk->next;
-		struct mempool_chunk *chunk = mp_new_big_chunk(amortized);
-		void *nptr = chunk - chunk->size;
-		memcpy(nptr, ptr, avail);
-		mp_free_big_chunk(old_chunk);
-		ptr = nptr;
-		chunk = ptr + amortized;
-		chunk->next = next;
-		MEMCHECK_NOACCESS(chunk, MP_CHUNK_TAIL);
-		pool->state.last[1] = chunk;
-		chunk->free = chunk->size;
-		pool->last_big = ptr;
-		return ptr;
-	} else {
-		void *p = mp_start_internal(pool, size);
-		MEMCHECK_UNDEFINED(p, pool->state.last[pool->idx]->free);
-		memcpy(p, ptr, avail);
-		MEMCHECK_NOACCESS(ptr, avail);
-		return p;
-	}
+	size = MAX(size, likely(avail <= MP_SIZE_MAX / 2) ? avail * 2 : MP_SIZE_MAX);
+	void *p = mp_start_internal(pool, size);
+	MEMCHECK_DEFINED(pool->last, MP_CHUNK_TAIL);
+	MEMCHECK_UNDEFINED(p, pool->last->free);
+	MEMCHECK_NOACCESS(pool->last, MP_CHUNK_TAIL);
+	memcpy(p, ptr, avail);
+	MEMCHECK_NOACCESS(ptr, avail);
+	return p;
 }
 
 size_t
 mp_open(struct mempool *pool, void *ptr)
 {
-	pool->idx = mp_idx(pool, ptr);
-	size_t size = ((uint8_t *)pool->state.last[pool->idx] - (uint8_t *)ptr) - pool->state.last[pool->idx]->free;
-	pool->state.last[pool->idx]->free += size;
-	MEMCHECK_UNDEFINED(ptr + size, pool->state.last[pool->idx]->free);
+	size_t size = ((uint8_t *)pool->last - (uint8_t *)ptr) - pool->last->free;
+	pool->last->free += size;
+	MEMCHECK_UNDEFINED(ptr, pool->last->free);
 	return size;
 }
 
