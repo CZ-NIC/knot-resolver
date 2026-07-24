@@ -159,7 +159,7 @@ int init_random_cid(ngtcp2_cid *cid, size_t len)
 	if (len == 0)
 		len = SERVER_DEFAULT_SCIDLEN;
 
-	uint8_t buf[32];
+	uint8_t buf[NGTCP2_MAX_CIDLEN];
 	if (len > sizeof(buf)) {
 		len = sizeof(buf);
 	}
