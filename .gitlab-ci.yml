@@ -239,7 +239,7 @@ docker:test:cross-platform:
   before_script:
     - apt-get update
     - apt-get -y install knot-dnsutils
-    - /usr/sbin/kresd -c /etc/knot-resolver/kresd.conf > kresd.log &
+    - /usr/sbin/kresd -n -c /etc/knot-resolver/kresd.conf > kresd.log 2>&1 &
   script:
     # check that the resolver responds to queries
     - kdig nic.cz @localhost#53
