@@ -145,9 +145,13 @@ class Subprocess:
         if self._config_file:
             self._config_file.unlink(missing_ok=True)
 
+    async def cleanup(self) -> None:
+        self._unlink_config()
+
     async def command(self, command: str) -> object:
-        if not self._id.subprocess_type is not SubprocessType.WORKER:
-            raise RuntimeError("")
+        if not self.type is not SubprocessType.WORKER:
+            msg = f"command can only be sent to a '{SubprocessType.WORKER}' subprocess; got '{self.type}'"
+            raise RuntimeError(msg)
 
         reader: asyncio.StreamReader
         writer: asyncio.StreamWriter | None = None

@@ -7,7 +7,7 @@ import os
 import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
-from xmlrpc.client import ServerProxy
+from xmlrpc.client import Fault, ServerProxy
 
 from supervisor.xmlrpc import SupervisorTransport
 
@@ -33,21 +33,24 @@ if TYPE_CHECKING:
     class SupervisorRPC(Protocol):
         def getState(self) -> dict[str, Any]: ...
         def getAllProcessInfo(self) -> list[dict[str, Any]]: ...
+        def getProcessInfo(self, name: str) -> dict[str, Any]: ...
         def startProcess(self, name: str, wait: bool = True) -> bool: ...
         def stopProcess(self, name: str, wait: bool = True) -> bool: ...
+        def shutdown(self) -> bool: ...
 
 
 logger = get_logger(__name__)
 
 
 def _create_server_proxy(config: KresConfig) -> ServerProxy:
+    # TODO(amrazek): get serverurl from configuration
     serverurl = "unix://" + str(get_absolute_path(SUPERVISORD_SOCK_NAME))
     transport = SupervisorTransport(
         username=None,
         password=None,
         serverurl=serverurl,
     )
-    return ServerProxy("http://127.0.0.1", transport=transport)
+    return ServerProxy("http://localhost", transport=transport)
 
 
 def _create_supervisord_proxy(config: KresConfig) -> SupervisorRPC:
@@ -56,20 +59,22 @@ def _create_supervisord_proxy(config: KresConfig) -> SupervisorRPC:
 
 
 class SupervisordController:
-    def __init__(self, args: KresArgs) -> None:
-        # TODO(amrazek): add declarative configuration
-        # self._config = config
+    def __init__(self, args: KresArgs, config: KresConfig) -> None:
         self._args = args
+        self._config = config
+
+    def get_proxy(self) -> SupervisorRPC:
+        return _create_supervisord_proxy(self._config)
 
     def write_config(self) -> None:
         logger.notice("Creating supervisord controller configuration...")
 
         config: str = SUPERVISORD_TEMPLATE.render(
-            supervisord=SupervisordConfig.create(self._args),
-            manager=SubprocessConfig.create_manager(self._args),
-            worker=SubprocessConfig.create_worker(self._args),
-            loader=SubprocessConfig.create_loader(self._args),
-            cache_gc=SubprocessConfig.create_cache_gc(self._args),
+            supervisord=SupervisordConfig.create(self._args, self._config),
+            manager=SubprocessConfig.create_manager(self._args, self._config),
+            worker=SubprocessConfig.create_worker(self._args, self._config),
+            loader=SubprocessConfig.create_loader(self._args, self._config),
+            cache_gc=SubprocessConfig.create_cache_gc(self._args, self._config),
         )
 
         config_path_tmp = Path(SUPERVISORD_CONFIGFILE_NAME_TMP)
@@ -102,3 +107,18 @@ class SupervisordController:
         except OSError as e:
             msg = f"supervisord exec failed: {e}"
             raise ControllerError(msg) from e
+
+    async def shutdown(self) -> None:
+        supervisord = self.get_proxy()
+
+        try:
+            supervisord.shutdown()
+        except Fault as e:
+            if e.faultCode == 6 and e.faultString == "SHUTDOWN_STATE":
+                # already shutting down
+                pass
+            else:
+                raise
+
+        config_path = Path(SUPERVISORD_CONFIGFILE_NAME)
+        config_path.unlink(missing_ok=True)

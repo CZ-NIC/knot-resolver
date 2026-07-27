@@ -1,4 +1,4 @@
-from knot_resolver.controller.subprocess import SubprocessID, SubprocessType
+from knot_resolver.controller.subprocess import Subprocess, SubprocessID, SubprocessType
 
 
 def test_subprocess_id() -> None:
@@ -17,3 +17,7 @@ def test_subprocess_id() -> None:
 
     assert loader.subprocess_num == 0
     assert cache_gc.subprocess_num == 0
+
+
+def test_subprocess() -> None:
+    pass
