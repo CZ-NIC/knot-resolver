@@ -374,6 +374,7 @@ static int pl_quic_demux_sess_init(struct session2 *session, void *sess_data, vo
 	}
 
 	if (!quic->conn_table) {
+		kr_require(the_network->quic_params);
 		quic->conn_table = kr_quic_table_new(
 				the_network->quic_params->max_conns,
 				NGTCP2_MAX_UDP_PAYLOAD_SIZE, creds);
