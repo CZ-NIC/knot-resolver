@@ -119,9 +119,9 @@ static enum protolayer_iter_cb_result pl_quic_demux_unwrap(void *sess_data,
 
 	bool retry_sent = false;
 	ngtcp2_version_cid dec_cids;
-	ngtcp2_cid odcid;
-	ngtcp2_cid dcid;
-	ngtcp2_cid scid;
+	ngtcp2_cid odcid = { 0 };
+	ngtcp2_cid dcid = { 0 };
+	ngtcp2_cid scid = { 0 };
 
 	kr_require(ctx->payload.type == PROTOLAYER_PAYLOAD_WIRE_BUF);
 	int ret = ngtcp2_pkt_decode_version_cid(&dec_cids,
@@ -374,6 +374,7 @@ static int pl_quic_demux_sess_init(struct session2 *session, void *sess_data, vo
 	}
 
 	if (!quic->conn_table) {
+		kr_require(the_network->quic_params);
 		quic->conn_table = kr_quic_table_new(
 				the_network->quic_params->max_conns,
 				NGTCP2_MAX_UDP_PAYLOAD_SIZE, creds);

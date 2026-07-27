@@ -566,12 +566,11 @@ void io_tty_process_input(uv_stream_t *stream, ssize_t nread, const uv_buf_t *bu
 		uv_os_fd_t dup_fd = dup(stream_fd);
 		if (dup_fd >= 0) {
 			out = fdopen(dup_fd, "w");
-		}
-
-		if (!out) {
-			close(dup_fd);
-			/* fallback to standard output */
-			out = stdout;
+			if (!out) {
+				close(dup_fd);
+				/* fallback to standard output */
+				out = stdout;
+			}
 		}
 	}
 
