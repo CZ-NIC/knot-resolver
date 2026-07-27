@@ -509,15 +509,13 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 		return kr_error(EINVAL);
 
 	int ret = kr_ok();
-	if (rrset_has_min_range_or_weird(rr, qry)) {
-		ret = kr_error(ERANGE);
+	if (rrset_has_min_range_or_weird(rr, qry))
 		goto return_needs_pkt;
-	}
 
 	const int wild_labels = rr_sigs == NULL ? 0 :
 	       knot_dname_labels(rr->owner, NULL) - knot_rrsig_labels(rr_sigs->rrs.rdata);
 	if (wild_labels < 0) {
-		ret = kr_error(ERANGE);
+		VERBOSE_MSG(qry, "=> invalid wildcard labels %d\n", wild_labels);
 		goto return_needs_pkt;
 	}
 	const knot_dname_t *encloser = rr->owner; /**< the closest encloser name */
@@ -537,7 +535,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 			signer_labels = MAX(signer_labels, l);
 		}
 		if (knot_dname_labels(encloser, NULL) < signer_labels) {
-			ret = kr_error(ERANGE);
+			VERBOSE_MSG(qry, "=> invalid wildcard labels %d\n", wild_labels);
 			goto return_needs_pkt;
 		}
 	}
