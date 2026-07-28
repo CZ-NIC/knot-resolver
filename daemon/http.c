@@ -388,7 +388,7 @@ static ssize_t send_callback(nghttp2_session *h2, const uint8_t *data, size_t le
 			     int flags, void *user_data)
 {
 	struct pl_http_sess_data *http = user_data;
-	struct http_send_ctx *send_ctx = malloc(sizeof(*send_ctx) + length);
+	struct http_send_ctx *send_ctx = malloc(offsetof(struct http_send_ctx, data) + length);
 	kr_require(send_ctx);
 	send_ctx->sess_data = http;
 	memcpy(send_ctx->data, data, length);
