@@ -11,6 +11,8 @@
 #include "quic_conn.h"
 #include "session2.h"
 #include "network.h"
+#include <asm-generic/errno.h>
+#include <ngtcp2/ngtcp2.h>
 #include <stdint.h>
 
 /* forward declaration */
@@ -146,11 +148,16 @@ static enum protolayer_iter_cb_result pl_quic_stream_wrap(void *sess_data,
 
 			return protolayer_break(ctx, kr_ok());
 		}
-		sent_msgs++;
 
 		if (sent > 0) {
 			kr_quic_stream_mark_sent(stream, sent);
 		}
+
+		if (nwrite == 0) {
+			break;
+		}
+
+		sent_msgs++;
 
 		protolayer_finished_cb finished_cb = NULL;
 		void *finished_baton = NULL;
@@ -212,6 +219,8 @@ static int send_stream(struct pl_quic_stream_sess_data *stream,
 			(stream_id >= 0 ? 1 : 0), quic_timestamp());
 
 	if (nwrite <= 0) {
+		/* Make sure there is nothing to send if write failed */
+		wire_buf_reset(&stream->outbuf);
 		return nwrite;
 	}
 

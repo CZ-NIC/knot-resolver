@@ -114,6 +114,7 @@ struct kr_quic_conn_param {
 	ngtcp2_cid scid;
 	ngtcp2_cid odcid;
 	ngtcp2_version_cid *dec_cids;
+	bool token_present;
 	struct comm_info *comm_storage;
 };
 

@@ -84,11 +84,13 @@ void kr_quic_table_rem(struct pl_quic_conn_sess_data *conn,
 		}
 	}
 
-	kr_quic_cid_t **podcid = kr_quic_table_lookup2(&conn->odcid, table);
-	if (kr_fails_assert(podcid != NULL && *podcid != NULL)) {
-		kr_log_debug(DOQ, "Failed to remove connection cid from table, counters might not match\n");
-	} else {
-		kr_quic_table_rem2(podcid, table);
+	if (conn->is_server) {
+		kr_quic_cid_t **podcid = kr_quic_table_lookup2(&conn->odcid, table);
+		if (kr_fails_assert(podcid != NULL && *podcid != NULL)) {
+			kr_log_debug(DOQ, "Failed to remove connection cid from table, counters might not match\n");
+		} else {
+			kr_quic_table_rem2(podcid, table);
+		}
 	}
 
 	int pos = heap_find(table->expiry_heap, (heap_val_t *)conn);
@@ -223,6 +225,7 @@ static enum protolayer_iter_cb_result pl_quic_demux_unwrap(void *sess_data,
 			.scid = scid,
 			.odcid = odcid,
 			.dec_cids = &dec_cids,
+			.token_present = header.tokenlen > 0,
 			.comm_storage = ctx->comm,
 		};
 

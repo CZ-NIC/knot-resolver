@@ -8,6 +8,7 @@
 #include "network.h"
 #include "quic_stream.h"
 
+#include <stdint.h>
 #include <ucw/lib.h>
 #include <sys/socket.h>
 
@@ -1799,11 +1800,13 @@ static int session2_transport_event(struct session2 *s,
 
 	bool is_close_event = (event == PROTOLAYER_EVENT_CLOSE ||
 			event == PROTOLAYER_EVENT_FORCE_CLOSE);
-	if (is_close_event) {
+	if (is_close_event && s->transport.type != SESSION2_TRANSPORT_PARENT) {
 		if (!session2_is_empty(s)) {
 			kr_log_debug(DEVEL, "failed empty s->proto: %d\n",
 					s->proto);
 		}
+		/* FIXME: This causes issues for subsessions which
+		 * actually enqueue tasks, i.e. QUIC_CONN. */
 		session2_waitinglist_finalize(s, KR_STATE_FAIL);
 		session2_tasklist_finalize(s, KR_STATE_FAIL);
 		session2_timer_stop(s);
