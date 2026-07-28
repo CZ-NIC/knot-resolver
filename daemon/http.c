@@ -76,7 +76,7 @@ struct pl_http_sess_data {
 	queue_http_stream streams;
 
 	trie_t *stream_write_queues;  /* Dictionary of stream data that needs to be freed after write. */
-	int32_t incomplete_stream;
+	int32_t incomplete_stream;  /** The currently processed stream.  Fields below relate to that one. */
 	int32_t last_stream;   /* The last used stream - mostly the same as incomplete_stream, but can be used after
 				  completion for sending HTTP status codes. */
 	enum http_method current_method;
@@ -240,6 +240,7 @@ void http_free_headers(kr_http_header_array_t *headers)
 static void http_cleanup_stream(struct pl_http_sess_data *ctx)
 {
 	ctx->incomplete_stream = -1;
+	wire_buf_reset(&ctx->wire_buf);
 	ctx->current_method = HTTP_METHOD_NONE;
 	ctx->status = HTTP_STATUS_OK;
 	free(ctx->uri_path);
@@ -665,7 +666,6 @@ static int data_chunk_recv_callback(nghttp2_session *h2, uint8_t flags, int32_t 
 		kr_log_debug(DOH, "[%p] stream %d incomplete, refusing (data_chunk_recv_callback)\n",
 			(void *)h2, ctx->incomplete_stream);
 		refuse_stream(h2, stream_id);
-		ctx->incomplete_stream = -1;
 		return 0;
 	}
 
@@ -680,6 +680,7 @@ static int data_chunk_recv_callback(nghttp2_session *h2, uint8_t flags, int32_t 
 	if (required > remaining) {
 		kr_log_error(DOH, "[%p] insufficient space in buffer\n", (void *)h2);
 		ctx->incomplete_stream = -1;
+		wire_buf_reset(wb);
 		return NGHTTP2_ERR_CALLBACK_FAILURE;
 	}
 
