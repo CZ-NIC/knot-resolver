@@ -89,6 +89,19 @@ bool worker_task_finished(struct qr_task *task);
 /** To be called after sending a DNS message.  It mainly deals with cleanups. */
 int qr_task_on_send(struct qr_task *task, struct session2 *s, int status);
 
+/* Handles QUIC handshake timeout.
+ * Unlike other transport protocols client-side DoQ can reach a state where:
+ *   - QUIC connection session exists
+ *   - session's waitinglist contains a task
+ *   - QUIC stream session does NOT exist
+ *   - handshake timed-out
+ * in order to provide uniform logging across all transport protocols
+ * this function logs the information usually written by
+ * pl_dns_stream_connection_fail (which in this situation is in
+ * a as of yet non-existend session, and cannot be reached). */
+void quic_handshake_timeout(struct session2 *session,
+		enum kr_selection_error sel_err);
+
 /* similar to on connect used by TCP */
 void doq_on_connect(struct pl_quic_conn_sess_data *conn, int status);
 

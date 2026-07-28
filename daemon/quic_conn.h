@@ -77,6 +77,7 @@ struct pl_quic_conn_sess_data {
 	ngtcp2_cid scid;
 	ngtcp2_cid odcid;
 	ngtcp2_version_cid dec_cids;
+	bool token_present;
 	uint8_t secret[32];
 	ngtcp2_path *path;
 	struct comm_info comm_storage;

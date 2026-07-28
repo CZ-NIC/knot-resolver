@@ -873,7 +873,10 @@ static int quic_client_verify_certchain(struct pl_quic_conn_sess_data *conn,
 		return GNUTLS_E_SUCCESS;
 	}
 
-	const char *addr_str = kr_straddr(session2_get_peer(conn->h.session));
+	const char *addr_str = NULL; 
+	if (conn->h.session->comm_storage.comm_addr) {
+		addr_str = kr_straddr(conn->h.session->comm_storage.comm_addr);
+	}
 	if (ret == GNUTLS_E_SUCCESS) {
 		gnutls_datum_t msg;
 		ret = gnutls_certificate_verification_status_print(

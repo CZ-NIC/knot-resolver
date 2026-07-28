@@ -190,6 +190,8 @@ void quic_handle_timeout(uv_timer_t *timer)
 	}
 	if (ret == NGTCP2_ERR_IDLE_CLOSE) {
 		session2_force_close(s);
+	} else if (ret == NGTCP2_ERR_HANDSHAKE_TIMEOUT) {
+		session2_event(s, PROTOLAYER_EVENT_CONNECT_TIMEOUT, NULL);
 	} else if (ret < 0) {
 		QUIC_SET_CLOSING(conn);
 		session2_close(s);
