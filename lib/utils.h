@@ -229,7 +229,7 @@ static inline bool kr_rand_coin(unsigned int nomin, unsigned int denomin)
 	return (kr_rand_bytes(1) < threshold);
 }
 
-/** Memory reservation routine for knot_mm_t */
+/** Memory reservation routine meant for memory pools. */
 KR_EXPORT
 int kr_memreserve(void *baton, void **mem, size_t elm_size, size_t want, size_t *have);
 
