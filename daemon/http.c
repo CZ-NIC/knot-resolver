@@ -472,7 +472,8 @@ static int send_data_callback(nghttp2_session *h2, nghttp2_frame *frame, const u
 	}
 
 	int iovcnt = 1 + dataiovcnt + (2 * has_padding);
-	struct http_send_data_ctx *sdctx = calloc(iovcnt, sizeof(*ctx) + sizeof(struct iovec[iovcnt]));
+	struct http_send_data_ctx *sdctx = malloc(offsetof(struct http_send_data_ctx, iov)
+						+ sizeof(struct iovec[iovcnt]));
 	sdctx->padlen = padlen;
 
 	struct iovec *dest_iov = sdctx->iov;
