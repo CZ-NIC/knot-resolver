@@ -23,6 +23,7 @@ from knot_resolver.controller import get_best_controller_implementation
 from knot_resolver.controller.exceptions import KresSubprocessControllerError, KresSubprocessControllerExec
 from knot_resolver.controller.interface import SubprocessType
 from knot_resolver.controller.registered_workers import command_single_registered_worker
+from knot_resolver.controller.supervisord.plugin.notify_socket import send_notify_socket_message
 from knot_resolver.datamodel import kres_config_json_schema
 from knot_resolver.datamodel.cache_schema import CacheClearRPCSchema
 from knot_resolver.datamodel.config_schema import KresConfig, get_rundir_without_validation
@@ -40,7 +41,6 @@ from knot_resolver.utils.modeling.exceptions import AggregateDataValidationError
 from knot_resolver.utils.modeling.parsing import DataFormat, data_combine, try_to_parse
 from knot_resolver.utils.modeling.query import query
 from knot_resolver.utils.modeling.types import NoneType
-from knot_resolver.utils.systemd_notify import systemd_notify
 
 from .config_store import ConfigStore
 from .constants import PID_FILE_NAME, init_user_constants
@@ -172,9 +172,9 @@ class Server:
 
     async def sighup_handler(self) -> None:
         logger.info("Received SIGHUP, reloading configuration file")
-        systemd_notify(RELOADING="1")
+        send_notify_socket_message(RELOADING="1")
         await self._reload_config()
-        systemd_notify(READY="1")
+        send_notify_socket_message(READY="1")
 
     @staticmethod
     def all_handled_signals() -> Set[signal.Signals]:
@@ -681,12 +681,12 @@ async def start_server(config: List[str]) -> int:  # noqa: C901, PLR0915
     logger.info(f"Manager fully initialized and running in {round(time() - start_time, 3)} seconds")
 
     # notify systemd/anything compatible that we are ready
-    systemd_notify(READY="1")
+    send_notify_socket_message(READY="1")
 
     await server.wait_for_shutdown()
 
     # notify systemd that we are shutting down
-    systemd_notify(STOPPING="1")
+    send_notify_socket_message(STOPPING="1")
 
     # Ok, now we are tearing everything down.
 
