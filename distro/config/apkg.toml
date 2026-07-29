@@ -5,8 +5,8 @@ make_archive_script = "scripts/make-archive.sh"
 
 [upstream]
 # needed for get-archive
-archive_url = "https://secure.nic.cz/files/knot-resolver/knot-resolver-{{ version }}.tar.xz"
-signature_url = "https://secure.nic.cz/files/knot-resolver/knot-resolver-{{ version }}.tar.xz.asc"
+archive_url = "https://knot-resolver.nic.cz/release/knot-resolver-{{ version }}.tar.xz"
+signature_url = "https://knot-resolver.nic.cz/release/knot-resolver-{{ version }}.tar.xz.asc"
 version_script = "scripts/upstream-version.sh"
 
 [apkg]

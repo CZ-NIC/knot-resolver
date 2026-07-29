@@ -31,7 +31,7 @@ Source1:        knot-resolver-%{version}.tar.xz.asc
 # PGP keys used to sign upstream releases
 # Export with --armor using command from https://fedoraproject.org/wiki/PackagingDrafts:GPGSignatures
 # Don't forget to update %%prep section when adding/removing keys
-# This key is from: https://secure.nic.cz/files/knot-resolver/kresd-keyblock.asc
+# This key is from: https://knot-resolver.nic.cz/release/kresd-keyblock.asc
 Source100:      kresd-keyblock.asc
 BuildRequires:  gnupg2
 %endif
