@@ -9,6 +9,7 @@ if NOTIFY_SUPPORT:
     import signal
     import time
     from functools import partial
+    from pathlib import Path
     from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar
 
     from supervisor.events import ProcessStateEvent, ProcessStateStartingEvent, subscribe
@@ -17,7 +18,12 @@ if NOTIFY_SUPPORT:
     from supervisor.states import ProcessStates
     from supervisor.supervisord import Supervisor
 
-    from knot_resolver.controller.supervisord.plugin import notify
+    from knot_resolver.controller.supervisord.plugin.notify_socket import (
+        init_notify_socket,
+        read_notify_socket,
+        NOTIFY_SOCKET,
+        NOTIFY_SOCKET_NAME,
+    )
 
     starting_processes: List[Subprocess] = []
 
@@ -34,7 +40,7 @@ if NOTIFY_SUPPORT:
         def __init__(self, supervisor: Supervisor, fd: int):
             self._supervisor = supervisor
             self.fd = fd
-            self.closed = False  # True if close() has been called
+            self.closed: bool = False  # True if close() has been called
 
         def __repr__(self):
             return f"<{self.__class__.__name__} with fd={self.fd}>"
@@ -48,10 +54,11 @@ if NOTIFY_SUPPORT:
         def handle_read_event(self):
             logger: Any = self._supervisor.options.logger
 
-            res: Optional[Tuple[int, bytes]] = notify.read_message(self.fd)
-            if res is None:
+            result: tuple[int, bytes, None] = read_notify_socket(self.fd)
+            if result is None:
                 return  # there was some junk
-            pid, data = res
+
+            pid, data = result
 
             # pylint: disable=undefined-loop-variable
             for proc in starting_processes:
@@ -162,7 +169,7 @@ if NOTIFY_SUPPORT:
     def supervisord_get_process_map(supervisord: Any, mp: Dict[Any, Any]) -> Dict[Any, Any]:
         global notify_dispatcher
         if notify_dispatcher is None:
-            notify_dispatcher = NotifySocketDispatcher(supervisord, notify.init_socket())
+            notify_dispatcher = NotifySocketDispatcher(supervisord, init_notify_socket())
             supervisord.options.logger.info("notify: injected $NOTIFY_SOCKET into event loop")
 
         # add our dispatcher to the result
@@ -173,7 +180,7 @@ if NOTIFY_SUPPORT:
 
     def process_spawn_as_child_add_env(slf: Subprocess, *args: Any) -> Tuple[Any, ...]:
         if is_type_notify(slf):
-            slf.config.environment["NOTIFY_SOCKET"] = os.getcwd() + "/supervisor-notify-socket"
+            slf.config.environment[NOTIFY_SOCKET] = str(Path.cwd() / NOTIFY_SOCKET_NAME)
         return (slf, *args)
 
     T = TypeVar("T")
