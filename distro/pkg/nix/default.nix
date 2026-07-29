@@ -20,7 +20,7 @@ unwrapped = stdenv.mkDerivation rec {
   version = "{{ version }}";
 
   src = fetchurl {
-    url = "https://secure.nic.cz/files/knot-resolver/${pname}-${version}.tar.xz";
+    url = "https://knot-resolver.nic.cz/release/${pname}-${version}.tar.xz";
     sha256 = "{{ src_hash }}";
   };
 

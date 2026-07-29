@@ -159,7 +159,7 @@ int init_random_cid(ngtcp2_cid *cid, size_t len)
 	if (len == 0)
 		len = SERVER_DEFAULT_SCIDLEN;
 
-	uint8_t buf[32];
+	uint8_t buf[NGTCP2_MAX_CIDLEN];
 	if (len > sizeof(buf)) {
 		len = sizeof(buf);
 	}
@@ -334,6 +334,8 @@ int write_retry_packet(struct wire_buf *dest, kr_quic_table_t *table,
 	uint8_t retry_token[NGTCP2_CRYPTO_MAX_RETRY_TOKENLEN2];
 	uint64_t now = quic_timestamp();
 
+	if (kr_fails_assert(src_addr->sa_family != AF_UNIX))
+		return -1;  // too long addr; silence analyzers
 	int ret = ngtcp2_crypto_generate_retry_token2(
 		retry_token, (const uint8_t *)table->hash_secret,
 		sizeof(table->hash_secret), dec_cids->version,

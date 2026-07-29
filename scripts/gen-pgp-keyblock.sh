@@ -8,7 +8,7 @@ keys=(
     # '4A8BA48C2AED933BD495C509A1FBA5F7EF8C4869'  # tomas.krizek@nic.cz  expired 2022-03-31
 )
 outfile="kresd-keyblock.asc"
-url="https://secure.nic.cz/files/knot-resolver/kresd-keyblock.asc"
+url="https://knot-resolver.nic.cz/release/kresd-keyblock.asc"
 
 keyring="$(mktemp -d)"
 keyring_import="$(mktemp -d)"
@@ -33,6 +33,6 @@ gpg --homedir "${keyring_import}" -q --import "${outfile}"
 gpg --homedir "${keyring_import}" -k
 echo "Created: ${outfile}"
 
-# check if update of secure.nic.cz keyblock might be needed
+# check if update of kresd-keyblock.asc might be needed
 curl -sfo "${published}" "${url}"
 diff -q "${outfile}" "${published}" &>/dev/null || echo "Generated keyblock differs from ${url}"

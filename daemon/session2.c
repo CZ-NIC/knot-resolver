@@ -913,7 +913,8 @@ struct session2 *session2_new(enum session2_transport_type transport_type,
 	return s;
 
 failed_init:
-	while (i --> 0) {
+	while (i > 0) {
+		i--;
 		struct protolayer_globals *globals = &protolayer_globals[grp->layers[i]];
 		struct protolayer_data *sess_data = protolayer_sess_data_get(s, i);
 		if (globals->sess_deinit) {
