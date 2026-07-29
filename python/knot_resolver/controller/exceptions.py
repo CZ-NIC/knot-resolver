@@ -7,6 +7,14 @@ class KresSubprocessControllerError(KresBaseError):
     """Class for errors that are raised in the controller module."""
 
 
+class KresSubprocessControllerErrorNotifySocketError(KresSubprocessControllerError):
+    """Exception class for notify socket errors."""
+
+    def __init__(self, msg: str) -> None:
+        msg = f"notify socket error: {msg}"
+        super().__init__(msg)
+
+
 class KresSubprocessControllerExec(Exception):  # noqa: N818
     """
     Custom non-error exception that indicates the need for exec().
