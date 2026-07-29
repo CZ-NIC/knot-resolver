@@ -458,6 +458,10 @@ static void drop_capabilities(void)
 #endif /* ENABLE_CAP_NG */
 }
 
+void mempool_timer_callback(uv_timer_t *handle) {
+	mp_log_global_stats();
+}
+
 int main(int argc, char **argv)
 {
 	//sleep(10);
@@ -634,6 +638,12 @@ int main(int argc, char **argv)
 	if (defer_init_idle(loop) != 0) {
 		ret = EXIT_FAILURE;
 		goto cleanup;
+	}
+
+	{
+		static uv_timer_t mempool_timer;
+		uv_timer_init(loop, &mempool_timer);
+		uv_timer_start(&mempool_timer, mempool_timer_callback, 0, 60000);
 	}
 
 	ret = kr_rules_init_ensure();

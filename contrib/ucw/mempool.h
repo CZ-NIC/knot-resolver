@@ -108,6 +108,9 @@ void mp_stats(struct mempool *pool, struct mempool_stats *stats);
  **/
 size_t mp_total_size(struct mempool *pool);
 
+KR_EXPORT
+void mp_log_global_stats(void);
+
 /***
  * [[alloc]]
  * Allocation routines
