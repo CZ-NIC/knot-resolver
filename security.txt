@@ -4,6 +4,6 @@ address.
 vladimir.cunat@nic.cz
 
 You can obtain our PGP keys from:
-https://secure.nic.cz/files/knot-resolver/kresd-keyblock.asc
+https://knot-resolver.nic.cz/release/kresd-keyblock.asc
 
 More info: https://www.knot-resolver.cz/contact
