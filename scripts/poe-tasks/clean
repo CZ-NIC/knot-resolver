@@ -5,10 +5,10 @@ src_dir="$(dirname "$(realpath "$0")")"
 source $src_dir/utils/_env.sh
 
 echo
-echo --------------------------------------------
-echo Removing mypy, pytest and other cached files 
-echo --------------------------------------------
-rm -vrf .coverage .mypy_cache .pytest_cache
+echo --------------------------------------------------------------
+echo Removing wheelhouse, ruff, mypy, pytest and other cached files
+echo --------------------------------------------------------------
+rm -vrf .coverage .mypy_cache .pytest_cache .ruff_cache .wheelhouse
 echo
 echo ------------------------------------------
 echo Removing Meson build directories and files
@@ -18,5 +18,6 @@ echo
 echo ------------------------------------------
 echo Removing __pycache__ directories and files
 echo ------------------------------------------
-find . -type d -name '__pycache__' -prune -exec rm -vrf {} +
+find python -type d -name '__pycache__' -prune -exec rm -vrf {} +
+find tests/python -type d -name '__pycache__' -prune -exec rm -vrf {} +
 echo
