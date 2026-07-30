@@ -22,11 +22,11 @@ if ! git describe --tags --exact-match >&2; then
     N_COMMITS=$(git rev-list $VERSION_TAG.. --count)
     FULL_VERSION="$VERSION.dev$N_COMMITS+$GIT_HASH"
 
-    # modify and commit meson.build
-    sed -i "s/^\(\s*version\s*:\s*'\)\([^']\+\)\('.*\)/\1$FULL_VERSION\3/" meson.build
+    # modify and commit VERSION file
+    printf '%s\n' "$FULL_VERSION" > PROJECT_VERSION
 
-    : changed version in meson.build, changes must be committed to git
-    git add meson.build >&2
+    : changed PROJECT_VERSION file, changes must be committed to git
+    git add PROJECT_VERSION >&2
     git commit -m 'DROP: devel version archive' >&2
 
     cleanup() {
