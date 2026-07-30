@@ -875,20 +875,24 @@ docs:website:
   <<: *nodep
   stage: sanity
   before_script:
-    - poetry --version
-    - poetry env use python${PYTHON_VERSION}
-    - poetry env info
+    - python${PYTHON_VERSION} -m venv .venv
+    - source .venv/bin/activate
+    - pip install --upgrade pip
+    - python --version
 
 python:check:files:
   <<: *python
   script:
-    - poetry install --all-extras --only main,build,dev,lint
+    - pip install -e ".[prometheus,watchdog]" --group all
     - poe check-files
 
 python:check:code:
   <<: *python
   script:
-    - poetry install --all-extras --only main,dev,lint
+    - >
+      pip install -e ".[prometheus,watchdog]" \
+        --group dev \
+        --group lint
     - poe check-code
   allow_failure: true
 
@@ -896,14 +900,14 @@ python:test:examples:
   <<: *python
   stage: test
   script:
-    - poetry install --all-extras --only main,dev
+    - pip install -e ".[prometheus,watchdog]" --group dev
     - poe test-examples
 
 python:test:migrate:
   <<: *python
   stage: test
   script:
-    - poetry install --all-extras --only main,dev
+    - pip install -e ".[prometheus,watchdog]" --group dev
     - poe test-migrate
 
 python:test:run:
@@ -919,7 +923,7 @@ python:test:run:
           - config.test-rate-limiting.yaml
   script:
     - touch etc/config/blocklist.rpz
-    - poetry install --all-extras --only main,dev
+    - pip install -e ".[prometheus,watchdog]" --group dev
     - poe configure
     # return code 124 is also OK
     - timeout 1m poe run etc/config/${ADD_CONFIG_FILE_NAME} || ( [[ $? -eq 124 ]] )
@@ -937,17 +941,21 @@ python:test:unit:
           - '3.13'
           - '3.14'
   script:
-    - poetry install --all-extras --only main,dev,test
+    - pip install -e ".[prometheus,watchdog]" --group dev --group test
     - poe test-unit
-    # the following command makes sure that the source root of the coverage file is at $gitroot
-    - poetry run bash -c "coverage combine .coverage; coverage xml"
+    # ensure consistent coverage file handling (no accidental stale artifacts)
+    - coverage combine || true
+    - coverage xml -o coverage.xml
   artifacts:
+    when: always
     reports:
       coverage_report:
         coverage_format: cobertura
         path: coverage.xml
       junit: unit.junit.xml
     paths:
+      - coverage.xml
       - unit.junit.xml
+
 
 # }}}
