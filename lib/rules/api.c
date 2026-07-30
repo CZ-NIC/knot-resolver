@@ -8,6 +8,7 @@
 #include "lib/cache/cdb_lmdb.h"
 
 #include <stdlib.h>
+#include <lmdb.h>
 
 
 struct kr_rules *the_rules = NULL;
@@ -635,8 +636,15 @@ int local_data_ins(knot_db_val_t key, const knot_rrset_t *rrs, const knot_rdatas
 
 	knot_db_val_t val = { .data = buf, .len = val_len };
 	int ret = ruledb_op(write, &key, &val, 1); // TODO: overwriting on ==tags?
-	// ENOSPC seems to be the only expectable error.
-	kr_assert(ret == 0 || ret == kr_error(ENOSPC));
+	if (unlikely(ret == MDB_BAD_VALSIZE)) { // yeah, leaking implementation details
+		KR_DNAME_GET_STR(owner_str, rrs->owner);
+		KR_RRTYPE_GET_STR(type_str, rrs->type);
+		kr_log_error(RULES, "records too big (%d B) for %s %s\n",
+				val_len, owner_str, type_str);
+	} else {
+		// ENOSPC seems to be the only other expectable error.
+		kr_assert(ret == 0 || ret == kr_error(ENOSPC));
+	}
 
 	if (ret || rrs->type != KNOT_RRTYPE_DNAME)
 		return ret;
