@@ -13,6 +13,8 @@ Packaging
 Improvements
 ------------
 - local-data: increase capacity to 63 GiB (logged MDB_MAP_FULL, !1885)
+- controller: reimplemented the notify socket in Python (!1875)
+  The `knot_resolver` Python package no longer contains native extensions and is now implemented entirely in Python.
 
 
 Knot Resolver 6.4.2 (2026-08-05)
