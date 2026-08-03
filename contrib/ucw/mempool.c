@@ -94,10 +94,6 @@ mp_new_big_chunk(size_t size)
 static void
 mp_free_big_chunk(struct mempool_chunk *chunk)
 {
-	char trace[150]; kr_log_get_shorttrace(trace);
-	printf("FREE_BIG_CHUNK: size %8u   %s\n",
-			chunk->size, trace);
-
 	void *ptr = (uint8_t *)chunk - chunk->size;
 	MEMCHECK_UNDEFINED(ptr, chunk->size);
 	free(ptr);
@@ -125,10 +121,6 @@ static void
 mp_free_chunk(struct mempool_chunk *chunk)
 {
 #ifdef CONFIG_UCW_POOL_IS_MMAP
-	char trace[150]; kr_log_get_shorttrace(trace);
-	printf("FREE_CHUNK:     size %8u   %s\n",
-			chunk->size, trace);
-
 	uint8_t *data = (uint8_t *)chunk - chunk->size;
 	MEMCHECK_UNDEFINED(data, chunk->size);
 	page_free(data, chunk->size + MP_CHUNK_TAIL);
@@ -188,6 +180,21 @@ mp_free_reusable_chunk(struct mempool_chunk *chunk) {
 	}
 }
 
+static void
+mp_balance_reusable(void) {
+	// just free all unused chunks for now
+	for (int i = 0; i < MP_REUSABLE_CNT; i++) {
+		for (struct mempool_chunk *chunk = mp_reusable[i].chunk; chunk; ) {
+			struct mempool_chunk *next = chunk->next;
+			mp_free_chunk(chunk);
+			chunk = next;
+		}
+		mp_reusable[i].chunk = NULL;
+		mp_reusable[i].total_cnt -= mp_reusable[i].unused_cnt;
+		mp_reusable[i].unused_cnt = 0;
+	}
+}
+
 #define mp_new_chunk       mp_new_reusable_chunk
 #define mp_free_chunk      mp_free_reusable_chunk
 #define mp_new_big_chunk   mp_new_reusable_chunk
@@ -239,6 +246,9 @@ void mp_log_global_stats(void)
 		printf("%5zu/%-5zu ", mp_reusable[i].total_cnt - mp_reusable[i].unused_cnt, mp_reusable[i].total_cnt);
 	}
 	printf("\n");
+
+	// free all unused chunks here to use total as per-minute maximum (temporary)
+	mp_balance_reusable();
 }
 
 struct mempool *
