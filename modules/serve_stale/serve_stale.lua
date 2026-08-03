@@ -7,15 +7,17 @@ local ffi = require('ffi')
 -- approximately at multiples of KR_CONN_RTT_MAX.
 M.timeout = 3*sec
 
-M.callback = ffi.cast("kr_stale_cb",
-	function (ttl) --, name, type, qry)
-		--log_debug(ffi.C.SRVSTALE, '   => called back with TTL: ' .. tostring(ttl))
-		if ttl + 3600 * 24 > 0 then -- at most one day stale
-			return 1
-		else
-			return -1
-		end
-	end)
+local function stale_cb(ttl) --, name, type, qry)
+	--log_debug(ffi.C.SRVSTALE, '   => called back with TTL: ' .. tostring(ttl))
+	if ttl + 3600 * 24 > 0 then -- at most one day stale
+		return 1
+	else
+		return -1
+	end
+end
+-- Work around a LuaJIT bug: https://github.com/LuaJIT/LuaJIT/issues/1498
+jit.off(stale_cb)
+M.callback = ffi.cast("kr_stale_cb", stale_cb)
 
 M.layer = {
 	produce = function (state, req)
