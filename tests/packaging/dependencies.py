@@ -1,32 +1,25 @@
 #!/usr/bin/env python3
 
-import importlib
-import importlib.util
 import sys
 from importlib.metadata import distributions
-from types import ModuleType
+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
 
 from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
 
+pyproject = sys.argv[1] if len(sys.argv) == 2 else "pyproject.toml"
 
-# replace imports with mocks
-dummy = ModuleType("dummy")
-dummy.__dict__["setup"] = lambda *args, **kwargs: None
-dummy.__dict__["build"] = lambda *args, **kwargs: None
-sys.modules["setuptools"] = dummy
-sys.modules["build_c_extensions"] = dummy
-
-# load install_requires array from setup.py
-spec = importlib.util.spec_from_file_location("setup", sys.argv[1] if len(sys.argv) == 2 else "setup.py")
-mod = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(mod)
-install_requires = mod.install_requires
+with open(pyproject, "rb") as f:
+    project = tomllib.load(f)["project"]
 
 # strip version codes
 deps = {
     canonicalize_name(Requirement(req).name)
-    for req in install_requires
+    for req in project.get("dependencies", [])
 }
 
 # find out which packages are missing
@@ -38,6 +31,6 @@ installed = {
 missing = deps - installed
 
 # fail if there are some missing
-if len(missing) > 0:
-    print(f"Some required packages are missing: {missing}", file=sys.stderr)
-    exit(1)
+if missing:
+    print(f"Some required packages are missing: {sorted(missing)}", file=sys.stderr)
+    sys.exit(1)
