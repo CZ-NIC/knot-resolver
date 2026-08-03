@@ -4,6 +4,7 @@ Knot Resolver 5.7.8 (2026-08-dd)
 Bugfixes
 --------
 - cache: avoid excessive logging introduced in the last release (!1871)
+- /options/serve-stale: avoid SIGSEGV from a LuaJIT bug (#957)
 
 Improvements
 ------------
