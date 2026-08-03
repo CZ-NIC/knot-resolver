@@ -177,6 +177,21 @@ mp_free_reusable_chunk(struct mempool_chunk *chunk) {
 	}
 }
 
+static void
+mp_balance_reusable(void) {
+	// just free all unused chunks for now
+	for (int i = 0; i < MP_REUSABLE_CNT; i++) {
+		for (struct mempool_chunk *chunk = mp_reusable[i].chunk; chunk; ) {
+			struct mempool_chunk *next = chunk->next;
+			mp_free_chunk(chunk);
+			chunk = next;
+		}
+		mp_reusable[i].chunk = NULL;
+		mp_reusable[i].total_cnt -= mp_reusable[i].unused_cnt;
+		mp_reusable[i].unused_cnt = 0;
+	}
+}
+
 #define mp_new_chunk       mp_new_reusable_chunk
 #define mp_free_chunk      mp_free_reusable_chunk
 #define mp_new_big_chunk   mp_new_reusable_chunk
