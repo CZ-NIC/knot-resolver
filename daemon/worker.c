@@ -297,7 +297,7 @@ static struct request_ctx *request_create(struct session2 *session,
                                           uint32_t uid)
 {
 	knot_mm_t pool = {
-		.ctx = mp_new(16 * 1024),
+		.ctx = mp_new(MM_DEFAULT_BLKSIZE),
 		.alloc = (knot_mm_alloc_t)mp_alloc
 	};
 
