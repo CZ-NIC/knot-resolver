@@ -25,11 +25,7 @@
 #define MP_CHUNK_TAIL ALIGN_TO(sizeof(struct mempool_chunk), CPU_STRUCT_ALIGN)
 #define MP_SIZE_MAX (UINT32_MAX - MP_CHUNK_TAIL - CPU_PAGE_SIZE)
 
-#define CONFIG_UCW_POOL_IS_MMAP       // use mmap backend (for normal chunks instead of malloc)
-#define CONFIG_UCW_POOL_IS_REUSABLE   // reuse chunks across pools
-
 /** \note Imported MMAP backend from bigalloc.c */
-#ifdef CONFIG_UCW_POOL_IS_MMAP
 #include <sys/mman.h>
 static void *
 page_alloc(size_t len)
@@ -55,17 +51,12 @@ page_free(void *start, size_t len)
 	assert(!((uintptr_t) start & (CPU_PAGE_SIZE-1)));
 	munmap(start, len);
 }
-#endif
 
 static size_t
 mp_align_size(size_t size)
 {
 	size = MAX(size, 64 + MP_CHUNK_TAIL);
-#ifdef CONFIG_UCW_POOL_IS_MMAP
 	return ALIGN_TO(size, CPU_PAGE_SIZE) - MP_CHUNK_TAIL;
-#else
-	return ALIGN_TO(size, CPU_STRUCT_ALIGN) - MP_CHUNK_TAIL;
-#endif
 }
 
 void
@@ -77,33 +68,9 @@ mp_init(struct mempool *pool, size_t chunk_size)
 	};
 }
 
-#ifndef CONFIG_UCW_POOL_IS_REUSABLE
-static void *
-mp_new_big_chunk(size_t size)
-{
-	uint8_t *data = malloc(size + MP_CHUNK_TAIL);
-	if (!data) {
-		return NULL;
-	}
-	MEMCHECK_NOACCESS(data, size);
-	struct mempool_chunk *chunk = (struct mempool_chunk *)(data + size);
-	chunk->size = size;
-	return chunk;
-}
-
-static void
-mp_free_big_chunk(struct mempool_chunk *chunk)
-{
-	void *ptr = (uint8_t *)chunk - chunk->size;
-	MEMCHECK_UNDEFINED(ptr, chunk->size);
-	free(ptr);
-}
-#endif
-
 static void *
 mp_new_chunk(size_t size)
 {
-#ifdef CONFIG_UCW_POOL_IS_MMAP
 	uint8_t *data = page_alloc(size + MP_CHUNK_TAIL);
 	if (!data) {
 		return NULL;
@@ -112,25 +79,17 @@ mp_new_chunk(size_t size)
 	struct mempool_chunk *chunk = (struct mempool_chunk *)(data + size);
 	chunk->size = size;
 	return chunk;
-#else
-	return mp_new_big_chunk(size);
-#endif
 }
 
 static void
 mp_free_chunk(struct mempool_chunk *chunk)
 {
-#ifdef CONFIG_UCW_POOL_IS_MMAP
 	uint8_t *data = (uint8_t *)chunk - chunk->size;
 	MEMCHECK_UNDEFINED(data, chunk->size);
 	page_free(data, chunk->size + MP_CHUNK_TAIL);
-#else
-	mp_free_big_chunk(chunk);
-#endif
 }
 
 // --- reusable chunks ---
-#ifdef  CONFIG_UCW_POOL_IS_REUSABLE
 const uint32_t mp_reusable_sizes[] = { 4 * 1024 - MP_CHUNK_TAIL, 16 * 1024 - MP_CHUNK_TAIL, 68 * 1024 - MP_CHUNK_TAIL};
 #define MP_REUSABLE_CNT ARRAY_SIZE(mp_reusable_sizes)
 struct mp_reusable {
@@ -193,14 +152,7 @@ mp_balance_reusable(void) {
 	}
 }
 
-#define mp_new_chunk       mp_new_reusable_chunk
-#define mp_free_chunk      mp_free_reusable_chunk
-#define mp_new_big_chunk   mp_new_reusable_chunk
-#define mp_free_big_chunk  mp_free_reusable_chunk
 #define CONFIG_UCW_POOL_ACTIVE_CHUNKS (ARRAY_SIZE(mp_reusable) + 1)
-#else
-#define CONFIG_UCW_POOL_ACTIVE_CHUNKS 2
-#endif
 // ------
 
 
@@ -208,7 +160,7 @@ struct mempool *
 mp_new(size_t chunk_size)
 {
 	chunk_size = mp_align_size(MAX(sizeof(struct mempool), chunk_size));
-	struct mempool_chunk *chunk = mp_new_chunk(chunk_size, 0);
+	struct mempool_chunk *chunk = mp_new_reusable_chunk(chunk_size, 0);
 	struct mempool *pool = (void *)chunk - chunk->size;
 	MEMCHECK_UNDEFINED(pool, sizeof(*pool));
 	DBG("Creating mempool %p with %zu bytes long chunks", pool, chunk_size);
@@ -232,7 +184,7 @@ mp_free_chain(struct mempool_chunk *chunk)
 	while (chunk) {
 		MEMCHECK_DEFINED(chunk, MP_CHUNK_TAIL);
 		struct mempool_chunk *next = chunk->next;
-		mp_free_chunk(chunk);
+		mp_free_reusable_chunk(chunk);
 		chunk = next;
 	}
 }
@@ -258,7 +210,7 @@ mp_flush(struct mempool *pool)
 			poolchunk = chunk;
 			chunk->next = NULL;
 		} else {
-			mp_free_chunk(chunk);
+			mp_free_reusable_chunk(chunk);
 		}
 		chunk = next;
 	}
@@ -348,7 +300,7 @@ mp_alloc_internal(struct mempool *pool, size_t size)
 		}
 
 		// allocate a new chunk
-		struct mempool_chunk *chunk = mp_new_chunk(size <= pool->chunk_size ? pool->chunk_size : mp_align_size(size), pool->total_size);
+		struct mempool_chunk *chunk = mp_new_reusable_chunk(size <= pool->chunk_size ? pool->chunk_size : mp_align_size(size), pool->total_size);
 		if (!chunk) {
 			return NULL;
 		}
