@@ -462,7 +462,6 @@ static int protolayer_iter_ctx_finish(struct protolayer_iter_ctx *ctx, int ret)
 		ctx->finished_cb(ret, s, ctx->comm, ctx->finished_cb_baton);
 
 	mm_ctx_delete(&ctx->pool);
-	free(ctx);
 
 	return ret;
 }
@@ -645,7 +644,9 @@ static int session2_submit(
 			session->proto != KR_PROTO_DOQ)
 		defer_sample_start(NULL);
 
-	struct protolayer_iter_ctx *ctx = malloc(session->iter_ctx_size);
+	knot_mm_t pool = { 0 };
+	mm_ctx_mempool(&pool, CPU_PAGE_SIZE);
+	struct protolayer_iter_ctx *ctx = mm_alloc(&pool, session->iter_ctx_size);
 	kr_require(ctx);
 
 	VERBOSE_LOG(session,
@@ -656,6 +657,7 @@ static int session2_submit(
 			layer_ix, layer_name(session->proto, layer_ix));
 
 	*ctx = (struct protolayer_iter_ctx) {
+		.pool = pool,
 		.payload = payload,
 		.direction = direction,
 		.layer_ix = layer_ix,
@@ -689,7 +691,6 @@ static int session2_submit(
 	} else {
 		ctx->comm = &session->comm_storage;
 	}
-	mm_ctx_mempool(&ctx->pool, CPU_PAGE_SIZE);
 
 	const struct protolayer_grp *grp = &protolayer_grps[session->proto];
 	for (size_t i = 0; i < grp->num_layers; i++) {
