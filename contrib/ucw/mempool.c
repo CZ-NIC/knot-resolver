@@ -149,8 +149,9 @@ struct mp_reusable *mp_get_reusable(uint32_t *size) {
 }
 
 static void *
-mp_new_reusable_chunk(uint32_t size) {
+mp_new_reusable_chunk(uint32_t requested_size, size_t pool_size) {
 	struct mempool_chunk *chunk = NULL;
+	uint32_t size = MAX(requested_size, MIN(pool_size >> 3, mp_reusable_sizes[MP_REUSABLE_CNT - 1]));
 	struct mp_reusable *reusable = mp_get_reusable(&size);
 	if (reusable) {
 		chunk = reusable->chunk;
@@ -255,7 +256,7 @@ struct mempool *
 mp_new(size_t chunk_size)
 {
 	chunk_size = mp_align_size(MAX(sizeof(struct mempool), chunk_size));
-	struct mempool_chunk *chunk = mp_new_chunk(chunk_size);
+	struct mempool_chunk *chunk = mp_new_chunk(chunk_size, 0);
 	struct mempool *pool = (void *)chunk - chunk->size;
 	MEMCHECK_UNDEFINED(pool, sizeof(*pool));
 	DBG("Creating mempool %p with %zu bytes long chunks", pool, chunk_size);
@@ -264,11 +265,12 @@ mp_new(size_t chunk_size)
 	chunk->pool = pool;
 #endif
 	chunk->free = chunk_size - sizeof(*pool);
-	MEMCHECK_NOACCESS(chunk, MP_CHUNK_TAIL);
 	*pool = (struct mempool) {
 		.last = chunk,
+		.total_size = chunk->size + MP_CHUNK_TAIL,
 		.chunk_size = chunk_size,
 	};
+	MEMCHECK_NOACCESS(chunk, MP_CHUNK_TAIL);
 	return pool;
 }
 
@@ -317,6 +319,7 @@ mp_flush(struct mempool *pool)
 				chunk->size - sizeof(struct mempool) + MP_CHUNK_TAIL);
 	}
 	pool->last = chunk;
+	pool->total_size = chunk ? chunk->size + MP_CHUNK_TAIL : 0; // memcheck violation
 }
 
 static void
@@ -347,9 +350,7 @@ mp_stats(struct mempool *pool, struct mempool_stats *stats)
 size_t
 mp_total_size(struct mempool *pool)
 {
-	struct mempool_stats stats;
-	mp_stats(pool, &stats);
-	return stats.total_size;
+	return pool->total_size;
 }
 
 static void *
@@ -397,7 +398,7 @@ mp_alloc_internal(struct mempool *pool, size_t size)
 		}
 
 		// allocate a new chunk
-		struct mempool_chunk *chunk = mp_new_chunk(size <= pool->chunk_size ? pool->chunk_size : mp_align_size(size));
+		struct mempool_chunk *chunk = mp_new_chunk(size <= pool->chunk_size ? pool->chunk_size : mp_align_size(size), pool->total_size);
 		if (!chunk) {
 			return NULL;
 		}
@@ -407,8 +408,9 @@ mp_alloc_internal(struct mempool *pool, size_t size)
 		chunk->next = pool->last;
 		chunk->free = chunk->size - size;
 		void *ptr = (uint8_t *)chunk - chunk->size;
-		MEMCHECK_NOACCESS(chunk, MP_CHUNK_TAIL);
 		pool->last = chunk;
+		pool->total_size += chunk->size + MP_CHUNK_TAIL;
+		MEMCHECK_NOACCESS(chunk, MP_CHUNK_TAIL);
 		return ptr;
 	} else {
 		fprintf(stderr, "Cannot allocate %zu bytes from a mempool", size);

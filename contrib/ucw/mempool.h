@@ -41,6 +41,7 @@ struct mempool_chunk {
 struct mempool {
 	struct mempool_chunk *last;
 	size_t chunk_size;
+	size_t total_size;
 };
 
 struct mempool_stats {          /** Mempool statistics. See mp_stats(). **/
@@ -103,8 +104,7 @@ void mp_stats(struct mempool *pool, struct mempool_stats *stats);
 
 /**
  * Return how many bytes were allocated by the pool, including unused parts
- * of chunks. This function scans the chunk list, so it can be slow
- * (upstream contains constant-time version).
+ * of chunks. This function is constant-time.
  **/
 size_t mp_total_size(struct mempool *pool);
 
