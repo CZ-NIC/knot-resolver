@@ -1,7 +1,12 @@
+from pathlib import Path
+
 import pytest
 
 from knot_resolver.datamodel.config_schema import KresConfig
+from knot_resolver.datamodel.globals import Context, set_global_validation_context
 from knot_resolver.manager.config_store import ConfigStore, only_on_real_changes_update
+
+set_global_validation_context(Context(Path("."), False))
 
 
 @pytest.mark.asyncio  # type: ignore
