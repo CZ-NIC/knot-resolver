@@ -286,7 +286,7 @@ void log_pool_stats(struct mempool *pool)
 
 	char *log_reason = NULL;
 	if ((float)free / total > 0.75) log_reason = "UNDERFULL_POOL";
-	if (count > 6) log_reason = "OVERCOUNT_POOL";
+	if (count > 18) log_reason = "OVERCOUNT_POOL";
 	if (counts[MP_REUSABLE_CNT] > 0) log_reason = "NOT-FULLY-REUSED_POOL";
 
 	if (log_reason) {
