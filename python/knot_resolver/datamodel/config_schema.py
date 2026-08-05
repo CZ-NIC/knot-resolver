@@ -55,7 +55,7 @@ def _get_views_tags(views: List[ViewSchema]) -> List[str]:
     tags = []
     for view in views:
         if view.tags:
-            tags += [str(tag) for tag in view.tags if tag not in tags]
+            tags += [str(tag) for tag in view.tags if str(tag) not in tags]
     return tags
 
 
@@ -73,7 +73,7 @@ def _check_local_data_tags(
                 tag_str = str(tag)
                 if tag_str not in tags:
                     tags.append(tag_str)
-                if tag_str not in views_tags:
+                if tag_str not in views_tags and tag_str not in tags_not_in:
                     tags_not_in.append(tag_str)
             if len(tags_not_in) > 0:
                 errs.append(
