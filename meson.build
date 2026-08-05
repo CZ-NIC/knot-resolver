@@ -4,7 +4,7 @@ project(
   'knot-resolver',
   ['c', 'cpp'],
   license: 'GPLv3+',
-  version: '6.4.1',
+  version: '6.4.2',
   default_options: ['c_std=gnu11', 'b_ndebug=true'],
   meson_version: '>=0.53',
 )
