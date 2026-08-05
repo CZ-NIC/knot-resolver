@@ -26,12 +26,12 @@
  ***/
 
 struct mempool_chunk {
+	struct mempool_chunk *prev;
+	uint32_t size;
+	uint32_t free;
 #ifdef CONFIG_DEBUG
 	struct mempool *pool;         // Can be useful when analysing coredump for memory leaks
 #endif
-	struct mempool_chunk *next;
-	uint32_t size;
-	uint32_t free;
 };
 
 /**
