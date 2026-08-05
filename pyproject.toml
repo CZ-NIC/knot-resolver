@@ -27,7 +27,7 @@ script = "build_c_extensions.py"
 generate-setup-file = true
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.9"
 aiohttp = "*"
 jinja2 = "*"
 pyyaml = "*"
@@ -97,7 +97,7 @@ clean = { cmd = "scripts/poe-tasks/clean", help="Cleanup build directories and f
 
 [tool.ruff]
 line-length = 120
-target-version = "py38"
+target-version = "py39"
 exclude = ["setup.py"]
 
 [tool.ruff.lint]
@@ -223,7 +223,7 @@ skip-magic-trailing-comma = false
 line-ending = "auto"
 
 [tool.mypy]
-python_version = "3.8"
+python_version = "3.9"
 disallow_any_generics = true
 disallow_subclassing_any = true
 disallow_untyped_calls = false
