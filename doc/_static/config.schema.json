@@ -458,6 +458,7 @@
                                     "dot",
                                     "doh-legacy",
                                     "doh2",
+                                    "doh2-insecure",
                                     "doq"
                                 ],
                                 "description": "Specifies DNS query transport protocol.",

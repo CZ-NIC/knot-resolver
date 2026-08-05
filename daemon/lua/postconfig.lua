@@ -14,6 +14,7 @@ local function count_sockets()
 			socket.kind == 'tls' or
 			socket.kind == 'doh_legacy' or
 			socket.kind == 'doh2' or
+			socket.kind == 'doh2-insecure' or
 			socket.kind == 'doq') then
 			dns_socks = dns_socks + 1
 		end
