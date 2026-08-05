@@ -1732,7 +1732,7 @@ static int worker_reserve(void)
 	the_worker->tcp_waiting = trie_create(NULL);
 	the_worker->subreq_out = trie_create(NULL);
 
-	mm_ctx_mempool(&the_worker->pkt_pool, 4 * sizeof(knot_pkt_t));
+	mm_ctx_mempool(&the_worker->pkt_pool, 2 * sizeof(knot_pkt_t));
 
 	return kr_ok();
 }
