@@ -3,13 +3,17 @@
  */
 
 #include "quic_conn.h"
+#include "lib/defines.h"
+#include "lib/layer.h"
 #include "lib/proto.h"
+#include "lib/selection.h"
 #include "network.h"
 #include "quic_common.h"
 #include "quic_demux.h"
 #include "quic_stream.h"
 #include "lib/dnssec.h"
 #include "session2.h"
+#include "tls.h"
 #include "worker.h"
 #include <gnutls/gnutls.h>
 #include <libknot/wire.h>
@@ -491,11 +495,12 @@ static int conn_new_handler(ngtcp2_conn **pconn, const ngtcp2_path *path,
 
 	ngtcp2_transport_params params;
 	ngtcp2_transport_params_default(&params);
-	if (unlikely(kr_fails_assert(the_network && the_network->quic_params))) {
+	/* FIXME: Remove, just to test failure */
+	if (unlikely(!the_network || the_network->quic_params.max_conns == 0)) {
 		kr_log_debug(DOQ, "Missing network struct or network quic_parameters\n");
 		return kr_error(EINVAL);
 	}
-	params.initial_max_streams_bidi = the_network->quic_params->max_streams;
+	params.initial_max_streams_bidi = the_network->quic_params.max_streams;
 	/* DoQ has no use for unidirectional streams */
 	params.initial_max_streams_uni = 0;
 	params.initial_max_stream_data_bidi_local = MAX_QUIC_FRAME_SIZE;
@@ -510,31 +515,25 @@ static int conn_new_handler(ngtcp2_conn **pconn, const ngtcp2_path *path,
 	params.active_connection_id_limit =
 		NGTCP2_DEFAULT_ACTIVE_CONNECTION_ID_LIMIT;
 
-	if (odcid != NULL && server) {
-		params.original_dcid = *odcid;
-		params.original_dcid_present = 1;
-	}
-
-	if (retry_sent) {
-		/* retry scid is retrieved from
-		 * ngtcp2_crypto_verify_retry_roken2 as the odcid
-		 * used by the client. */
-		params.retry_scid = *dcid;
-		params.retry_scid_present = 1;
-	}
-
-	int ret = dnssec_random_buffer(params.stateless_reset_token,
-					NGTCP2_STATELESS_RESET_TOKENLEN);
-	if (ret != KNOT_EOK) {
-		return kr_error(ret);
-	}
-
 	if (server) {
-		// const ngtcp2_cid *client_dcid = scid;
-		// const ngtcp2_cid *client_scid = dcid;
-		return ngtcp2_conn_server_new(pconn, scid/*client_dcid*/, dcid/*client_scid*/,
-				path, version, &callbacks, &settings, &params,
-				NULL, conn);
+		ngtcp2_crypto_generate_stateless_reset_token(
+				params.stateless_reset_token, conn->secret,
+				sizeof(conn->secret), scid);
+		if (odcid != NULL) {
+			params.original_dcid = *odcid;
+			params.original_dcid_present = 1;
+		}
+
+		if (retry_sent) {
+			/* retry scid is retrieved from
+			 * ngtcp2_crypto_verify_retry_roken2 as the odcid
+			 * used by the client. */
+			params.retry_scid = *dcid;
+			params.retry_scid_present = 1;
+		}
+
+		return ngtcp2_conn_server_new(pconn, scid, dcid, path, version,
+				&callbacks, &settings, &params, NULL, conn);
 	} else {
 		return ngtcp2_conn_client_new(pconn, dcid, scid, path, version,
 				&callbacks, &settings, &params, NULL, conn);
@@ -565,8 +564,6 @@ struct session2 *setup_quic_stream(struct pl_quic_conn_sess_data *conn)
 	ret = ngtcp2_conn_open_bidi_stream(conn->conn,
 			&conn->next_stream_id, new_stream);
 	if (ret) {
-		kr_log_error(DOQCLIENT, "\nUnable to open stream, stream id %zu e: %s (%d)\n\n",
-				conn->next_stream_id, ngtcp2_strerror(ret), ret);
 		session2_force_close(new_stream->h.session);
 		return NULL;
 	}
@@ -1084,10 +1081,10 @@ static enum protolayer_iter_cb_result pl_quic_conn_unwrap(void *sess_data,
 				NULL /* &conn->comm_storage */,
 				ctx->finished_cb,
 				ctx->finished_cb_baton);
-		session2_dec_refs(s);
 		queue_pop(conn->pending_unwrap);
 
 		if (s->outgoing) {
+			session2_close(s);
 		}
 	}
 
@@ -1130,8 +1127,7 @@ static enum protolayer_iter_cb_result pl_quic_conn_wrap(void *sess_data,
 		if ((ret = quic_init_conn(conn, ctx, false)) != kr_ok()) {
 			kr_log_error(DOQ, "Failed to create QUIC connection %d\n",
 					ret);
-
-			return protolayer_break(ctx, -1);
+			return protolayer_break(ctx, ret);
 		}
 	}
 
@@ -1256,14 +1252,6 @@ static int pl_quic_conn_sess_init(struct session2 *session, void *sess_data,
 		memcpy(&conn->dec_cids, p->dec_cids, sizeof(ngtcp2_version_cid));
 	}
 
-	session->comm_storage.src_addr = calloc(sizeof(struct sockaddr), 1);
-	if (kr_fails_assert(session->comm_storage.src_addr)) {
-		return kr_error(ENOMEM);
-	}
-	session->comm_storage.comm_addr = calloc(sizeof(struct sockaddr), 1);
-	if (kr_fails_assert(session->comm_storage.comm_addr)) {
-		return kr_error(ENOMEM);
-	}
 
 	struct comm_info *comm = p->comm_storage;
 	if (comm->src_addr) {
@@ -1329,13 +1317,16 @@ static int pl_quic_conn_sess_deinit(struct session2 *session, void *sess_data)
 	kr_require(conn->streams_count == 0);
 
 	if (conn->state & QUIC_STATE_HANDSHAKE_DONE) {
-		kr_log_debug(DOQ, "Closing established connection, [%s] useful, served %zu streams\n",
+		kr_log_debug(DOQ, "Closing established connection to: '%s', [%s] useful, served %zu streams\n",
+				kr_straddr(conn->comm_storage.comm_addr),
 				conn->finished_streams ? "was" : "was not",
 				conn->finished_streams);
 	} else {
-		kr_log_debug(DOQ, "Closing connection with unfinished HS, wasn't useful, [%s] send retry\n",
+		kr_log_debug(DOQ, "Closing connection with unfinished HS to: '%s', wasn't useful, [%s] send retry\n",
+				kr_straddr(conn->comm_storage.comm_addr),
 				conn->retry_sent ? "did" : "did not");
 	}
+
 	// FIXME: Kept from doq-client-new, same as the FIXME several line above */
 	// struct pl_quic_stream_sess_data *s_node;
 	// WALK_LIST_FIRST(s_node, conn->streams) {
@@ -1389,6 +1380,7 @@ static int pl_quic_conn_sess_deinit(struct session2 *session, void *sess_data)
 	if (conn->is_server) {
 		tls_credentials_release(conn->server_credentials);
 	} else {
+		tls_client_param_unref(conn->client_params);
 	}
 
 	if (conn->comm_storage.src_addr) {
@@ -1437,9 +1429,11 @@ static enum protolayer_event_cb_result pl_quic_conn_event_unwrap(
 		}
 
 		while (queue_len(conn->pending_unwrap) > 0) {
-			struct session2 *s =
-				queue_head(conn->pending_unwrap)->h.session;
+			struct pl_quic_stream_sess_data *stream =
+				queue_head(conn->pending_unwrap);
+			struct session2 *s = stream->h.session;
 			queue_pop(conn->pending_unwrap);
+			rem_node(&stream->list_node);
 			session2_dec_refs(s);
 		}
 
@@ -1488,7 +1482,10 @@ static enum protolayer_event_cb_result pl_quic_conn_event_wrap(
 			struct pl_quic_stream_sess_data *stream = *baton;
 			rem_node(&stream->list_node);
 			stream->conn_ref->streams_count--;
-			ngtcp2_conn_extend_max_streams_bidi(stream->conn, 1);
+			/* Only client can initiate a stream in DoQ */
+			if (!session->outgoing) {
+				ngtcp2_conn_extend_max_streams_bidi(stream->conn, 1);
+			}
 			ngtcp2_conn_shutdown_stream(stream->conn, 0,
 					stream->stream_id, 0);
 			ngtcp2_conn_set_stream_user_data(conn->conn,

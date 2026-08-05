@@ -39,37 +39,6 @@ bool inline quic_can_send(struct pl_quic_conn_sess_data *conn)
 		&& conn->state < QUIC_STATE_DRAINING;
 }
 
-int quic_configuration_set(void)
-{
-	if (kr_fails_assert(the_network)) {
-		return kr_error(EINVAL);
-	}
-
-	if (the_network->quic_params) {
-		return kr_ok();
-	}
-
-	struct net_quic_params *quic_params = calloc(1, sizeof(*quic_params));
-	if (quic_params == NULL) {
-		return kr_error(ENOMEM);
-	}
-
-	the_network->quic_params = quic_params;
-	/* Default values */
-	the_network->quic_params->require_retry = false;
-	the_network->quic_params->max_streams = 16;
-	the_network->quic_params->max_conns = 1024;
-	return kr_ok();
-}
-
-int quic_configuration_free(struct net_quic_params *quic_params)
-{
-	if (quic_params) {
-		free(quic_params);
-	}
-	return kr_ok();
-}
-
 uint64_t quic_timestamp(void)
 {
 	struct timespec ts;

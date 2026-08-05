@@ -711,8 +711,7 @@ static int qr_task_send(struct qr_task *task, struct session2 *session,
 		struct session2 *stream;
 		if ((stream = setup_quic_stream(conn)) == NULL) {
 			kr_log_debug(DOQCLIENT, "Failed to open stream for outgoing query\n");
-			/* Push the task onto the waitinglist */
-			return qr_task_on_send(task, stream, kr_error(EAGAIN));
+			return qr_task_on_send(task, stream, kr_error(EBUSY));
 		}
 
 		/* Replace session with stream session which will be used
@@ -776,40 +775,88 @@ static struct kr_query *task_get_last_pending_query(struct qr_task *task)
 	return array_tail(task->ctx->req.rplan.pending);
 }
 
+// /* Only used by DoQ, each layer in DoQ represents a more granular
+//  * separation of the transport, with stream session representing
+//  * only a single query. The queue is therefore stored in the CONN layer
+//  * since it encompasses the entire upstream communication */
+// static int send_waiting_subsession_term(struct session2 *session)
+// {
+// 	struct session2 *s_waiting = session;
+// 	while (s_waiting && s_waiting->proto != KR_PROTO_DOQ_CONN) {
+// 		s_waiting = s_waiting->transport.parent;
+// 	}
+// 	if (!s_waiting) {
+// 		return kr_error(EINVAL);
+// 	}
+// 	if (session2_waitinglist_is_empty(s_waiting)) {
+// 		return 0;
+// 	}
+//
+// 	defer_sample_state_t defer_prev_sample_state;
+// 	defer_sample_start(&defer_prev_sample_state);
+// 	int ret = 0;
+// 	do {
+// 		struct qr_task *t = session2_waitinglist_get(s_waiting);
+// 		defer_sample_task(t);
+// 		ret = qr_task_send(t, session, NULL, NULL);
+// 		defer_sample_restart();
+// 		if (ret != 0) {
+// 			// struct sockaddr *peer = session2_get_peer(session);
+// 			session2_waitinglist_finalize(session, KR_STATE_FAIL);
+// 			session2_tasklist_finalize(session, KR_STATE_FAIL);
+// 			// worker_del_tcp_connected(peer);
+// 			// session2_close(session);
+// 			break;
+// 		}
+// 		// Let's be a bit defensive and check that nothing's changed before _pop()
+// 		// and recover if it has, as qr_task_send() is rather complex.
+// 		if (session2_waitinglist_get(s_waiting) == t) {
+// 			session2_waitinglist_pop(s_waiting, true);
+// 		} else { // a normal assertion could kr_error_log() too much in some rarer cases
+// 			VERBOSE_MSG(NULL, "soft assertion: waitinglist mismatch in send_waiting_subsession()\n");
+// 		}
+// 	} while (!session2_waitinglist_is_empty(s_waiting));
+// 	defer_sample_stop(&defer_prev_sample_state, true);
+//
+// 	return ret;
+// }
+
 /* Only used by DoQ, each layer in DoQ represents a more granular
  * separation of the transport, with stream session representing
  * only a single query. The queue is therefore stored in the CONN layer
  * since it encompasses the entire upstream communication */
-static int send_waiting_subsession(struct session2 *session)
+int send_waiting_subsession(struct session2 *session)
 {
-	struct session2 *s_waiting = session;
-	while (s_waiting && s_waiting->proto != KR_PROTO_DOQ_CONN) {
-		s_waiting = s_waiting->transport.parent;
-	}
-	if (!s_waiting) {
-		return kr_error(EINVAL);
-	}
-	if (session2_waitinglist_is_empty(s_waiting)) {
+	if (session2_waitinglist_is_empty(session))
 		return 0;
-	}
 
-	defer_sample_state_t defer_prev_sample_state;
-	defer_sample_start(&defer_prev_sample_state);
 	int ret = 0;
 	do {
-		struct qr_task *t = session2_waitinglist_get(s_waiting);
-		defer_sample_task(t);
+		struct qr_task *t = session2_waitinglist_get(session);
 		ret = qr_task_send(t, session, NULL, NULL);
-		defer_sample_restart();
+		if (ret != 0) {
+			if (ret == kr_error(EAGAIN) || ret == kr_error(EBUSY)) {
+				/* No stream capacity right now, leave
+				 * the task in the queue */
+				break;
+			}
+			/* connection-fatal error. */
+			struct sockaddr *peer = session2_get_peer(session);
+			session2_waitinglist_finalize(session, KR_STATE_FAIL);
+			session2_tasklist_finalize(session, KR_STATE_FAIL);
+			worker_del_quic_connected(peer);
+			// session2_close(session);
+			break;
+		}
+		the_network->flushed_decl_streams++;
 		// Let's be a bit defensive and check that nothing's changed before _pop()
 		// and recover if it has, as qr_task_send() is rather complex.
-		if (session2_waitinglist_get(s_waiting) == t) {
-			session2_waitinglist_pop(s_waiting, true);
-		} else { // a normal assertion could kr_error_log() too much in some rarer cases
-			VERBOSE_MSG(NULL, "soft assertion: waitinglist mismatch in send_waiting()\n");
+		if (session2_waitinglist_get(session) == t) {
+			session2_waitinglist_pop(session, true);
+		} else {
+			VERBOSE_MSG(NULL, "soft assertion: waitinglist mismatch in send_waiting_subsession()\n");
 		}
-	} while (!session2_waitinglist_is_empty(s_waiting));
-	defer_sample_stop(&defer_prev_sample_state, true);
+	} while (!session2_waitinglist_is_empty(session));
 
 	return ret;
 }
@@ -967,8 +1014,7 @@ void quic_handshake_timeout(struct session2 *session,
 	kr_assert(session2_tasklist_is_empty(session));
 }
 
-void doq_on_connect(struct pl_quic_conn_sess_data *conn,
-		/* FIXME: remove? errors probably cannot occur here */ int status)
+void doq_on_connect(struct pl_quic_conn_sess_data *conn, int status)
 {
 	kr_require(the_worker);
 	struct session2 *session = conn->h.session;
@@ -991,8 +1037,8 @@ void doq_on_connect(struct pl_quic_conn_sess_data *conn,
 	if (!found_session || found_session != session) {
 		if (log_debug) {
 			const char *peer_str = kr_straddr(peer);
-			kr_log_debug(WORKER, "=> connection to '%s' failed (%s), flagged as 'bad'\n",
-					peer_str ? peer_str : "", uv_strerror(status));
+			kr_log_debug(WORKER, "=> connection to '%s' failed (unrecognised), flagged as 'bad'\n",
+					peer_str ? peer_str : "");
 		}
 
 		kr_assert(session2_tasklist_is_empty(session));
@@ -1021,8 +1067,8 @@ void doq_on_connect(struct pl_quic_conn_sess_data *conn,
 	if (status != 0) {
 		if (log_debug) {
 			const char *peer_str = kr_straddr(peer);
-			kr_log_debug(WORKER, "=> connection to '%s' failed (%s), flagged as 'bad'\n",
-					peer_str ? peer_str : "", uv_strerror(status));
+			kr_log_debug(WORKER, "=> connection to '%s' failed, flagged as 'bad'\n",
+					peer_str ? peer_str : "");
 		}
 		worker_del_quic_waiting(peer);
 		if (status != UV_ETIMEDOUT) {
@@ -1038,8 +1084,11 @@ void doq_on_connect(struct pl_quic_conn_sess_data *conn,
 	worker_del_quic_waiting(peer);
 	int err = worker_add_quic_connected(peer, session);
 	if (err != 0) {
-		kr_log_debug(DOQ, "Failed to register connection\n");
-		worker_del_quic_waiting(peer);
+		if (log_debug) {
+			const char *peer_str = kr_straddr(peer);
+			kr_log_debug(WORKER, "Failed to register connection to '%s' onto the 'connected' list\n",
+					peer_str);
+		}
 		kr_assert(session2_tasklist_is_empty(session));
 		session2_close(session);
 		return;
@@ -1048,7 +1097,8 @@ void doq_on_connect(struct pl_quic_conn_sess_data *conn,
 
 	if (log_debug) {
 		const char *peer_str = kr_straddr(peer);
-		kr_log_debug(WORKER, "=> connected to '%s'\n", peer_str ? peer_str : "");
+		kr_log_debug(WORKER, "=> connected to '%s'\n",
+				peer_str ? peer_str : "");
 	}
 
 	struct session2* io_session = session;
@@ -1545,11 +1595,9 @@ static int doq_task_make_connection(struct qr_task *task,
 
 		if (!session) {
 			kr_log_debug(DOQ, "Failed to create outbound udp endpoint\n");
-			return kr_error(EINVAL);
+			return kr_error(EIO);
 		}
 
-		if (addr->sa_family == AF_INET) {
-		}
 		the_worker->doq_out_session = session;
 	}
 
@@ -1563,7 +1611,7 @@ static int doq_task_make_connection(struct qr_task *task,
 	ngtcp2_cid scid;
 	if (init_unique_cid(&dcid, 0, demux->conn_table) != 0
 			|| init_unique_cid(&scid, 0, demux->conn_table) != 0) {
-		return -1;
+		return kr_error(ECONNABORTED);
 	}
 
 	union kr_sockaddr local;
@@ -1612,6 +1660,8 @@ static int doq_task_make_connection(struct qr_task *task,
 		session2_new_child(the_worker->doq_out_session,
 				KR_PROTO_DOQ_CONN, &data_param, 1, true);
 
+	worker_add_quic_waiting(addr,  new_conn_sess);
+
 	task->ctx->req.qsource.flags.quic = true;
 	kr_require(new_conn_sess->proto == KR_PROTO_DOQ_CONN);
 	kr_require(demux->h.session->proto == KR_PROTO_DOQ);
@@ -1624,9 +1674,7 @@ static int doq_task_make_connection(struct qr_task *task,
 
 	if ((ret = kr_quic_table_add(conn_sess_data, &scid,
 					demux->conn_table)) != kr_ok()) {
-		worker_del_quic_waiting(addr);
-		session2_force_close(new_conn_sess);
-		return ret;
+		goto abort;
 	}
 
 	struct protolayer_payload payload =
@@ -1634,22 +1682,32 @@ static int doq_task_make_connection(struct qr_task *task,
 	ret = session2_wrap(new_conn_sess, payload,
 			&demux->h.session->comm_storage,
 			NULL, NULL, (void *)addr);
-	if (ret < 0) {
-		worker_del_quic_waiting(addr);
-		session2_force_close(new_conn_sess);
-		return kr_error(EINVAL);
+	/* Programming error, otherwise impossible */
+	if (kr_fails_assert(ret >= 0)) {
+		goto abort;
+	}
+	struct pl_quic_conn_sess_data *conn =
+		protolayer_sess_data_get_proto(new_conn_sess,
+				PROTOLAYER_TYPE_QUIC_CONN);
+	/* Init failed, terminate the session */
+	if (!conn || !conn->conn) {
+		goto abort;
 	}
 
 	io_start_read(session2_get_handle(the_worker->doq_out_session));
 
 	ret = session2_waitinglist_push(new_conn_sess, task);
 	if (ret < 0) {
-		worker_del_quic_waiting(addr);
-		session2_close(new_conn_sess);
-		return kr_error(EINVAL);
+		goto abort;
 	}
 
 	return kr_ok();
+
+abort:
+	kr_log_debug(DOQCLIENT, "Connection setup aborted due to a local error\n");
+	worker_del_quic_waiting(addr);
+	session2_force_close(new_conn_sess);
+	return kr_error(ECONNABORTED);
 }
 
 static int doq_task_waiting_connection(struct session2 *session,
@@ -1683,11 +1741,6 @@ static int doq_task_existing_connection(struct session2 *session,
 		return kr_error(EINVAL);
 	}
 
-	ret = send_waiting_subsession(session);
-	if (ret != 0) {
-		return kr_error(EINVAL);
-	}
-
 	/* No unsent queries at that point. */
 	if (session2_tasklist_get_len(session) >= the_worker->tcp_pipeline_max) {
 		/* Too many outstanding queries, answer with SERVFAIL, */
@@ -1696,15 +1749,14 @@ static int doq_task_existing_connection(struct session2 *session,
 
 	/* Send query to upstream. */
 	ret = qr_task_send(task, session, NULL, NULL);
-	if (ret != 0) {
+	if (ret == kr_error(EBUSY) || ret == kr_error(EAGAIN)){
 		/* maximum concurrent stream count reached, defer task */
 		session2_waitinglist_push(session, task);
-		return kr_error(EAGAIN);
+		return ret;
 	}
-
-	qr_task_on_send(task, session, ret);
-
-	return kr_ok();
+	/* attempt to flush other waiting tasks */
+	send_waiting_subsession(session);
+	return ret;
 }
 
 static int doq_task_step(struct qr_task *task,
@@ -1749,6 +1801,9 @@ static int doq_task_step(struct qr_task *task,
 	}
 
 	if (ret != kr_ok()) {
+		if (ret == kr_error(EBUSY)) {
+			return kr_ok();
+		}
 		subreq_finalize(task, addr, packet);
 		if (ret == kr_error(EAGAIN)) {
 			ret = qr_task_step(task, addr, NULL);

@@ -635,20 +635,11 @@ static int net_quic_max_conns(lua_State *L)
 		return 0;
 	}
 
-	// /* Only return current max conns. */
+	/* Only return current max conns. */
 	if (lua_gettop(L) == 0) {
-		if (!the_network->quic_params) {
-			return 0;
-		}
-
 		lua_newtable(L);
-		lua_pushinteger(L, the_network->quic_params->max_conns);
+		lua_pushinteger(L, the_network->quic_params.max_conns);
 		return 1;
-	}
-
-	/* Allocate struct if needed */
-	if (!the_network->quic_params && quic_configuration_set() != kr_ok()) {
-		lua_error_p(L, "Out of memory allocating net_quic_params");
 	}
 
 	if (lua_gettop(L) != 1 || !lua_isnumber(L, 1))
@@ -658,7 +649,7 @@ static int net_quic_max_conns(lua_State *L)
 	if (v < 1 || v > 4096)
 		lua_error_p(L, "net.quic_max_conns must be within <1,  4096>");
 
-	the_network->quic_params->max_conns = (uint16_t)v;
+	the_network->quic_params.max_conns = (uint16_t)v;
 #endif // otherwise we just ignore the setting
 	lua_pushboolean(L, true);
 	return 1;
@@ -671,20 +662,11 @@ static int net_quic_max_streams(lua_State *L)
 		return 0;
 	}
 
-	// /* Only return current max streams. */
+	/* Only return current max streams. */
 	if (lua_gettop(L) == 0) {
-		if (!the_network->quic_params) {
-			return 0;
-		}
-
 		lua_newtable(L);
-		lua_pushinteger(L, the_network->quic_params->max_streams);
+		lua_pushinteger(L, the_network->quic_params.max_streams);
 		return 1;
-	}
-
-	/* Allocate struct if needed */
-	if (!the_network->quic_params && quic_configuration_set() != kr_ok()) {
-		lua_error_p(L, "Out of memory allocating net_quic_params");
 	}
 
 	if (lua_gettop(L) != 1 || !lua_isnumber(L, 1))
@@ -694,7 +676,7 @@ static int net_quic_max_streams(lua_State *L)
 	if (v < 1 || v > 4096)
 		lua_error_p(L, "net.quic_max_streams must be within <1,  4096>");
 
-	the_network->quic_params->max_streams = (uint16_t)v;
+	the_network->quic_params.max_streams = (uint16_t)v;
 #endif // otherwise we just ignore the setting
 	lua_pushboolean(L, true);
 	return 1;
@@ -707,14 +689,10 @@ static int net_quic_reqire_retry(lua_State *L)
 		return 0;
 	}
 
-	// /* Only return current require_retry. */
+	/* Only return current require_retry. */
 	if (lua_gettop(L) == 0) {
-		if (!the_network->quic_params) {
-			return 0;
-		}
-
 		lua_newtable(L);
-		lua_pushboolean(L, the_network->quic_params->require_retry);
+		lua_pushboolean(L, the_network->quic_params.require_retry);
 		return 1;
 	}
 
@@ -722,13 +700,7 @@ static int net_quic_reqire_retry(lua_State *L)
 		lua_error_p(L, "net.quic_require_retry requires one boolean value");
 
 	bool v = lua_toboolean(L, 1);
-
-	/* Allocate struct if needed */
-	if (!the_network->quic_params && quic_configuration_set() != kr_ok()) {
-		lua_error_p(L, "Out of memory allocating net_quic_params");
-	}
-
-	the_network->quic_params->require_retry = v;
+	the_network->quic_params.require_retry = v;
 #endif // otherwise we just ignore the setting
 	lua_pushboolean(L, true);
 	return 1;

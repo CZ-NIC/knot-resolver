@@ -131,9 +131,6 @@ void quic_set_hs_completed(struct pl_quic_conn_sess_data *conn);
 bool quic_not_draining(struct pl_quic_conn_sess_data *conn);
 /* check that handshake has finished and connection is not in DRAINING state */
 bool quic_can_send(struct pl_quic_conn_sess_data *conn);
-int quic_configuration_set(void);
-
-int quic_configuration_free(struct net_quic_params *quic_params);
 bool kr_quic_conn_timeout(struct pl_quic_conn_sess_data *conn, uint64_t *now);
 
 uint64_t cid2hash(const ngtcp2_cid *cid, kr_quic_table_t *table);

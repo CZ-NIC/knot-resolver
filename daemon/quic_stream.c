@@ -345,6 +345,9 @@ static enum protolayer_event_cb_result pl_quic_stream_event_wrap(
 		enum protolayer_event_type event, void **baton,
 		struct session2 *session, void *sess_data)
 {
+	if (event == PROTOLAYER_EVENT_STATS_SEND_ERR) {
+		the_worker->stats.err_quic += 1;
+	}
 	if (event == PROTOLAYER_EVENT_CLOSE
 			|| event == PROTOLAYER_EVENT_FORCE_CLOSE) {
 		kr_require(session2_is_empty(session));

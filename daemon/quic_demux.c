@@ -65,7 +65,8 @@ void kr_quic_table_rem(struct pl_quic_conn_sess_data *conn,
 		ngtcp2_conn_get_scid(conn->conn, scids);
 
 		for (size_t i = 0; i < num_scid; i++) {
-			kr_quic_cid_t **pcid = kr_quic_table_lookup2(&scids[i], table);
+			kr_quic_cid_t **pcid =
+				kr_quic_table_lookup2(&scids[i], table);
 			if (*pcid == NULL) {
 				continue;
 			}
@@ -74,7 +75,10 @@ void kr_quic_table_rem(struct pl_quic_conn_sess_data *conn,
 
 		free(scids);
 	} else {
-		kr_quic_cid_t **pcid = kr_quic_table_lookup2(&conn->dcid, table);
+		/* Client side puts its source CID into the table
+		 * when creating the connection. */
+		ngtcp2_cid rem_cid = conn->is_server ? conn->dcid : conn->scid;
+		kr_quic_cid_t **pcid = kr_quic_table_lookup2(&rem_cid, table);
 		if (kr_fails_assert(pcid != NULL && (*pcid) != NULL)) {
 			/* Likely impossible without a significantly corrupt
 			 * state and/or presence of a programming error */
@@ -168,8 +172,7 @@ static enum protolayer_iter_cb_result pl_quic_demux_unwrap(void *sess_data,
 			return protolayer_break(ctx, kr_ok());
 		}
 
-		if (header.tokenlen == 0 && the_network->quic_params
-				&& the_network->quic_params->require_retry) {
+		if (header.tokenlen == 0 && the_network->quic_params.require_retry) {
 			if (send_special(&dec_cids, demux->conn_table, ctx,
 					QUIC_SEND_RETRY, NULL,
 					demux->h.session, NULL) != kr_ok()) {
@@ -368,20 +371,9 @@ static int pl_quic_demux_sess_init(struct session2 *session, void *sess_data, vo
 
 	struct tls_credentials *creds = the_network->tls_credentials;
 
-	/* kresd process was run without a manager and no quic configuration
-	 * which would set defaults was provided -> init and set defaults */
-	if (!the_network->quic_params) {
-		int ret = 0;
-		if ((ret = quic_configuration_set()) != kr_ok()) {
-			kr_log_error(DOQ, "Failed to allocate quic defaults\n");
-			return ret;
-		}
-	}
-
 	if (!quic->conn_table) {
-		kr_require(the_network->quic_params);
 		quic->conn_table = kr_quic_table_new(
-				the_network->quic_params->max_conns,
+				the_network->quic_params.max_conns,
 				NGTCP2_MAX_UDP_PAYLOAD_SIZE, creds);
 		if (!quic->conn_table) {
 			kr_log_error(DOQ, "Failed to create QUIC connection table\n");
