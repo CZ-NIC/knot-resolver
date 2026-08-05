@@ -572,6 +572,7 @@ static int protolayer_step(struct protolayer_iter_ctx *ctx)
 						ctx->session, ctx->layer_ix);
 				struct protolayer_data *iter_data = protolayer_iter_data_get(
 						ctx, ctx->layer_ix);
+				
 				enum protolayer_iter_cb_result result = cb(sess_data, iter_data, ctx);
 				if (kr_fails_assert(result == PROTOLAYER_ITER_CB_RESULT_MAGIC)) {
 					/* Callback did not use a *layer
@@ -1584,7 +1585,6 @@ static int session2_transport_pushv(struct session2 *s,
 				return kr_ok();
 			} else {
 				bool conn = s->outgoing && the_network->enable_connect_udp
-					/* FIXME: Verify this */
 					&& s->proto != KR_PROTO_DOQ;
 				int ret = uv_udp_try_send((uv_udp_t*)handle, (uv_buf_t *)iov, iovcnt,
 								conn ? NULL : comm->comm_addr);

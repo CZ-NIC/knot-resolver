@@ -123,7 +123,7 @@ struct network {
 	/** Low source port (e.g. 53) might be useful for attacks with spoofed source IPs. */
 	uint16_t min_udp_source_port;
 
-	struct net_quic_params *quic_params;
+	struct net_quic_params quic_params;
 };
 
 /** Pointer to the singleton network state. NULL if not initialized. */

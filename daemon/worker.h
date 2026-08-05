@@ -89,6 +89,10 @@ bool worker_task_finished(struct qr_task *task);
 /** To be called after sending a DNS message.  It mainly deals with cleanups. */
 int qr_task_on_send(struct qr_task *task, struct session2 *s, int status);
 
+/* Attempt to send out waiting tasks, waiting tasks are usually the result
+ * of max_streams_bidi limits for the connection */
+int send_waiting_subsession(struct session2 *session);
+
 /* Handles QUIC handshake timeout.
  * Unlike other transport protocols client-side DoQ can reach a state where:
  *   - QUIC connection session exists

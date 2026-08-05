@@ -81,7 +81,10 @@ void network_init(uv_loop_t *loop, int tcp_backlog)
 	the_network->tcp_backlog = tcp_backlog;
 	the_network->enable_connect_udp = true;
 	the_network->min_udp_source_port = 1024;
-	the_network->quic_params = NULL;
+	/* quic configuration defaults */
+	the_network->quic_params.max_conns = 1024;
+	the_network->quic_params.max_streams = 16;
+	the_network->quic_params.require_retry = false;
 
 	// On Linux, unset means some auto-tuning mechanism also depending on RAM,
 	// which might be OK default (together with the user_timeout above)
@@ -312,9 +315,6 @@ void network_deinit(void)
 	trie_free(the_network->proxy_addrs6);
 
 	tls_credentials_free(the_network->tls_credentials);
-#if HAS_QUIC
-	quic_configuration_free(the_network->quic_params);
-#endif
 	tls_client_params_free(the_network->tls_client_params);
 	tls_session_ticket_ctx_destroy(the_network->tls_session_ticket_ctx);
 #ifndef NDEBUG
