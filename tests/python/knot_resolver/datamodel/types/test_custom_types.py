@@ -1,11 +1,13 @@
 import ipaddress
 import random
 import string
+from pathlib import Path
 from typing import Any
 
 import pytest
 from pytest import raises
 
+from knot_resolver.datamodel.globals import Context, set_global_validation_context
 from knot_resolver.datamodel.types import (
     Dir,
     DomainName,
@@ -26,6 +28,8 @@ from knot_resolver.datamodel.types import (
     TimeUnit,
 )
 from knot_resolver.utils.modeling import BaseSchema
+
+set_global_validation_context(Context(Path("."), False))
 
 
 def _rand_domain(label_chars: int, levels: int = 1) -> str:

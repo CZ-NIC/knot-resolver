@@ -1,8 +1,10 @@
 import inspect
 import json
+from pathlib import Path
 from typing import Any, Dict, Type, cast
 
 from knot_resolver.datamodel import KresConfig
+from knot_resolver.datamodel.globals import Context, set_global_validation_context
 from knot_resolver.datamodel.lua_schema import LuaSchema
 from knot_resolver.utils.modeling import BaseSchema
 from knot_resolver.utils.modeling.types import (
@@ -15,6 +17,8 @@ from knot_resolver.utils.modeling.types import (
     is_optional,
     is_union,
 )
+
+set_global_validation_context(Context(Path("."), False))
 
 
 def test_config_check_str_type():
