@@ -9,6 +9,54 @@
  *  Source: https://www.ucw.cz/libucw/
  */
 
+/* Design overview:
+ *
+ * A _mempool_ consists of mmapped chunks of different sizes.
+ * We use _chunk_ to refer the mempool_chunk struct located after the data area of size chunk->size,
+ * which contains data already allocated to the application followed by chunk->free bytes of available space.
+ * Normal chunks of sizes 4K, 16K, 68K and greater are mmaped on their own,
+ * small chunks of size 1K are allocated by whole pages consecutively containing four of them.
+ *
+ * When allocating memory to the application,
+ * we seek sufficient space in several last chunks of the mempool and move the chosen one to the end of list,
+ * or we add a new chunk while getting the lowest-free-space one out of our view.
+ * The last allocation may be resized if needed.
+ * The size of a new chunk is lower-bounded by wanted allocation size and mempool chunk_size
+ * and becomes larger with increasing total size of the mempool.
+ *
+ * Unused chunks of sizes up to 68K from deleted pools are recycled globally.
+ * They are pointed by the _unused_ structure mp_unused connected to lists containing same-sized chunks;
+ * the structure is located either in the data area of normal chunks
+ * or after the 4-tuple of small chunks representing all unused of them.
+ *
+ * During idle, the some unused chunks are munmapped... TODO
+ *
+ *
+ * MEMCHECK summary (ASan + Valgrind annotations):
+ *
+ * Memory regions are explicitely marked as
+ *   * NOACCESS (locked, poisoned, inaccessible),
+ *   * UNDEFINED (unlocked but uninitialized), or
+ *   * DEFINED (unlocked and initialized).
+ * ASan then disallows access to poisoned (NOACCESS) memory,
+ * Valgrind also detects decisions based on uninitialized memory.
+ *
+ * Desired state outside of our code:
+ *   * mempool structure is accessible,
+ *   * within used chunks
+ *      * user-allocated data are accessible,
+ *      * free part of the data area is locked,
+ *      * chunk (metadata) is locked,
+ *   * within unused chunks
+ *      * data area is locked except for the possibly contained unused structure,
+ *      * chunk (metadata) is accessible,
+ *      * unused structure is accessible,
+ *   * other internal metadata are accessible.
+ * During internal code execution the memory classification is being changed as needed
+ * to access the internal structures but allow detection of user data overflow to our metadata;
+ * also reused memory can be repeteadly handled as uninitialized this way.
+ */
+
 #undef LOCAL_DEBUG
 
 #include <string.h>
