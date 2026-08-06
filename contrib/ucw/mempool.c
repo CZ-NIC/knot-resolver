@@ -189,6 +189,7 @@ static void *
 mp_new_reusable_chunk(uint32_t requested_size, size_t pool_size) {
 	struct mempool_chunk *chunk = NULL;
 	uint32_t size = MAX(requested_size, MIN(pool_size >> 3, mp_reusable_sizes[MP_REUSABLE_CNT - 1] - MP_CHUNK_TAIL));
+	if ((pool_size > 0) && (size < 2048)) size = 4000;  // XXX
 	struct mp_reusable *reusable = mp_get_reusable(&size);
 	if (reusable) {
 		struct mp_unused *unused = reusable->head.prev;
