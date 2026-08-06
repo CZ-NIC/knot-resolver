@@ -5,6 +5,7 @@
 #pragma once
 
 #include <syslog.h>
+#include <stdio.h>
 #include "lib/defines.h"
 
 #define LOG_UNKNOWN_LEVEL	-1 /**< Negative error value. */
