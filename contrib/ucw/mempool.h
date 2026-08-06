@@ -18,6 +18,8 @@
 #include <string.h>
 #include <stdint.h>
 
+#include <lib/log.h>
+
 
 /***
  * [[defs]]
@@ -261,7 +263,13 @@ static inline void *mp_end(struct mempool *pool, void *end)
 	// MEMCHECK: pool defined, pool chunks locked, free data unlocked
 	void *p = mp_ptr(pool);
 	MEMCHECK_DEFINED(pool->last, MP_CHUNK_TAIL);
-	pool->last->free = (uint8_t *)pool->last - (uint8_t *)end;
+	const size_t avail = (uint8_t *)pool->last - (uint8_t *)end;
+	if (avail > pool->last->free) {
+		char trace[150]; kr_log_get_shorttrace(trace);
+		printf("BUG_MP_END: chunk %p, free %d, end %p, new free %ld   %s\n",
+				pool->last, pool->last->free, end, avail, trace);
+	}
+	pool->last->free = avail;
 	MEMCHECK_NOACCESS(end, pool->last->free + MP_CHUNK_TAIL);
 	return p;
 	// MEMCHECK: pool defined, pool chunks locked, free data locked
