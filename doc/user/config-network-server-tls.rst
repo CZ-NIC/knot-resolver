@@ -87,6 +87,23 @@ the following status codes:
    ``GET``, ``POST``, or ``HEAD``
 
 
+.. _dns-over-http:
+
+Insecure DoH
+""""""""""""
+
+This is a special mode not intended to be exposed to users.
+The main use case is to avoid useless encryption between resolver and a reverse TLS-stripping proxy.
+
+You can configure it by selecting ``doh2-insecure`` kind in
+:option:`network/listen <network/listen: <list>>`.
+
+.. warning::
+
+   Currently this is offered only as an alpha feature,
+   but the code diff from normal (encrypted) DoH is very small.
+
+
 .. _dot-doh-doq-config-options:
 
 Configuration options for DoT, DoH and DoQ

@@ -8,6 +8,7 @@
 #include "lib/cache/cdb_lmdb.h"
 
 #include <stdlib.h>
+#include <lmdb.h>
 
 
 struct kr_rules *the_rules = NULL;
@@ -227,8 +228,9 @@ int kr_rules_init(const char *path, size_t maxsize, bool overwrite)
 		.path = path ? path : "ruledb", // under current workdir
 		// Caveat: mdb_env_set_mapsize() can only be called without transactions open.
 		// Note that this value does not affect file size thanks to not using MDB_WRITEMAP.
+		// Large mmap would cause issues with valgrind: https://stackoverflow.com/a/59834216
 		.maxsize = !overwrite ? 0 :
-			(maxsize ? maxsize : (size_t)(sizeof(size_t) > 4 ? 128 * 1024 : 500) * 1024*1024),
+			(maxsize ? maxsize : (size_t)(sizeof(size_t) > 4 ? 63 * 1024 : 500) * 1024*1024),
 	};
 	int ret = the_rules->api->open(&the_rules->db, &the_rules->stats, &opts);
 
@@ -803,8 +805,15 @@ int local_data_ins(knot_db_val_t key, const knot_rrset_t *rrs, const knot_rdatas
 
 	knot_db_val_t val = { .data = buf, .len = val_len };
 	int ret = ruledb_op(write, &key, &val, 1); // TODO: overwriting on ==tags?
-	// ENOSPC seems to be the only expectable error.
-	kr_assert(ret == 0 || ret == kr_error(ENOSPC));
+	if (unlikely(ret == MDB_BAD_VALSIZE)) { // yeah, leaking implementation details
+		KR_DNAME_GET_STR(owner_str, rrs->owner);
+		KR_RRTYPE_GET_STR(type_str, rrs->type);
+		kr_log_error(RULES, "records too big (%d B) for %s %s\n",
+				val_len, owner_str, type_str);
+	} else {
+		// ENOSPC seems to be the only other expectable error.
+		kr_assert(ret == 0 || ret == kr_error(ENOSPC));
+	}
 
 	if (ret || rrs->type != KNOT_RRTYPE_DNAME)
 		return ret;

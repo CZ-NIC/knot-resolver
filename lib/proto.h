@@ -26,6 +26,7 @@
     XX(TCP53, tcp53, "DNS TCP") \
     XX(DOT, dot, "DNS-over-TLS") \
     XX(DOH, doh, "DNS-over-HTTPS") \
+    XX(DOH_INSECURE, doh_insecure, "Insecure DNS-over-HTTP") \
     XX(DOQ, doq_demux, "DNS-over-QUIC-demux") \
     XX(DOQ_CONN, doq_conn, "DNS-over-QUIC-conn") \
     XX(DOQ_STREAM, doq_stream, "DNS-over-QUIC-stream") \
@@ -50,5 +51,5 @@ KR_EXPORT
 const char *kr_proto_name(enum kr_proto p);
 
 /** Bitmap of enum kr_proto options. */
-typedef uint8_t kr_proto_set;
+typedef uint16_t kr_proto_set;
 static_assert(sizeof(kr_proto_set) * 8 >= KR_PROTO_COUNT, "bad combination of type sizes");

@@ -1,9 +1,31 @@
-Knot Resolver 6.4.2 (2026-08-dd)
+Knot Resolver 6.x.y (2026-0m-dd)
+================================
+
+Bugfixes
+--------
+- views: fix "unused tags" error when repeating a tag in views (!1883)
+
+Packaging
+---------
+- arch: updates and cleanup (!1858)
+
+Improvements
+------------
+- local-data: increase capacity to 63 GiB (logged MDB_MAP_FULL, !1885)
+
+
+Knot Resolver 6.4.2 (2026-08-05)
 ================================
 
 Bugfixes
 --------
 - cache: avoid excessive logging introduced in the last release (!1869)
+- /options/serve-stale: avoid SIGSEGV from a LuaJIT bug (#957)
+
+Improvements
+------------
+- DoH: add unencrypted mode for reverese proxies (alpha, !1877)
+- deal with LMDB 1.0.0 switching format (!1880)
 
 
 Knot Resolver 6.4.1 (2026-07-22)

@@ -20,12 +20,14 @@ First, you need to decide what type of service should be available on a given IP
 address + port combination.
 
 .. csv-table::
-   :header: "Protocol/service", :option:`kind <kind: dns|xdp|dot|doh2|doh-legacy>`
+   :header: "Protocol/service", :option:`kind <kind: dns|xdp|dot|doq|doh2|doh2-insecure|doh-legacy>`
 
    "DNS (unencrypted UDP+TCP, :rfc:`1034`)","``dns``"
    "DNS (unencrypted UDP, `using XDP Linux API <./dev/daemon-bindings-net_xdpsrv.html#dns-over-xdp>`_)","``xdp``"
    ":ref:`dns-over-tls`","``dot``"
+   ":ref:`dns-over-quic`","``doq``"
    ":ref:`dns-over-https`","``doh2``"
+   ":ref:`dns-over-http`","``doh2-insecure``"
    "`Legacy DNS-over-HTTPS (DoH) <./dev/modules-http.html#mod-http-doh>`_","``doh-legacy``"
 
 .. option:: network/listen: <list>
@@ -55,7 +57,7 @@ address + port combination.
 
       Port number to listen on.
 
-   .. option:: kind: dns|xdp|dot|doh2|doh-legacy|doq
+   .. option:: kind: dns|xdp|dot|doq|doh2|doh2-insecure|doh-legacy
 
       :default: dns
 

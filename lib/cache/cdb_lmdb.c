@@ -471,6 +471,18 @@ static int cdb_init(kr_cdb_pt *db, struct kr_cdb_stats *stats, struct kr_cdb_opt
 	env->is_cache = opts->is_cache;
 
 	int ret = cdb_open_env(env, opts->path, opts->maxsize, stats);
+	/* Uh, LMDB 1.0 is incompatible with LMDB 0.y.  Hack-retry. */
+	if (abs(ret) == abs(MDB_INVALID)) {
+		env->is_cache = opts->is_cache; // needed already here to classify kr_log_*
+		kr_log_error(MDB, "found incompatible data after LMDB version change, probably; "
+				"clearing and retrying\n");
+		auto_free char *mdb_datafile = kr_strcatdup(2, opts->path, "/data.mdb");
+		auto_free char *mdb_lockfile = kr_strcatdup(2, opts->path, "/lock.mdb");
+		unlink(mdb_datafile); /* we ignore errors; e.g. either might not exist */
+		unlink(mdb_lockfile);
+
+		ret = cdb_open_env(env, opts->path, opts->maxsize, stats);
+	}
 	if (ret != 0) {
 		free(env);
 		return ret;
@@ -590,6 +602,37 @@ static int lockfile_release(int fd)
 	}
 }
 
+/// return lmdb_error(env, mdb_drop(txn, env->dbi, 0)); - or workaround on LMDB 1.0.0
+static int clear(MDB_txn *txn, struct lmdb_env *env)
+{
+	int lmdb_major, lmdb_minor, lmdb_patch;
+	(void)mdb_version(&lmdb_major, &lmdb_minor, &lmdb_patch);
+
+	if (lmdb_major != 1 || lmdb_minor != 0 || lmdb_patch != 0)
+		return lmdb_error(env, mdb_drop(txn, env->dbi, 0));
+	kr_log_debug(MDB, "working around mdb_drop() broken in LMDB 1.0.0\n");
+
+	MDB_cursor *cursor = NULL;
+	int ret = mdb_cursor_open(txn, env->dbi, &cursor);
+	if (ret != MDB_SUCCESS)
+		return lmdb_error(env, ret);
+
+	MDB_val mdb_key, mdb_val;
+	ret = mdb_cursor_get(cursor, &mdb_key, &mdb_val, MDB_FIRST);
+	while (ret == MDB_SUCCESS) {
+		ret = mdb_cursor_del(cursor, 0);
+		if (ret != MDB_SUCCESS)
+			break;
+		ret = mdb_cursor_get(cursor, &mdb_key, &mdb_val, MDB_NEXT);
+	}
+
+	mdb_cursor_close(cursor);
+
+	if (ret != MDB_NOTFOUND && ret != MDB_SUCCESS)
+		return lmdb_error(env, ret);
+
+	return kr_ok();
+}
 static int cdb_clear(kr_cdb_pt db, struct kr_cdb_stats *stats, const size_t mapsize)
 {
 	struct lmdb_env *env = db2env(db);
@@ -599,7 +642,7 @@ static int cdb_clear(kr_cdb_pt db, struct kr_cdb_stats *stats, const size_t maps
 		MDB_txn *txn = NULL;
 		int ret = txn_get(env, &txn, false);
 		if (ret == kr_ok()) {
-			ret = lmdb_error(env, mdb_drop(txn, env->dbi, 0));
+			ret = clear(txn, env);
 			if (ret == kr_ok() && env->is_cache) {
 				ret = cdb_commit(db, stats, true, true);
 			}

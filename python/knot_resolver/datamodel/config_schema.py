@@ -77,7 +77,7 @@ def _check_local_data_tags(
                 tag_str = str(tag)
                 if tag_str not in tags:
                     tags.append(tag_str)
-                if tag_str not in views_tags:
+                if tag_str not in views_tags and tag_str not in tags_not_in:
                     tags_not_in.append(tag_str)
             if len(tags_not_in) > 0:
                 errs.append(

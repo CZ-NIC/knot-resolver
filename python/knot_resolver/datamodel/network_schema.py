@@ -20,7 +20,7 @@ from knot_resolver.datamodel.types import (
 )
 from knot_resolver.utils.modeling import ConfigSchema
 
-KindEnum = Literal["dns", "xdp", "dot", "doh-legacy", "doh2", "doq"]
+KindEnum = Literal["dns", "xdp", "dot", "doh-legacy", "doh2", "doh2-insecure", "doq"]
 
 
 class EdnsBufferSizeSchema(ConfigSchema):
@@ -160,6 +160,8 @@ class ListenSchema(ConfigSchema):
                 return PortNumber(853)
             if origin.kind in ["doh-legacy", "doh2"]:
                 return PortNumber(443)
+            if origin.kind == "doh2-insecure":
+                return PortNumber(80)
             return PortNumber(53)
         return None
 
