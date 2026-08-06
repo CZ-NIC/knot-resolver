@@ -260,8 +260,9 @@ static inline void *mp_end(struct mempool *pool, void *end)
 {
 	// MEMCHECK: pool defined, pool chunks locked, free data unlocked
 	void *p = mp_ptr(pool);
+	MEMCHECK_DEFINED(pool->last, MP_CHUNK_TAIL);
 	pool->last->free = (uint8_t *)pool->last - (uint8_t *)end;
-	MEMCHECK_NOACCESS(end, pool->last->free);
+	MEMCHECK_NOACCESS(end, pool->last->free + MP_CHUNK_TAIL);
 	return p;
 	// MEMCHECK: pool defined, pool chunks locked, free data locked
 }
