@@ -168,11 +168,11 @@ int kr_rules_init(const char *path, size_t maxsize, bool overwrite)
 	struct kr_cdb_opts opts = {
 		.is_cache = false,
 		.path = path ? path : "ruledb", // under current workdir
-		// FIXME: the file will be sparse, but we still need to choose its size somehow.
-		// Later we might improve it to auto-resize in case of running out of space.
 		// Caveat: mdb_env_set_mapsize() can only be called without transactions open.
+		// Note that this value does not affect file size thanks to not using MDB_WRITEMAP.
+		// Large mmap would cause issues with valgrind: https://stackoverflow.com/a/59834216
 		.maxsize = !overwrite ? 0 :
-			(maxsize ? maxsize : (size_t)(sizeof(size_t) > 4 ? 2048 : 500) * 1024*1024),
+			(maxsize ? maxsize : (size_t)(sizeof(size_t) > 4 ? 63 * 1024 : 500) * 1024*1024),
 	};
 	int ret = the_rules->api->open(&the_rules->db, &the_rules->stats, &opts);
 
@@ -198,7 +198,13 @@ int kr_rules_init(const char *path, size_t maxsize, bool overwrite)
 failure:
 	free(the_rules);
 	the_rules = NULL;
-	auto_free const char *path_abs = kr_absolutize_path(".", opts.path);
+	auto_free const char *str_to_free = NULL;
+	const char *path_abs;
+	if (opts.path[0] == '/') {
+ 		path_abs = opts.path;
+	} else {
+		path_abs = str_to_free = kr_absolutize_path(".", opts.path);
+	}
 	kr_log_error(RULES, "failed while opening or initializing rule DB %s/\n", path_abs);
 	return ret;
 }
