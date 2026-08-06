@@ -33,6 +33,7 @@ struct mempool_chunk {
 	struct mempool *pool;         // Can be useful when analysing coredump for memory leaks
 #endif
 };
+#define MP_CHUNK_TAIL ALIGN_TO(sizeof(struct mempool_chunk), CPU_STRUCT_ALIGN)
 
 /**
  * Memory pool.
@@ -166,7 +167,11 @@ void *mp_start(struct mempool *pool, size_t size);
  **/
 static inline void *mp_ptr(struct mempool *pool)
 {
-	return (uint8_t *)pool->last - pool->last->free;
+	// MEMCHECK: pool defined, pool chunks locked, free data unlocked
+	MEMCHECK_DEFINED(pool->last, MP_CHUNK_TAIL);
+	void *ptr = (uint8_t *)pool->last - pool->last->free;
+	MEMCHECK_NOACCESS(pool->last, MP_CHUNK_TAIL);
+	return ptr;
 }
 
 /**
@@ -175,7 +180,11 @@ static inline void *mp_ptr(struct mempool *pool)
  **/
 static inline size_t mp_avail(struct mempool *pool)
 {
-	return pool->last->free;
+	// MEMCHECK: pool defined, pool chunks locked, free data unlocked
+	MEMCHECK_DEFINED(pool->last, MP_CHUNK_TAIL);
+	const size_t avail = pool->last->free;
+	MEMCHECK_NOACCESS(pool->last, MP_CHUNK_TAIL);
+	return avail;
 }
 
 /**
@@ -186,6 +195,7 @@ static inline size_t mp_avail(struct mempool *pool)
  * Multiple calls to mp_grow() have amortized linear cost wrt. the maximum value of \p size. */
 static inline void *mp_grow(struct mempool *pool, size_t size)
 {
+	// MEMCHECK: pool defined, pool chunks locked, free data unlocked
 	return (size <= mp_avail(pool)) ? mp_ptr(pool) : mp_grow_internal(pool, size);
 }
 
@@ -203,6 +213,7 @@ static inline void *mp_expand(struct mempool *pool)
  **/
 static inline void *mp_spread(struct mempool *pool, void *p, size_t size)
 {
+	// MEMCHECK: pool defined, pool chunks locked, free data unlocked
 	return (((size_t)((uint8_t *)pool->last - (uint8_t *)p) >= size) ? p : mp_spread_internal(pool, p, size));
 }
 
@@ -247,10 +258,12 @@ static inline void *mp_append_string(struct mempool *pool, void *p, const char *
  **/
 static inline void *mp_end(struct mempool *pool, void *end)
 {
+	// MEMCHECK: pool defined, pool chunks locked, free data unlocked
 	void *p = mp_ptr(pool);
 	pool->last->free = (uint8_t *)pool->last - (uint8_t *)end;
 	MEMCHECK_NOACCESS(end, pool->last->free);
 	return p;
+	// MEMCHECK: pool defined, pool chunks locked, free data locked
 }
 
 /**
@@ -267,7 +280,11 @@ static inline char *mp_end_string(struct mempool *pool, void *end)
  **/
 static inline size_t mp_size(struct mempool *pool, void *ptr)
 {
-	return ((uint8_t *)pool->last - (uint8_t *)ptr) - pool->last->free;
+	// MEMCHECK: pool defined, pool chunks locked
+	MEMCHECK_DEFINED(pool->last, MP_CHUNK_TAIL);
+	const size_t size = ((uint8_t *)pool->last - (uint8_t *)ptr) - pool->last->free;
+	MEMCHECK_NOACCESS(pool->last, MP_CHUNK_TAIL);
+	return size;
 }
 
 /**
@@ -330,8 +347,7 @@ char *mp_vprintf_append(struct mempool *mp, char *ptr, const char *fmt, va_list 
  * Some parts of mempools were removed in Knot projects,
  * see upstream if you need:
      * variants of methods returning zeroed memory and/or unaligned memory,
-     * restoring previous state of allocations,
+     * restoring previous state of allocations (no more compatible with our version of mempools),
      * concatenating and duplicating memory/strings on mempools,
-     * generic allocator interface spanning both malloc and mempools,
-     * constant-time version of mp_total_size and mp_shrink scanning only deallocated chunks.
+     * generic allocator interface spanning both malloc and mempools.
 */
