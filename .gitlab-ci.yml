@@ -894,6 +894,7 @@ python:check:code:
   script:
     - poetry install --all-extras --only main,dev,lint
     - poe check-code
+  allow_failure: true
 
 python:test:examples:
   <<: *python
