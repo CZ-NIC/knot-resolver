@@ -109,7 +109,6 @@ mp_align_size(size_t size)
 void
 mp_init(struct mempool *pool, size_t chunk_size)
 {
-	if (chunk_size == 4096) chunk_size = 512;  // reduce chunk_size of all page-sized pools (tmp), TODO remove
 	chunk_size = MAX(sizeof(struct mempool), chunk_size);
 	*pool = (struct mempool) {
 		.chunk_size = chunk_size,
@@ -385,7 +384,6 @@ void mp_log_global_stats(void)
 struct mempool *
 mp_new(size_t chunk_size)
 {
-	if (chunk_size == 4096) chunk_size = 512;  // reduce chunk_size of all page-sized pools (tmp), TODO remove
 	chunk_size = MAX(sizeof(struct mempool), chunk_size);
 	struct mempool_chunk *chunk = mp_new_reusable_chunk(chunk_size, 0);
 	struct mempool *pool = (void *)chunk - chunk->size;
