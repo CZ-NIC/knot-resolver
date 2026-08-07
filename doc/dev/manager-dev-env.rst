@@ -8,7 +8,7 @@ Manager development environment
 
 In this guide, we will setup a development environment and discuss tooling.
 
-The manager is written in Python 3 with the goal of supporting multiple versions of Python (3.8 or newer) available in current Linux distributions.
+The manager is written in Python 3 with the goal of supporting multiple versions of Python (3.9 or newer) available in current Linux distributions.
 These compatibility requirements also force us not to rely heavily on modern runtime libraries such as Pydantic.
 
 

@@ -293,7 +293,7 @@ Please note that starting with version 6, Knot Resolver is only officially suppo
 .. csv-table::
    :header: "Requirement", "Notes"
 
-   "python3_ >=3.8", "Python language interpreter"
+   "python3_ >=3.9", "Python language interpreter"
    "Jinja2_", "Template engine for Python"
    "PyYAML_", "YAML framework for Python"
    "aiohttp_", "HTTP Client/Server for Python."
