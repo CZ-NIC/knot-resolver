@@ -73,5 +73,11 @@ VOLUME /etc/knot-resolver
 # Prepare shared cache
 VOLUME /var/cache/knot-resolver
 
+# prepare directories
+RUN install -d -o root -g root -m 0750 \
+    /var/lib/knot-resolver \
+    /var/cache/knot-resolver \
+    /run/knot-resolver
+
 ENTRYPOINT ["/usr/bin/knot-resolver"]
 CMD ["-c", "/etc/knot-resolver/config.yaml"]
