@@ -29,7 +29,7 @@
  * the structure is located either in the data area of normal chunks
  * or after the 4-tuple of small chunks representing all unused of them.
  *
- * During idle, the some unused chunks are munmapped... TODO
+ * During idle, unused chunks that were not used for at least 1 minute are munmapped.
  *
  *
  * MEMCHECK summary (ASan + Valgrind annotations):
@@ -67,10 +67,30 @@
 #include <ucw/lib.h>
 #include <ucw/mempool.h>
 #include <lib/log.h>
+#include <time.h>
 
 #pragma GCC diagnostic ignored "-Wpointer-arith"
 
 #define MP_SIZE_MAX (UINT32_MAX - MP_CHUNK_TAIL - CPU_PAGE_SIZE)
+
+#define MP_REUSABLE_HOLD_TIME 60000
+#define MP_REUSABLE_MIN_FREE_PERIOD 1000
+#define MP_REUSABLE_MAX_CONSECUTIVE_FREES 250
+
+static uint32_t get_stamp_default(void) {
+	struct timespec ts = { 0 };
+#ifdef CLOCK_MONOTONIC_COARSE
+	clock_gettime(CLOCK_MONOTONIC_COARSE, &ts);  // Linux-specific
+#else
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+#endif
+	return ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+}
+static uint32_t (*get_stamp)(void) = get_stamp_default;
+
+void mp_set_time(uint32_t (*get_stamp_cb)(void)) {
+	get_stamp = get_stamp_cb;
+}
 
 /** \note Imported MMAP backend from bigalloc.c */
 #include <sys/mman.h>
@@ -166,6 +186,7 @@ static inline struct mp_unused *chunk_to_unused(struct mempool_chunk *chunk)
 	unused->count++;
 	chunk->prev = unused->chunk;
 	unused->chunk = chunk;
+	unused->timestamp = get_stamp ? get_stamp() : 0;
 
 	// MEMCHECK: chunk defined, unused defined
 	return unused;
@@ -304,13 +325,20 @@ mp_free_reusable_chunk(struct mempool_chunk *chunk) {
 	}
 }
 
-static void
-mp_balance_reusable(void) {
+uint64_t mp_balance_reusable(void)
+{
 	// MEMCHECK: all data locked, chunks defined, unused defined
-	// just free all unused chunks/blocks for now
+	uint32_t now = get_stamp ? get_stamp() : 0;
+	uint32_t longest_unused = 0;
+	int max_frees = MP_REUSABLE_MAX_CONSECUTIVE_FREES;
 	for (int i = 0; i < MP_REUSABLE_CNT; i++) {
 		struct mp_unused *unused;
 		while ((unused = mp_reusable[i].head.next)->count > 0) {
+			if (get_stamp && (now - unused->timestamp < MP_REUSABLE_HOLD_TIME)) {
+				longest_unused = MAX(longest_unused, now - unused->timestamp);
+				break;
+			}
+			if (max_frees-- <= 0) return 0;
 			mp_remove_unused(unused);
 			mp_reusable[i].total_cnt  -= mp_reusable[i].chunks_per_block;
 			mp_reusable[i].unused_cnt -= mp_reusable[i].chunks_per_block;
@@ -321,6 +349,8 @@ mp_balance_reusable(void) {
 			}
 		}
 	}
+
+	return MAX(MP_REUSABLE_HOLD_TIME - longest_unused, MP_REUSABLE_MIN_FREE_PERIOD);
 }
 
 #define CONFIG_UCW_POOL_ACTIVE_CHUNKS (ARRAY_SIZE(mp_reusable) + 1)
