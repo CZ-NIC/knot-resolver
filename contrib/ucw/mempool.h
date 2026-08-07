@@ -53,6 +53,29 @@ struct mempool_stats {          /** Mempool statistics. See mp_stats(). **/
 	unsigned chunks_count;      /** Number of allocated chunks. */
 };
 
+// #define MP_DEBUG_CONSISTENCY_CHECKS  // slow
+#ifdef MP_DEBUG_CONSISTENCY_CHECKS
+#define MP_CHUNK_CHECK(c) MP_CHUNK_CHECKi(c, 0)
+#define MP_CHUNK_CHECKi(c, i) \
+	if ((c->free > c->size) || (c->size > (1 << 23))) { \
+		char trace[150]; kr_log_get_shorttrace(trace); \
+		printf("BUG: chunk %p (%d-th), size %d, free %d   %s\n", (void *)c, i, c->size, c->free, trace); \
+	}
+#define MP_POOL_CHECK(pool) \
+{ \
+	struct mempool_chunk *c = pool->last; \
+	for (int ci = 0; c && (ci < 6); ci++) { \
+		MEMCHECK_DEFINED(c, MP_CHUNK_TAIL); \
+		MP_CHUNK_CHECKi(c, ci); \
+		c = c->prev; \
+		MEMCHECK_NOACCESS(c, MP_CHUNK_TAIL); \
+	} \
+}
+#else
+#define MP_CHUNK_CHECK(c)
+#define MP_POOL_CHECK(c)
+#endif
+
 /***
  * [[basic]]
  * Basic manipulation
@@ -279,6 +302,7 @@ static inline void *mp_append_string(struct mempool *pool, void *p, const char *
 static inline void *mp_end(struct mempool *pool, void *end)
 {
 	// MEMCHECK: pool defined, pool chunks locked, free data unlocked
+	MP_POOL_CHECK(pool);
 	void *p = mp_ptr(pool);
 	MEMCHECK_DEFINED(pool->last, MP_CHUNK_TAIL);
 	const size_t avail = (uint8_t *)pool->last - (uint8_t *)end;
@@ -289,6 +313,7 @@ static inline void *mp_end(struct mempool *pool, void *end)
 	}
 	pool->last->free = avail;
 	MEMCHECK_NOACCESS(end, pool->last->free + MP_CHUNK_TAIL);
+	MP_POOL_CHECK(pool);
 	return p;
 	// MEMCHECK: pool defined, pool chunks locked, free data locked
 }
