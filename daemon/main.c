@@ -13,6 +13,7 @@
 #include "daemon/worker.h"
 #include "daemon/ratelimiting.h"
 #include "daemon/defer.h"
+#include "daemon/idletimer.h"
 
 #include "lib/defines.h"
 #include "lib/dnssec.h"
@@ -458,9 +459,19 @@ static void drop_capabilities(void)
 #endif /* ENABLE_CAP_NG */
 }
 
+void mempool_timer_callback(uv_timer_t *handle) {
+	mp_balance_reusable();
+}
+
+uint32_t mp_get_stamp_uv(void)
+{
+	return uv_now(uv_default_loop());
+}
+
 int main(int argc, char **argv)
 {
-	//sleep(10);
+	mp_set_time(mp_get_stamp_uv);
+
 	kr_log_group_reset();
 	if (setvbuf(stdout, NULL, _IONBF, 0) || setvbuf(stderr, NULL, _IONBF, 0)) {
 		kr_log_error(SYSTEM, "failed to set output buffering (ignored): %s\n",
@@ -634,6 +645,11 @@ int main(int argc, char **argv)
 	if (defer_init_idle(loop) != 0) {
 		ret = EXIT_FAILURE;
 		goto cleanup;
+	}
+
+	{
+		static idletimer_t mempool_timer;
+		idletimer_init(&mempool_timer, mp_balance_reusable, 1000);
 	}
 
 	ret = kr_rules_init_ensure();
