@@ -312,4 +312,4 @@ void kr_log_fmt(enum kr_log_group group, kr_log_level_t level, const char *file,
  * See backtrace(3) for required compilation flags to make this work.
  */
 KR_EXPORT
-char *kr_log_get_trace(char *buf, size_t buf_size, int first_level, int last_level, char *sep);
+char *kr_log_get_trace(char *buf, size_t buf_size, int first_level, int last_level, const char *sep);

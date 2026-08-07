@@ -332,7 +332,7 @@ void kr_log_q1(const struct kr_query * const qry,
 	va_end(args);
 }
 
-char *kr_log_get_trace(char *buf, size_t buf_size, int first_level, int last_level, char *sep)
+char *kr_log_get_trace(char *buf, size_t buf_size, int first_level, int last_level, const char *sep)
 {
 	const size_t sep_size = strlen(sep);
 	void *addresses[last_level + 2];
@@ -348,10 +348,10 @@ char *kr_log_get_trace(char *buf, size_t buf_size, int first_level, int last_lev
 	int i = first_level;
 	for (; i < MIN(cnt, last_level + 1); i++) {
 		char *start = symbols[i];
-		char *par1, *par2, *plus;
+		char *par1 = NULL, *par2 = NULL, *plus = NULL;
 		par1 = strchr(start, '(');
-		if (par1) {
-			par2 = strchr(par1, ')');
+		if (par1) par2 = strchr(par1, ')');
+		if (par2) {
 			plus = memchr(par1, '+', par2 - par1);
 			if (!plus) plus = par2;
 		} else {
@@ -365,7 +365,7 @@ char *kr_log_get_trace(char *buf, size_t buf_size, int first_level, int last_lev
 		
 		char *name = bin;
 		char *name_end = bin_end;
-		char *offset = '\0';
+		char *offset = "\0";
 		char *offset_end = offset;
 		if (
 				(strncmp("kresd", bin, bin_end - bin) == 0)   ||
