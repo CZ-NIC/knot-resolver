@@ -26,8 +26,7 @@ socket. One possible use-case is reconfiguring the resolver instances from
 another program, e.g. a maintenance script.
 
 .. note:: Each instance of Knot Resolver exposes its own control socket. Take
-   that into account when scripting deployments with
-   :ref:`systemd-multiple-instances`.
+   that into account when scripting deployments with multiple workers.
 
 When Knot Resolver is started using Systemd (see section
 `Startup <../gettingstarted-startup.html>`_) it creates a control socket in path

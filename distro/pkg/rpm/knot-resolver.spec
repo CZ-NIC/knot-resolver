@@ -213,7 +213,6 @@ getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysc
 
 %post
 # systemd_post macro is not needed for anything (calls systemctl preset)
-%tmpfiles_create %{_tmpfilesdir}/knot-resolver.conf
 %if "x%{?fedora}" == "x"
 /sbin/ldconfig
 %endif
@@ -243,7 +242,6 @@ getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysc
 %dir %{_unitdir}/multi-user.target.wants
 %{_unitdir}/knot-resolver.service
 %{_unitdir}/multi-user.target.wants/knot-resolver.service
-%{_tmpfilesdir}/knot-resolver.conf
 %ghost /run/%{name}
 %ghost %{_localstatedir}/cache/%{name}
 %attr(750,knot-resolver,knot-resolver) %dir %{_libdir}/%{name}

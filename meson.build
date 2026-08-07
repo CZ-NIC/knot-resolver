@@ -78,7 +78,6 @@ endif
 systemd_work_dir = prefix / get_option('localstatedir') / 'lib' / 'knot-resolver'
 systemd_cache_dir = prefix / get_option('localstatedir') / 'cache' / 'knot-resolver'
 systemd_unit_dir = prefix / 'lib' / 'systemd' / 'system'
-systemd_tmpfiles_dir = prefix / 'lib' / 'tmpfiles.d'
 systemd_sysusers_dir = prefix / 'lib' / 'sysusers.d'
 completion_dir = prefix / 'share'
 
@@ -212,8 +211,7 @@ summary({'sendmmsg': sendmmsg,
 
 ### Systemd; most is in systemd/meson.build
 systemd_files = get_option('systemd_files')
-systemd_legacy_units = get_option('systemd_legacy_units')
-libsystemd = dependency('libsystemd', required: systemd_files == 'enabled')
+libsystemd = dependency('libsystemd', version: '>=235', required: systemd_files == 'enabled')
 summary({'libsystemd support': libsystemd.found(),
          'files': systemd_files == 'enabled',
         }, section: 'Systemd', bool_yn: true)
