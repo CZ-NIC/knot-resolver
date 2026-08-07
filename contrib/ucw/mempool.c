@@ -262,6 +262,7 @@ mp_new_reusable_chunk(uint32_t requested_size, size_t pool_size) {
 				mp_insert_unused(unused, reusable->head.prev);
 			}
 			MEMCHECK_NOACCESS((uint8_t *)chunk - chunk->size, chunk->size);
+			MP_CHUNK_CHECK(chunk);
 			return chunk;
 		} else if (reusable->chunks_per_block > 1) {
 			unused = mp_new_small_chunks(size);
@@ -271,6 +272,7 @@ mp_new_reusable_chunk(uint32_t requested_size, size_t pool_size) {
 			unused->count--;
 			reusable->unused_cnt += unused->count;
 			mp_insert_unused(unused, reusable->head.prev);
+			MP_CHUNK_CHECK(chunk);
 			return chunk;
 		} else {
 			reusable->total_cnt++;
@@ -279,7 +281,9 @@ mp_new_reusable_chunk(uint32_t requested_size, size_t pool_size) {
 	} else {
 		size = mp_align_size(size);
 	}
-	return mp_new_chunk(size);
+	chunk = mp_new_chunk(size);
+	MP_CHUNK_CHECK(chunk);
+	return chunk;
 	// MEMCHECK: data locked, chunk defined
 }
 
@@ -332,6 +336,7 @@ mp_balance_reusable(void) {
 void log_pool_stats(struct mempool *pool)
 {
 	// MEMCHECK: pool defined, pool chunks locked, data unknown
+	MP_POOL_CHECK(pool);
 	int counts[MP_REUSABLE_CNT + 1] = { 0 };
 	int count = 0;
 	size_t free = 0, total = 0;
@@ -367,6 +372,7 @@ void log_pool_stats(struct mempool *pool)
 		}
 		printf(", util %5.1f %%, %s\n", (float)(total - free) / total * 100, trace);
 	}
+	MP_POOL_CHECK(pool);
 }
 
 void mp_log_global_stats(void)
@@ -400,6 +406,7 @@ mp_new(size_t chunk_size)
 		.chunk_size = chunk_size,
 	};
 	MEMCHECK_NOACCESS(chunk, MP_CHUNK_TAIL);
+	MP_POOL_CHECK(pool);
 	return pool;
 	// MEMCHECK: pool defined, other data locked, chunk locked
 }
@@ -420,6 +427,7 @@ void
 mp_delete(struct mempool *pool)
 {
 	// MEMCHECK: pool defined, pool chunks locked, data unknown
+	MP_POOL_CHECK(pool);
 	if (pool == NULL) {
 		return;
 	}
@@ -432,6 +440,7 @@ void
 mp_flush(struct mempool *pool)
 {
 	// MEMCHECK: pool defined, pool chunks locked, data unknown
+	MP_POOL_CHECK(pool);
 	log_pool_stats(pool);
 	struct mempool_chunk *chunk = pool->last, *prev, *poolchunk = NULL;
 	while (chunk) {
@@ -454,6 +463,7 @@ mp_flush(struct mempool *pool)
 				chunk->size - sizeof(struct mempool) + MP_CHUNK_TAIL);
 	}
 	pool->last = chunk;
+	MP_POOL_CHECK(pool);
 	// MEMCHECK: pool defined, pool chunks locked, data except pool locked
 }
 
@@ -520,6 +530,7 @@ mp_alloc_internal(struct mempool *pool, size_t size)
 						MEMCHECK_NOACCESS(c, MP_CHUNK_TAIL);
 						c = prev;
 					}
+					MP_POOL_CHECK(pool);
 					return ptr;
 				}
 				if ((*pchunk)->free < (*pfullest)->free) {
@@ -554,6 +565,7 @@ mp_alloc_internal(struct mempool *pool, size_t size)
 		pool->last = chunk;
 		pool->total_size += chunk->size + MP_CHUNK_TAIL;
 		MEMCHECK_NOACCESS(chunk, MP_CHUNK_TAIL);
+		MP_POOL_CHECK(pool);
 		return ptr;
 	} else {
 		fprintf(stderr, "Cannot allocate %zu bytes from a mempool", size);
@@ -567,6 +579,7 @@ void *
 mp_alloc(struct mempool *pool, size_t size)
 {
 	// MEMCHECK: pool defined, pool chunks locked, free data region locked
+	MP_POOL_CHECK(pool);
 	void *ptr = NULL;
 	if (pool->last) {
 		MEMCHECK_DEFINED(pool->last, MP_CHUNK_TAIL);
@@ -581,6 +594,7 @@ mp_alloc(struct mempool *pool, size_t size)
 		ptr = mp_alloc_internal(pool, size);
 	}
 	if (ptr) MEMCHECK_UNDEFINED(ptr, size);
+	MP_POOL_CHECK(pool);
 	return ptr;
 	// MEMCHECK: pool defined, pool chunks locked, alloc'd data undefined
 }
@@ -601,6 +615,7 @@ void *
 mp_start(struct mempool *pool, size_t size)
 {
 	// MEMCHECK: pool defined, pool chunks locked, free data region locked
+	MP_POOL_CHECK(pool);
 	void *ptr = NULL;
 	if (pool->last) {
 		MEMCHECK_DEFINED(pool->last, MP_CHUNK_TAIL);
@@ -619,6 +634,7 @@ mp_start(struct mempool *pool, size_t size)
 		MEMCHECK_UNDEFINED(ptr, pool->last->free);
 		MEMCHECK_NOACCESS(pool->last, MP_CHUNK_TAIL);
 	}
+	MP_POOL_CHECK(pool);
 	return ptr;
 	// MEMCHECK: pool defined, pool chunks locked, free data undefined
 }
@@ -627,6 +643,7 @@ void *
 mp_grow_internal(struct mempool *pool, size_t size)
 {
 	// MEMCHECK: pool defined, pool chunks locked, free data unlocked
+	MP_POOL_CHECK(pool);
 	if (unlikely(size > MP_SIZE_MAX))
 		return NULL;
 	size_t avail = mp_avail(pool);
@@ -638,6 +655,7 @@ mp_grow_internal(struct mempool *pool, size_t size)
 	MEMCHECK_NOACCESS(pool->last, MP_CHUNK_TAIL);
 	memcpy(p, ptr, avail);
 	MEMCHECK_NOACCESS(ptr, avail);
+	MP_POOL_CHECK(pool);
 	return p;
 	// MEMCHECK: pool defined, pool chunks locked, free data unlocked, previous free data locked
 }
@@ -646,11 +664,13 @@ size_t
 mp_open(struct mempool *pool, void *ptr)
 {
 	// MEMCHECK: pool defined, pool chunks locked, free data locked
+	MP_POOL_CHECK(pool);
 	MEMCHECK_DEFINED(pool->last, MP_CHUNK_TAIL);
 	size_t size = ((uint8_t *)pool->last - (uint8_t *)ptr) - pool->last->free;
 	MEMCHECK_UNDEFINED(ptr + size, pool->last->free);
 	pool->last->free += size;
 	MEMCHECK_NOACCESS(pool->last, MP_CHUNK_TAIL);
+	MP_POOL_CHECK(pool);
 	return size;
 	// MEMCHECK: pool defined, pool chunks locked, free data unlocked
 }
