@@ -110,6 +110,7 @@ void
 mp_init(struct mempool *pool, size_t chunk_size)
 {
 	chunk_size = MAX(sizeof(struct mempool), chunk_size);
+	chunk_size = chunk_size < 2048 ? chunk_size : mp_align_size(chunk_size);
 	*pool = (struct mempool) {
 		.chunk_size = chunk_size,
 	};
@@ -391,6 +392,7 @@ struct mempool *
 mp_new(size_t chunk_size)
 {
 	chunk_size = MAX(sizeof(struct mempool), chunk_size);
+	chunk_size = chunk_size < 2048 ? chunk_size : mp_align_size(chunk_size);
 	struct mempool_chunk *chunk = mp_new_reusable_chunk(chunk_size, 0);
 	struct mempool *pool = (void *)chunk - chunk->size;
 	MEMCHECK_UNDEFINED(pool, sizeof(*pool));
