@@ -109,6 +109,24 @@ void mp_stats(struct mempool *pool, struct mempool_stats *stats);
  **/
 size_t mp_total_size(struct mempool *pool);
 
+/**
+ * Free memory which was unused for a certain time period.
+ * It has to be called periodically; no memory is ever freed otherwise.
+ * Returns time delay in msec in which it may be called again;
+ * ideally, call it sometime after that time during idle.
+ * It may yield (and return 0) before freeing is fully completed,
+ * not to block for too long.
+ */
+KR_EXPORT
+uint64_t mp_balance_reusable(void);
+
+/**
+ * Set function returning current time in msec (but precision of secs is also OK)
+ * instead of the default clock_gettime, which might be slow.
+ * Call it before using mempools to keep internal timestamps consistent.
+ */
+void mp_set_time(uint32_t (*get_stamp_cb)(void));
+
 /***
  * [[alloc]]
  * Allocation routines
