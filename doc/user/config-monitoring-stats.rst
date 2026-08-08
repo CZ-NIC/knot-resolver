@@ -33,11 +33,15 @@ You can see all built-in statistics in `built-in statistics <./dev/modules-stats
 
 .. _config-monitoring-prometheus:
 
-Prometheus metrics endpoint
----------------------------
+Metrics endpoints
+-----------------
 
-The :ref:`manager-api` exposes `/metrics` endpoint that serves agregated metrics from statistics collector in Prometheus text format.
-You can use it as soon as the HTTP API is configured.
+The :ref:`manager-api` exposes `/metrics/prometheus` and `/metrcis/json` endpoints
+which serve aggregated metrics from statistics collector in two different text formats.
+
+You can use them as soon as the HTTP API is configured.
+For uncommon Knot Resolver packages, the Python ``prometheus-client`` package may not be installed by default.
+Without it, the `/metrics/prometheus` endpoint will not be available.
 
 It is also possible to use the :ref:`manager-client` to obtain and save metrics:
 
