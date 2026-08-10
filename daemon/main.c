@@ -459,10 +459,6 @@ static void drop_capabilities(void)
 #endif /* ENABLE_CAP_NG */
 }
 
-void mempool_timer_callback(uv_timer_t *handle) {
-	mp_balance_reusable();
-}
-
 uint32_t mp_get_stamp_uv(void)
 {
 	return uv_now(uv_default_loop());
