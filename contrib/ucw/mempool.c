@@ -321,6 +321,9 @@ mp_free_reusable_chunk(struct mempool_chunk *chunk) {
 		}
 		// MEMCHECK: data locked, chunk defined, unused defined
 	} else {
+		char trace[150]; kr_log_get_shorttrace(trace);
+		printf("FREE_REUSABLE: size orig %8u, new %8u   %s\n",
+				size, chunk->size, trace);
 		mp_free_chunk(chunk);
 	}
 }
@@ -350,12 +353,67 @@ uint64_t mp_balance_reusable(void)
 		}
 	}
 
+	// temporary logging
+	static uint32_t log_ts = 0;
+	if (now - log_ts >= 60000) {
+		log_ts = now;
+		mp_log_global_stats();
+	}
+
 	return MAX(MP_REUSABLE_HOLD_TIME - longest_unused, MP_REUSABLE_MIN_FREE_PERIOD);
 }
 
 #define CONFIG_UCW_POOL_ACTIVE_CHUNKS (ARRAY_SIZE(mp_reusable) + 1)
 // ------
 
+void log_pool_stats(struct mempool *pool)
+{
+	// MEMCHECK: pool defined, pool chunks locked, data unknown
+	int counts[MP_REUSABLE_CNT + 1] = { 0 };
+	int count = 0;
+	size_t free = 0, total = 0;
+	for (struct mempool_chunk *chunk = pool->last; chunk; ) {
+		MEMCHECK_DEFINED(chunk, MP_CHUNK_TAIL);
+		free += chunk->free;
+		total += chunk->size;  // excl. chunk metadata
+		count++;
+		int size_index = MP_REUSABLE_CNT;
+		for (int i = 0; i < MP_REUSABLE_CNT; i++) {
+			if (chunk->size == mp_reusable[i].chunk_size) {
+				size_index = i;
+				break;
+			}
+		}
+		counts[size_index]++;
+
+		struct mempool_chunk *prev = chunk->prev;
+		MEMCHECK_NOACCESS(chunk, MP_CHUNK_TAIL);
+		chunk = prev;
+	}
+
+	char *log_reason = NULL;
+	if ((float)free / total > 0.5) log_reason = "UNDERFULL_POOL";
+	if (count > 18) log_reason = "OVERCOUNT_POOL";
+	if (counts[MP_REUSABLE_CNT] > 0) log_reason = "NOT-FULLY-REUSED_POOL";
+
+	if (log_reason) {
+		char trace[150]; kr_log_get_shorttrace(trace);
+		printf("%21s: counts", log_reason);
+		for (int i = 0; i < MP_REUSABLE_CNT + 1; i++) {
+			printf(" %2d", counts[i]);
+		}
+		printf(", util %5.1f %%, %s\n", (float)(total - free) / total * 100, trace);
+	}
+}
+
+void mp_log_global_stats(void)
+{
+	printf("MEMPOOL_STATS: ");
+	for (int i = 0; i < MP_REUSABLE_CNT; i++) {
+		printf("%5zu/%-5zu ", mp_reusable[i].total_cnt - mp_reusable[i].unused_cnt, mp_reusable[i].total_cnt);
+	}
+	printf("\n");
+}
 
 struct mempool *
 mp_new(size_t chunk_size)
@@ -400,6 +458,7 @@ mp_delete(struct mempool *pool)
 	if (pool == NULL) {
 		return;
 	}
+	// log_pool_stats(pool);
 	DBG("Deleting mempool %p", pool);
 	mp_free_chain(pool->last); // can contain the mempool structure
 }
@@ -408,6 +467,7 @@ void
 mp_flush(struct mempool *pool)
 {
 	// MEMCHECK: pool defined, pool chunks locked, data unknown
+	// log_pool_stats(pool);
 	struct mempool_chunk *chunk = pool->last, *prev, *poolchunk = NULL;
 	while (chunk) {
 		MEMCHECK_DEFINED(chunk, MP_CHUNK_TAIL);
