@@ -10,6 +10,8 @@ Packaging
 - arch: updates and cleanup (!1858)
 - deb: migrate to sysusers and update packaging (!1857)
 - python: raised minimum supported version to 3.9 (!1886)
+- Add a `VERSION` file as the single source of truth for the project version. (!1889)
+- pyproject.toml: migrate from Poetry to `setuptools` (!1889)
 
 Improvements
 ------------
