@@ -471,11 +471,6 @@ uint32_t mp_get_stamp_uv(void)
 
 int main(int argc, char **argv)
 {
-#ifdef __linux__
-	// Transparent huge pages caused huge peaks in resident memory usage and not returning the memory.
-	prctl(PR_SET_THP_DISABLE, 1, 0L, 0L, 0L);
-#endif
-
 	mp_set_time(mp_get_stamp_uv);
 
 	kr_log_group_reset();
