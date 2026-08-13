@@ -3,11 +3,10 @@ from __future__ import annotations
 import fcntl
 import os
 import signal
-from pathlib import Path
 from pwd import getpwuid
 from typing import TYPE_CHECKING, Any
 
-from .constants import USER, VERSION
+from .constants import LINUX_SYS, USER, VERSION
 from .controller import get_best_controller_implementation
 from .controller.exceptions import KresSubprocessControllerError, KresSubprocessControllerExec
 from .datamodel.config_schema import KresConfig, get_rundir_without_validation
@@ -18,9 +17,65 @@ from .manager.server import load_raw_config
 from .utils.modeling.parsing import data_combine
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from .args import KresArgs
 
+
 logger = get_logger(__name__)
+
+
+if LINUX_SYS:
+    import ctypes
+    import ctypes.util
+
+    PR_SET_THP_DISABLE = 41
+    PR_THP_DISABLE_EXCEPT_ADVISED = ctypes.c_ulong(2)
+
+    def linux_disable_transparent_huge_pages() -> None:
+        libc_path = ctypes.util.find_library("c")
+        if libc_path is None:
+            logger.warning("Unable to find libc; cannot disable THP (Transparent Huge Pages).")
+            return
+
+        libc = ctypes.CDLL(libc_path, use_errno=True)
+        prctl = libc.prctl
+
+        if (
+            prctl(
+                PR_SET_THP_DISABLE,
+                ctypes.c_long(1),
+                PR_THP_DISABLE_EXCEPT_ADVISED,
+                ctypes.c_ulong(0),
+                ctypes.c_ulong(0),
+            )
+            == 0
+        ):
+            logger.info("THP (Transparent Huge Pages) disabled except advised.")
+            return
+        errno = ctypes.get_errno()
+
+        if (
+            prctl(
+                PR_SET_THP_DISABLE,
+                ctypes.c_long(1),
+                ctypes.c_ulong(0),
+                ctypes.c_ulong(0),
+                ctypes.c_ulong(0),
+            )
+            == 0
+        ):
+            logger.info("THP (Transparent Huge Pages) disabled.")
+            return
+        fallback_errno = ctypes.get_errno()
+
+        logger.warning(
+            "Unable to disable THP (Transparent Huge Pages) (errno=%d: %s; fallback errno=%d: %s).",
+            errno,
+            os.strerror(errno),
+            fallback_errno,
+            os.strerror(fallback_errno),
+        )
 
 
 async def start_resolver(args: KresArgs) -> int:
@@ -54,7 +109,7 @@ async def start_resolver(args: KresArgs) -> int:
                     " from '%s', which is used as the prefix for relative paths."
                     "This can cause issues with files that are configured with relative paths.",
                     config_file,
-                    args.config[0]
+                    args.config[0],
                 )
 
             # Preprocess config - load from file or in general take it to the last step before validation.
@@ -88,6 +143,11 @@ async def start_resolver(args: KresArgs) -> int:
         except BlockingIOError:
             logger.error("Rundir already in use: %s", rundir.absolute())
             return 1
+
+        if LINUX_SYS:
+            # Disable Transparent Huge Pages on Linux for this process and all children.
+            # THP causes large memory footprint in kresd processes (peaks and not returning memory).
+            linux_disable_transparent_huge_pages()
 
         # Start the controller
         controller = await get_best_controller_implementation(config)
