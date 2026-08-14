@@ -1,8 +1,15 @@
 # Knot Resolver
 
-[![Build Status](https://gitlab.nic.cz/knot/knot-resolver/badges/nightly/pipeline.svg?x)](https://gitlab.nic.cz/knot/knot-resolver/commits/nightly)
-[![Coverage Status](https://gitlab.nic.cz/knot/knot-resolver/badges/nightly/coverage.svg?x)](https://www.knot-resolver.cz/documentation/latest)
-[![Packaging status](https://repology.org/badge/tiny-repos/knot-resolver.svg)](https://repology.org/project/knot-resolver/versions)
+[![Latest release](https://gitlab.nic.cz/knot/knot-resolver/-/badges/release.svg)](https://gitlab.nic.cz/knot/knot-resolver/-/releases)
+[![Packaging status](https://repology.org/badge/tiny-repos/knot-resolver.svg)](https://repology.org/project/knot-resolver)
+
+<!-- Other badges
+Build status... unfortunately in our current CI this will always show a gray "manual" state, which is bad.
+    [![Build Status](https://gitlab.nic.cz/knot/knot-resolver/badges/nightly/pipeline.svg?x)](https://gitlab.nic.cz/knot/knot-resolver/commits/nightly)
+
+Coverage... we currently don't track it for the C parts.
+    [![Coverage Status](https://gitlab.nic.cz/knot/knot-resolver/badges/nightly/coverage.svg?x)](https://www.knot-resolver.cz/documentation/latest)
+-->
 
 Knot Resolver is a full caching DNS resolver implementation. The core architecture is tiny and efficient, written in C and [LuaJIT][luajit], providing a foundation and a state-machine-like API for extension modules. There are three built-in modules - *iterator*, *validator* and *cache* - which provide the main functionality of the resolver. A few other modules are automatically loaded by default to extend the resolver's functionality.
 
