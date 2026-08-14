@@ -1,9 +1,15 @@
 # Knot Resolver
 
-[![Build Status](https://gitlab.nic.cz/knot/knot-resolver/badges/nightly/pipeline.svg?x)](https://gitlab.nic.cz/knot/knot-resolver/commits/nightly)
-[![Coverage Status](https://gitlab.nic.cz/knot/knot-resolver/badges/nightly/coverage.svg?x)](https://knot.pages.nic.cz/knot-resolver/)
-[![Documentation Status](https://readthedocs.org/projects/knot-resolver/badge/?version=latest)](https://readthedocs.org/projects/knot-resolver/?badge=latest)
-[![Packaging status](https://repology.org/badge/tiny-repos/knot-resolver.svg)](https://repology.org/project/knot-resolver/versions)
+[![Latest release](https://gitlab.nic.cz/knot/knot-resolver/-/badges/release.svg)](https://gitlab.nic.cz/knot/knot-resolver/-/releases)
+[![Packaging status](https://repology.org/badge/tiny-repos/knot-resolver.svg)](https://repology.org/project/knot-resolver)
+
+<!-- Other badges
+Build status... unfortunately in our current CI this will always show a gray "manual" state, which is bad.
+    [![Build Status](https://gitlab.nic.cz/knot/knot-resolver/badges/nightly/pipeline.svg?x)](https://gitlab.nic.cz/knot/knot-resolver/commits/nightly)
+
+Coverage... we currently don't track it for the C parts.
+    [![Coverage Status](https://gitlab.nic.cz/knot/knot-resolver/badges/nightly/coverage.svg?x)](https://www.knot-resolver.cz/documentation/latest)
+-->
 
 Knot Resolver is a caching full resolver implementation written in C and [LuaJIT][luajit], both a resolver library and a daemon. The core architecture is tiny and efficient, and provides a foundation and
 a state-machine like API for extensions. There are three modules built-in - *iterator*, *validator*, *cache*, and a few more are loaded by default. Most of the [rich features](https://knot-resolver.readthedocs.io/en/latest/config-overview.html) are written in Lua(JIT) and C. Batteries are included, but optional.
