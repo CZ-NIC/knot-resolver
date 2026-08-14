@@ -232,6 +232,8 @@ static void write_stats_line(FILE *f, float tunnel_prob, struct kr_query *qry)
 	char buf[KNOT_DNAME_MAXLEN];
 	if (knot_dname_to_str(buf, qry->sname, sizeof(buf)))
 		(void)fprintf(f, "|%s|\n", buf);
+	else
+		(void)fprintf(f, "|-|\n");
 }
 
 static void update_stats(float tunnel_prob, struct kr_query *qry)
@@ -419,7 +421,7 @@ static void do_filter(kr_layer_t *ctx, knot_pkt_t *pkt)
 		knot_dname_t registrable[300];
 		int registrable_ret = qname_to_registrable_dname(req, registrable, sizeof(registrable));
 
-		if (qry->stype != KNOT_RRTYPE_NULL || config.sensitivity >= 90) {
+		if (qry->stype != KNOT_RRTYPE_NULL || config.sensitivity <= 90) {
 			uint8_t model_version = get_model_version(config.net);
 
 			if (model_version == 1) {
