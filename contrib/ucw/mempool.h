@@ -139,11 +139,21 @@ void mp_log_global_stats(void);
 
 /**
  * Free memory which was unused for a certain time period.
- * It has to be called periodically; no memory is ever freed otherwise.
+ * After it is called for the first time, it has to be called periodically for freeing memory.
  * Returns time delay in msec in which it may be called again;
  * ideally, call it sometime after that time during idle.
  * It may yield (and return 0) before freeing is fully completed,
  * not to block for too long.
+ *
+ * Before calling this function for the first time,
+ * balancing is performed during some other mempool operations.
+ * If you however don't use mempools for a long time after a memory intensive operation,
+ * the unused memory stays allocated; calling this function is thus recommended.
+ *
+ * If MEMPOOL_IS_THREAD_SAFE is defined in C file,
+ * reusing chunks is thread_local as well as the effects of this function.
+ * The balancing during other operations is then disabled only in threads
+ * where this function was called.
  */
 KR_EXPORT
 uint64_t mp_balance_reusable(void);
@@ -152,6 +162,7 @@ uint64_t mp_balance_reusable(void);
  * Set function returning current time in msec (but precision of secs is also OK)
  * instead of the default clock_gettime, which might be slow.
  * Call it before using mempools to keep internal timestamps consistent.
+ * The function is set globally for all threads.
  */
 void mp_set_time(uint32_t (*get_stamp_cb)(void));
 
