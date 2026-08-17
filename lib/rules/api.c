@@ -457,9 +457,9 @@ static int subtree_search(const size_t lf_start_i, const knot_db_val_t key,
 	knot_db_val_t val;
 	if (qry->stype == KNOT_RRTYPE_DS)
 		goto shorten; // parent-side type, belongs into zone closer to root
-	// LATER: again, use cursor to iterate over multiple rules on the same key.
-	do {
+	do { // TODO: the control-flow is a bit complex with continue+goto labels
 		int ret = ruledb_op(read_leq, &key_leq, &val);
+			// this also left cursor on the first &val of &key_leq
 		if (ret == -ENOENT) return RET_CONTINUE;
 		if (ret < 0) return kr_error(ret);
 		if (ret > 0) { // found a previous key
@@ -476,8 +476,8 @@ static int subtree_search(const size_t lf_start_i, const knot_db_val_t key,
 			.data = key_leq.data + lf_start_i,
 			.len  = key_leq.len  - lf_start_i,
 		};
-
-		// Found some good key, now get the ZLA type,
+	retry_val:;
+		// Found some good key_leq, now get the ZLA type,
 		// and deal with the special _FORWARD case.
 		val_zla_type_t ztype;
 		if (deserialize_fails_assert(&val, &ztype))
@@ -502,8 +502,14 @@ static int subtree_search(const size_t lf_start_i, const knot_db_val_t key,
 		// The other ztype possibilities are similar; check the tags now.
 		if (!kr_rule_consume_tags(&val, req, allow_audit)) {
 			kr_assert(key_leq.len >= lf_start_i);
+		keyval_next:
+			// try next &val on the same &key_leq
+			ret = ruledb_op(it_next, &val);
+			kr_assert(ret == 0 || ret == -ENOENT || ret == MDB_NOTFOUND);
+			if (ret == 0)
+				goto retry_val;
 		shorten:
-			// Shorten key_leq by one label and retry.
+			// Otherwise shorten key_leq by one label and retry.
 			if (key_leq.len <= lf_start_i) // nowhere to shorten
 				return RET_CONTINUE;
 			const char *data = key_leq.data;
@@ -530,10 +536,10 @@ static int subtree_search(const size_t lf_start_i, const knot_db_val_t key,
 		if (deserialize_fails_assert(&val, &opts))
 			return kr_error(EILSEQ);
 		if (opts.is_block && kr_request_unblocked(req))
-			goto shorten; // continue looking for rules
+			goto keyval_next; // continue looking for rules
 		log_rule(opts, qry);
 		if (opts.score < req->rule_score_apply)
-			goto shorten; // continue looking for rules
+			goto keyval_next; // continue looking for rules
 
 		// The non-forward types optionally specify TTL.
 		uint32_t ttl = KR_RULE_TTL_DEFAULT;
@@ -567,7 +573,7 @@ static int subtree_search(const size_t lf_start_i, const knot_db_val_t key,
 			return kr_error(EILSEQ);
 		}
 		if (ret == kr_error(EAGAIN))
-			goto shorten;
+			goto keyval_next; // continue looking for rules
 
 		if (ret >= 0)
 			req_set_ede(req, opts, apex_name);

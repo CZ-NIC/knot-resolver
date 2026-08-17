@@ -92,6 +92,7 @@ struct kr_cdb_api {
 
 	/** Less-or-equal search (lexicographic ordering).
 	 * On successful return, key->data and val->data point to DB-owned data.
+	 * - ruledb: it also leaves the cursor/iterator on the first &val of the &key.
 	 * return: 0 for equality, > 0 for less, < 0 kr_error */
 	int (*read_leq)(kr_cdb_pt db, struct kr_cdb_stats *stat,
 			knot_db_val_t *key, knot_db_val_t *val);
@@ -117,8 +118,9 @@ struct kr_cdb_api {
 
 	/** Start iterating: get the first *val with *key + return error code.
 	 *
-	 * - in cache: ensures a RO transaction (and commits the RW txn if any)
 	 * - in ruledb: transaction is preserved if exists, otherwise RO txn gets opened
+	 * - in cache there's no use for this function (we're not in DUP mode),
+	 *   but it ensures a RO transaction (and commits the RW txn if any)
 	 */
 	int (*it_first)(kr_cdb_pt db, struct kr_cdb_stats *stat,
 			const knot_db_val_t *key, knot_db_val_t *val);

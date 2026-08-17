@@ -903,7 +903,10 @@ static int cdb_read_leq(kr_cdb_pt db, struct kr_cdb_stats *stats,
 
 	/* we must be greater than key; do one step to smaller */
 	stats->read_leq++;
-	ret = mdb_cursor_get(curs, &key2_m, &val2_m, MDB_PREV);
+	ret = mdb_cursor_get(curs, &key2_m, &val2_m,
+				env->is_cache ? MDB_PREV : MDB_PREV_NODUP);
+	if (!env->is_cache && ret == 0)
+		ret = mdb_cursor_get(curs, &key2_m, &val2_m, MDB_FIRST_DUP);
 	if (ret) goto failure;
 	ret = 1;
 success:
