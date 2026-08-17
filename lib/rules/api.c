@@ -41,7 +41,7 @@ const kr_rule_opts_t KR_RULE_OPTS_DEFAULT = { .score = KR_RULE_SCORE_DEFAULT, /*
 
 /// We put basically everything into this ruleset.
 /*const*/ char RULESET_DEFAULT[] = "d";
-/// _START is only used for VAL_ZLAT_UNBLOCK (in KEY_ZONELIKE_A) and only once per kr_request.
+/// _START is only used only once per kr_request for KEY_ZONELIKE_A (un/blocking).
 /*const*/ char RULESET_START[] = "1";
 /*const*/ char RULESETS_ALL[] = "1\0d";
 
@@ -68,17 +68,10 @@ static int answer_zla_dname(val_zla_type_t type, struct kr_query *qry, knot_pkt_
 static int answer_zla_redirect(struct kr_query *qry, knot_pkt_t *pkt, const char *ruleset_name,
 				/*const*/ knot_dname_t apex_name[], uint32_t ttl);
 
-static void qry_set_action(struct kr_query *qry, enum kr_request_rule_action action)
+static inline void qry_set_action(struct kr_query *qry, enum kr_request_rule_action action)
 {
-	// We only set the action if applying on the original QNAME
-	// or the CNAME chain leading from it, not on any other sub-queries.
-	const struct kr_query *q = qry;
-	while (q->cname_parent)
-		q = q->cname_parent;
-	if (q->parent)
-		return;
 	qry->request->rule.action = action;
-}
+} // LATER: probably dissolve this function
 
 // LATER: doing tag_names_default() and kr_rule_tag_add() inside a RW transaction would be better.
 static int tag_names_default(void)
@@ -527,7 +520,7 @@ static int subtree_search(const size_t lf_start_i, const knot_db_val_t key,
 			VERBOSE_MSG(qry, "=> unblocked\n");
 			if (kr_fails_assert(val.len == 0))
 				kr_log_error(RULES, "ERROR: unused bytes: %zu\n", val.len);
-			// nothing to search, as RULESET_START is dedicated to all _UNBLOCK
+			// nothing to search, as RULESET_START is dedicated to (un)blocking
 			return RET_CONTINUE;
 		}
 
@@ -630,7 +623,7 @@ int rule_local_data_answer(struct kr_query *qry, knot_pkt_t *pkt)
 		// RULESET_START only applies once per kr_request,
 		// and it doesn't do exact matches
 		if (strcmp(ruleset_name, RULESET_START) == 0) {
-			if (qry->parent) {
+			if (qry->parent || qry->cname_parent) {
 				continue;
 			} else {
 				goto skip_exact;
@@ -794,6 +787,16 @@ int kr_rule_local_data_ins(const knot_rrset_t *rrs, const knot_rdataset_t *sig_r
 int local_data_ins(knot_db_val_t key, const knot_rrset_t *rrs, const knot_rdataset_t *sig_rds,
 			kr_rule_tags_t tags, kr_rule_opts_t opts)
 {
+	if (opts.is_block) { // FIXME: resolve this somehow before this change gets outside jezek*
+		static bool warned = false;
+		if (!warned) {
+			kr_log_error(RULES, "wrong .is_block with KEY_EXACT_MATCH; "
+						"warning once per reload\n");
+			warned = true;
+		}
+		// but let's not block on this issue
+		opts.is_block = false;
+	}
 	// Prepare the data into a temporary buffer.
 	const int rr_ssize = rdataset_dematerialize_size(&rrs->rrs);
 	const int val_len = sizeof(tags) + sizeof(opts) + sizeof(rrs->ttl) + rr_ssize
@@ -1143,6 +1146,7 @@ int rule_local_subtree(const knot_dname_t *apex, enum kr_rule_sub_t type,
 {
 	// type-check
 	const bool has_target = (type == KR_RULE_SUB_DNAME || type == KR_RULE_SUB_DNAME_FLAT);
+	const bool has_ttl = ttl != KR_RULE_TTL_DEFAULT || has_target;
 	switch (type) {
 	case KR_RULE_SUB_DNAME:
 	case KR_RULE_SUB_DNAME_FLAT:
@@ -1162,35 +1166,44 @@ int rule_local_subtree(const knot_dname_t *apex, enum kr_rule_sub_t type,
 
 	ENSURE_the_rules;
 
+	const char *RULESET = opts.is_block ? RULESET_START : RULESET_DEFAULT;
 	uint8_t key_data[KEY_MAXLEN];
-	knot_db_val_t key = zla_key(apex, key_data, RULESET_DEFAULT);
+	knot_db_val_t key = zla_key(apex, key_data, RULESET);
 
 	// Maybe the name is there already?  Read it and combine the tags.
-	// LATER: more precise logic after subtree_search() can iterate
-	//   over multiple rules on the same key
 	int ret = ruledb_op(txn_open_rw);
+	if (ret)
+		return kr_error(ret);
 	knot_db_val_t val = { 0 };
-	if (ret == 0)
-		ret = ruledb_op(read, &key, &val, 1);
-	kr_assert(ret == 0 || ret == kr_error(ENOENT));
-	if (ret == 0) {
+	for (ret = ruledb_op(it_first, &key, &val); ret == 0; ret = ruledb_op(it_next, &val)) {
+		// Read some other parameters of the _old rule.
+		uint8_t *data = val.data;
+		if (val.len < sizeof(ztype) + sizeof(tags) + sizeof(opts))
+			continue;
 		val_zla_type_t ztype_old;
-		memcpy(&ztype_old, val.data, sizeof(ztype_old));
+		memcpy(&ztype_old, data, sizeof(ztype_old));
+		data += sizeof(ztype_old);
 		kr_rule_tags_t tags_old;
-		uint8_t *data = val.data + sizeof(ztype_old);
 		memcpy(&tags_old, data, sizeof(tags_old));
-		tags = kr_rule_tags_combine(tags, tags_old);
-		// ATM ruledb does not overwrite, so we `remove` before `write`,
-		// but combining wouldn't make much sense if the types don't match.
-		if (ztype == ztype_old) {
-			ret = ruledb_op(remove, &key, 1);
-			kr_assert(ret == 1);
+		data += sizeof(tags_old);
+		kr_rule_opts_t opts_old;
+		memcpy(&opts_old, data, sizeof(opts_old));
+		data += sizeof(opts_old);
+		// Check that we can reasonably combine the rules
+		bool ok = !has_target && !has_ttl && ztype == ztype_old
+			&& kr_rule_opts_equal(opts, opts_old);
+		if (ok) {
+			tags = kr_rule_tags_combine(tags, tags_old);
+			// ATM ruledb does not overwrite, so we `remove` before `write`.
+			ret = ruledb_op(it_del);
+			kr_assert(ret == kr_ok());
+			break;
 		}
 	}
+	kr_assert(ret == 0 || ret == kr_error(ENOENT));
 
 	// Prepare the data into a temporary buffer.
 	const int target_len = has_target ? knot_dname_size(target) : 0;
-	const bool has_ttl = ttl != KR_RULE_TTL_DEFAULT || has_target;
 	const int val_len = sizeof(ztype) + sizeof(tags) + sizeof(opts)
 			  + (has_ttl ? sizeof(ttl) : 0) + target_len;
 	uint8_t buf[val_len], *data = buf;
@@ -1230,18 +1243,21 @@ int kr_rule_local_unblock(const knot_dname_t *apex, kr_rule_tags_t tags)
 
 	// Maybe the name is there already?  Read it and combine the tags.
 	knot_db_val_t val = { 0 };
-	int ret = ruledb_op(read, &key, &val, 1);
-	kr_assert(ret == 0 || ret == kr_error(ENOENT));
-	if (ret == 0) {
+	int ret;
+	for (ret = ruledb_op(it_first, &key, &val); ret == 0; ret = ruledb_op(it_next, &val)) {
+		kr_assert(ret == 0 || ret == kr_error(ENOENT));
 		if (kr_fails_assert(val.len == val_len))
-			return kr_error(EINVAL);
+			continue;
+		if (memcmp(&ztype, val.data, sizeof(ztype)) != 0)
+			continue;
 		kr_rule_tags_t tags_old;
 		uint8_t *data = val.data + sizeof(ztype);
 		memcpy(&tags_old, data, sizeof(tags_old));
 		tags = kr_rule_tags_combine(tags, tags_old);
 		// ATM ruledb does not overwrite, so we `remove` before `write`.
-		ret = ruledb_op(remove, &key, 1);
-		kr_assert(ret == 1);
+		ret = ruledb_op(it_del);
+		kr_assert(ret == kr_ok());
+		break;
 	}
 
 	// Construct the data to write

@@ -45,7 +45,10 @@ struct kr_rule_opts {
 	    https://datatracker.ietf.org/doc/html/draft-ietf-dnsop-structured-dns-error#name-new-registry-for-dns-sub-er
 	*/
 	uint8_t ede_sub : 3;
-	/// Whether the rule is considered a "block"; relevant for kr_rule_local_unblock()
+	/** If true, the rule is considered a "block" or "unblock".
+	    - relevant for kr_rule_local_unblock()
+	    - only allowed in kr_rule_local_subtree() currently
+	*/
 	bool is_block : 1;
 };
 typedef struct kr_rule_opts kr_rule_opts_t;
@@ -58,6 +61,18 @@ enum { // Default minimal score of a rule to log/apply it.
 	KR_RULE_SCORE_APPLY   =  6,
 	KR_RULE_SCORE_DEFAULT = 10,
 };
+/// Return true iff two kr_rule_opts_t are the same.
+static inline bool kr_rule_opts_equal(kr_rule_opts_t o1, kr_rule_opts_t o2)
+{
+	// C is just a horrible language for this purpose.
+	return o1.score == o2.score
+		&& o1.log_ip == o2.log_ip
+		&& o1.log_name == o2.log_name
+		&& o1.log_level == o2.log_level
+		&& o1.ede_code == o2.ede_code
+		&& o1.ede_sub == o2.ede_sub
+		&& o1.is_block == o2.is_block;
+}
 
 static inline int map_log_level(uint8_t ll)
 {
