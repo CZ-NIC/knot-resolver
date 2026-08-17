@@ -387,14 +387,14 @@ char *kr_log_get_trace(char *buf, size_t buf_size, int first_level, int last_lev
 
 		int max_size = name_end - name + offset_end - offset + sep_size;
 		if (str + max_size + sep_size + 4 >= buf + buf_size) break;
-		if (i > first_level) str = memcpy(str, sep, sep_size) + sep_size;
-		str = memcpy(str, name, name_end - name) + (name_end - name);
-		str = memcpy(str, offset, offset_end - offset) + (offset_end - offset);
+		if (i > first_level) str = (char *)memcpy(str, sep, sep_size) + sep_size;
+		str = (char *)memcpy(str, name, name_end - name) + (name_end - name);
+		str = (char *)memcpy(str, offset, offset_end - offset) + (offset_end - offset);
 		*str = '\0';
 	}
 	if (i < cnt) {
-		str = memcpy(str, sep, sep_size) + sep_size;
-		str = memcpy(str, "...", 3) + 3;
+		str = (char *)memcpy(str, sep, sep_size) + sep_size;
+		str = (char *)memcpy(str, "...", 3) + 3;
 		*str = '\0';
 	}
 	free(symbols);

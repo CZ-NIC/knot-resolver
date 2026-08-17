@@ -320,7 +320,7 @@ static inline void *mp_end(struct mempool *pool, void *end)
 	if (avail > pool->last->free) {
 		char trace[150]; kr_log_get_shorttrace(trace);
 		printf("BUG_MP_END: chunk %p, free %d, end %p, new free %ld   %s\n",
-				pool->last, pool->last->free, end, avail, trace);
+				(void *)pool->last, pool->last->free, end, avail, trace);
 	}
 	pool->last->free = avail;
 	MEMCHECK_NOACCESS(end, pool->last->free + MP_CHUNK_TAIL);
