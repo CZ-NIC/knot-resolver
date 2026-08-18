@@ -1,5 +1,5 @@
-from knot_resolver import KresBaseError
+from knot_resolver.exceptions import KresError
 
 
-class KresManagerBaseError(KresBaseError):
+class KresManagerBaseError(KresError):
     """Base class for all errors used in the manager module."""

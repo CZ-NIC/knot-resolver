@@ -1,2 +1,2 @@
-class KresBaseError(Exception):
+class KresError(Exception):
     """Base class for all custom errors used in the knot_resolver module."""
