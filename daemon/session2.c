@@ -653,7 +653,7 @@ static int session2_submit(
 		defer_sample_start(NULL);
 
 	knot_mm_t pool = { 0 };
-	mm_ctx_mempool(&pool, 1000);
+	mm_ctx_mempool(&pool, 1024);
 	struct protolayer_iter_ctx *ctx = mm_alloc(&pool, session->iter_ctx_size);
 	kr_require(ctx);
 
