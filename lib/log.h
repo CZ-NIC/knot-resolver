@@ -295,6 +295,7 @@ void kr_log_fmt(enum kr_log_group group, kr_log_level_t level, const char *file,
  *   current_function:line_in_its_file <- outer_function+byte_offset <- more_outer_function+byte_offset <- ...
  * The argument has to be an array, its sizeof determines number of levels obtained.
  * See backtrace(3) for required compilation flags to make this work.
+ * On non-linux systems just the inner-most function is returned.
  */
 #define kr_log_get_shorttrace(char_array) { \
 	size_t len = snprintf(char_array, sizeof(char_array), "%s:%d <- ", __func__, __LINE__); \
@@ -310,6 +311,8 @@ void kr_log_fmt(enum kr_log_group group, kr_log_level_t level, const char *file,
  *
  * Each level contains function_name+byte_offset or binary_filename+byte_offset if function is unknown.
  * See backtrace(3) for required compilation flags to make this work.
+ *
+ * On non-linux systems, just three dots are written into buf.
  */
 KR_EXPORT
 char *kr_log_get_trace(char *buf, size_t buf_size, int first_level, int last_level, const char *sep);

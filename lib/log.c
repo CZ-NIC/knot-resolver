@@ -333,6 +333,7 @@ void kr_log_q1(const struct kr_query * const qry,
 	va_end(args);
 }
 
+#ifdef __linux__
 char *kr_log_get_trace(char *buf, size_t buf_size, int first_level, int last_level, const char *sep)
 {
 	const size_t sep_size = strlen(sep);
@@ -399,4 +400,14 @@ char *kr_log_get_trace(char *buf, size_t buf_size, int first_level, int last_lev
 	free(symbols);
 	return str;
 }
+#else
+char *kr_log_get_trace(char *buf, size_t buf_size, int first_level, int last_level, const char *sep)
+{
+	// return just final dots on non-linux systems
+	char *str = buf; *str = '\0';
+	str = (char *)memcpy(str, "...", 3) + 3;
+	*str = '\0';
+	return str;
+}
+#endif
 
