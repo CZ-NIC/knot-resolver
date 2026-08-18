@@ -11,6 +11,7 @@
 #include "lib/log.h"
 #include "lib/resolve.h"
 #include <execinfo.h>
+#include <string.h>
 
 #if ENABLE_LIBSYSTEMD
 #include <stdlib.h>
