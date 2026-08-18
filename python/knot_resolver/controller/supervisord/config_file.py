@@ -7,7 +7,7 @@ from typing import Literal
 
 from jinja2 import Template
 
-from knot_resolver.constants import KRES_CACHE_GC_EXECUTABLE, KRESD_EXECUTABLE, LINUX_SYS, NOTIFY_SUPPORT
+from knot_resolver.constants import DAEMON_EXECUTABLE, MANAGER_EXECUTABLE, CACHE_GC_EXECUTABLE, LINUX_SYS, NOTIFY_SUPPORT
 from knot_resolver.controller.interface import KresID, SubprocessType
 from knot_resolver.datamodel.config_schema import KresConfig, workers_max_count
 from knot_resolver.datamodel.logging_schema import LogTargetEnum
@@ -20,7 +20,6 @@ from knot_resolver.manager.constants import (
     supervisord_pid_file,
     supervisord_sock_file,
     supervisord_subprocess_log_dir,
-    user_constants,
 )
 from knot_resolver.utils.async_utils import read_resource, writefile
 
@@ -91,7 +90,7 @@ class ProcessTypeConfig:
         return ProcessTypeConfig(  # type: ignore[call-arg]
             logfile=supervisord_subprocess_log_dir(config) / "gc.log",
             workdir=cwd,
-            command=f"{KRES_CACHE_GC_EXECUTABLE} -c {kres_cache_dir(config)}{kres_cache_gc_args(config)}",
+            command=f"{CACHE_GC_EXECUTABLE} -c {kres_cache_dir(config)}{kres_cache_gc_args(config)}",
             startsecs=0,
             environment="",
         )
@@ -102,7 +101,7 @@ class ProcessTypeConfig:
         return ProcessTypeConfig(  # type: ignore[call-arg]
             logfile=supervisord_subprocess_log_dir(config) / "policy-loader.log",
             workdir=cwd,
-            command=f"{KRESD_EXECUTABLE} -c {(policy_loader_config_file(config))} -c - -n",
+            command=f"{DAEMON_EXECUTABLE} -c {(policy_loader_config_file(config))} -c - -n",
             startsecs=0,
             environment="",
         )
@@ -125,7 +124,7 @@ class ProcessTypeConfig:
         return ProcessTypeConfig(  # type: ignore[call-arg]
             logfile=supervisord_subprocess_log_dir(config) / "kresd%(process_num)d.log",
             workdir=cwd,
-            command=f"{KRESD_EXECUTABLE} -c {kresd_config_file_supervisord_pattern(config)} -n",
+            command=f"{DAEMON_EXECUTABLE} -c {kresd_config_file_supervisord_pattern(config)} -n",
             startsecs=startsecs,
             environment=environment,
             max_procs=int(workers_max_count()) + 1,  # +1 for the canary process
@@ -141,6 +140,9 @@ class ProcessTypeConfig:
             # other systems
             args = [sys.executable] + sys.argv
 
+        index = args.index("--config")
+        args = args[index:]
+
         # insert debugger when asked
         if os.environ.get("KRES_DEBUG_MANAGER"):
             logger.warning("Injecting debugger into the supervisord config")
@@ -153,9 +155,10 @@ class ProcessTypeConfig:
         if NOTIFY_SUPPORT:
             environment += ",X-SUPERVISORD-TYPE=notify"
 
+        cwd = str(os.getcwd())
         return ProcessTypeConfig(  # type: ignore[call-arg]
-            workdir=user_constants().working_directory_on_startup,
-            command=cmd,
+            workdir=cwd,
+            command=f"{MANAGER_EXECUTABLE} {cmd}",
             startsecs=600 if NOTIFY_SUPPORT else 0,
             environment=environment,
             logfile=Path(""),  # this will be ignored
