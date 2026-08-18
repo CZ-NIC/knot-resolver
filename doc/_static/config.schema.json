@@ -1520,7 +1520,10 @@
             "type": "object",
             "properties": {
                 "level": {
-                    "type": "string",
+                    "type": [
+                        "string",
+                        "null"
+                    ],
                     "enum": [
                         "crit",
                         "err",
@@ -1529,28 +1532,21 @@
                         "info",
                         "debug"
                     ],
-                    "description": "Global logging level.",
-                    "default": "notice"
+                    "description": "Global logging level. If not configured, the logging level parsed from the program arguments is used (default 'notice').",
+                    "default": null
                 },
                 "target": {
-                    "anyOf": [
-                        {
-                            "type": "string",
-                            "enum": [
-                                "syslog",
-                                "stderr",
-                                "stdout"
-                            ]
-                        },
-                        {
-                            "type": "string",
-                            "enum": [
-                                "from-env"
-                            ]
-                        }
+                    "type": [
+                        "string",
+                        "null"
                     ],
-                    "description": "Global logging stream target. \"from-env\" uses $KRES_LOGGING_TARGET and defaults to \"stdout\".",
-                    "default": "from-env"
+                    "enum": [
+                        "syslog",
+                        "stderr",
+                        "stdout"
+                    ],
+                    "description": "Global logging stream target. If not configured, the logging target parsed from the program arguments is used (default 'stderr').",
+                    "default": null
                 },
                 "groups": {
                     "type": [
@@ -1665,8 +1661,8 @@
                 }
             },
             "default": {
-                "level": "notice",
-                "target": "stdout",
+                "level": null,
+                "target": null,
                 "groups": null,
                 "dnstap": {
                     "enable": false,

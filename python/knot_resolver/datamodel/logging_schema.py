@@ -103,36 +103,20 @@ class DnstapSchema(ConfigSchema):
 
 
 class LoggingSchema(ConfigSchema):
-    class Raw(ConfigSchema):
-        """
-        Logging and debugging configuration.
+    """
+    Logging and debugging configuration.
 
-        ---
-        level: Global logging level.
-        target: Global logging stream target. "from-env" uses $KRES_LOGGING_TARGET and defaults to "stdout".
-        groups: List of groups for which 'debug' logging level is set.
-        dnstap: Logging DNS requests and responses to a unix socket.
-        """
+    ---
+    level: Global logging level. If not configured, the logging level parsed from the program arguments is used (default 'notice').
+    target: Global logging stream target. If not configured, the logging target parsed from the program arguments is used (default 'stderr').
+    groups: List of groups for which 'debug' logging level is set.
+    dnstap: Logging DNS requests and responses to a unix socket.
+    """
 
-        level: LogLevelEnum = "notice"
-        target: Union[LogTargetEnum, Literal["from-env"]] = "from-env"
-        groups: Optional[List[LogGroupsEnum]] = None
-        dnstap: DnstapSchema = DnstapSchema()
-
-    _LAYER = Raw
-
-    level: LogLevelEnum
-    target: LogTargetEnum
-    groups: Optional[List[LogGroupsEnum]]
-    dnstap: DnstapSchema
-
-    def _target(self, raw: Raw) -> LogTargetEnum:
-        if raw.target == "from-env":
-            target = os.environ.get("KRES_LOGGING_TARGET") or "stdout"
-            if not is_obj_type_valid(target, cast(Type[Any], LogTargetEnum)):
-                raise ValueError(f"logging target '{target}' read from $KRES_LOGGING_TARGET is invalid")
-            return cast(LogTargetEnum, target)
-        return raw.target
+    level: Optional[LogLevelEnum] = None
+    target: Optional[LogTargetEnum] = None
+    groups: Optional[List[LogGroupsEnum]] = None
+    dnstap: DnstapSchema = DnstapSchema()
 
     def _validate(self) -> None:
         if self.groups is None:
