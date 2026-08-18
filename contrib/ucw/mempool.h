@@ -43,7 +43,7 @@ struct mempool_chunk {
  **/
 struct mempool {
 	struct mempool_chunk *last;
-	size_t chunk_size;
+	size_t ext_chunk_size;
 	size_t total_size;
 };
 
@@ -84,25 +84,25 @@ struct mempool_stats {          /** Mempool statistics. See mp_stats(). **/
 
 /**
  * Initialize a given mempool structure.
- * \p chunk_size must be in the interval `[1, SIZE_MAX / 2]`.
- * It will allocate memory by this large chunks and take
- * memory to satisfy requests from them.
+ * The given ext_chunk_size is the initial external size of chunks requested from system;
+ * the space inside may be a little lower;
+ * it may grow in time with memory allocated from the pool.
  *
  * Memory pools can be treated as <<trans:respools,resources>>, see <<trans:res_mempool()>>.
  **/
 KR_EXPORT
-void mp_init(struct mempool *pool, size_t chunk_size);
+void mp_init(struct mempool *pool, size_t ext_chunk_size);
 
 /**
  * Allocate and initialize a new memory pool.
- * See \ref mp_init() for \p chunk_size limitations.
+ * See \ref mp_init() for \p ext_chunk_size meaning.
  *
  * The new mempool structure is allocated on the new mempool.
  *
  * Memory pools can be treated as <<trans:respools,resources>>, see <<trans:res_mempool()>>.
  **/
 KR_EXPORT
-struct mempool *mp_new(size_t chunk_size);
+struct mempool *mp_new(size_t ext_chunk_size);
 
 /**
  * Cleanup mempool initialized by mp_init or mp_new.
