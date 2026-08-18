@@ -51,8 +51,9 @@ extras_require = {
 
 entry_points = {
     "console_scripts": [
-        "kresctl = knot_resolver.client.main:main",
-        "knot-resolver = knot_resolver.manager.main:main"
+        "knot-resolver = knot_resolver.main:main",
+        "kres-manager = knot_resolver.manager.main:main",
+        "kresctl = knot_resolver.client.main:main"
     ]
 }
 
