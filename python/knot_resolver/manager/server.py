@@ -8,7 +8,6 @@ import sys
 from functools import partial
 from http import HTTPStatus
 from pathlib import Path
-from pwd import getpwuid
 from time import time
 from typing import Any, Dict, List, Literal, Optional, Set, Union, cast
 
@@ -18,20 +17,18 @@ from aiohttp.web_app import Application
 from aiohttp.web_response import json_response
 from aiohttp.web_runner import AppRunner, TCPSite, UnixSite
 
-from knot_resolver.constants import USER
+from knot_resolver.args import KresArgs
 from knot_resolver.controller import get_best_controller_implementation
-from knot_resolver.controller.exceptions import KresSubprocessControllerError, KresSubprocessControllerExec
 from knot_resolver.controller.interface import SubprocessType
 from knot_resolver.controller.registered_workers import command_single_registered_worker
 from knot_resolver.controller.supervisord.plugin.notify_socket import send_notify_socket_message
 from knot_resolver.datamodel import kres_config_json_schema
 from knot_resolver.datamodel.cache_schema import CacheClearRPCSchema
-from knot_resolver.datamodel.config_schema import KresConfig, get_rundir_without_validation
+from knot_resolver.datamodel.config_schema import KresConfig
 from knot_resolver.datamodel.globals import Context, set_global_validation_context
 from knot_resolver.datamodel.management_schema import ManagementSchema
 from knot_resolver.exceptions import KresError
 from knot_resolver.manager import files, metrics
-from knot_resolver.utils import custom_atexit as atexit
 from knot_resolver.utils import ignore_exceptions_optional
 from knot_resolver.utils.async_utils import readfile
 from knot_resolver.utils.compat import asyncio as asyncio_compat
@@ -43,7 +40,6 @@ from knot_resolver.utils.modeling.query import query
 from knot_resolver.utils.modeling.types import NoneType
 
 from .config_store import ConfigStore
-from .constants import PID_FILE_NAME, init_user_constants
 from .exceptions import KresManagerBaseError
 from .logger import logger_init
 from .manager import KresManager
@@ -434,7 +430,7 @@ class Server:
         return self._exit_code
 
 
-async def _load_raw_config(config: Union[Path, Dict[str, Any]]) -> Dict[str, Any]:
+async def load_raw_config(config: Union[Path, Dict[str, Any]]) -> Dict[str, Any]:
     # Initial configuration of the manager
     if isinstance(config, Path):
         if not config.exists():
@@ -458,14 +454,14 @@ async def _init_config_store(config: Dict[str, Any]) -> ConfigStore:
     return ConfigStore(config_validated)
 
 
-async def _init_manager(config_store: ConfigStore) -> KresManager:
+async def _init_manager(args: KresArgs, config_store: ConfigStore) -> KresManager:
     """Call asynchronously when the application initializes."""
     # Instantiate subprocess controller (if we wanted to, we could switch it at this point)
     controller = await get_best_controller_implementation(config_store.get())
 
     # Create KresManager. This will perform autodetection of available service managers and
     # select the most appropriate to use (or use the one configured directly)
-    manager = await KresManager.create(controller, config_store)
+    manager = await KresManager.create(args, controller, config_store)
 
     logger.info("Initial configuration applied. Process manager initialized...")
     return manager
@@ -480,53 +476,6 @@ async def _deny_working_directory_changes(
     return Result.ok(None)
 
 
-def _set_working_directory(config_raw: Dict[str, Any]) -> None:
-    try:
-        rundir = get_rundir_without_validation(config_raw)
-    except ValueError as e:
-        raise DataValidationError(str(e), "/rundir") from e
-
-    logger.debug(f"Changing working directory to '{rundir.to_path().absolute()}'.")
-    os.chdir(rundir.to_path())
-
-
-def _lock_working_directory(attempt: int = 0) -> None:
-    # the following syscall is atomic, it's essentially the same as acquiring a lock
-    try:
-        pidfile_fd = os.open(PID_FILE_NAME, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
-    except OSError as e:
-        if e.errno == errno.EEXIST and attempt == 0:
-            # the pid file exists, let's check PID
-            with open(PID_FILE_NAME, "r", encoding="utf-8") as f:
-                pid = int(f.read().strip())
-            try:
-                os.kill(pid, 0)
-            except OSError as e2:
-                if e2.errno == errno.ESRCH:
-                    os.unlink(PID_FILE_NAME)
-                    _lock_working_directory(attempt=attempt + 1)
-                    return
-            raise KresManagerBaseError(
-                "Another manager is running in the same working directory."
-                f" PID file is located at {os.getcwd()}/{PID_FILE_NAME}"
-            ) from e
-        raise KresManagerBaseError(
-            "Another manager is running in the same working directory."
-            f" PID file is located at {os.getcwd()}/{PID_FILE_NAME}"
-        ) from e
-
-    # now we know that we are the only manager running in this directory
-
-    # write PID to the pidfile and close it afterwards
-    pidfile = os.fdopen(pidfile_fd, "w")
-    pid = os.getpid()
-    pidfile.write(f"{pid}\n")
-    pidfile.close()
-
-    # make sure that the file is deleted on shutdown
-    atexit.register(lambda: os.unlink(PID_FILE_NAME))
-
-
 async def _sigint_while_shutting_down() -> None:
     logger.warning(
         "Received SIGINT while already shutting down. Ignoring."
@@ -539,46 +488,34 @@ async def _sigterm_while_shutting_down() -> None:
     sys.exit(128 + signal.SIGTERM)
 
 
-async def start_server(config: List[str]) -> int:  # noqa: C901, PLR0915
+async def start_server(args: KresArgs) -> int:
     # This function is quite long, but it describes how manager runs. So let's silence pylint
     # pylint: disable=too-many-statements
 
     start_time = time()
-    working_directory_on_startup = os.getcwd()
     manager: Optional[KresManager] = None
 
     # Block signals during initialization to force their processing once everything is ready
     signal.pthread_sigmask(signal.SIG_BLOCK, Server.all_handled_signals())
 
-    # Check if we are running under the intended user, if not, log a warning message
-    pw_username = getpwuid(os.getuid()).pw_name
-    if pw_username != USER:
-        logger.warning(
-            f"Knot Resolver does not run as the default '{USER}' user, but as '{pw_username}' instead."
-            " This may or may not affect the configuration validation and the proper functioning of the resolver."
-        )
-    if os.geteuid() == 0:
-        logger.warning(" It is not recommended to run under root privileges unless there is no other option.")
-
     # before starting server, initialize the subprocess controller, config store, etc. Any errors during inicialization
     # are fatal
     try:
         # Make sure that the config paths does not change meaning when we change working directory
-        config_absolute = [Path(path).absolute() for path in config]
-
+        config_files = [Path(config_file) for config_file in args.config]
         config_data: Dict[str, Any] = {}
-        for file in config_absolute:
+        for config_file in config_files:
             # warning about the different parent directories of each config file
             # compared to the first one which is used as the prefix path
-            if config_absolute[0].parent != file.parent:
+            if config_files[0].parent != config_file.parent:
                 logger.warning(
-                    f"The configuration file '{file}' has a parent directory that is different"
-                    f" from '{config_absolute[0]}', which is used as the prefix for relative paths."
+                    f"The configuration file '{config_file}' has a parent directory that is different"
+                    f" from '{config_files[0]}', which is used as the prefix for relative paths."
                     "This can cause issues with files that are configured with relative paths."
                 )
 
             # Preprocess config - load from file or in general take it to the last step before validation.
-            config_raw = await _load_raw_config(file)
+            config_raw = await load_raw_config(config_file)
 
             # combine data from all config files
             config_data = data_combine(config_data, config_raw)
@@ -587,26 +524,22 @@ async def start_server(config: List[str]) -> int:  # noqa: C901, PLR0915
         #  - resolve_root: root against which all relative paths will be resolved
         #  - strict_validation: check for path existence during configuration validation
         #  - permissions_default: validate dirs/files rwx permissions against default user:group in constants
-        set_global_validation_context(Context(config_absolute[0].parent, True, False))
+        set_global_validation_context(Context(config_files[0].parent, True, False))
 
         # We want to change cwd as soon as possible. Some parts of the codebase are using os.getcwd() to get the
         # working directory.
         #
         # If we fail to read rundir from unparsed config, the first config validation error comes from here
-        _set_working_directory(config_data)
+        # _set_working_directory(config_data)
 
-        # We don't want more than one manager in a single working directory. So we lock it with a PID file.
-        # Warning - this does not prevent multiple managers with the same naming of kresd service.
-        _lock_working_directory()
+        # # We don't want more than one manager in a single working directory. So we lock it with a PID file.
+        # # Warning - this does not prevent multiple managers with the same naming of kresd service.
+        # _lock_working_directory()
 
         # set_global_validation_context(Context(config.parent))
 
         # After the working directory is set, we can initialize proper config store with a newly parsed configuration.
         config_store = await _init_config_store(config_data)
-
-        # Some "constants" need to be loaded from the initial config,
-        # some need to be stored from the initial run conditions
-        await init_user_constants(config_store, working_directory_on_startup)
 
         # This behaviour described above with paths means, that we MUST NOT allow `rundir` change after initialization.
         # It would cause strange problems because every other path configuration depends on it. Therefore, we have to
@@ -624,33 +557,13 @@ async def start_server(config: List[str]) -> int:  # noqa: C901, PLR0915
         await files.init_files_watchdog(config_store)
 
         # After we have loaded the configuration, we can start worrying about subprocess management.
-        manager = await _init_manager(config_store)
+        manager = await _init_manager(args, config_store)
 
         # prepare instance of the server (no side effects)
-        server = Server(config_store, config_absolute, manager)
+        server = Server(config_store, config_files, manager)
 
         # add Server's shutdown trigger to the manager
         manager.add_shutdown_trigger(server.trigger_shutdown)
-
-    except KresSubprocessControllerExec as e:
-        # if we caught this exception, some component wants to perform a reexec during startup. Most likely, it would
-        # be a subprocess manager like supervisord, which wants to make sure the manager runs under supervisord in
-        # the process tree. So now we stop everything, and exec what we are told to. We are assuming, that the thing
-        # we'll exec will invoke us again.
-        logger.info("Exec requested with arguments: %s", str(e.exec_args))
-
-        # unblock signals, this could actually terminate us straight away
-        signal.pthread_sigmask(signal.SIG_UNBLOCK, Server.all_handled_signals())
-
-        # run exit functions
-        atexit.run_callbacks()
-
-        # and finally exec what we were told to exec
-        os.execl(*e.exec_args)
-
-    except KresSubprocessControllerError as e:
-        logger.error(f"Server initialization failed: {e}")
-        return 1
 
     except KresError as e:
         # We caught an error with a pretty error message. Just print it and exit.

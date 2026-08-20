@@ -30,9 +30,11 @@ done
 shopt -u globstar
 shopt -u nullglob
 echo
-echo --------------------------------------
-echo Starting Knot Resolver wit the Manager
-echo --------------------------------------
-python3 -m knot_resolver.manager \
+echo ----------------------
+echo Starting Knot Resolver
+echo ----------------------
+python3 -m knot_resolver \
+    --logtarget stdout \
+    --loglevel debug \
     --config "$KRES_DEV_CONFIG_FILE" \
     "$@"
