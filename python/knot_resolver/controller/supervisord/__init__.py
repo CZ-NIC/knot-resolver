@@ -6,6 +6,7 @@ from xmlrpc.client import Fault, ServerProxy
 
 import supervisor.xmlrpc  # type: ignore[import]
 
+from knot_resolver.args import KresArgs
 from knot_resolver.controller.exceptions import KresSubprocessControllerError, KresSubprocessControllerExec
 from knot_resolver.controller.interface import (
     KresID,
@@ -33,9 +34,9 @@ async def _start_supervisord(config: KresConfig) -> None:
         raise KresSubprocessControllerError(f"Supervisord exited with exit code {res}")
 
 
-async def _exec_supervisord(config: KresConfig) -> NoReturn:
+async def _exec_supervisord(args: KresArgs, config: KresConfig) -> NoReturn:
     logger.debug("Writing supervisord config")
-    await write_config_file(config)
+    await write_config_file(args, config)
     logger.debug("Execing supervisord")
     raise KresSubprocessControllerExec(
         [
@@ -47,8 +48,8 @@ async def _exec_supervisord(config: KresConfig) -> NoReturn:
     )
 
 
-async def _reload_supervisord(config: KresConfig) -> None:
-    await write_config_file(config)
+async def _reload_supervisord(args: KresArgs, config: KresConfig) -> None:
+    await write_config_file(args, config)
     try:
         supervisord = _create_supervisord_proxy(config)
         supervisord.reloadConfig()
@@ -265,17 +266,17 @@ class SupervisordSubprocessController(SubprocessController):
             ]
         return []
 
-    async def initialize_controller(self, config: KresConfig) -> None:
+    async def initialize_controller(self, args: KresArgs, config: KresConfig) -> None:
         self._controller_config = config
 
         if not await _is_supervisord_running(config):
             logger.info(
                 "We want supervisord to restart us when needed, we will therefore exec() it and let it start us again."
             )
-            await _exec_supervisord(config)
+            await _exec_supervisord(args, config)
         else:
             logger.info("Supervisord is already running, we will just update its config...")
-            await _reload_supervisord(config)
+            await _reload_supervisord(args, config)
 
     async def shutdown_controller(self) -> None:
         assert self._controller_config is not None

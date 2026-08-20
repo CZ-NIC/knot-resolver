@@ -7,6 +7,7 @@ from secrets import token_hex
 from subprocess import SubprocessError
 from typing import Any, Callable, List, Optional
 
+from knot_resolver.args import KresArgs
 from knot_resolver.controller.exceptions import KresSubprocessControllerError
 from knot_resolver.controller.interface import Subprocess, SubprocessController, SubprocessStatus, SubprocessType
 from knot_resolver.controller.registered_workers import command_registered_workers, get_registered_workers_kresids
@@ -87,21 +88,22 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
 
     @staticmethod
     async def create(
+        args: KresArgs,
         subprocess_controller: SubprocessController,
         config_store: ConfigStore,
     ) -> "KresManager":
         """Create new instance of KresManager."""
         inst = KresManager(_i_know_what_i_am_doing=True)
-        await inst._async_init(subprocess_controller, config_store)  # noqa: SLF001
+        await inst._async_init(args, subprocess_controller, config_store)  # noqa: SLF001
         return inst
 
-    async def _async_init(self, subprocess_controller: SubprocessController, config_store: ConfigStore) -> None:
+    async def _async_init(self, args: KresArgs, subprocess_controller: SubprocessController, config_store: ConfigStore) -> None:
         self._controller = subprocess_controller
         self._config_store = config_store
 
         # initialize subprocess controller
-        logger.debug("Starting controller")
-        await self._controller.initialize_controller(config_store.get())
+        await self._controller.initialize_controller(args, config_store.get())
+
         self._processes_watchdog_task = asyncio.create_task(self._processes_watchdog())
         logger.debug("Looking for already running workers")
         await self._collect_already_running_workers()

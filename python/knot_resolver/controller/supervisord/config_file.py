@@ -1,13 +1,21 @@
 import logging
 import os
+import shutil
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Optional
 
 from jinja2 import Template
 
-from knot_resolver.constants import DAEMON_EXECUTABLE, MANAGER_EXECUTABLE, CACHE_GC_EXECUTABLE, LINUX_SYS, NOTIFY_SUPPORT
+from knot_resolver.args import KresArgs
+from knot_resolver.constants import (
+    CACHE_GC_EXECUTABLE,
+    DAEMON_EXECUTABLE,
+    LINUX_SYS,
+    MANAGER_EXECUTABLE,
+    NOTIFY_SUPPORT,
+)
 from knot_resolver.controller.interface import KresID, SubprocessType
 from knot_resolver.datamodel.config_schema import KresConfig, workers_max_count
 from knot_resolver.datamodel.logging_schema import LogTargetEnum
@@ -20,6 +28,7 @@ from knot_resolver.manager.constants import (
     supervisord_pid_file,
     supervisord_sock_file,
     supervisord_subprocess_log_dir,
+    user_constants,
 )
 from knot_resolver.utils.async_utils import read_resource, writefile
 
@@ -131,26 +140,33 @@ class ProcessTypeConfig:
         )
 
     @staticmethod
-    def create_manager_config(_config: KresConfig) -> "ProcessTypeConfig":
-        if LINUX_SYS:
-            # read original command from /proc
-            with open("/proc/self/cmdline", "rb") as f:
-                args = [s.decode("utf-8") for s in f.read()[:-1].split(b"\0")]
+    def create_manager_config(args: KresArgs, _config: KresConfig) -> "ProcessTypeConfig":
+        if MANAGER_EXECUTABLE.exists():
+            command_args = [str(MANAGER_EXECUTABLE)]
         else:
-            # other systems
-            args = [sys.executable] + sys.argv
+            command_args = [
+                str(shutil.which("python3")),
+                "-m",
+                "knot_resolver.manager",
+            ]
 
-        index = args.index("--config")
-        args = args[index:]
+        if args:
+            command_args += [
+                "--logtarget",
+                args.logtarget,
+                "--loglevel",
+                args.loglevel,
+                "--config",
+                *map(str, args.config),
+            ]
 
-        # insert debugger when asked
-        if os.environ.get("KRES_DEBUG_MANAGER"):
-            logger.warning("Injecting debugger into the supervisord config")
-            # the args array looks like this:
-            # [PYTHON_PATH, "-m", "knot_resolver", ...]
-            args = args[:1] + ["-m", "debugpy", "--listen", "0.0.0.0:5678", "--wait-for-client"] + args[2:]
+        # # insert debugger when asked
+        # if os.environ.get("KRES_DEBUG_MANAGER"):
+        #     logger.warning("Injecting debugger into the supervisord config")
+        #     # the args array looks like this:
+        #     # [PYTHON_PATH, "-m", "knot_resolver", ...]
+        #     args = args[:1] + ["-m", "debugpy", "--listen", "0.0.0.0:5678", "--wait-for-client"] + args[2:]
 
-        cmd = '"' + '" "'.join(args) + '"'
         environment = "KRES_SUPRESS_LOG_PREFIX=true"
         if NOTIFY_SUPPORT:
             environment += ",X-SUPERVISORD-TYPE=notify"
@@ -158,7 +174,7 @@ class ProcessTypeConfig:
         cwd = str(os.getcwd())
         return ProcessTypeConfig(  # type: ignore[call-arg]
             workdir=cwd,
-            command=f"{MANAGER_EXECUTABLE} {cmd}",
+            command=" ".join(command_args),
             startsecs=600 if NOTIFY_SUPPORT else 0,
             environment=environment,
             logfile=Path(""),  # this will be ignored
@@ -201,7 +217,7 @@ class SupervisordConfig:
         )
 
 
-async def write_config_file(config: KresConfig) -> None:
+async def write_config_file(args: KresArgs, config: KresConfig) -> None:
     if not supervisord_subprocess_log_dir(config).exists():
         supervisord_subprocess_log_dir(config).mkdir(exist_ok=True)
 
@@ -212,7 +228,7 @@ async def write_config_file(config: KresConfig) -> None:
         gc=ProcessTypeConfig.create_gc_config(config),
         loader=ProcessTypeConfig.create_policy_loader_config(config),
         kresd=ProcessTypeConfig.create_kresd_config(config),
-        manager=ProcessTypeConfig.create_manager_config(config),
+        manager=ProcessTypeConfig.create_manager_config(args, config),
         config=SupervisordConfig.create(config),
     )
     await writefile(supervisord_config_file_tmp(config), config_string)
