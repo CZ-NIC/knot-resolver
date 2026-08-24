@@ -9,6 +9,30 @@
  *  Source: https://www.ucw.cz/libucw/
  */
 
+#include <string.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <assert.h>
+#include <ucw/config.h>
+#include <ucw/lib.h>
+#include <ucw/mempool.h>
+#include <lib/log.h>
+#include <time.h>
+
+#pragma GCC diagnostic ignored "-Wpointer-arith"
+#define MP_SIZE_MAX (UINT32_MAX - MP_CHUNK_TAIL - CPU_PAGE_SIZE)
+
+// Unused normal chunk or page-sized block of small chunks.
+struct mp_unused {
+	uint32_t timestamp;
+	uint32_t count;
+	struct mempool_chunk *chunk;  // single normal chunk or list of small unused chunks within their page
+	struct mp_unused *next;
+	struct mp_unused *prev;
+};
+#define MP_UNUSED_TAIL ALIGN_TO(sizeof(struct mp_unused), CPU_STRUCT_ALIGN)
+
+
 /* Design overview:
  *
  * A _mempool_ consists of mmapped chunks of different sizes.
@@ -18,21 +42,21 @@
  * small chunks of size 1K are allocated by whole pages consecutively containing four of them.
  *
  * When allocating memory to the application,
- * we seek sufficient space in several last chunks of the mempool and move the chosen one to the end of list,
+ * we seek sufficient space in MP_ACTIVE_CHUNKS last chunks of the mempool and move the chosen one to the end of list,
  * or we add a new chunk while getting the lowest-free-space one out of our view.
  * The last allocation may be resized if needed.
  * The size of a new chunk is lower-bounded by wanted allocation size and mempool chunk_size
  * and becomes larger with increasing total size of the mempool.
  *
  * Unused chunks of sizes up to 68K from deleted pools are recycled globally
- * (or per-thread if MEMPOOL_IS_THREAD_SAFE is defined).
+ * (or per-thread if MP_IS_THREAD_SAFE is defined).
  * They are pointed by the _unused_ structure mp_unused connected to lists containing same-sized chunks;
  * the structure is located either in the data area of normal chunks
  * or after the 4-tuple of small chunks representing all unused of them.
  *
  * The unused chunks that were not used for at least 1 minute are munmapped
  * either by explicitly calling mp_balance_reusable() while idle or during other mempool operations.
- * If MEMPOOL_IS_THREAD_SAFE is defined below, only the specific-thread structures are affected by the call.
+ * If MP_IS_THREAD_SAFE is defined below, only the specific-thread structures are affected by the call.
  *
  *
  * MEMCHECK summary (ASan + Valgrind annotations):
@@ -57,35 +81,78 @@
  *   * other internal metadata are accessible.
  * During internal code execution the memory classification is being changed as needed
  * to access the internal structures but allow detection of user data overflow to our metadata;
- * also reused memory can be repeteadly handled as uninitialized this way.
- */
+ * also reused memory can be repeteadly handled as uninitialized this way. */
 
-#undef LOCAL_DEBUG
+// --- configuration ---
 
-#include <string.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <assert.h>
-#include <ucw/config.h>
-#include <ucw/lib.h>
-#include <ucw/mempool.h>
-#include <lib/log.h>
-#include <time.h>
+/* The external sizes of reusable chunks, to which sizes of all chunks will be rounded up.
+ * The chunks of larger sizes will be rounded to pages and immediately munmapped when unneeded.
+ *
+ * All sizes comprised of at least one page have to be page-aligned.
+ * Smaller chunks are groupped in single pages accompanied with the metadata of MP_UNUSED_TAIL size,
+ * so set their size to fill the (CPU_PAGE_SIZE - MP_UNUSED_TAIL) space fully.
+ *
+ * These chunks may be used also to satisfy needs for larger allocations than the natural pool chunk size.
+ * The usable internal chunk size is lower than the external size by MP_CHUNK_TAIL,
+ * so you may need to make some sizes 1 page larger to accommodate large enough allocations.
+ *
+ * In case of changing these, see also the beginning of mp_new_reusable_chunk,
+ * where it is defined how default chunk size is increased with growing pool size. */
+const uint32_t mp_reusable_ext_sizes[] = {
+	(CPU_PAGE_SIZE - MP_UNUSED_TAIL) / 4,  // ~1K
+	 4 * 1024,
+	16 * 1024,
+	68 * 1024,  // support 64K allocations
+};
+#define MP_REUSABLE_CNT ARRAY_SIZE(mp_reusable_ext_sizes)
 
-#pragma GCC diagnostic ignored "-Wpointer-arith"
+/* Call munmap on chunks which were not used for at least this time period. */
+#define MP_REUSABLE_HOLD_TIME            60000  // ms
 
-#define MP_SIZE_MAX (UINT32_MAX - MP_CHUNK_TAIL - CPU_PAGE_SIZE)
+/* Minimal time period between two balancing. */
+#define MP_REUSABLE_MIN_FREE_PERIOD       1000  // ms
 
-#define MP_REUSABLE_HOLD_TIME 60000
-#define MP_REUSABLE_MIN_FREE_PERIOD 1000
-#define MP_REUSABLE_MAX_CONSECUTIVE_FREES 250
+/* Maximal number of calls to munmap during single mp_balance_reusable call. */
+#define MP_REUSABLE_MAX_CONSECUTIVE_FREES  250
 
-//#define MEMPOOL_IS_THREAD_SAFE
-#ifdef MEMPOOL_IS_THREAD_SAFE
-#define GLOBAL_STORAGE_CLASS _Thread_local
-#else
-#define GLOBAL_STORAGE_CLASS static
-#endif
+/* Make allocations thread-safe by storing unused chunks to thread local lists.
+ * Balancing is then needed independently in all the threads. */
+//#define MP_IS_THREAD_SAFE
+
+/* The number of last chunks of the pool that may be used for user allocations;
+ * see design overview above.
+ *
+ * The rationale behind making it by one larger than the number of reusable chunk sizes is
+ * that it behaves at least as good as having separate list for each chunk size. */
+#define MP_ACTIVE_CHUNKS (MP_REUSABLE_CNT + 1)
+
+/* If defined, print counts of currently used and all existing chunks of reusable sizes
+ * periodically at most once per the given time period during balancing.
+ * It also turns on logging of immediate munmapping of too large chunks;
+ * you may want to add larger reusable chunk size if this happens often. */
+//#define MP_LOG_GLOBAL_STATS_PERIOD       60000  // ms
+
+/* If defined, pool statistics are conditionally printed on mp_delete and mp_flush.
+ * See or adjust conditions in log_pool_stats().
+ *
+ * Currently, it informs about pools with too low usage (larger chunks than needed?),
+ * too high number of chunks (probably not an issue),
+ * and containing non-reusable chunks (larger reusable sizes needed?). */
+//#define MP_LOG_POOL_STATS
+
+/* A printf-like function for debug logging; called only if global or pool stats are enabled. */
+#define MP_LOG_LINE(fmt, ...) printf(fmt "\n", ##__VA_ARGS__)
+
+/* A printf-like function for debug logging, optionally with short backtrace.
+ * It is used mainly for pool stats, where you may be interested in the place in your code.
+ * As there may be high number of such prints, keep it in one line so you can later easily count their occurrences. */
+#define MP_LOG_LINE_WITH_TRACE(fmt, ...) { \
+	char trace[150]; kr_log_get_shorttrace(trace); \
+	MP_LOG_LINE(fmt ", %s", ##__VA_ARGS__, trace); \
+}
+
+
+// --- getting timestamps ---
 
 static uint32_t get_stamp_default(void)
 {
@@ -103,6 +170,9 @@ void mp_set_time(uint32_t (*get_stamp_cb)(void))
 {
 	get_stamp = get_stamp_cb;
 }
+
+
+// --- allocating pages from system ---
 
 /** \note Imported MMAP backend from bigalloc.c */
 #include <sys/mman.h>
@@ -129,13 +199,8 @@ static void page_free(void *start, size_t len)
 	munmap(start, len);
 }
 
-void mp_init(struct mempool *pool, size_t ext_chunk_size)
-{
-	*pool = (struct mempool) {
-		.ext_chunk_size = ext_chunk_size,
-	};
-	// MEMCHECK: pool defined
-}
+
+// --- allocating chunks from pages ---
 
 static void *mp_new_chunk(size_t size)
 {
@@ -156,38 +221,6 @@ static void mp_free_chunk(struct mempool_chunk *chunk)
 	uint8_t *data = (uint8_t *)chunk - chunk->size;
 	MEMCHECK_UNDEFINED(data, chunk->size);
 	page_free(data, chunk->size + MP_CHUNK_TAIL);
-}
-
-// --- reusable chunks ---
-#define MP_REUSABLE_CNT ARRAY_SIZE(mp_reusable_ext_sizes)
-#define MP_UNUSED_TAIL ALIGN_TO(sizeof(struct mp_unused), CPU_STRUCT_ALIGN)
-struct mp_unused {
-	uint32_t timestamp;
-	uint32_t count;
-	struct mempool_chunk *chunk;  // single normal chunk or list of small unused chunks within their page
-	struct mp_unused *next;
-	struct mp_unused *prev;
-};
-
-static inline struct mp_unused *chunk_to_unused(struct mempool_chunk *chunk, uint32_t now)
-{
-	// MEMCHECK: chunk defined, unused defined iff small
-	struct mp_unused *unused;
-	if (chunk->size < CPU_PAGE_SIZE >> 1) {
-		unused = (void *)((uintptr_t)(chunk) & (UINTPTR_MAX - CPU_PAGE_SIZE + 1)) + CPU_PAGE_SIZE - MP_UNUSED_TAIL;
-	} else {
-		unused = (void *)(chunk) - MP_UNUSED_TAIL;
-		MEMCHECK_UNDEFINED(unused, MP_UNUSED_TAIL);
-		memset(unused, 0, sizeof(*unused));
-	}
-
-	unused->count++;
-	chunk->prev = unused->chunk;
-	unused->chunk = chunk;
-	unused->timestamp = now;
-
-	// MEMCHECK: chunk defined, unused defined
-	return unused;
 }
 
 static struct mp_unused *mp_new_small_chunks(size_t size)
@@ -219,6 +252,30 @@ static void mp_free_small_chunks(struct mp_unused *unused)
 	page_free(data, CPU_PAGE_SIZE);
 }
 
+
+// --- handling unused chunks ---
+
+static inline struct mp_unused *chunk_to_unused(struct mempool_chunk *chunk, uint32_t now)
+{
+	// MEMCHECK: chunk defined, unused defined iff small
+	struct mp_unused *unused;
+	if (chunk->size < CPU_PAGE_SIZE >> 1) {
+		unused = (void *)((uintptr_t)(chunk) & (UINTPTR_MAX - CPU_PAGE_SIZE + 1)) + CPU_PAGE_SIZE - MP_UNUSED_TAIL;
+	} else {
+		unused = (void *)(chunk) - MP_UNUSED_TAIL;
+		MEMCHECK_UNDEFINED(unused, MP_UNUSED_TAIL);
+		memset(unused, 0, sizeof(*unused));
+	}
+
+	unused->count++;
+	chunk->prev = unused->chunk;
+	unused->chunk = chunk;
+	unused->timestamp = now;
+
+	// MEMCHECK: chunk defined, unused defined
+	return unused;
+}
+
 static inline void mp_insert_unused(struct mp_unused *item, struct mp_unused *after)
 {
 	// MEMCHECK: all unused defined
@@ -237,7 +294,12 @@ static inline void mp_remove_unused(struct mp_unused *item)
 	item->prev = NULL;
 }
 
-const uint32_t mp_reusable_ext_sizes[] = { (CPU_PAGE_SIZE - MP_UNUSED_TAIL) / 4, 4 * 1024, 16 * 1024, 68 * 1024};
+#ifdef MP_IS_THREAD_SAFE
+#define GLOBAL_STORAGE_CLASS _Thread_local
+#else
+#define GLOBAL_STORAGE_CLASS static
+#endif
+
 GLOBAL_STORAGE_CLASS struct mp_reusable {
 	size_t unused_cnt, total_cnt;
 	struct mp_unused head, sep;
@@ -327,7 +389,6 @@ static void *mp_new_reusable_chunk(uint32_t requested_size, size_t pool_ext_chun
 static void mp_free_reusable_chunk(struct mempool_chunk *chunk, uint32_t now)
 {
 	// MEMCHECK: data unknown, chunk defined, unused defined if small
-	uint32_t size = chunk->size;
 	struct mp_reusable *reusable = mp_get_reusable(&chunk->size);
 	if (reusable) {
 		MEMCHECK_NOACCESS((uint8_t *)chunk - chunk->size, chunk->size);
@@ -341,12 +402,24 @@ static void mp_free_reusable_chunk(struct mempool_chunk *chunk, uint32_t now)
 		}
 		// MEMCHECK: data locked, chunk defined, unused defined
 	} else {
-		char trace[150]; kr_log_get_shorttrace(trace);
-		printf("FREE_REUSABLE: size orig %8u, new %8u   %s\n",
-				size, chunk->size, trace);
+#ifdef MP_LOG_GLOBAL_STATS_PERIOD
+		MP_LOG_LINE_WITH_TRACE("FREE_REUSABLE: size %8u", chunk->size);
+#endif
 		mp_free_chunk(chunk);
 	}
 }
+
+#ifdef MP_LOG_GLOBAL_STATS_PERIOD
+static void log_global_stats(void)
+{
+	char str[30 + 20 * MP_REUSABLE_CNT], *s = str;
+	s += snprintf(s, sizeof(str) - (s - str), "MEMPOOL_STATS: ");
+	for (int i = 0; i < MP_REUSABLE_CNT; i++) {
+		s += snprintf(s, sizeof(str) - (s - str), "%5zu/%-5zu ", mp_reusable[i].total_cnt - mp_reusable[i].unused_cnt, mp_reusable[i].total_cnt);
+	}
+	MP_LOG_LINE("%s", str);
+}
+#endif
 
 static uint64_t mp_balance_internal(uint32_t now)
 {
@@ -372,12 +445,13 @@ static uint64_t mp_balance_internal(uint32_t now)
 		}
 	}
 
-	// temporary logging
+#ifdef MP_LOG_GLOBAL_STATS_PERIOD
 	static uint32_t log_ts = 0;
-	if (now - log_ts >= 60000) {
+	if (now - log_ts >= MP_LOG_GLOBAL_STATS_PERIOD) {
 		log_ts = now;
-		mp_log_global_stats();
+		log_global_stats();
 	}
+#endif
 
 	return MAX(MP_REUSABLE_HOLD_TIME - longest_unused, MP_REUSABLE_MIN_FREE_PERIOD);
 }
@@ -389,10 +463,11 @@ uint64_t mp_balance_reusable(void)
 	return mp_balance_internal(now);
 }
 
-#define CONFIG_UCW_POOL_ACTIVE_CHUNKS (ARRAY_SIZE(mp_reusable) + 1)
-// ------
 
-void log_pool_stats(struct mempool *pool)
+// --- handling pools ---
+
+#ifdef MP_LOG_POOL_STATS
+static void log_pool_stats(struct mempool *pool)
 {
 	// MEMCHECK: pool defined, pool chunks locked, data unknown
 	MP_POOL_CHECK(pool);
@@ -424,23 +499,24 @@ void log_pool_stats(struct mempool *pool)
 	if (counts[MP_REUSABLE_CNT] > 0) log_reason = "NOT-FULLY-REUSED_POOL";
 
 	if (log_reason) {
-		char trace[150]; kr_log_get_shorttrace(trace);
-		printf("%21s: counts", log_reason);
+		char str[100 + 10 * MP_REUSABLE_CNT], *s = str;
+		s += snprintf(s, sizeof(str) - (s - str), "%21s: counts", log_reason);
 		for (int i = 0; i < MP_REUSABLE_CNT + 1; i++) {
-			printf(" %2d", counts[i]);
+			s += snprintf(s, sizeof(str) - (s - str), " %2d", counts[i]);
 		}
-		printf(", util %5.1f %%, %s\n", (float)(total - free) / total * 100, trace);
+		s += snprintf(s, sizeof(str) - (s - str), ", util %5.1f %%", (float)(total - free) / total * 100);
+		MP_LOG_LINE_WITH_TRACE("%s", str);
 	}
 	MP_POOL_CHECK(pool);
 }
+#endif
 
-void mp_log_global_stats(void)
+void mp_init(struct mempool *pool, size_t ext_chunk_size)
 {
-	printf("MEMPOOL_STATS: ");
-	for (int i = 0; i < MP_REUSABLE_CNT; i++) {
-		printf("%5zu/%-5zu ", mp_reusable[i].total_cnt - mp_reusable[i].unused_cnt, mp_reusable[i].total_cnt);
-	}
-	printf("\n");
+	*pool = (struct mempool) {
+		.ext_chunk_size = ext_chunk_size,
+	};
+	// MEMCHECK: pool defined
 }
 
 struct mempool *mp_new(size_t ext_chunk_size)
@@ -448,7 +524,6 @@ struct mempool *mp_new(size_t ext_chunk_size)
 	struct mempool_chunk *chunk = mp_new_reusable_chunk(sizeof(struct mempool), ext_chunk_size, 0);
 	struct mempool *pool = (void *)chunk - chunk->size;
 	MEMCHECK_UNDEFINED(pool, sizeof(*pool));
-	DBG("Creating mempool %p with %zu bytes long chunks", pool, chunk_size);
 	chunk->prev = NULL;
 #ifdef CONFIG_DEBUG
 	chunk->pool = pool;
@@ -488,8 +563,9 @@ void mp_delete(struct mempool *pool)
 		return;
 	}
 	const uint32_t now = get_stamp ? get_stamp() : 0;
-	// log_pool_stats(pool);
-	DBG("Deleting mempool %p", pool);
+#ifdef MP_LOG_POOL_STATS
+	log_pool_stats(pool);
+#endif
 	mp_free_chain(pool->last, now); // can contain the mempool structure
 	if (!mp_balance_on_demand) mp_balance_internal(now);
 }
@@ -499,7 +575,9 @@ void mp_flush(struct mempool *pool)
 	// MEMCHECK: pool defined, pool chunks locked, data unknown
 	MP_POOL_CHECK(pool);
 	const uint32_t now = get_stamp ? get_stamp() : 0;
-	// log_pool_stats(pool);
+#ifdef MP_LOG_POOL_STATS
+	log_pool_stats(pool);
+#endif
 	struct mempool_chunk *chunk = pool->last, *prev, *poolchunk = NULL;
 	while (chunk) {
 		MEMCHECK_DEFINED(chunk, MP_CHUNK_TAIL);
@@ -557,16 +635,19 @@ size_t mp_total_size(struct mempool *pool)
 	return pool->total_size;
 }
 
+
+// --- allocating space from pools ---
+
 static void *mp_alloc_internal(struct mempool *pool, size_t size)
 {
 	// MEMCHECK: pool defined, pool chunks locked
 	if (likely(size <= MP_SIZE_MAX)) {
-		// try finding space within CONFIG_UCW_POOL_ACTIVE_CHUNKS chunks (excl. the first one)
+		// try finding space within MP_ACTIVE_CHUNKS chunks (excl. the first one)
 		if (pool->last) {
 			struct mempool_chunk **pchunk, **pfullest;
 			pfullest = pchunk = &pool->last;
 			MEMCHECK_DEFINED(*pchunk, MP_CHUNK_TAIL);
-			for (int i = 1; *(pchunk = &(*pchunk)->prev) && (i < CONFIG_UCW_POOL_ACTIVE_CHUNKS) ; i++) {
+			for (int i = 1; *(pchunk = &(*pchunk)->prev) && (i < MP_ACTIVE_CHUNKS) ; i++) {
 				MEMCHECK_DEFINED(*pchunk, MP_CHUNK_TAIL);
 				size_t avail = (*pchunk)->free & ~(size_t)(CPU_STRUCT_ALIGN - 1);
 				if (size <= avail) {

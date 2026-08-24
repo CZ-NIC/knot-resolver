@@ -472,6 +472,7 @@ uint32_t mp_get_stamp_uv(void)
 int main(int argc, char **argv)
 {
 	mp_set_time(mp_get_stamp_uv);
+	mp_balance_reusable();  // avoid balancing in other operations
 
 	kr_log_group_reset();
 	if (setvbuf(stdout, NULL, _IONBF, 0) || setvbuf(stderr, NULL, _IONBF, 0)) {
