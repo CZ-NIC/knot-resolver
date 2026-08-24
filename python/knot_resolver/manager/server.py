@@ -685,9 +685,6 @@ async def start_server(config: List[str]) -> int:  # noqa: C901, PLR0915
 
     await server.wait_for_shutdown()
 
-    # notify systemd that we are shutting down
-    send_notify_socket_message(STOPPING="1")
-
     # Ok, now we are tearing everything down.
 
     # First of all, let's block all unwanted interruptions. We don't want to be reconfiguring kresd's while
