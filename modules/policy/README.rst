@@ -308,12 +308,14 @@ They are marked as ``debug`` level, so e.g. with journalctl command you can use 
 
 .. py:attribute:: QTRACE
 
-   Pretty-print DNS responses from upstream servers (or cache) into logs.
+   Pretty-print DNS responses from upstream servers into logs.
    It's useful for debugging weird DNS servers.
 
    If you do not use ``QTRACE`` in combination with ``DEBUG*``,
    you additionally need either ``log_groups({'iterat'})`` (possibly with other groups)
    or ``log_level('debug')`` to see the output in logs.
+
+   Before version 6.0.15 this also showed pseudo-answers coming from cache.
 
 .. py:attribute:: REQTRACE
 
