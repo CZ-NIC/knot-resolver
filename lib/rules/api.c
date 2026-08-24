@@ -277,7 +277,7 @@ int kr_rules_commit(bool accept)
 int kr_rules_reset(void)
 {
 	if (!the_rules) return kr_error(EINVAL);
-	int ret = ruledb_op(check_health);
+	int ret = ruledb_op(check_health, true);
 	switch (ret) {
 		case 0: return ruledb_op(commit, false, true);
 		case 1: return kr_ok(); // could return 1, but let's only propagate errors

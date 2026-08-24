@@ -1069,7 +1069,7 @@ static void health_timer_cb(uv_timer_t *health_timer)
 {
 	struct kr_cache *cache = health_timer->data;
 	if (cache)
-		cache_op(cache, check_health);
+		cache_op(cache, check_health, false);
 	/* We don't do anything with the return code.  For example, in some situations
 	 * the file may not exist (temporarily), and we just expect to be more lucky
 	 * when the timer fires again. */
@@ -1078,7 +1078,7 @@ static void health_timer_cb(uv_timer_t *health_timer)
 int kr_cache_check_health(struct kr_cache *cache, int interval)
 {
 	if (interval == 0)
-		return cache_op(cache, check_health);
+		return cache_op(cache, check_health, false);
 	if (interval < 0) {
 		if (!cache->health_timer)
 			return kr_ok(); // tolerate stopping a "stopped" timer

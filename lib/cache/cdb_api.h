@@ -112,8 +112,9 @@ struct kr_cdb_api {
 	/** Perform maintenance.
 	 * In LMDB case it checks whether data.mdb is still the same
 	 * and reopens it if it isn't; it errors out if the file doesn't exist anymore.
+	 * \p change_expected adjust logging based on whether a data.mdb change is expectable now
 	 * \return 0 if OK, 1 if reopened OK, < 0 kr_error */
-	int (*check_health)(kr_cdb_pt db, struct kr_cdb_stats *stat);
+	int (*check_health)(kr_cdb_pt db, struct kr_cdb_stats *stat, bool change_expected);
 
 
 	/** Start iterating: get the first *val with *key + return error code.

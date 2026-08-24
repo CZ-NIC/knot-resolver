@@ -112,8 +112,11 @@ static inline MDB_val val_knot2mdb(knot_db_val_t v)
 }
 
 /** Refresh mapsize value from file, including env->mapsize.
- * It's much lighter than reopen_env(). */
-static int refresh_mapsize(struct lmdb_env *env)
+ *
+ * It's much lighter than reopen_env().
+ * \p change_expected adjust logging based on whether a mapsize change is expectable now
+ */
+static int refresh_mapsize(struct lmdb_env *env, bool change_expected)
 {
 	int ret = cdb_commit(env2db(env), NULL, true, true);
 	if (!ret) ret = lmdb_error(env, mdb_env_set_mapsize(env->env, 0));
@@ -124,7 +127,7 @@ static int refresh_mapsize(struct lmdb_env *env)
 	if (ret) return ret;
 
 	env->mapsize = info.me_mapsize;
-	if (env->mapsize != env->st_size) {
+	if (env->mapsize != env->st_size && !change_expected) {
 		kr_log_info(MDB, "suspicious size of file '%s'"
 				": file size %zu != LMDB map size %zu\n",
 				env->mdb_data_path, (size_t)env->st_size, env->mapsize);
@@ -170,7 +173,7 @@ retry:
 
 	if (unlikely(ret == MDB_MAP_RESIZED)) {
 		kr_log_info(MDB, "detected size increased by another process\n");
-		ret = refresh_mapsize(env);
+		ret = refresh_mapsize(env, false);
 		if (ret == 0)
 			goto retry;
 	} else if (unlikely(ret == MDB_READERS_FULL)) {
@@ -402,7 +405,7 @@ static int cdb_open_env(struct lmdb_env *env, const char *path, const size_t map
 	/* Get the real mapsize.  Shrinking can be restricted, etc.
 	 * Unfortunately this is only reliable when not setting the size explicitly. */
 	if (!size_requested) {
-		ret = refresh_mapsize(env);
+		ret = refresh_mapsize(env, false);
 		if (ret) goto error_sys;
 	}
 
@@ -535,7 +538,7 @@ static int reopen_env(struct lmdb_env *env, struct kr_cdb_stats *stats, const si
 	return cdb_open_env(env, path_copy, mapsize, stats);
 }
 
-static int cdb_check_health(kr_cdb_pt db, struct kr_cdb_stats *stats)
+static int cdb_check_health(kr_cdb_pt db, struct kr_cdb_stats *stats, bool change_expected)
 {
 	struct lmdb_env *env = db2env(db);
 
@@ -556,11 +559,14 @@ static int cdb_check_health(kr_cdb_pt db, struct kr_cdb_stats *stats)
 	 * For ruledb the size isn't constant (anymore). */
 	if (!env->is_cache || st.st_size == env->st_size)
 		return kr_ok();
-	kr_log_info(MDB, "detected size change (by another instance?) of file '%s'"
+	// kr_log_debug+kr_log_info hybrid
+	kr_log_fmt(LOG_GRP_MDB, (change_expected ? LOG_DEBUG : LOG_INFO), SD_JOURNAL_METADATA,
+			"[%-6s] " "detected size change (by another instance?) of file '%s'"
 			": file size %zu -> file size %zu\n",
-			env->mdb_data_path, (size_t)env->st_size, (size_t)st.st_size);
+			LOG_GRP_MDB_TAG, env->mdb_data_path,
+			(size_t)env->st_size, (size_t)st.st_size);
 	env->st_size = st.st_size; // avoid retrying in cycle even if we fail
-	return refresh_mapsize(env);
+	return refresh_mapsize(env, change_expected);
 }
 
 /** Obtain exclusive (advisory) lock by creating a file, returning FD or negative kr_error().
@@ -684,7 +690,7 @@ static int cdb_clear(kr_cdb_pt db, struct kr_cdb_stats *stats, const size_t maps
 	/* We acquired lockfile.  Now find whether *.mdb are what we have open now.
 	 * If they are not we don't want to remove them; most likely they have been
 	 * cleaned by another instance. */
-	ret = cdb_check_health(db, stats);
+	ret = cdb_check_health(db, false, stats);
 	if (ret != 0) {
 		if (ret == 1) // file changed and reopened successfully
 			ret = kr_ok();
