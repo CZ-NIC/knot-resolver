@@ -181,6 +181,8 @@ if NOTIFY_SUPPORT:
     def process_spawn_as_child_add_env(slf: Subprocess, *args: Any) -> Tuple[Any, ...]:
         if is_type_notify(slf):
             slf.config.environment[NOTIFY_SOCKET] = str(Path.cwd() / NOTIFY_SOCKET_NAME)
+        else:
+            slf.config.environment[NOTIFY_SOCKET] = ""
         return (slf, *args)
 
     T = TypeVar("T")
