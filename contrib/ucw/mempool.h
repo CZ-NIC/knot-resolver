@@ -77,6 +77,60 @@ struct mempool_stats {          /** Mempool statistics. See mp_stats(). **/
 #endif
 
 /***
+ * [[maintenance]]
+ * Global maintenance
+ * ------------------
+ ***/
+
+/**
+ * Free memory which was unused for a certain time period (configurable in C file).
+ * After it is called for the first time, it has to be called periodically for freeing memory.
+ * Returns time delay in msec in which it may be called again;
+ * ideally, call it sometime after that time during idle.
+ * It may yield (and return 0) before freeing is fully completed,
+ * not to block for too long.
+ *
+ * Before calling this function for the first time,
+ * balancing is performed during some other mempool operations.
+ * If you however don't use mempools for a long time after a memory intensive operation,
+ * the unused memory stays allocated; calling this function is thus recommended.
+ *
+ * If MEMPOOL_IS_THREAD_SAFE is defined in C file,
+ * reusing chunks is thread_local as well as the effects of this function.
+ * The balancing during other operations is then disabled only in threads
+ * where this function was called.
+ */
+KR_EXPORT
+uint64_t mp_balance_reusable(void);
+
+/**
+ * Set function returning current time in msec (but precision of secs is also OK)
+ * instead of the default clock_gettime, which might be slower than somehow cached timestamps.
+ * Call it before using mempools to keep internal timestamps consistent.
+ * The function is set globally for all threads
+ * and it is called once during flushing or deleting mempool and during balancing,
+ * which is called also from other operations unless mp_balance_reusable is used.
+ */
+void mp_set_time(uint32_t (*get_stamp_cb)(void));
+
+/**
+ * Compute some statistics for debug purposes.
+ * See the definition of the <<struct_mempool_stats,mempool_stats structure>>.
+ * This function scans the chunk list, so it can be slow.
+ *
+ * See the configuration section of C file for other ways of logging,
+ * which do not require changing your code.
+ **/
+void mp_stats(struct mempool *pool, struct mempool_stats *stats);
+
+/**
+ * Return how many bytes were allocated by the pool, including unused parts
+ * of chunks. This function is constant-time.
+ **/
+size_t mp_total_size(struct mempool *pool);
+
+
+/***
  * [[basic]]
  * Basic manipulation
  * ------------------
@@ -84,9 +138,12 @@ struct mempool_stats {          /** Mempool statistics. See mp_stats(). **/
 
 /**
  * Initialize a given mempool structure.
- * The given ext_chunk_size is the initial external size of chunks requested from system;
- * the space inside may be a little lower;
- * it may grow in time with memory allocated from the pool.
+ *
+ * The given ext_chunk_size is the initial external size of chunks to be requested from system;
+ * the space inside may be a little lower (by MP_CHUNK_TAIL bytes).
+ * It is rounded up to the nearest reusable size, which are configurable in C file,
+ * or to the multiple of page size if it is too large to be reused.
+ * It may grow in time with memory allocated from the pool.
  *
  * Memory pools can be treated as <<trans:respools,resources>>, see <<trans:res_mempool()>>.
  **/
@@ -120,51 +177,6 @@ void mp_delete(struct mempool *pool);
  **/
 KR_EXPORT
 void mp_flush(struct mempool *pool);
-
-/**
- * Compute some statistics for debug purposes.
- * See the definition of the <<struct_mempool_stats,mempool_stats structure>>.
- * This function scans the chunk list, so it can be slow.
- **/
-void mp_stats(struct mempool *pool, struct mempool_stats *stats);
-
-/**
- * Return how many bytes were allocated by the pool, including unused parts
- * of chunks. This function is constant-time.
- **/
-size_t mp_total_size(struct mempool *pool);
-
-KR_EXPORT
-void mp_log_global_stats(void);
-
-/**
- * Free memory which was unused for a certain time period.
- * After it is called for the first time, it has to be called periodically for freeing memory.
- * Returns time delay in msec in which it may be called again;
- * ideally, call it sometime after that time during idle.
- * It may yield (and return 0) before freeing is fully completed,
- * not to block for too long.
- *
- * Before calling this function for the first time,
- * balancing is performed during some other mempool operations.
- * If you however don't use mempools for a long time after a memory intensive operation,
- * the unused memory stays allocated; calling this function is thus recommended.
- *
- * If MEMPOOL_IS_THREAD_SAFE is defined in C file,
- * reusing chunks is thread_local as well as the effects of this function.
- * The balancing during other operations is then disabled only in threads
- * where this function was called.
- */
-KR_EXPORT
-uint64_t mp_balance_reusable(void);
-
-/**
- * Set function returning current time in msec (but precision of secs is also OK)
- * instead of the default clock_gettime, which might be slow.
- * Call it before using mempools to keep internal timestamps consistent.
- * The function is set globally for all threads.
- */
-void mp_set_time(uint32_t (*get_stamp_cb)(void));
 
 /***
  * [[alloc]]
@@ -317,11 +329,7 @@ static inline void *mp_end(struct mempool *pool, void *end)
 	void *p = mp_ptr(pool);
 	MEMCHECK_DEFINED(pool->last, MP_CHUNK_TAIL);
 	const size_t avail = (uint8_t *)pool->last - (uint8_t *)end;
-	if (avail > pool->last->free) {
-		char trace[150]; kr_log_get_shorttrace(trace);
-		printf("BUG_MP_END: chunk %p, free %d, end %p, new free %ld   %s\n",
-				(void *)pool->last, pool->last->free, end, avail, trace);
-	}
+	assert(avail <= pool->last->free);  // primarily checks avail underflow, but it's unsigned
 	pool->last->free = avail;
 	MEMCHECK_NOACCESS(end, pool->last->free + MP_CHUNK_TAIL);
 	MP_POOL_CHECK(pool);
