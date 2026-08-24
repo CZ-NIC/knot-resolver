@@ -39,7 +39,7 @@ def check_for_starting_manager(event: ProcessStateStartingEvent) -> None:
 
     proc: Subprocess = event.process
     processname = as_string(proc.config.name)
-    if processname == "manager":
+    if processname == "manager" and SYSTEMD_NOTIFY_SOCKET is not None:
         # manager has sucessfully started, report it upstream
         send_notify_socket_message(SYSTEMD_NOTIFY_SOCKET, STATUS="Starting services...")
 
@@ -49,7 +49,7 @@ def check_for_runnning_manager(event: ProcessStateRunningEvent) -> None:
 
     proc: Subprocess = event.process
     processname = as_string(proc.config.name)
-    if processname == "manager":
+    if processname == "manager" and SYSTEMD_NOTIFY_SOCKET is not None:
         # manager has sucessfully started, report it upstream
         send_notify_socket_message(SYSTEMD_NOTIFY_SOCKET, READY="1", STATUS="Ready")
 
@@ -72,7 +72,8 @@ def inject(supervisord: Supervisor, **_config: Any) -> Any:  # pylint: disable=u
     # This status notification here unsets the env variable $NOTIFY_SOCKET provided by systemd
     # and stores it locally. Therefore, it shouldn't clash with $NOTIFY_SOCKET we are providing
     # downstream
-    send_notify_socket_message(SYSTEMD_NOTIFY_SOCKET, STATUS="Initializing supervisord...")
+    if SYSTEMD_NOTIFY_SOCKET is not None:
+        send_notify_socket_message(SYSTEMD_NOTIFY_SOCKET, STATUS="Initializing supervisord...")
 
     # register events
     subscribe(ProcessStateFatalEvent, check_for_fatal_manager)
