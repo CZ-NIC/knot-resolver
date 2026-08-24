@@ -20,12 +20,6 @@ packages = [
 ]
 exclude = ["**/*.in", "**/meson.build"]
 
-# See currently open issue about building C extensions here:
-# https://github.com/python-poetry/poetry/issues/2740
-[tool.poetry.build]
-script = "build_c_extensions.py"
-generate-setup-file = true
-
 [tool.poetry.dependencies]
 python = "^3.9"
 aiohttp = "*"
