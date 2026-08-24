@@ -8,8 +8,7 @@
  * which can be arbitrarily delayed due to being busy.
  * If defer is active, callbacks calls require one libuv cycle without processing any requests
  * to make sure no work is pending;
- * if defer is disabled, it just uses libuv timers without checking for idle.
- */
+ * if defer is disabled, it just uses libuv timers without checking for idleness. */
 
 #pragma once
 #include <uv.h>
@@ -18,9 +17,8 @@
 /** Callback function doing the periodic work.
  *
  * It is expected to return time delay in msec after which it may be called again.
- * You can yield earlier returning zero not to block for too long.
- * At least one libuv cycle is always processed before next execution.
- */
+ * You can yield earlier with returning zero not to block for too long.
+ * At least one libuv cycle is always processed before next execution. */
 typedef uint64_t (*idletimer_callback_t)(void);
 
 /// An opaque handle.
