@@ -32,7 +32,7 @@ Every other part of the processing pipeline is fully concurrent. The manager is 
 
 The Knot Resolver Manager supports several backends, more specifically several service managers that can run our workers. The main one being `systemd` has several variants, so that it can run even without privileges. The other currently supported option is `supervisord`.
 
-The used backend is chosen automatically on startup based on available privileges and other running software. This decision can be overriden manually using a command line option.
+The used backend is chosen automatically on startup based on available privileges and other running software. This decision can be overridden manually using a command line option.
 
 # Partial config updates
 
