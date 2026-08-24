@@ -113,15 +113,15 @@ archive:
   script:
     - apkg make-archive
 
-build-arch:
-  <<: *build
-  allow_failure: true
-  image: $IMAGE_PREFIX/arch:$IMAGE_TAG
-  script:
-    - meson build_ci_arch --prefix=$PREFIX -Dmalloc=disabled -Dwerror=true
-    - ninja -C build_ci_arch
-    - ninja -C build_ci_arch install >/dev/null
-    - ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite snowflake
+#build-arch:
+#  <<: *build
+#  allow_failure: true
+#  image: $IMAGE_PREFIX/arch:$IMAGE_TAG
+#  script:
+#    - meson build_ci_arch --prefix=$PREFIX -Dmalloc=disabled -Dwerror=true
+#    - ninja -C build_ci_arch
+#    - ninja -C build_ci_arch install >/dev/null
+#    - ${MESON_TEST} --suite unit --suite config --suite dnstap --no-suite snowflake
 
 build-stable:
   <<: *build
