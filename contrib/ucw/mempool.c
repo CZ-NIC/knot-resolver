@@ -38,8 +38,10 @@ struct mp_unused {
  * A _mempool_ consists of mmapped chunks of different sizes.
  * We use _chunk_ to refer the mempool_chunk struct located after the data area of size chunk->size,
  * which contains data already allocated to the application followed by chunk->free bytes of available space.
- * Normal chunks of sizes 4K, 16K, 68K and greater are mmaped on their own,
- * small chunks of size 1K are allocated by whole pages consecutively containing four of them.
+ * Normal chunks with sizes of at least one page are mmaped on their own,
+ * small chunks are allocated by single whole pages consecutively containing several of them.
+ * See mp_reusable_ext_sizes[] in the configuration section below for the specific sizes of reusable chunks,
+ * each chunk has its size rounded up to those values, or if it is greater, it is munmapped immediatelly when unneed.
  *
  * When allocating memory to the application,
  * we seek sufficient space in MP_ACTIVE_CHUNKS last chunks of the mempool and move the chosen one to the end of list,
@@ -48,15 +50,17 @@ struct mp_unused {
  * The size of a new chunk is lower-bounded by wanted allocation size and mempool chunk_size
  * and becomes larger with increasing total size of the mempool.
  *
- * Unused chunks of sizes up to 68K from deleted pools are recycled globally
+ * Unused chunks of reusable sizes from deleted pools are recycled globally
  * (or per-thread if MP_IS_THREAD_SAFE is defined).
  * They are pointed by the _unused_ structure mp_unused connected to lists containing same-sized chunks;
  * the structure is located either in the data area of normal chunks
- * or after the 4-tuple of small chunks representing all unused of them.
+ * or after the group of small chunks, where it represents all unused of them.
  *
- * The unused chunks that were not used for at least 1 minute are munmapped
+ * The unused chunks that were not used for at least the configured time are munmapped
  * either by explicitly calling mp_balance_reusable() while idle or during other mempool operations.
  * If MP_IS_THREAD_SAFE is defined below, only the specific-thread structures are affected by the call.
+ *
+ * See configuration section below.
  *
  *
  * MEMCHECK summary (ASan + Valgrind annotations):
@@ -66,7 +70,7 @@ struct mp_unused {
  *   * UNDEFINED (unlocked but uninitialized), or
  *   * DEFINED (unlocked and initialized).
  * ASan then disallows access to poisoned (NOACCESS) memory,
- * Valgrind also detects decisions based on uninitialized memory.
+ * Valgrind in addittion to that detects decisions based on uninitialized memory.
  *
  * Desired state outside of our code:
  *   * mempool structure is accessible,
@@ -80,8 +84,10 @@ struct mp_unused {
  *      * unused structure is accessible,
  *   * other internal metadata are accessible.
  * During internal code execution the memory classification is being changed as needed
- * to access the internal structures but allow detection of user data overflow to our metadata;
+ * to allow us access the internal structures
+ * but disallow it to the user to detect user data overflow to our metadata;
  * also reused memory can be repeteadly handled as uninitialized this way. */
+
 
 // --- configuration ---
 
@@ -96,7 +102,7 @@ struct mp_unused {
  * The usable internal chunk size is lower than the external size by MP_CHUNK_TAIL,
  * so you may need to make some sizes 1 page larger to accommodate large enough allocations.
  *
- * In case of changing these, see also the beginning of mp_new_reusable_chunk,
+ * In case of changing these, see also the beginning of mp_new_reusable_chunk(),
  * where it is defined how default chunk size is increased with growing pool size. */
 const uint32_t mp_reusable_ext_sizes[] = {
 	(CPU_PAGE_SIZE - MP_UNUSED_TAIL) / 4,  // ~1K
@@ -112,10 +118,10 @@ const uint32_t mp_reusable_ext_sizes[] = {
 /* Minimal time period between two balancing. */
 #define MP_REUSABLE_MIN_FREE_PERIOD       1000  // ms
 
-/* Maximal number of calls to munmap during single mp_balance_reusable call. */
+/* Maximal number of calls to munmap during a single mp_balance_reusable call. */
 #define MP_REUSABLE_MAX_CONSECUTIVE_FREES  250
 
-/* Make allocations thread-safe by storing unused chunks to thread local lists.
+/* Make allocations thread-safe by storing unused chunks in thread local lists.
  * Balancing is then needed independently in all the threads. */
 //#define MP_IS_THREAD_SAFE
 
@@ -123,7 +129,9 @@ const uint32_t mp_reusable_ext_sizes[] = {
  * see design overview above.
  *
  * The rationale behind making it by one larger than the number of reusable chunk sizes is
- * that it behaves at least as good as having separate list for each chunk size. */
+ * that it behaves at least as good as having separate list for each chunk size
+ * with just one active chunk in each of them
+ * and separately having one active chunk with possibly resizable data. */
 #define MP_ACTIVE_CHUNKS (MP_REUSABLE_CNT + 1)
 
 /* If defined, print counts of currently used and all existing chunks of reusable sizes
@@ -140,16 +148,9 @@ const uint32_t mp_reusable_ext_sizes[] = {
  * and containing non-reusable chunks (larger reusable sizes needed?). */
 //#define MP_LOG_POOL_STATS
 
-/* A printf-like function for debug logging; called only if global or pool stats are enabled. */
-#define MP_LOG_LINE(fmt, ...) printf(fmt "\n", ##__VA_ARGS__)
-
-/* A printf-like function for debug logging, optionally with short backtrace.
- * It is used mainly for pool stats, where you may be interested in the place in your code.
- * As there may be high number of such prints, keep it in one line so you can later easily count their occurrences. */
-#define MP_LOG_LINE_WITH_TRACE(fmt, ...) { \
-	char trace[150]; kr_log_get_shorttrace(trace); \
-	MP_LOG_LINE(fmt ", %s", ##__VA_ARGS__, trace); \
-}
+/* Other options are available in the header file:
+     * MP_LOG_LINE and MP_LOG_LINE_WITH_TRACE macros used for logging statistics,
+     * MP_DEBUG_CONSISTENCY_CHECKS enabling possibly slow metadata checking. */
 
 
 // --- getting timestamps ---
