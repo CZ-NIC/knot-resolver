@@ -21,10 +21,18 @@ Improvements
 - systemd: use unit's {Runtime,State,Cache}Directory directives instead of tmpfiles.d (!1853)
 - controller: reimplemented the notify socket in Python (!1875)
   The `knot_resolver` Python package no longer contains native extensions and is now implemented entirely in Python.
+- python: improve Knot Resolver startup procedure (!1893)
+  Some startup actions previously handled by the manager have been moved to a separate startup program.
+  This simplifies the manager's startup logic and isolates Knot Resolver's initialization steps.
+  - `knot-resolver` executable: added `--loglevel` and `--logtarget` arguments.
+     These arguments are also used as defaults when the logging level or target is not configured in configuration.
+  - New `kres-manager` executable with same arguments as `knot-resolver` that starts only the manager.
 
 Incompatible changes
 --------------------
 - remove legacy systemd unit files (kresd@.service, kres-cache-gc.service) (!1853)
+- remove $KRES_LOGGING_TARGET environment variable (!1893)
+  /logging/target: removed `from-env` choice
 
 
 Knot Resolver 6.4.2 (2026-08-05)
