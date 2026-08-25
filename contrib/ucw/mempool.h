@@ -53,13 +53,27 @@ struct mempool_stats {          /** Mempool statistics. See mp_stats(). **/
 	unsigned chunks_count;      /** Number of allocated chunks. */
 };
 
-// #define MP_DEBUG_CONSISTENCY_CHECKS  // slow
+// --- configuration ---  (see also many other options in C file)
+
+/* A printf-like function for debug logging;
+ * called only if global or pool stats in C file or consistency checks below are enabled. */
+#define MP_LOG_LINE(fmt, ...) printf(fmt "\n", ##__VA_ARGS__)
+
+/* A printf-like function for debug logging as above, but optionally with short backtrace.
+ * It is used mainly for pool stats and consistency checks, where you may be interested in the place in your code.
+ * As there may be high number of such prints, keep it in one line so you can later easily count their occurrences. */
+#define MP_LOG_LINE_WITH_TRACE(fmt, ...) { \
+	char trace[150]; kr_log_get_shorttrace(trace); \
+	MP_LOG_LINE(fmt ", %s", ##__VA_ARGS__, trace); \
+}
+
+/* Check consistency of internal structures before and after our modifications; possibly slow. */
+//#define MP_DEBUG_CONSISTENCY_CHECKS
 #ifdef MP_DEBUG_CONSISTENCY_CHECKS
 #define MP_CHUNK_CHECK(c) MP_CHUNK_CHECKi(c, 0)
 #define MP_CHUNK_CHECKi(c, i) \
 	if ((c->free > c->size) || (c->size > (1 << 23))) { \
-		char trace[150]; kr_log_get_shorttrace(trace); \
-		printf("BUG: chunk %p (%d-th), size %d, free %d   %s\n", (void *)c, i, c->size, c->free, trace); \
+		MP_LOG_LINE_WITH_TRACE("BUG: chunk %p (%d-th), size %d, free %d", (void *)c, i, c->size, c->free); \
 	}
 #define MP_POOL_CHECK(pool) \
 { \
