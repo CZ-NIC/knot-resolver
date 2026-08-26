@@ -187,8 +187,15 @@ static struct session2 *ioreq_spawn(int socktype, sa_family_t family,
 		if (socktype == SOCK_DGRAM) {
 			uv_udp_t *udp = (uv_udp_t *)session2_get_handle(s);
 			ret = uv_udp_bind(udp, &addr->ip, 0);
-		} else if (socktype == SOCK_STREAM){
+		} else if (socktype == SOCK_STREAM) {
 			uv_tcp_t *tcp = (uv_tcp_t *)session2_get_handle(s);
+#ifdef IP_BIND_ADDRESS_NO_PORT
+			int fd = -1;
+			if (uv_fileno((const uv_handle_t *)tcp, &fd) == 0) {
+				int on = 1;
+				setsockopt(fd, IPPROTO_IP, IP_BIND_ADDRESS_NO_PORT, &on, sizeof(on));
+			}
+#endif
 			ret = uv_tcp_bind(tcp, &addr->ip, 0);
 		}
 	}
