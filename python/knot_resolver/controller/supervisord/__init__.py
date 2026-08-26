@@ -1,7 +1,9 @@
+import asyncio
 import logging
+from collections.abc import Coroutine, Iterable
 from os import getppid, kill  # pylint: disable=[no-name-in-module]
 from pathlib import Path
-from typing import Any, Dict, Iterable, NoReturn, Optional, Union, cast
+from typing import Any, Callable, Dict, NoReturn, Optional, TypeVar, Union, cast
 from xmlrpc.client import Fault, ServerProxy
 
 import supervisor.xmlrpc  # type: ignore[import]
@@ -20,9 +22,17 @@ from knot_resolver.datamodel.config_schema import KresConfig, workers_max_count
 from knot_resolver.manager.constants import supervisord_config_file, supervisord_pid_file, supervisord_sock_file
 from knot_resolver.utils import which
 from knot_resolver.utils.async_utils import call, readfile
-from knot_resolver.utils.compat.asyncio import async_in_a_thread
+
+T = TypeVar("T")
 
 logger = logging.getLogger(__name__)
+
+
+def async_in_a_thread(func: Callable[..., T]) -> Callable[..., Coroutine[None, None, T]]:
+    async def wrapper(*args: Any, **kwargs: Any) -> T:
+        return await asyncio.to_thread(func, *args, **kwargs)
+
+    return wrapper
 
 
 async def _start_supervisord(config: KresConfig) -> None:
