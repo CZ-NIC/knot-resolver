@@ -7,8 +7,6 @@ from asyncio import create_subprocess_exec, create_subprocess_shell
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
-from knot_resolver.utils.compat.asyncio import to_thread
-
 
 async def call(
     cmd: Union[str, bytes, List[str], List[bytes]], shell: bool = False, discard_output: bool = False
@@ -40,7 +38,7 @@ async def readfile(path: Path) -> str:
         with path.open("r", encoding="utf8") as file:
             return file.read()
 
-    return await to_thread(readfile_sync, path)
+    return await asyncio.to_thread(readfile_sync, path)
 
 
 async def writefile(path: Path, content: str) -> None:
@@ -50,7 +48,7 @@ async def writefile(path: Path, content: str) -> None:
         with path.open("w", encoding="utf8") as file:
             return file.write(content)
 
-    await to_thread(writefile_sync, path, content)
+    await asyncio.to_thread(writefile_sync, path, content)
 
 
 async def wait_for_process_termination(pid: int, sleep_sec: float = 0) -> None:
@@ -73,8 +71,8 @@ async def wait_for_process_termination(pid: int, sleep_sec: float = 0) -> None:
         except ProcessLookupError:
             pass
 
-    await to_thread(wait_sync, pid, sleep_sec)
+    await asyncio.to_thread(wait_sync, pid, sleep_sec)
 
 
 async def read_resource(package: str, filename: str) -> Optional[bytes]:
-    return await to_thread(pkgutil.get_data, package, filename)
+    return await asyncio.to_thread(pkgutil.get_data, package, filename)
