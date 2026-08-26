@@ -2,12 +2,12 @@
 import argparse
 import json
 import os
+import shutil
 import sys
 from pathlib import Path
 from typing import List, Optional, Tuple, Type
 
 from knot_resolver.client.command import Command, CommandArgs, CompWords, comp_get_words, register_command
-from knot_resolver.utils import which
 from knot_resolver.utils.requests import request
 
 PROCS_TYPE = List
@@ -66,15 +66,13 @@ class DebugCommand(Command):
 
     def run(self, args: CommandArgs) -> None:  # noqa: C901, PLR0912, PLR0915
         if self.gdb is None:
-            try:
-                gdb_cmd = str(which.which("gdb"))
-            except RuntimeError:
+            gdb_cmd = shutil.which("gdb")
+            if gdb_cmd is None:
                 print("Could not find 'gdb' in $PATH. Is GDB installed?", file=sys.stderr)
                 sys.exit(1)
         elif "/" not in self.gdb:
-            try:
-                gdb_cmd = str(which.which(self.gdb))
-            except RuntimeError:
+            gdb_cmd = shutil.which(self.gdb)
+            if gdb_cmd is None:
                 print(f"Could not find '{self.gdb}' in $PATH.", file=sys.stderr)
                 sys.exit(1)
         else:
@@ -106,9 +104,8 @@ class DebugCommand(Command):
 
         # Put `sudo --` at the beginning of the command.
         if self.sudo:
-            try:
-                sudo_cmd = str(which.which("sudo"))
-            except RuntimeError:
+            sudo_cmd = shutil.which("sudo")
+            if sudo_cmd is None:
                 print("Could not find 'sudo' in $PATH. Is sudo installed?", file=sys.stderr)
                 sys.exit(1)
             exec_args.extend([sudo_cmd, "--"])
