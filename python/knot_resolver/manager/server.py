@@ -32,7 +32,6 @@ from knot_resolver.exceptions import KresError
 from knot_resolver.logging import reconfigure_logging
 from knot_resolver.manager import files, metrics
 from knot_resolver.manager.config_store import only_on_real_changes_update
-from knot_resolver.utils import ignore_exceptions_optional
 from knot_resolver.utils.async_utils import readfile
 from knot_resolver.utils.etag import structural_etag
 from knot_resolver.utils.functional import Result
@@ -231,9 +230,16 @@ class Server:
         else:
             update_with = parse_from_mime_type(await request.text(), request.content_type)
         document_path = request.match_info["path"]
-        getheaders = ignore_exceptions_optional(KeyError, None)(request.headers.getall)
-        etags = getheaders("if-match")
-        not_etags = getheaders("if-none-match")
+
+        def get_header_values(name: str) -> Optional[List[str]]:
+            try:
+                return request.headers.getall(name)
+            except KeyError:
+                return None
+
+        etags = get_header_values("if-match")
+        not_etags = get_header_values("if-none-match")
+
         current_config: Dict[str, Any] = self.config_store.get().get_unparsed_data()
 
         # stop processing if etags
