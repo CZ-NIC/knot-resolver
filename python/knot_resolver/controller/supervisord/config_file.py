@@ -1,8 +1,10 @@
+import asyncio
 import logging
 import os
 import shutil
 import sys
 from dataclasses import dataclass
+from importlib.resources import files
 from pathlib import Path
 from typing import Literal, Optional
 
@@ -30,7 +32,7 @@ from knot_resolver.manager.constants import (
     supervisord_subprocess_log_dir,
     user_constants,
 )
-from knot_resolver.utils.async_utils import read_resource, writefile
+from knot_resolver.utils.async_utils import writefile
 
 logger = logging.getLogger(__name__)
 
@@ -221,9 +223,7 @@ async def write_config_file(args: KresArgs, config: KresConfig) -> None:
     if not supervisord_subprocess_log_dir(config).exists():
         supervisord_subprocess_log_dir(config).mkdir(exist_ok=True)
 
-    template = await read_resource(__package__, "supervisord.conf.j2")
-    assert template is not None
-    template = template.decode("utf8")
+    template = await asyncio.to_thread((files(__package__) / "supervisord.conf.j2").read_text)
     config_string = Template(template).render(
         gc=ProcessTypeConfig.create_gc_config(config),
         loader=ProcessTypeConfig.create_policy_loader_config(config),

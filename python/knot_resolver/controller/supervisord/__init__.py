@@ -21,7 +21,7 @@ from knot_resolver.controller.interface import (
 from knot_resolver.controller.supervisord.config_file import SupervisordKresID, write_config_file
 from knot_resolver.datamodel.config_schema import KresConfig, workers_max_count
 from knot_resolver.manager.constants import supervisord_config_file, supervisord_pid_file, supervisord_sock_file
-from knot_resolver.utils.async_utils import call, readfile
+from knot_resolver.utils.async_utils import readfile
 
 T = TypeVar("T")
 
@@ -33,15 +33,6 @@ def async_in_a_thread(func: Callable[..., T]) -> Callable[..., Coroutine[None, N
         return await asyncio.to_thread(func, *args, **kwargs)
 
     return wrapper
-
-
-async def _start_supervisord(config: KresConfig) -> None:
-    logger.debug("Writing supervisord config")
-    await write_config_file(config)
-    logger.debug("Starting supervisord")
-    res = await call(["supervisord", "--configuration", str(supervisord_config_file(config).absolute())])
-    if res != 0:
-        raise KresSubprocessControllerError(f"Supervisord exited with exit code {res}")
 
 
 async def _exec_supervisord(args: KresArgs, config: KresConfig) -> NoReturn:
