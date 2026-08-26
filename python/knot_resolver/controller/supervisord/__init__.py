@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import shutil
 from collections.abc import Coroutine, Iterable
 from os import getppid, kill  # pylint: disable=[no-name-in-module]
 from pathlib import Path
@@ -20,7 +21,6 @@ from knot_resolver.controller.interface import (
 from knot_resolver.controller.supervisord.config_file import SupervisordKresID, write_config_file
 from knot_resolver.datamodel.config_schema import KresConfig, workers_max_count
 from knot_resolver.manager.constants import supervisord_config_file, supervisord_pid_file, supervisord_sock_file
-from knot_resolver.utils import which
 from knot_resolver.utils.async_utils import call, readfile
 
 T = TypeVar("T")
@@ -48,9 +48,15 @@ async def _exec_supervisord(args: KresArgs, config: KresConfig) -> NoReturn:
     logger.debug("Writing supervisord config")
     await write_config_file(args, config)
     logger.debug("Execing supervisord")
+
+    supervisord = shutil.which("supervisord")
+    if supervisord is None:
+        msg = "The executable 'supervisord' was not found in $PATH"
+        raise RuntimeError(msg)
+
     raise KresSubprocessControllerExec(
         [
-            str(which.which("supervisord")),
+            supervisord,
             "supervisord",
             "--configuration",
             str(supervisord_config_file(config).absolute()),
@@ -93,10 +99,9 @@ async def _is_supervisord_available() -> bool:
     # yes, it is! The code in this file wouldn't be running without it due to imports :)
 
     # so let's just check that we can find supervisord and supervisorctl binaries
-    try:
-        which.which("supervisord")
-        which.which("supervisorctl")
-    except RuntimeError:
+    supervisord = shutil.which("supervisord")
+    supervisorctl = shutil.which("supervisorctl")
+    if supervisord is None or supervisorctl is None:
         logger.error("Failed to find supervisord or supervisorctl executables in $PATH")
         return False
 
