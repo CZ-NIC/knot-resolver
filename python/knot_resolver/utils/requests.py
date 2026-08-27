@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import errno
 import socket
 import sys
 from http.client import HTTPConnection
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, unquote, urlparse
 from urllib.request import AbstractHTTPHandler, Request, build_opener, install_opener, urlopen
@@ -54,7 +56,7 @@ def request(
     socket_desc: SocketDesc,
     method: Literal["GET", "POST", "HEAD", "PUT", "DELETE"],
     path: str,
-    body: Optional[str] = None,
+    body: str | None = None,
     content_type: str = "application/json",
 ) -> Response:
     while path.startswith("/"):
@@ -109,7 +111,7 @@ class UnixHTTPConnection(HTTPConnection):
         super().__init__("localhost", timeout=timeout)
         self.unix_socket_path = unix_socket_url
         self.timeout = timeout
-        self.sock: Optional[socket.socket] = None
+        self.sock: socket.socket | None = None
 
     def __del__(self) -> None:  # base class does not have d'tor
         if self.sock:

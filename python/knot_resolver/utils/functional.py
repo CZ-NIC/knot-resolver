@@ -1,5 +1,10 @@
+from __future__ import annotations
+
 from enum import Enum, auto
-from typing import Any, Callable, Generic, Iterable, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Callable, Generic, TypeVar
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 T = TypeVar("T")
 
@@ -37,23 +42,23 @@ _RESULT_SENTINEL = _ResultSentinel()
 
 class Result(Generic[Succ, Err]):
     @staticmethod
-    def ok(succ: T) -> "Result[T, Any]":
+    def ok(succ: T) -> Result[T, Any]:
         return Result(_Status.OK, succ=succ)
 
     @staticmethod
-    def err(err: T) -> "Result[Any, T]":
+    def err(err: T) -> Result[Any, T]:
         return Result(_Status.ERROR, err=err)
 
     def __init__(
         self,
         status: _Status,
-        succ: Union[Succ, _ResultSentinel] = _RESULT_SENTINEL,
-        err: Union[Err, _ResultSentinel] = _RESULT_SENTINEL,
+        succ: Succ | _ResultSentinel = _RESULT_SENTINEL,
+        err: Err | _ResultSentinel = _RESULT_SENTINEL,
     ) -> None:
         super().__init__()
         self._status: _Status = status
-        self._succ: Union[_ResultSentinel, Succ] = succ
-        self._err: Union[_ResultSentinel, Err] = err
+        self._succ: _ResultSentinel | Succ = succ
+        self._err: _ResultSentinel | Err = err
 
     def unwrap(self) -> Succ:
         assert self._status is _Status.OK
