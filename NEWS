@@ -4,6 +4,8 @@ Knot Resolver 6.x.y (2026-0m-dd)
 Bugfixes
 --------
 - views: fix "unused tags" error when repeating a tag in views (!1883)
+- watchdog: detect file-changes done via rename*() syscall (!1895)
+  This is relevant for RPZ files and TLS certs+keys.
 
 Packaging
 ---------
