@@ -27,6 +27,7 @@ Improvements
   - `knot-resolver` executable: added `--loglevel` and `--logtarget` arguments.
      These arguments are also used as defaults when the logging level or target is not configured in configuration.
   - New `kres-manager` executable with same arguments as `knot-resolver` that starts only the manager.
+- python: utils: refactoring and cleanup (!1894)
 
 Incompatible changes
 --------------------
