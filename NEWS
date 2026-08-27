@@ -27,6 +27,7 @@ Improvements
   This simplifies the manager's startup logic and isolates Knot Resolver's initialization steps.
   - `knot-resolver` executable: added `--loglevel` and `--logtarget` startup arguments.
   - New `kres-manager` executable with same arguments as `knot-resolver` that starts only the manager.
+- python: utils: refactoring and cleanup (!1894)
 
 Incompatible changes
 --------------------
