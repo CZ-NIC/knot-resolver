@@ -899,6 +899,11 @@ pkg:fedora-44:
   <<: *pkg_test
   image: $CI_REGISTRY/packaging/apkg/full/fedora-44
 
+pkg:fedora-rawhide:
+  <<: *pkg_test
+  image: $CI_REGISTRY/packaging/apkg/full/fedora-rawhide
+  allow_failure: true
+
 pkg:alma-9:
   <<: *pkg_test
   image: $CI_REGISTRY/packaging/apkg/full/alma-9
@@ -906,6 +911,20 @@ pkg:alma-9:
 pkg:alma-10:
   <<: *pkg_test
   image: $CI_REGISTRY/packaging/apkg/full/alma-10
+
+pkg:opensuse-16.0:
+  <<: *pkg_test
+  image: $CI_REGISTRY/packaging/apkg/full/opensuse-16.0
+  before_script:
+    # openSUSE excludes docs installation by default
+    - echo "rpm.install.excludedocs = no" > /etc/zypp/zypp.conf.d/no-excludedocs.conf
+
+pkg:opensuse-tumbleweed:
+  <<: *pkg_test
+  image: $CI_REGISTRY/packaging/apkg/full/opensuse-tumbleweed
+  before_script:
+    # openSUSE excludes docs installation by default
+    - echo "rpm.install.excludedocs = no" > /etc/zypp/zypp.conf.d/no-excludedocs.conf
 
 pkg:arch:
   <<: *pkg_test_user
