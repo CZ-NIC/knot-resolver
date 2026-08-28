@@ -701,5 +701,5 @@ async def start_server(config: List[str]) -> int:  # noqa: C901, PLR0915
     await server.shutdown()
     logger.info("Stopping kresd manager...")
     await manager.stop()
-    logger.info(f"The manager run for {round(time() - start_time)} seconds...")
+    logger.info(f"The manager ran for {round(time() - start_time)} seconds...")
     return server.get_exit_code()
