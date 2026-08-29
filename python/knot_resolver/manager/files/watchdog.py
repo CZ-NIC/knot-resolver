@@ -59,10 +59,16 @@ if WATCHDOG_LIB:
                         cancel_cmd(cmd)
 
         def on_moved(self, event: FileSystemEvent) -> None:
+            dest_path = Path(str(event.dest_path))
             src_path = Path(str(event.src_path))
+            if dest_path in self._files.keys():
+                logger.info(f"Watched file '{dest_path}' has been moved in")
+                self._trigger(self._files[dest_path])
             if src_path in self._files.keys():
-                logger.info(f"Watched file '{src_path}' has been moved")
-                self._trigger(self._files[src_path])
+                logger.warning(f"Watched file '{src_path}' has been moved out")
+                cmd = self._files[src_path]
+                if cmd:
+                    cancel_cmd(cmd)
 
         def on_modified(self, event: FileSystemEvent) -> None:
             src_path = Path(str(event.src_path))

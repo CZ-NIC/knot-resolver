@@ -96,7 +96,28 @@ fi
 
 # }}
 
-# test recovery from deletion and creation
+# test replacement by moving
+# {{
+
+rel_count=$(count_reloads)
+
+# edit the already existing .new file
+echo "48.zz.102.db8.2001.rpz-client-ip  CNAME rpz-passthru." >> $rpz_file.new
+
+# replace files
+mv -f $rpz_file.new $rpz_file
+
+# wait for files reload to finish
+sleep 10
+
+if [ $(count_errors) -ne $err_count ] || [ $(count_reloads) -eq $rel_count ]; then
+    echo "Could not reload replaced RPZ file."
+    exit 1
+fi
+
+# }}
+
+# test recovery from deletion (rm) and creation (cp)
 # {{
 
 rel_count=$(count_reloads)
@@ -115,6 +136,38 @@ sleep 10
 
 if [ $(count_errors) -ne $err_count ] || [ $(count_reloads) -eq $rel_count ]; then
     echo "Could not reload created RPZ file."
+    exit 1
+fi
+
+if ! journalctl -q -u knot-resolver.service | grep -Fq "Watched file '$rpz_file' has been deleted"; then
+    echo "Watchdog did not detect the file being deleted."
+    exit 1
+fi
+
+# }}
+
+
+# test recovery from deletion (moved out) and creation (moved in)
+# {{
+
+rel_count=$(count_reloads)
+
+# move out rpz file
+mv $rpz_file $rpz_file.backup
+
+# move in rpz file
+mv -f $rpz_file.backup $rpz_file
+
+# wait for files reload to finish
+sleep 10
+
+if [ $(count_errors) -ne $err_count ] || [ $(count_reloads) -eq $rel_count ]; then
+    echo "Could not reload created RPZ file."
+    exit 1
+fi
+
+if ! journalctl -q -u knot-resolver.service | grep -Fq "Watched file '$rpz_file' has been moved out"; then
+    echo "Watchdog did not detect the file being moved out."
     exit 1
 fi
 
