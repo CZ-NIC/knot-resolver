@@ -19,6 +19,13 @@ Please note that this module does not offer stable configuration interface
 yet. For this reason it is suitable mainly for public resolver operators
 who do not need to whitelist certain subnets.
 
+There is experimental support for whitelisting:
+
+.. code-block:: lua
+
+  modules.load('rebinding < iterate')
+  rebinding.add_whitelist_entry('my.domain', '192.168.1.0/24', 'fd31:6ac3:7c6b:70d4::/64'))
+
 .. warning:: DNS Blacklists (`RFC 5782`_) often use `127.0.0.0/8` to blacklist
    a domain. Using the rebinding module prevents DNSBL from functioning
    properly.
