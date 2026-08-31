@@ -63,18 +63,21 @@ typedef enum {
 /* maximum message length for messages used in ccerr */
 #define MAX_REASONLEN 128
 #define BUCKETS_PER_CONNS 8
-#define MAX_QUIC_PKT_SIZE 65536
-#define MAX_QUIC_FRAME_SIZE 65536
+#define DOQ_MAX_MESSAGE_SIZE 65535
+#define DOQ_MAX_STREAM_DATA (DOQ_MAX_MESSAGE_SIZE + sizeof(uint16_t))
 #define QUIC_MAX_SEND_PER_RECV	4
 /* A connection can reach a state where the internal ngtcp2 state machine is
  * not waiting for any event. In such a case the ngtcp2_conn_get_expiry
  * returns UINT64_MAX => meaning no timer event. If the peer abruptly
- * stops communicating in such a state the connection remain in the table/
+ * stops communicating in such a state the connection remains in the table.
  * We set the timer to the QUIC_MAX_TIMEOUT to assure
- * that every connection will terminate within a reasonable time period */
+ * that every connection will terminate within a reasonable time period.
+ * NOTE These constants are in nanoseconds! use quic_ns_to_ms_ceil(...)
+ * when using them in libuv function calls.*/
 #define QUIC_MAX_IDLE_TIMEOUT (15 * NGTCP2_SECONDS)
-#define QUIC_CONN_IDLE_TIMEOUT (8 * NGTCP2_SECONDS)
-#define QUIC_HS_IDLE_TIMEOUT   (5 * NGTCP2_SECONDS)
+#define QUIC_CONN_IDLE_TIMEOUT (5 * NGTCP2_SECONDS)
+#define QUIC_HS_IDLE_TIMEOUT   (4 * NGTCP2_SECONDS)
+
 
 #define container_of(ptr, type, member) \
 	((type *)((char *)(ptr) - offsetof(type, member)))
@@ -121,7 +124,6 @@ struct kr_quic_conn_param {
 struct kr_quic_stream_param {
 	int64_t stream_id;
 	ngtcp2_conn *conn;
-	struct comm_info comm_storage;
 };
 
 void quic_set_draining(struct pl_quic_conn_sess_data *conn);
@@ -160,6 +162,10 @@ void quic_reset_expiry(struct pl_quic_conn_sess_data *conn);
 
 int kr_quic_table_rem2(kr_quic_cid_t **pcid, kr_quic_table_t *table);
 
+/* Function to forcefully terminate the connection because the peer
+ * violated protocol specification, see RFC 9250 4.3.3 Protocol Errors. */
+int doq_protocol_error(struct session2 *stream, const char *msg);
+
 /* Set the connection ccerr to type TRANSPORT with the error code
  * containing the tls alert. The error code is calculated as
  * 0x100 | <the tls alert>  (see RFC 9001 4.8. TLS Errors). */
@@ -186,27 +192,32 @@ kr_quic_cid_t **kr_quic_table_insert(struct pl_quic_conn_sess_data *conn,
 int kr_quic_table_add(struct pl_quic_conn_sess_data *conn_sess,
 		const ngtcp2_cid *cid, kr_quic_table_t *table);
 
+/* Due to the multi-protolayer-group design of DoQ the session2_get_peer
+ * function is not usable for DoQ sessions. This function locates
+ * the KR_PROTO_DOQ_CONN session (if applicable) and returns
+ * comm_addr stored in the sess_data. Returns NULL if the data is missing
+ * or the input session is not valid for this lookup. */
+const struct sockaddr *quic_get_peer(struct session2 *s);
+
 int init_unique_cid(ngtcp2_cid *cid, size_t len, kr_quic_table_t *table);
 
 int init_random_cid(ngtcp2_cid *cid, size_t len);
 
 uint64_t quic_timestamp(void);
 
-// void quic_hs_timeout(uv_timer_t *timer);
-//
-// void quic_handle_timeout(uv_timer_t *timer);
-
 kr_quic_cid_t **kr_quic_table_lookup2(const ngtcp2_cid *cid,
 		kr_quic_table_t *table);
 
 struct pl_quic_conn_sess_data *kr_quic_table_lookup(const ngtcp2_cid *cid,
 		kr_quic_table_t *table);
-// kr_quic_cid_t **kr_quic_table_insert(struct pl_quic_conn_sess_data *conn,
-// 		const ngtcp2_cid *cid, kr_quic_table_t *table);
-// int kr_quic_table_add(struct pl_quic_conn_sess_data *conn_sess,
-// 		const ngtcp2_cid *cid, kr_quic_table_t *table);
-int write_retry_packet(struct wire_buf *dest, kr_quic_table_t *table,
-		ngtcp2_version_cid *dec_cids,
-		const struct sockaddr *src_addr);
 
+/* Writes a retry packer into the buffer pointer to by dest and sends
+ * it into the protolayer cascade in the wrap direction.
+ * Since this function can be called from different contexts and sides
+ * of the connection dec_cids and conn are exclusive parameters;
+ * only one has to be NULL. dec_cids one is used when the function call
+ * is a response to an initial packet with no existing connection. */
+int write_retry_packet(struct wire_buf *dest, kr_quic_table_t *table,
+		const struct sockaddr *src_addr, ngtcp2_version_cid *dec_cids,
+		struct pl_quic_conn_sess_data *conn);
 #endif

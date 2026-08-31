@@ -36,7 +36,7 @@ Forwarding implementation in Knot Resolver has following properties:
 .. code-block:: yaml
 
   forward:
-    # encrypted public resolver, again for all names
+    # encrypted public resolver queried via DNS-over-TLS, again for all names
     - subtree: .
       servers:
         - address: [ 2001:148f:fffe::1, 193.17.47.1 ]
@@ -66,7 +66,7 @@ The :option:`forward <forward: <list>>` list of rules overrides which servers ge
 
          IP address(es) of a forward server.
 
-      .. option:: transport: tls
+      .. option:: transport: tls|quic
 
          Optional, transport protocol for a forward server.
 

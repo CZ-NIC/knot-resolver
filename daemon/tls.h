@@ -90,13 +90,6 @@ void tls_client_params_free(tls_client_params_t *params);
 
 /** Allocate and initialize the structure (with ->ref = 1). */
 tls_client_param_t * doq_client_param_new(void);
-// FIXME: remove if infact reusable
-// /** Reference-counted free(); any inside data is freed alongside. */
-// void tls_client_param_unref(tls_client_param_t *entry);
-//
-// int tls_client_param_remove(tls_client_params_t *params, const struct sockaddr *addr);
-// /** Free TLS authentication parameters. */
-// void tls_client_params_free(tls_client_params_t *params);
 
 /*! Set TLS certificate and key from files. */
 int tls_certificate_set(const char *tls_cert, const char *tls_key);

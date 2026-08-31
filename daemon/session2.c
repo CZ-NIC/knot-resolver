@@ -85,7 +85,6 @@ static const enum protolayer_type protolayer_grp_doq_stream[] = {
 };
 
 static const enum protolayer_type protolayer_grp_doq_conn[] = {
-	PROTOLAYER_TYPE_PROXYV2_STREAM,
 	PROTOLAYER_TYPE_DEFER,
 	PROTOLAYER_TYPE_QUIC_CONN,
 	PROTOLAYER_TYPE_NULL,
@@ -93,7 +92,7 @@ static const enum protolayer_type protolayer_grp_doq_conn[] = {
 
 static const enum protolayer_type protolayer_grp_doq_demux[] = {
 	PROTOLAYER_TYPE_UDP,
-	PROTOLAYER_TYPE_PROXYV2_STREAM,
+	PROTOLAYER_TYPE_PROXYV2_DGRAM,
 	PROTOLAYER_TYPE_QUIC_DEMUX,
 	PROTOLAYER_TYPE_NULL,
 };
@@ -837,6 +836,10 @@ int wire_buf_reset(struct wire_buf *wb)
 	return kr_ok();
 }
 
+void free_failed_session(uv_handle_t *handle)
+{
+	free(handle->data);
+}
 
 struct session2 *session2_new(enum session2_transport_type transport_type,
                               enum kr_proto proto,
@@ -941,6 +944,11 @@ failed_init:
 		}
 	}
 
+	trie_free(s->tasks);
+	queue_deinit(s->waiting);
+	wire_buf_deinit(&s->wire_buf);
+	uv_close((uv_handle_t *)&s->timer, free_failed_session);
+
 	return NULL;
 }
 
@@ -988,6 +996,15 @@ int session2_stop_read(struct session2 *session)
 
 struct sockaddr *session2_get_peer(struct session2 *s)
 {
+	/* DoQ multiplexes connections on a single root session and
+	 * therefore handles peer addresses differently. Calling this
+	 * function is considered a programming error. */
+	if(unlikely(kr_fails_assert(s->proto != KR_PROTO_DOQ
+				&& s->proto != KR_PROTO_DOQ_CONN
+				&& s->proto != KR_PROTO_DOQ_STREAM))) {
+		return NULL;
+	}
+
 	while (s && s->transport.type == SESSION2_TRANSPORT_PARENT)
 		s = s->transport.parent;
 
@@ -1023,6 +1040,14 @@ struct session2 *session2_get_root(struct session2 *s)
 
 	return (s && s->transport.type == SESSION2_TRANSPORT_IO)
 		? s
+		: NULL;
+}
+
+struct session2 *session2_get_parent(struct session2 *s)
+{
+	return s && !kr_fails_assert(
+			s->transport.type == SESSION2_TRANSPORT_PARENT)
+		? s->transport.parent
 		: NULL;
 }
 
@@ -1262,7 +1287,7 @@ void session2_waitinglist_retry(struct session2 *session, bool increase_timeout_
 			if (increase_timeout_cnt) {
 				worker_task_timeout_inc(task);
 			}
-			worker_task_step(task, session2_get_peer(session), NULL);
+			worker_task_step(task, NULL, NULL);
 			worker_task_unref(task);
 			defer_sample_restart();
 		} while (!session2_waitinglist_is_empty(session));
@@ -1800,16 +1825,12 @@ static int session2_transport_event(struct session2 *s,
 
 	bool is_close_event = (event == PROTOLAYER_EVENT_CLOSE ||
 			event == PROTOLAYER_EVENT_FORCE_CLOSE);
-	if (is_close_event && s->transport.type != SESSION2_TRANSPORT_PARENT) {
-		if (!session2_is_empty(s)) {
-			kr_log_debug(DEVEL, "failed empty s->proto: %d\n",
-					s->proto);
+	if (is_close_event) {
+		if (s->transport.type != SESSION2_TRANSPORT_PARENT) {
+			session2_waitinglist_finalize(s, KR_STATE_FAIL);
+			session2_tasklist_finalize(s, KR_STATE_FAIL);
+			session2_timer_stop(s);
 		}
-		/* FIXME: This causes issues for subsessions which
-		 * actually enqueue tasks, i.e. QUIC_CONN. */
-		session2_waitinglist_finalize(s, KR_STATE_FAIL);
-		session2_tasklist_finalize(s, KR_STATE_FAIL);
-		session2_timer_stop(s);
 		s->closing = true;
 	}
 

@@ -254,7 +254,7 @@ For certificate configuration, refer to :ref:`dot-doh-doq-config-options`.
 
     .. option:: max-streams: <1-4096>
 
-    :default: 1024
+    :default: 16
 
     The maximum number of concurrent streams a connection can open.
     Setting this value too low or too high may negatively affect performance.
@@ -270,5 +270,4 @@ For certificate configuration, refer to :ref:`dot-doh-doq-config-options`.
     the return routability of the source address of a client.
 
     For further details see:
-    https://datatracker.ietf.org/doc/html/rfc9000#name-address-validation-using-re
-    and https://datatracker.ietf.org/doc/html/rfc9250#name-address-validation
+    :rfc:`9000`, :rfc:`9001` and :rfc:`9250`

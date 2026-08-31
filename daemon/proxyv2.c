@@ -396,7 +396,7 @@ static enum protolayer_iter_cb_result pl_proxyv2_stream_unwrap(
 			if (kr_log_is_debug(IO, NULL)) {
 				kr_log_debug(IO, "<= connection to '%s': PROXYv2 not allowed "
 						"for this peer, close\n",
-						kr_straddr(peer));
+						peer ? kr_straddr(peer) : "Unknown");
 			}
 			session2_force_close(s);
 			return protolayer_break(ctx, kr_error(ECONNRESET));

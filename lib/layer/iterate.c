@@ -70,8 +70,14 @@ static bool is_paired_to_query(const knot_pkt_t *answer, struct kr_query *query)
 	const knot_dname_t *qname = minimized_qname(query, &qtype);
 
 	/* ID should already match, thanks to session_tasklist_del_msgid()
-	 * in worker_submit(), but it won't hurt to check again. */
-	return query->id      == knot_wire_get_id(answer->wire) &&
+	 * in worker_submit(), but it won't hurt to check again.
+	 * Expects id == 0 for answers transported over DoQ. */
+	bool is_id_ok = query->id == knot_wire_get_id(answer->wire) ||
+		(query->request->upstream.transport &&
+		query->request->upstream.transport->protocol == KR_TRANSPORT_DOQ &&
+		knot_wire_get_id(answer->wire) == 0);
+
+	return is_id_ok &&
 	       knot_wire_get_qdcount(answer->wire) == 1 &&
 	       query->sclass  == knot_pkt_qclass(answer) &&
 	       qtype          == knot_pkt_qtype(answer) &&

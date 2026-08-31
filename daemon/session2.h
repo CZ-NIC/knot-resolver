@@ -1032,6 +1032,11 @@ KR_EXPORT uv_handle_t *session2_get_handle(struct session2 *s);
  * May return `NULL` if no peer is set.  */
 KR_EXPORT struct session2 *session2_get_root(struct session2 *s);
 
+/** Gets the parent session from the specified session.
+ *
+ * May return `NULL` if s argument is NULL or session is not a child session. */
+KR_EXPORT struct session2 *session2_get_parent(struct session2 *s);
+
 /** Start the session timer. On timeout, the specified `event` is sent in the
  * `_UNWRAP` direction. Only a single timeout can be active at a time. */
 int session2_timer_start(struct session2 *s, enum protolayer_event_type event,

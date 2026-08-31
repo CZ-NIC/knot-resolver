@@ -183,7 +183,10 @@ static int edns_create(knot_pkt_t *pkt, const struct kr_request *req)
 		wire_size += KR_COOKIE_OPT_MAX_LEN;
 	}
 #endif /* ENABLE_COOKIES */
-	if (req->qsource.flags.tls || req->qsource.comm_flags.tls) {
+	if (req->qsource.flags.tls
+			|| req->qsource.comm_flags.tls
+			|| req->qsource.flags.quic
+			|| req->qsource.comm_flags.quic) {
 		wire_size += edns_padding_option_size(req->ctx->tls_padding);
 	}
 	return knot_pkt_reserve(pkt, wire_size);
@@ -274,7 +277,10 @@ static int answer_padding(struct kr_request *request)
 {
 	if (kr_fails_assert(request && request->answer && request->ctx))
 		return kr_error(EINVAL);
-	if (!request->qsource.flags.tls && !request->qsource.comm_flags.tls) {
+	if (!request->qsource.flags.tls
+			&& !request->qsource.comm_flags.tls
+			&& !request->qsource.flags.quic
+			&& !request->qsource.comm_flags.quic) {
 		/* Not meaningful to pad without encryption. */
 		return kr_ok();
 	}

@@ -198,12 +198,19 @@ to protect the users from being eavesdropped on by using TLS encryption.
    - Simran Patil and Nikita Borisov. 2019. What can you learn from an IP? (`slides <https://irtf.org/anrw/2019/slides-anrw19-final44.pdf>`_, `the article itself <https://dl.acm.org/authorize?N687437>`_)
    - `Bert Hubert. 2019. Centralised DoH is bad for Privacy, in 2019 and beyond <https://labs.ripe.net/Members/bert_hubert/centralised-doh-is-bad-for-privacy-in-2019-and-beyond>`_
 
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Forwarding over TLS protocol (DNS-over-TLS)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Forwarding over TLS and QUIC protocols (DNS-over-TLS, DNS-over-QUIC)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forwarding over the TLS protocol protects DNS queries sent out by the resolver.
+Forwarding over the TLS and QUIC protocols protects DNS queries sent out by the resolver.
 It can be configured using :ref:`forwarding <config-forward>`, which provides settings for authentication.
+
+.. warning::
+    DoQ Forwarding is currently considered a beta feature,
+    and its configuration might change.
+
+    If you encounter any issues or have any questions,
+    please do not hesitate to contact us via the standard communication channels.
 
 .. code-block:: yaml
 
@@ -214,7 +221,8 @@ It can be configured using :ref:`forwarding <config-forward>`, which provides se
          - address:
              - 2001:148f:fffe::1
              - 193.17.47.1
-           transport: tls
+           transport: tls|quic
+           # Note that odvr.nic.cz does not currently support DoQ
            hostname: odvr.nic.cz
 
 .. tip::

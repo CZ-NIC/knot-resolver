@@ -11,6 +11,7 @@
 #include "lib/proto.h"
 #include "quic_conn.h"
 #include "session2.h"
+#include "defer.h"
 #include "network.h"
 
 void inline quic_set_draining(struct pl_quic_conn_sess_data *conn)
@@ -30,13 +31,13 @@ void inline quic_set_hs_completed(struct pl_quic_conn_sess_data *conn)
 
 bool inline quic_not_draining(struct pl_quic_conn_sess_data *conn)
 {
-	return conn->state < QUIC_STATE_DRAINING;
+	return !(conn->state & QUIC_STATE_DRAINING);
 }
 
 bool inline quic_can_send(struct pl_quic_conn_sess_data *conn)
 {
-	return conn->state >= QUIC_STATE_HANDSHAKE_DONE
-		&& conn->state < QUIC_STATE_DRAINING;
+	return conn->state & QUIC_STATE_HANDSHAKE_DONE
+		&& quic_not_draining(conn);
 }
 
 uint64_t quic_timestamp(void)
@@ -47,74 +48,6 @@ uint64_t quic_timestamp(void)
 
 	return ((uint64_t)ts.tv_sec * NGTCP2_SECONDS) + (uint64_t)ts.tv_nsec;
 }
-
-// void quic_hs_timeout(uv_timer_t *timer)
-// {
-// 	struct session2 *s = timer->data;
-// 	session2_timer_stop(s);
-//
-// 	struct session2 *root = session2_get_root(s);
-// 	struct pl_quic_conn_sess_data *conn =
-// 		protolayer_sess_data_get_proto(s, PROTOLAYER_TYPE_QUIC_CONN);
-// 	session2_event(root, PROTOLAYER_EVENT_CONNECT_TIMEOUT, conn);
-// }
-//
-// static void quic_idle_timeout(uv_timer_t *timer)
-// {
-// 	struct session2 *s = timer->data;
-// 	struct pl_quic_conn_sess_data *conn =
-// 		protolayer_sess_data_get_proto(s, PROTOLAYER_TYPE_QUIC_CONN);
-// 	struct session2 *demux = session2_get_root(s);
-// 	uint64_t now = quic_timestamp();
-// 	int ret = ngtcp2_conn_handle_expiry(conn->conn, now);
-// 	if (ret == NGTCP2_ERR_IDLE_CLOSE) {
-// 		/* idle equal max_idle_timeout, don't send CONNECTION_CLOSE */
-// 		quic_set_draining(conn);
-// 		session2_event(demux, PROTOLAYER_EVENT_GENERAL_TIMEOUT, conn);
-// 	} else if (ret < 0) {
-// 		quic_set_closing(conn);
-// 		session2_event(demux, PROTOLAYER_EVENT_GENERAL_TIMEOUT, conn);
-// 	} else {
-// 		/* ngtcp2_conn_writev_stream should be scheduled
-// 		 * see https://nghttp2.org/ngtcp2/ngtcp2_conn_handle_expiry.html#c.ngtcp2_conn_handle_expiry */
-// 	}
-// }
-//
-// int quic_set_timeout(struct session2 *s, uint64_t ms, uv_timer_cb timeout_cb)
-// {
-// 	uv_timer_stop(&s->timer);
-// 	return uv_timer_start(&s->timer, timeout_cb, ms, ms);
-// }
-//
-// int quic_set_hs_timeout(struct session2 *s, uint64_t ms)
-// {
-// 	return quic_set_timeout(s, ms, quic_hs_timeout);
-// }
-//
-// int quic_set_idle_timeout(struct session2 *s, uint64_t ms)
-// {
-// 	return quic_set_timeout(s, ms, quic_idle_timeout);
-// }
-//
-// void quic_reset_expiry(struct pl_quic_conn_sess_data *conn)
-// {
-// 	kr_require(conn);
-// 	struct session2 *s = conn->h.session;
-// 	ngtcp2_tstamp expiry = ngtcp2_conn_get_expiry(conn->conn);
-//
-// 	/* In case timeout is set to 0 and the peer agrees => no timeout */
-// 	if (expiry == UINT64_MAX) {
-// 		uv_timer_stop(&s->timer);
-// 		/* In QUICv1 the max_idle_timeout cat NOT be
-// 		 * changed after initial negotiation. */
-// 		return;
-// 	}
-//
-// 	/* only fails if UV_HANDLE_CLOSING or the handle->cb == NULL */
-// 	if (uv_timer_again(&s->timer) != 0) {
-// 		session2_event(s, PROTOLAYER_EVENT_FORCE_CLOSE, conn);
-// 	}
-// }
 
 inline uint64_t quic_ns_to_ms_ceil(uint64_t ns)
 {
@@ -143,12 +76,15 @@ void quic_handle_timeout(uv_timer_t *timer)
 	struct pl_quic_conn_sess_data *conn =
 		protolayer_sess_data_get_proto(s, PROTOLAYER_TYPE_QUIC_CONN);
 
+	defer_sample_state_t prev;
+	defer_sample_start(&prev);
+
 	if (conn->state & QUIC_STATE_CLOSING) {
 		session2_close(conn->h.session);
-		return;
+		goto exit;
 	} else if (conn->state & QUIC_STATE_DRAINING) {
 		session2_force_close(conn->h.session);
-		return;
+		goto exit;
 	}
 
 	uint64_t now = quic_timestamp();
@@ -165,16 +101,19 @@ void quic_handle_timeout(uv_timer_t *timer)
 		QUIC_SET_CLOSING(conn);
 		session2_close(s);
 	} else {
+		wire_buf_reset(&s->wire_buf);
 		quic_flush_streams(conn);
-		/* let the connection itself send whatever data it needs to */
+		/* let the connection send whatever data it needs to. */
 		session2_wrap(s, protolayer_payload_wire_buf(&s->wire_buf, true),
 				&conn->comm_storage, NULL, NULL, NULL);
 	}
+
+exit:
+	defer_sample_stop(&prev, true);
 }
 
 int quic_set_timeout(struct session2 *s, uint64_t ms, uv_timer_cb timeout_cb)
 {
-	uv_timer_stop(&s->timer);
 	return uv_timer_start(&s->timer, timeout_cb, ms, 0);
 }
 
@@ -194,10 +133,18 @@ void quic_reset_expiry(struct pl_quic_conn_sess_data *conn)
 	struct session2 *s = conn->h.session;
 	ngtcp2_tstamp expiry = ngtcp2_conn_get_expiry(conn->conn);
 
+	if (expiry == conn->armed_expiry && (conn->armed_expiry != 0)
+			&& uv_is_active((uv_handle_t *)&s->timer)) {
+		/* Do nothing, the timeout is the same as in the previous call */
+		return;
+	}
+
+	conn->armed_expiry = expiry;
+
 	uv_timer_stop(&s->timer);
 	if (expiry == UINT64_MAX) {
 		uv_timer_start(&s->timer, quic_handle_timeout,
-				QUIC_MAX_IDLE_TIMEOUT, 0);
+				quic_ns_to_ms_ceil(QUIC_MAX_IDLE_TIMEOUT), 0);
 		return;
 	}
 	uint64_t now = quic_timestamp();
@@ -207,6 +154,22 @@ void quic_reset_expiry(struct pl_quic_conn_sess_data *conn)
 	} else {
 		uv_timer_start(&s->timer, quic_handle_timeout, 0, 0);
 	}
+}
+
+const struct sockaddr *quic_get_peer(struct session2 *s)
+{
+	if (!s || s->proto == KR_PROTO_DOQ)
+		return NULL;
+
+	if (s->proto == KR_PROTO_DOQ_STREAM)
+		s = s->transport.parent;
+
+	if (!s || s->proto != KR_PROTO_DOQ_CONN)
+		return NULL;
+
+	struct pl_quic_conn_sess_data *conn =
+		protolayer_sess_data_get_proto(s, PROTOLAYER_TYPE_QUIC_CONN);
+	return conn ? conn->comm_storage.comm_addr : NULL;
 }
 
 int init_random_cid(ngtcp2_cid *cid, size_t len)
@@ -317,6 +280,22 @@ int kr_quic_table_rem2(kr_quic_cid_t **pcid, kr_quic_table_t *table)
 	return kr_ok();
 }
 
+int doq_protocol_error(struct session2 *stream, const char *msg)
+{
+	if (kr_fails_assert(stream->proto == KR_PROTO_DOQ_STREAM))
+		return kr_error(EINVAL);
+
+	struct session2 *conn_session = session2_get_parent(stream);
+	struct pl_quic_conn_sess_data *conn =
+		protolayer_sess_data_get_proto(conn_session,
+				PROTOLAYER_TYPE_QUIC_CONN);
+	set_application_error(conn, DOQ_PROTOCOL_ERROR,
+			(const uint8_t *)msg, strlen(msg));
+
+	session2_close(conn_session);
+	return kr_ok();
+}
+
 int set_tls_error(struct pl_quic_conn_sess_data *conn,
 		quic_doq_error_t *error_code,
 		const uint8_t *msg, size_t msglen)
@@ -371,19 +350,28 @@ int init_unique_cid(ngtcp2_cid *cid, size_t len, kr_quic_table_t *table)
 }
 
 int write_retry_packet(struct wire_buf *dest, kr_quic_table_t *table,
-		ngtcp2_version_cid *dec_cids,
-		const struct sockaddr *src_addr)
+		const struct sockaddr *src_addr, ngtcp2_version_cid *dec_cids,
+		struct pl_quic_conn_sess_data *conn)
 {
-	ngtcp2_cid odcid;
-	ngtcp2_cid oscid;
-	ngtcp2_cid retry_scid;
+	if (kr_fails_assert((!conn && dec_cids) || (conn && !dec_cids)))
+			return kr_error(EINVAL);
+	uint32_t version = 0;
+	ngtcp2_cid odcid = { 0 }, oscid = { 0 }, retry_scid = { 0 };
 
-	ngtcp2_cid_init(&odcid, dec_cids->dcid, dec_cids->dcidlen);
-	ngtcp2_cid_init(&oscid, dec_cids->scid, dec_cids->scidlen);
-	init_random_cid(&retry_scid, 0);
-	if (init_unique_cid(&retry_scid, 0, table) != 0) {
-		kr_log_debug(DOQ, "Failed to initialize unique cid for Retry packet\n");
-		return -1;
+	if (conn) {
+		odcid = conn->odcid;
+		oscid = conn->scid;
+		retry_scid = conn->dcid;
+		version = conn->version;
+	} else  {
+		version = dec_cids->version;
+		ngtcp2_cid_init(&odcid, dec_cids->dcid, dec_cids->dcidlen);
+		ngtcp2_cid_init(&oscid, dec_cids->scid, dec_cids->scidlen);
+		init_random_cid(&retry_scid, 0);
+		if (init_unique_cid(&retry_scid, 0, table) != 0) {
+			kr_log_debug(DOQ, "Failed to initialize unique cid for Retry packet\n");
+			return -1;
+		}
 	}
 
 	uint8_t retry_token[NGTCP2_CRYPTO_MAX_RETRY_TOKENLEN2];
@@ -393,7 +381,7 @@ int write_retry_packet(struct wire_buf *dest, kr_quic_table_t *table,
 		return -1;  // too long addr; silence analyzers
 	int ret = ngtcp2_crypto_generate_retry_token2(
 		retry_token, (const uint8_t *)table->hash_secret,
-		sizeof(table->hash_secret), dec_cids->version,
+		sizeof(table->hash_secret), version,
 		src_addr, kr_sockaddr_len(src_addr),
 		&retry_scid, &odcid, now);
 
@@ -402,13 +390,7 @@ int write_retry_packet(struct wire_buf *dest, kr_quic_table_t *table,
 		return ret;
 	}
 
-	ret = ngtcp2_crypto_write_retry(
-		wire_buf_free_space(dest),
-		wire_buf_free_space_length(dest),
-		dec_cids->version, &oscid,
-		&retry_scid, &odcid,
-		retry_token, ret
-	);
-
-	return ret;
+	return ngtcp2_crypto_write_retry(wire_buf_free_space(dest),
+		wire_buf_free_space_length(dest), version, &oscid, &retry_scid,
+		&odcid, retry_token, ret);
 }
