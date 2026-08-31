@@ -3,19 +3,9 @@
  */
 
 #include "kresconfig.h"
-#include "lib/generic/trie.h"
-#include "lib/proto.h"
-#include "lib/selection.h"
-#include "mempattern.h"
-#include <libknot/consts.h>
-#include <libknot/wire.h>
 #include "network.h"
-#include "quic_common.h"
 #include "quic_conn.h"
 #include "quic_demux.h"
-#include "quic_stream.h"
-#include "daemon/worker.h"
-
 #include <libknot/wire.h>
 #include <netinet/in.h>
 #include <ngtcp2/ngtcp2.h>

@@ -346,6 +346,7 @@ ${CDEFS} ${KRESD} types <<-EOF
 	typedef uv_loop_t
 	typedef tls_client_params_t
 	struct net_tcp_param
+	struct net_quic_params
 	struct network
 EOF
 echo "struct args *the_args;"

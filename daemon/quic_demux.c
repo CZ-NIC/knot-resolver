@@ -3,11 +3,8 @@
  */
 
 #include "network.h"
-#include "quic_common.h"
 #include "quic_conn.h"
 #include "quic_demux.h"
-#include "session2.h"
-#include "worker.h"
 #include "lib/dnssec.h"
 #include "session2.h"
 #include "worker.h"
@@ -111,7 +108,8 @@ void kr_quic_table_free(kr_quic_table_t *table)
 	if (!table)
 		return;
 
-	kr_require(EMPTY_HEAP(table->expiry_heap));
+	// NOLINTNEXTLINE(bugprone-casting-through-void)
+	kr_require(EMPTY_LIST(table->conn_list));
 	kr_assert(table->usage == 0);
 	kr_assert(table->pointers == 0);
 
@@ -411,11 +409,15 @@ static enum protolayer_event_cb_result pl_quic_demux_event_unwrap(
 		struct session2 *session, void *sess_data)
 {
 	struct pl_quic_demux_sess_data *demux = sess_data;
-	if (event == PROTOLAYER_EVENT_CLOSE || event == PROTOLAYER_EVENT_FORCE_CLOSE) {
-		while (!EMPTY_HEAP(demux->conn_table->expiry_heap)) {
-			struct pl_quic_conn_sess_data *c =
-				*(struct pl_quic_conn_sess_data **)HHEAD(
-						demux->conn_table->expiry_heap);
+	if (event == PROTOLAYER_EVENT_CLOSE
+			|| event == PROTOLAYER_EVENT_FORCE_CLOSE) {
+		int guard = demux->conn_table->usage + 1;
+		// NOLINTNEXTLINE(bugprone-casting-through-void)
+		while (!EMPTY_LIST(demux->conn_table->conn_list)) {
+			// NOLINTNEXTLINE(bugprone-casting-through-void)
+			struct pl_quic_conn_sess_data *c = container_of(
+				HEAD(demux->conn_table->conn_list),
+				struct pl_quic_conn_sess_data, table_node);
 			ngtcp2_ccerr_set_application_error(&c->ccerr,
 					DOQ_NO_ERROR, NULL, 0);
 			session2_event(c->h.session, event, NULL);
