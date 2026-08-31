@@ -60,7 +60,8 @@ typedef struct {
 	array_t(const char *) ca_files; /**< Paths to certificate files; not really used. */
 	array_t(const uint8_t *) pins; /**< Certificate pins as raw unterminated strings.*/
 	gnutls_certificate_credentials_t credentials; /**< CA creds. in gnutls format.  */
-	gnutls_datum_t session_data; /**< Session-resumption data gets stored here.    */
+	gnutls_datum_t session_data; /**< Session-resumption data for Dot/DoH gets stored here. */
+	gnutls_datum_t quic_session_data; /**< Session-resumption data for DoQ gets stored here. */
 } tls_client_param_t;
 /** Holds configuration for TLS authentication for all potential servers.
  * Special case: NULL pointer also means empty. */
@@ -85,6 +86,12 @@ tls_client_param_t * tls_client_param_new(void);
 void tls_client_param_unref(tls_client_param_t *entry);
 
 int tls_client_param_remove(tls_client_params_t *params, const struct sockaddr *addr);
+
+/** Install the certificate verify callback matching this session's kind.
+ * Must be called on every client-side session before the handshake, and
+ * must agree with the pointer passed to gnutls_session_set_ptr(). */
+void kr_tls_session_set_verify(gnutls_session_t session, bool quic);
+
 /** Free TLS authentication parameters. */
 void tls_client_params_free(tls_client_params_t *params);
 

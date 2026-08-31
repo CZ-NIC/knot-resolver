@@ -149,20 +149,12 @@ static enum protolayer_iter_cb_result pl_quic_stream_wrap(void *sess_data,
 
 		sent_msgs++;
 
-		protolayer_finished_cb finished_cb = NULL;
-		void *finished_baton = NULL;
-		if (sent > 0 && stream->unsent_obuf == NULL
-				&& stream->h.session->outgoing) {
-			finished_cb = ctx->finished_cb;
-			finished_baton = ctx->finished_cb_baton;
-		}
-
 		session2_wrap_after(stream->h.session->transport.parent,
 				PROTOLAYER_TYPE_QUIC_CONN,
 				ctx->payload,
 				ctx->comm,
-				finished_cb,
-				finished_baton);
+				NULL,
+				NULL);
 	} while (sent > 0 && sent_msgs < QUIC_MAX_SEND_PER_RECV);
 
 	if (!stream->skip_update_time && stream->conn) {

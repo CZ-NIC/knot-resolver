@@ -607,6 +607,10 @@ void tls_client_param_unref(tls_client_param_t *entry)
 		gnutls_free(entry->session_data.data);
 	}
 
+	if (entry->quic_session_data.data) {
+		gnutls_free(entry->quic_session_data.data);
+	}
+
 	free(entry);
 }
 
@@ -639,7 +643,11 @@ tls_client_param_t * tls_client_param_new(void)
 		free(e);
 		return NULL;
 	}
-	gnutls_certificate_set_verify_function(e->credentials, client_verify_certificate);
+	/* The verify function is no longer set here. It depends on what kind
+	 * of session2 pointer the session will carry (pl_tls_sess_data for
+	 * DoT/DoH, nc_conn_ref_placeholder_t for DoQ), and a single entry in
+	 * the_network->tls_client_params may be used by any of them. Each
+	 * session installs its own via kr_tls_session_set_verify(). */
 	return e;
 }
 
@@ -969,6 +977,17 @@ static int quic_client_verify_certificate(gnutls_session_t tls_session)
 		return quic_client_verify_certchain(conn, conn->client_params->hostname);
 }
 
+void kr_tls_session_set_verify(gnutls_session_t session, bool quic)
+{
+	/* Overrides the credentials callback for this session only,
+	 * so that DoT and DoQ can share one tls_client_param_t. The two
+	 * callbacks expect different things from gnutls_session_get_ptr():
+	 * struct pl_tls_sess_data vs nc_conn_ref_placeholder_t. */
+	gnutls_session_set_verify_function(session,
+			quic ? quic_client_verify_certificate
+			: client_verify_certificate);
+}
+
 static int tls_pull_timeout_func(gnutls_transport_ptr_t h, unsigned int ms)
 {
 	struct pl_tls_sess_data *tls = h;
@@ -1145,6 +1164,8 @@ static int pl_tls_sess_client_init(struct session2 *session,
 	 * and must not be freed while the session is active. */
 	++(param->refs);
 	tls->client_params = param;
+
+	kr_tls_session_set_verify(tls->tls_session, false);
 
 	ret = gnutls_credentials_set(tls->tls_session, GNUTLS_CRD_CERTIFICATE,
 	                             param->credentials);
