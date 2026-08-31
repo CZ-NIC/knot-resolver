@@ -404,7 +404,7 @@ Actions :func:`policy.FORWARD`, :func:`policy.TLS_FORWARD` and :func:`policy.STU
              {'2001:148f:fffe::1', '2001:148f:ffff::1',
               '185.43.135.1', '193.14.47.1'})))
 
-   A variant which uses encrypted DNS-over-TLS transport is called :func:`policy.TLS_FORWARD`, please see section :ref:`tls-forwarding`.
+   Variants which use encrypted DNS-over-TLS or DNS-over-QUIC transports are called :func:`policy.TLS_FORWARD` and :func:`policy.DOQ_FORWARD` respectively, please see section :ref:`tls-forwarding`.
 
 .. function:: STUB(ip_address)
               STUB({ ip_address, [ip_address, ...] })
@@ -446,11 +446,13 @@ Actions :func:`policy.FORWARD`, :func:`policy.TLS_FORWARD` and :func:`policy.STU
 
 .. _tls-forwarding:
 
-Forwarding over TLS protocol (DNS-over-TLS)
--------------------------------------------
+Forwarding over TLS and QUIC protocols (DNS-over-TLS, DNS-over-QUIC)
+--------------------------------------------------------------------
 .. function:: TLS_FORWARD( { {ip_address, authentication}, [...] } )
+.. function:: DOQ_FORWARD( { {ip_address, authentication}, [...] } )
 
-   Same as :func:`policy.FORWARD` but send query over DNS-over-TLS protocol (encrypted).
+   Same as :func:`policy.FORWARD` but send query over DNS-over-TLS and
+   DNS-over-QUIC protocols (encrypted).
    Each target IP address needs explicit configuration how to validate
    TLS certificate so each IP address is configured by pair:
    ``{ip_address, authentication}``. See sections below for more details.
@@ -458,7 +460,9 @@ Forwarding over TLS protocol (DNS-over-TLS)
 
 Policy :func:`policy.TLS_FORWARD` allows you to forward queries using `Transport Layer Security`_ protocol, which hides the content of your queries from an attacker observing the network traffic. Further details about this protocol can be found in :rfc:`7858` and `IETF draft dprive-dtls-and-tls-profiles`_.
 
-Queries affected by :func:`policy.TLS_FORWARD` will always be resolved over TLS connection. Knot Resolver does not implement fallback to non-TLS connection, so if TLS connection cannot be established or authenticated according to the configuration, the resolution will fail.
+Similarly Policy :func:`policy.DOQ_FORWARD` allows you to forward queries using `QUIC`_ protocol that uses `Transport Layer Security`_ protocol, which hides the content of your queries from an attacker observing the network traffic. Further details about this protocol can be found in :rfc:`9001` and :rfc:`9250`.
+
+Queries affected by :func:`policy.TLS_FORWARD` and :func:`policy.DOQ_FORWARD` will always be resolved over TLS or QUIC connections respectively. Knot Resolver does not implement fallback to non-TLS connection, so if TLS or QUIC connection cannot be established or authenticated according to the configuration, the resolution will fail.
 
 To test this feature you need to either :ref:`configure Knot Resolver as DNS-over-TLS server <tls-server-config>`, or pick some public DNS-over-TLS server. Please see `DNS Privacy Project`_ homepage for list of public servers.
 
@@ -473,6 +477,8 @@ When multiple servers are specified, the one with the lowest round-trip time is 
 CA+hostname authentication
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 Traditional PKI authentication requires server to present certificate with specified hostname, which is issued by one of trusted CAs. Example policy is:
+
+.. note:: Following sections apply to both :func:`policy.TLS_FORWARD` and :func:`policy.DOQ_FORWARD`
 
 .. code-block:: lua
 
@@ -770,6 +776,7 @@ Most properties (actions, filters) are described above.
 .. _`Pro DNS and BIND`: http://www.zytrax.com/books/dns/ch7/rpz.html
 .. _`Jan-Piet Mens's post`: http://jpmens.net/2011/04/26/how-to-configure-your-bind-resolvers-to-lie-using-response-policy-zones-rpz/
 .. _`Transport Layer Security`: https://en.wikipedia.org/wiki/Transport_Layer_Security
+.. _`QUIC`: https://en.wikipedia.org/wiki/QUIC
 .. _`DNS Privacy Project`: https://dnsprivacy.org/
 .. _`IETF draft dprive-dtls-and-tls-profiles`: https://tools.ietf.org/html/draft-ietf-dprive-dtls-and-tls-profiles
 .. _SNI: https://en.wikipedia.org/wiki/Server_Name_Indication

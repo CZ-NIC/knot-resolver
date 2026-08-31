@@ -31,7 +31,7 @@ typedef enum {
 	QUIC_STATE_HS_ABORT       = (1 << 7),
 } quic_conn_state_t;
 
-/* Quic connection state set functions */
+/* Quic connection state functions */
 #define QUIC_SET_DRAINING(conn) \
 	(conn)->state |= QUIC_STATE_DRAINING;
 #define QUIC_SET_CLOSING(conn) \
@@ -41,7 +41,9 @@ typedef enum {
 #define QUIC_SET_HS_ABORT(conn) \
 	(conn)->state |= QUIC_STATE_HS_ABORT;
 #define QUIC_CAN_SEND(conn) \
-	((conn)->state < QUIC_STATE_DRAINING)
+	(!((conn)->state \
+	   & (QUIC_STATE_DRAINING | QUIC_STATE_HS_ABORT | QUIC_STATE_BLOCKED)))
+
 
 typedef struct {
 	struct ngtcp2_conn *(*get_conn)(ngtcp2_crypto_conn_ref *conn_ref);
@@ -66,6 +68,9 @@ struct pl_quic_conn_sess_data {
 	/* queue for streams that received full queries and are ready
 	 * to proceed in the unwrap direction */
 	queue_t(struct pl_quic_stream_sess_data *) pending_unwrap;
+	/* Storage for the last expiry received from ngtcp2_conn_get_expiry
+	 * used to limit the heap operaions in libuv */
+	uint64_t armed_expiry;
 	bool is_server;
 	bool retry_sent;
 	/* defer can keep the session alive even if the connection timed out or
@@ -76,7 +81,7 @@ struct pl_quic_conn_sess_data {
 	ngtcp2_cid dcid;
 	ngtcp2_cid scid;
 	ngtcp2_cid odcid;
-	ngtcp2_version_cid dec_cids;
+	uint32_t version;
 	bool token_present;
 	uint8_t secret[32];
 	ngtcp2_path *path;
@@ -90,20 +95,17 @@ struct pl_quic_conn_sess_data {
 
 	/* TLS data */
 	gnutls_session_t tls_session;
-	struct gnutls_priority_st *priority;
 	union {
 		struct tls_credentials *server_credentials;
 		tls_client_param_t *client_params; /* for TBD client side */
 	};
 
-	// crypto callbacks
+	/* crypto callbacks */
 	ngtcp2_crypto_conn_ref crypto_ref;
 
 	list_t streams;
-	// number of allocated streams structures
+	/* number of allocated streams structures */
 	int16_t streams_count;
-	/* only used by client side */
-	int64_t next_stream_id;
 	uint64_t finished_streams;
 	quic_conn_state_t state;
 	size_t cid_pointers;
@@ -111,7 +113,7 @@ struct pl_quic_conn_sess_data {
 	kr_quic_table_t *table_ref;
 };
 
-/* Iterates over the connections streams attempting to send out
+/* Iterates over the connection's streams attempting to send out
  * any data that failed to get sent previously. Also flushes
  * any messages the connection itself might want to send. */
 int quic_flush_streams(struct pl_quic_conn_sess_data *conn);
@@ -120,8 +122,8 @@ int quic_flush_streams(struct pl_quic_conn_sess_data *conn);
  * often followed by CONNECTION CLOSE. This function doesn't overwrite the
  * buffer in the provided ctx and takes care of submitting the message
  * to the wrap dirrection cascade.
- * Currently sends special payload to the
- * following QUIC_SEND requests:
+ *
+ * Currently sends special payload to the following QUIC_SEND requests:
  *
  * QUIC_SEND_VERSION_NEGOTIOATION
  *   Response to a client using an unsupported QUIC version.
@@ -132,6 +134,8 @@ int quic_flush_streams(struct pl_quic_conn_sess_data *conn);
  *   Once the retry packet is sent the connection state is to be destroyed and
  *   the client is expected to send a new INITIAL containing the address
  *   validation token (as a response to the retry packet).
+ *   Only one of conn, dec_cids can be supplied with this action, see
+ *   write_retry_packet documentations for more details.
  *
  * QUIC_SEND_CONN_CLOSE
  *   in case the ccerr for this connection is DOQ_NO_ERROR this function will

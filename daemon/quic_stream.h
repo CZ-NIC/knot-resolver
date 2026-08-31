@@ -40,14 +40,11 @@ struct pl_quic_stream_sess_data {
 	struct wire_buf pers_inbuf;
 	struct wire_buf outbuf;
 	struct comm_info comm_storage;
+	struct comm_addr_storage comm_addr_storage;
 	/* stores both data that has been sent out but hasn't been acked and
 	 * data that has just been created and is waiting to be sent out */
 	struct list outbufs;
 	size_t obufs_size;
-
-	/* Parent connection was closed, but this stream's death was
-	 * defered to finish a leading task. */
-	bool orphan;
 	bool terminated_gracefully;
 	uint32_t state;
 	struct kr_quic_obuf *unsent_obuf;
@@ -63,6 +60,6 @@ struct pl_quic_stream_sess_data {
 };
 
 void kr_quic_stream_ack_data(struct pl_quic_stream_sess_data *stream,
-		int64_t stream_id, size_t end_acked, bool keep_stream);
+		int64_t stream_id, size_t end_acked);
 uint8_t *kr_quic_stream_add_data(struct pl_quic_stream_sess_data *s,
 		   uint8_t *data, size_t len);

@@ -179,8 +179,10 @@ struct worker_ctx {
 	knot_mm_t pkt_pool;
 	unsigned int next_request_uid;
 
-	/* session for all outgoing DoQ requests. */
-	struct session2 *doq_out_session;
+	/* session for all ipv4 outgoing DoQ requests. */
+	struct session2 *doq_out_session4;
+	/* session for all ipv6 outgoing DoQ requests. */
+	struct session2 *doq_out_session6;
 
 	/* HTTP Headers for DoH. */
 	doh_headerlist_t doh_qry_headers;

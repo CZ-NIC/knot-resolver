@@ -94,18 +94,12 @@ static enum protolayer_iter_cb_result pl_quic_stream_wrap(void *sess_data,
 		void *iter_data, struct protolayer_iter_ctx *ctx)
 {
 	struct pl_quic_stream_sess_data *stream = sess_data;
-	// FIXME: Leftover from doq-client-new, see if necessary
-	//
-	// /* Connection already expired, this stream exists as an orphan only
-	//  * to avoid force closing leading tasks */
-	// if (stream->orphan) {
-	// 	return protolayer_break(ctx, kr_error(ESHUTDOWN));
-	// }
 
 	/* new data only comes as a iovec, flushing the stream with no new data
 	 * to append uses wire_buf */
 	if (likely(ctx->payload.type == PROTOLAYER_PAYLOAD_IOVEC)) {
-		if (unlikely(kr_quic_stream_add_data(stream, ctx->payload.iovec.iov[1].iov_base,
+		if (unlikely(kr_quic_stream_add_data(stream,
+				ctx->payload.iovec.iov[1].iov_base,
 				ctx->payload.iovec.iov[1].iov_len) == NULL)) {
 			return protolayer_break(ctx, kr_error(ENOMEM));
 		}
@@ -113,10 +107,6 @@ static enum protolayer_iter_cb_result pl_quic_stream_wrap(void *sess_data,
 		ctx->payload = protolayer_payload_wire_buf(&stream->outbuf,
 				false);
 	}
-	// FIXME: from doq-client-new, might be sufficient, along the stream_add_data
-	//
-	// kr_require(ctx->payload.type == PROTOLAYER_PAYLOAD_IOVEC);
-	// ctx->payload = protolayer_payload_wire_buf(&stream->outbuf, false);
 
 	if (wire_buf_data_length(&stream->outbuf) != 0) {
 		wire_buf_reset(&stream->outbuf);
@@ -175,9 +165,8 @@ static enum protolayer_iter_cb_result pl_quic_stream_wrap(void *sess_data,
 				finished_baton);
 	} while (sent > 0 && sent_msgs < QUIC_MAX_SEND_PER_RECV);
 
-	if (!stream->skip_update_time) {
-		ngtcp2_conn_update_pkt_tx_time(stream->conn_ref->conn,
-				quic_timestamp());
+	if (!stream->skip_update_time && stream->conn) {
+		ngtcp2_conn_update_pkt_tx_time(stream->conn, quic_timestamp());
 	}
 
 	return protolayer_break(ctx, kr_ok());
@@ -200,9 +189,9 @@ static int send_stream(struct pl_quic_stream_sess_data *stream,
 	if (len > wire_buf_free_space_length(&stream->outbuf)) {
 		wire_buf_reserve(&stream->outbuf,
 			MIN(MAX(1200, wire_buf_data_length(&stream->outbuf) + len * 2),
-				MAX_QUIC_FRAME_SIZE));
+				DOQ_MAX_STREAM_DATA));
 	}
-	if (len >= wire_buf_free_space_length(&stream->outbuf)) {
+	if (len > wire_buf_free_space_length(&stream->outbuf)) {
 		return NGTCP2_ERR_NOMEM;
 	}
 
@@ -244,14 +233,13 @@ static int pl_quic_stream_sess_init(struct session2 *session,
 	session->secure = true;
 
 	struct kr_quic_stream_param *p = param;
-	stream->orphan = false;
 	stream->terminated_gracefully = false;
 	stream->conn = p->conn;
 	stream->closed = false;
 	stream->stream_id = p->stream_id;
 	stream->write_closed = false;
 	stream->skip_update_time = false;
-	session->comm_storage = p->comm_storage;
+
 	if (stream->obufs_size == 0) {
 		init_list(&stream->outbufs);
 	} else {
@@ -262,9 +250,9 @@ static int pl_quic_stream_sess_init(struct session2 *session,
 }
 
 void kr_quic_stream_ack_data(struct pl_quic_stream_sess_data *stream,
-		int64_t stream_id, size_t end_acked, bool keep_stream)
+		int64_t stream_id, size_t end_acked)
 {
-	if (stream->obufs_size == 0)
+	if (kr_fails_assert(stream) || stream->obufs_size == 0)
 		return;
 
 	struct list *obs = &stream->outbufs;
@@ -289,27 +277,13 @@ void kr_quic_stream_ack_data(struct pl_quic_stream_sess_data *stream,
 		/* The buffer is now empty, potential stream
 		 * session deinit shall not be blocked by payload reference */
 		stream->state &= ~QUIC_STREAM_ACK_PENDING;
-		// return session2_dec_refs(stream->h.session);
 	}
 }
 
 static int pl_quic_stream_sess_deinit(struct session2 *session, void *sess_data)
 {
 	struct pl_quic_stream_sess_data *stream = sess_data;
-	kr_quic_stream_ack_data(stream, stream->stream_id, SIZE_MAX, false);
-
-	// FIXME: Again from doq-client-new...
-	//
-	// rem_node(&stream->list_node);
-	//
-	// if (!session2_tasklist_is_empty(session)) {
-	// 	/* The stream is closing without resolving the query */
-	// 	session2_tasklist_finalize(session, KR_STATE_FAIL);
-	// }
-	//
-	// kr_require(session2_tasklist_is_empty(session));
-	// kr_require(session2_waitinglist_is_empty(session));
-
+	kr_quic_stream_ack_data(stream, stream->stream_id, SIZE_MAX);
 	wire_buf_deinit(&stream->pers_inbuf);
 	wire_buf_deinit(&stream->outbuf);
 	return kr_ok();
@@ -333,10 +307,7 @@ static enum protolayer_event_cb_result pl_quic_stream_event_unwrap(
 		struct pl_quic_stream_sess_data *stream =
 			protolayer_sess_data_get_proto(session,
 					PROTOLAYER_TYPE_QUIC_STREAM);
-		kr_quic_stream_ack_data(stream,
-				stream->stream_id,
-				SIZE_MAX,
-				false);
+		kr_quic_stream_ack_data(stream, stream->stream_id, SIZE_MAX);
 	}
 	return PROTOLAYER_EVENT_PROPAGATE;
 }

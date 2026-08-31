@@ -357,6 +357,9 @@ as some parts are optional to a degree or even not relevant to DNS resolvers.
     We also have a fallback that deals with typical cases of non-conforming servers.*
 :rfc:`9210`
     DNS Transport over TCP - Operational Requirements
-.. No DoQ yet, but it's planned.
- :rfc:`9250`
+:rfc:`9250`
     DNS over Dedicated QUIC Connections
+
+    *DoQ is currently considered a beta feature. If you encounter any issues or
+    have any questions, please do not hesitate to contact us via the standard
+    communication channels. Both DoQ server and DoQ forwarding client are supported.*

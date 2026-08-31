@@ -275,8 +275,8 @@ static void tls_handshake_success(struct pl_tls_sess_data *tls,
 
 /** Perform TLS handshake and handle error codes according to the documentation.
   * See See https://gnutls.org/manual/html_node/TLS-handshake.html#TLS-handshake
-  * The function returns kr_ok() or success or non fatal error, kr_error(EAGAIN) on blocking, or kr_error(EIO) on fatal error.
-  */
+  * The function returns kr_ok() on success or non fatal error,
+  * kr_error(EAGAIN) on blocking, or kr_error(EIO) on fatal error. */
 static int tls_handshake(struct pl_tls_sess_data *tls, struct session2 *session)
 {
 	int err = gnutls_handshake(tls->tls_session);
@@ -652,7 +652,7 @@ tls_client_param_t * doq_client_param_new(void)
 	e->refs = 1;
 	int ret = gnutls_certificate_allocate_credentials(&e->credentials);
 	if (ret != GNUTLS_E_SUCCESS) {
-		kr_log_error(TLSCLIENT, "error: gnutls_certificate_allocate_credentials() fails (%s)\n",
+		kr_log_error(DOQCLIENT, "error: gnutls_certificate_allocate_credentials() fails (%s)\n",
 			     gnutls_strerror_name(ret));
 		free(e);
 		return NULL;

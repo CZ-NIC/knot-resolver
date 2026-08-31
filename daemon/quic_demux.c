@@ -12,10 +12,8 @@
 #include "session2.h"
 #include "worker.h"
 #include <stdlib.h>
+#include <uv.h>
 
-/* Toggle sending retry for new connections. This is a way to validate the
- * client address, but it adds 1 round trip to the connection establishment
- * potentially hindering performance */
 #define BUCKETS_PER_CONNS 8 // Each connecion has several dCIDs, and each CID takes one hash table bucket.
 
 void kr_quic_table_rem(struct pl_quic_conn_sess_data *conn, kr_quic_table_t *table);
@@ -61,19 +59,23 @@ void kr_quic_table_rem(struct pl_quic_conn_sess_data *conn,
 
 	if (conn->conn) {
 		size_t num_scid = ngtcp2_conn_get_scid(conn->conn, NULL);
-		ngtcp2_cid *scids = calloc(num_scid, sizeof(*scids));
-		ngtcp2_conn_get_scid(conn->conn, scids);
+		if (unlikely(num_scid)) {
+			ngtcp2_cid *scids = calloc(num_scid, sizeof(*scids));
+			/* Proper cleanup is not possible without this array */
+			kr_require(scids);
+			ngtcp2_conn_get_scid(conn->conn, scids);
 
-		for (size_t i = 0; i < num_scid; i++) {
-			kr_quic_cid_t **pcid =
-				kr_quic_table_lookup2(&scids[i], table);
-			if (*pcid == NULL) {
-				continue;
+			for (size_t i = 0; i < num_scid; i++) {
+				kr_quic_cid_t **pcid =
+					kr_quic_table_lookup2(&scids[i], table);
+				if (*pcid == NULL) {
+					continue;
+				}
+				kr_quic_table_rem2(pcid, table);
 			}
-			kr_quic_table_rem2(pcid, table);
-		}
 
-		free(scids);
+			free(scids);
+		}
 	} else {
 		/* Client side puts its source CID into the table
 		 * when creating the connection. */
@@ -131,12 +133,17 @@ static enum protolayer_iter_cb_result pl_quic_demux_unwrap(void *sess_data,
 	ngtcp2_cid dcid = { 0 };
 	ngtcp2_cid scid = { 0 };
 
-	kr_require(ctx->payload.type == PROTOLAYER_PAYLOAD_WIRE_BUF);
-	int ret = ngtcp2_pkt_decode_version_cid(&dec_cids,
-			wire_buf_data(ctx->payload.wire_buf),
-			wire_buf_data_length(ctx->payload.wire_buf),
-			SERVER_DEFAULT_SCIDLEN);
+	if (ctx->payload.type != PROTOLAYER_PAYLOAD_BUFFER) {
+		kr_log_warning(DOQ, "demux received invalid payload type: %s, dropping\n",
+			      ctx->payload.type == PROTOLAYER_PAYLOAD_WIRE_BUF
+			      ? "WIRE_BUF" : "IOVEC");
+		return protolayer_break(ctx, kr_error(EINVAL));
+	}
 
+	int ret = ngtcp2_pkt_decode_version_cid(&dec_cids,
+			ctx->payload.buffer.buf,
+			ctx->payload.buffer.len,
+			SERVER_DEFAULT_SCIDLEN);
 	if (ret == NGTCP2_ERR_INVALID_ARGUMENT) {
 		kr_log_warning(DOQ, "Could not decode pkt header: (%d) %s\n",
 				ret, ngtcp2_strerror(ret));
@@ -154,18 +161,20 @@ static enum protolayer_iter_cb_result pl_quic_demux_unwrap(void *sess_data,
 
 	qconn = kr_quic_table_lookup(&dcid, demux->conn_table);
 	if (!qconn) {
+		if (demux->h.session->outgoing) {
+			kr_log_debug(DOQCLIENT, "Dropping packet from unrecognised connection\n");
+			return protolayer_break(ctx, kr_ok());
+		}
 		if (demux->conn_table->usage >= demux->conn_table->max_conns) {
 			return protolayer_break(ctx, kr_ok());
 		}
 
 		ngtcp2_pkt_hd header = { 0 };
-		ret = ngtcp2_accept(&header,
-			wire_buf_data(ctx->payload.wire_buf),
-			wire_buf_data_length(ctx->payload.wire_buf));
+		ret = ngtcp2_accept(&header, ctx->payload.buffer.buf,
+				ctx->payload.buffer.len);
 		if (ret != NGTCP2_NO_ERROR) {
 			kr_log_debug(DOQ, "error accepting new conn: %s (%d)\n",
 					ngtcp2_strerror(ret), ret);
-
 			/* either the packet is not acceptable as the first
 			 * packet of a new connection, or the function failed
 			 * to parse the packet header */
@@ -189,8 +198,8 @@ static enum protolayer_iter_cb_result pl_quic_demux_unwrap(void *sess_data,
 				ret = ngtcp2_crypto_verify_retry_token2(
 					&odcid, header.token, header.tokenlen,
 					(const uint8_t *)demux->conn_table->hash_secret,
-					sizeof(demux->conn_table->hash_secret), header.version,
-					ctx->comm->src_addr,
+					sizeof(demux->conn_table->hash_secret),
+					header.version, ctx->comm->src_addr,
 					kr_sockaddr_len(ctx->comm->src_addr),
 					&dcid, QUIC_CONN_IDLE_TIMEOUT,
 					now);
@@ -199,7 +208,7 @@ static enum protolayer_iter_cb_result pl_quic_demux_unwrap(void *sess_data,
 					header.token, header.tokenlen,
 					(const uint8_t *)demux->conn_table->hash_secret,
 					sizeof(demux->conn_table->hash_secret),
-					ctx->comm_storage.src_addr,
+					ctx->comm->src_addr,
 					kr_sockaddr_len(ctx->comm->src_addr),
 					QUIC_REGULAR_TOKEN_TIMEOUT, now);
 			}
@@ -208,8 +217,9 @@ static enum protolayer_iter_cb_result pl_quic_demux_unwrap(void *sess_data,
 						ngtcp2_strerror(ret), ret);
 				return protolayer_break(ctx, kr_ok());
 			}
+		}
 
-		} else {
+		if (header.tokenlen == 0 || (header.token[0] != NGTCP2_CRYPTO_TOKEN_MAGIC_RETRY2)) {
 			memcpy(&odcid, &dcid, sizeof(odcid));
 
 			/* TODO remove 'likely' once outgoing DoQ is supported */
@@ -251,8 +261,17 @@ static enum protolayer_iter_cb_result pl_quic_demux_unwrap(void *sess_data,
 		struct pl_quic_conn_sess_data *conn_sess_data =
 			protolayer_sess_data_get_proto(new_conn_sess,
 					PROTOLAYER_TYPE_QUIC_CONN);
-		kr_quic_table_add(conn_sess_data, &dcid, demux->conn_table);
-		kr_quic_table_insert(conn_sess_data, &odcid, demux->conn_table);
+		if (kr_quic_table_add(conn_sess_data, &dcid,
+					demux->conn_table) != 0) {
+			session2_force_close(new_conn_sess);
+			return protolayer_break(ctx, kr_error(ENOMEM));
+		}
+		if (!kr_quic_table_insert(conn_sess_data, &odcid,
+					demux->conn_table)) {
+			kr_quic_table_rem(conn_sess_data, demux->conn_table);
+			session2_force_close(new_conn_sess);
+			return protolayer_break(ctx, kr_error(ENOMEM));
+		}
 		qconn = conn_sess_data;
 
 		/* We need the handling of the first packet of the connection
@@ -264,10 +283,12 @@ static enum protolayer_iter_cb_result pl_quic_demux_unwrap(void *sess_data,
 				ctx->comm,
 				ctx->finished_cb,
 				ctx->finished_cb_baton);
+
 		/* The connection failed to initialize. Either a general
 		 * failure or a retry pkt was sent, both cases mean we
 		 * can discard the current conn state (close the session) */
-		if (qconn->state >= QUIC_STATE_DRAINING) {
+		if (qconn->state & QUIC_STATE_DRAINING
+				|| qconn->state & QUIC_STATE_HS_ABORT) {
 			session2_force_close(new_conn_sess);
 			return protolayer_break(ctx, kr_ok());
 		}
@@ -279,15 +300,6 @@ static enum protolayer_iter_cb_result pl_quic_demux_unwrap(void *sess_data,
 				ctx->finished_cb_baton);
 	}
 
-	/* The received message caused the conn to enter closing state,
-	 * terminate session here since the protolayer_iter_ctx needs
-	 * the session, otherwise mark used and sweep. */
-	if ((qconn->state & QUIC_STATE_DRAINING)
-		|| (qconn->state & QUIC_STATE_CLOSING)) {
-		// pass
-	} else {
-		quic_conn_mark_used(qconn, demux->conn_table);
-	}
 	return protolayer_break(ctx, kr_ok());
 }
 
@@ -297,37 +309,39 @@ kr_quic_table_t *kr_quic_table_new(size_t max_conns, size_t udp_payload,
 	int ret;
 	size_t table_size = max_conns * BUCKETS_PER_CONNS;
 
-	kr_quic_table_t *new_table = calloc(1, sizeof(*new_table) + (table_size * sizeof(new_table->conns[0])));
+	kr_quic_table_t *new_table = calloc(1,
+		sizeof(*new_table) + (table_size * sizeof(new_table->conns[0])));
 	if (new_table == NULL) {
 		kr_log_error(DOQ, "Calloc in kr_quic_table_new_failed\n");
 		return NULL;
 	}
 
-
-	new_table->size = table_size;
 	new_table->usage = 0;
 	new_table->pointers = 0;
+	new_table->creds = creds;
+	new_table->size = table_size;
 	new_table->max_conns = max_conns;
 	new_table->udp_payload_limit = udp_payload;
 
-	// NOTE: Taken from tls-proxy.c/96, we might need to use this
-	// to enforce the use of tls1.3 (tls1.3 compat mode might be problematic)
-	//
-	// static const char * const tlsv13_priorities =
-	// 	"NORMAL:" /* GnuTLS defaults */
-	// 	"-VERS-TLS1.0:-VERS-TLS1.1:-VERS-TLS1.2:+VERS-TLS1.3:" /* TLS 1.3 only */
-	// 	"-VERS-SSL3.0:-ARCFOUR-128:-COMP-ALL:+COMP-NULL";
+	/* we need to enforce the use of tls1.3, tls1.3 compat mode is problematic. */
+	static const char * const tlsv13_priorities =
+		"%DISABLE_TLS13_COMPAT_MODE:"          /* RFC 9001 8.4 */
+		"-VERS-TLS1.0:-VERS-TLS1.1:-VERS-TLS1.2:+VERS-TLS1.3:" /* TLS 1.3 only */
+		"-VERS-SSL3.0:-ARCFOUR-128:-COMP-ALL:+COMP-NULL";
 
-	ret = gnutls_priority_init2(&new_table->priority, NULL, NULL, 0);
-	if (ret != GNUTLS_E_SUCCESS)
+	ret = gnutls_priority_init2(&new_table->priority, tlsv13_priorities,
+			NULL, GNUTLS_PRIORITY_INIT_DEF_APPEND);
+
+	if (ret != GNUTLS_E_SUCCESS) {
+		kr_log_error(DOQ, "Failed to set QUIC conn table TLS priority: %s (%d)\n",
+				gnutls_strerror_name(ret), ret);
 		goto fail;
+	}
 
 	new_table->expiry_heap = malloc(sizeof(struct heap));
 	if (new_table->expiry_heap == NULL ||
 			!heap_init(new_table->expiry_heap, cmp_expiry_heap_nodes, 0))
 		goto fail;
-
-	new_table->creds = creds;
 
 	new_table->hash_secret[0] = dnssec_random_uint64_t();
 	new_table->hash_secret[1] = dnssec_random_uint64_t();
@@ -337,12 +351,6 @@ kr_quic_table_t *kr_quic_table_new(size_t max_conns, size_t udp_payload,
 	return new_table;
 
 fail:
-	if (new_table->creds) {
-		if (new_table->creds->credentials) {
-			gnutls_certificate_free_credentials(
-					new_table->creds->credentials);
-		}
-	}
 	if (new_table->priority) {
 		gnutls_priority_deinit(new_table->priority);
 	}
@@ -386,15 +394,15 @@ static int pl_quic_demux_sess_init(struct session2 *session, void *sess_data, vo
 
 static int pl_quic_demux_sess_deinit(struct session2 *session, void *data)
 {
-	if (session->outgoing && the_worker->doq_out_session == session) {
-		the_worker->doq_out_session = NULL;
+	if (session->outgoing) {
+		if (the_worker->doq_out_session4 == session)
+			the_worker->doq_out_session4 = NULL;
+		else if (the_worker->doq_out_session6 == session)
+			the_worker->doq_out_session6 = NULL;
 	}
 
 	struct pl_quic_demux_sess_data *quic = data;
 	kr_quic_table_free(quic->conn_table);
-	if (session->outgoing) {
-		the_worker->doq_out_session = NULL;
-	}
 	return kr_ok();
 }
 
@@ -444,7 +452,7 @@ static void quic_demux_protolayers_init(void)
 {
 	protolayer_globals[PROTOLAYER_TYPE_QUIC_DEMUX] = (struct protolayer_globals) {
 		.sess_size = sizeof(struct pl_quic_demux_sess_data),
-		.wire_buf_overhead = MAX_QUIC_FRAME_SIZE,
+		.wire_buf_overhead = DOQ_MAX_MESSAGE_SIZE,
 		.sess_init = pl_quic_demux_sess_init,
 		.sess_deinit = pl_quic_demux_sess_deinit,
 		.unwrap = pl_quic_demux_unwrap,
