@@ -7,7 +7,6 @@
 #include "daemon/engine.h"
 #include "lib/generic/array.h"
 #include "lib/generic/trie.h"
-#include "daemon/quic_conn.h"
 
 /** Query resolution task (opaque). */
 struct qr_task;
@@ -107,6 +106,7 @@ void quic_handshake_timeout(struct session2 *session,
 		enum kr_selection_error sel_err);
 
 /* similar to on connect used by TCP */
+struct pl_quic_conn_sess_data;
 void doq_on_connect(struct pl_quic_conn_sess_data *conn, int status);
 
 void worker_remove_quic_conn(struct session2 *session, const struct sockaddr *addr);

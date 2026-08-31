@@ -410,10 +410,10 @@ static int stream_reset_cb(ngtcp2_conn* ngconn, int64_t stream_id,
 
 	struct pl_quic_conn_sess_data *conn = user_data;
 	if (conn->is_server)
-		kr_log_debug(DOQ, "RESET_STREAM received, abandonning transaction (error code: %zu)\n",
+		kr_log_debug(DOQ, "RESET_STREAM received, abandonning transaction (error code: %" PRIu64 ")\n",
 				app_error_code);
 	else
-		kr_log_debug(DOQCLIENT, "RESET_STREAM received, abandonning transaction (error code: %zu)\n",
+		kr_log_debug(DOQCLIENT, "RESET_STREAM received, abandonning transaction (error code: %" PRIu64 ")\n",
 				app_error_code);
 
 	struct pl_quic_stream_sess_data *stream = stream_user_data;
@@ -598,7 +598,9 @@ static int conn_new_handler(ngtcp2_conn **pconn, const ngtcp2_path *path,
 			params.retry_scid_present = 1;
 		}
 
-		return ngtcp2_conn_server_new(pconn, scid, dcid, path, version,
+		const ngtcp2_cid *rem_dcid = scid;
+		const ngtcp2_cid *rem_scid = dcid;
+		return ngtcp2_conn_server_new(pconn, rem_dcid, rem_scid, path, version,
 				&callbacks, &settings, &params, NULL, conn);
 	} else {
 		return ngtcp2_conn_client_new(pconn, dcid, scid, path, version,
@@ -1343,7 +1345,7 @@ static int pl_quic_conn_sess_deinit(struct session2 *session, void *sess_data)
 	kr_require(conn->streams_count == 0);
 
 	if (conn->state & QUIC_STATE_HANDSHAKE_DONE) {
-		kr_log_debug(DOQ, "Closing established connection to: '%s', [%s] useful, served %zu streams\n",
+		kr_log_debug(DOQ, "Closing established connection to: '%s', [%s] useful, served %" PRIu64 " streams\n",
 				kr_straddr(conn->comm_storage.comm_addr),
 				conn->finished_streams ? "was" : "was not",
 				conn->finished_streams);
@@ -1419,13 +1421,6 @@ static enum protolayer_event_cb_result pl_quic_conn_event_unwrap(
 			session2_event(s->h.session, event, NULL);
 			s = NULL;
 		}
-
-		// NOLINTNEXTLINE(bugprone-casting-through-void)
-		if (!EMPTY_LIST(conn->streams)) {
-			kr_log_notice(DEVEL, "Streams list not empty: %hd\n",
-					conn->streams_count);
-		}
-		//
 		// NOLINTNEXTLINE(bugprone-casting-through-void)
 		kr_require(EMPTY_LIST(conn->streams));
 

@@ -6,12 +6,8 @@
 #include "quic_common.h"
 #include "quic_stream.h"
 #include "lib/resolve.h"
-#include "mempattern.h"
-#include "lib/proto.h"
 #include "quic_conn.h"
 #include "session2.h"
-#include "network.h"
-#include <asm-generic/errno.h>
 #include <ngtcp2/ngtcp2.h>
 #include <stdint.h>
 
@@ -279,15 +275,6 @@ static int pl_quic_stream_sess_deinit(struct session2 *session, void *sess_data)
 	wire_buf_deinit(&stream->pers_inbuf);
 	wire_buf_deinit(&stream->outbuf);
 	return kr_ok();
-}
-
-static void on_close_stream_timer(uv_handle_t *handle)
-{
-	struct pl_quic_stream_sess_data *stream =
-		protolayer_sess_data_get_proto(handle->data,
-				PROTOLAYER_TYPE_QUIC_STREAM);
-	stream->state &= ~QUIC_STREAM_HAS_TIMER;
-	session2_dec_refs(handle->data);
 }
 
 static enum protolayer_event_cb_result pl_quic_stream_event_unwrap(

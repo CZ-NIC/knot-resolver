@@ -9,14 +9,11 @@
 {%- for addr in server.address -%}
 {'{{ addr }}',
 {%- if server.transport == 'tls' -%}
-tls=true,
-quic=false,
+tls=true,quic=false,
 {%- elif server.transport == 'quic' -%}
-tls=false,
-quic=true,
+tls=false,quic=true,
 {%- else -%}
-tls=false,
-quic=false,
+tls=false,quic=false,
 {%- endif -%}
 {%- if server.hostname -%}
 hostname='{{ server.hostname }}',
