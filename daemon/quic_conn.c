@@ -711,8 +711,8 @@ static int quic_hs_hook(gnutls_session_t session, unsigned int htype,
 
 	gnutls_datum_t d = { NULL, 0 };
 	if (gnutls_session_get_data2(session, &d) == GNUTLS_E_SUCCESS) {
-		gnutls_free(conn->client_params->session_data.data);
-		conn->client_params->session_data = d;
+		gnutls_free(conn->client_params->quic_session_data.data);
+		conn->client_params->quic_session_data = d;
 	}
 	return 0;
 }
@@ -812,10 +812,10 @@ int kr_quic_tls_session(struct pl_quic_conn_sess_data *conn)
 			return ret;
 		}
 
-		if (conn->client_params->session_data.data) {
+		if (conn->client_params->quic_session_data.data) {
 			(void)gnutls_session_set_data(conn->tls_session,
-					conn->client_params->session_data.data,
-					conn->client_params->session_data.size);
+					conn->client_params->quic_session_data.data,
+					conn->client_params->quic_session_data.size);
 		}
 
 		gnutls_handshake_set_hook_function(conn->tls_session,
@@ -863,6 +863,8 @@ static int quic_tls_init_conn_session(struct pl_quic_conn_sess_data *conn)
 	};
 
 	gnutls_session_set_ptr(conn->tls_session, &conn->conn_ref);
+	if (!conn->is_server)
+		kr_tls_session_set_verify(conn->tls_session, true);
 	ngtcp2_conn_set_tls_native_handle(conn->conn, conn->tls_session);
 
 	return kr_ok();

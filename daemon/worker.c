@@ -2275,6 +2275,12 @@ struct kr_request *worker_task_request(struct qr_task *task)
 
 int worker_task_finalize(struct qr_task *task, int state)
 {
+	/* DoQ is the first transport that both leads and
+	 * pushes tasks onto the waitinglist during handshake.
+	 * Assertion that task->leading == false here can therefore be
+	 * legitimately violated, add DoQ exeption. */
+	if (task->leading && task->transport->protocol == KR_TRANSPORT_DOQ)
+		subreq_finalize(task, NULL, NULL);
 	return qr_task_finalize(task, state);
 }
 
