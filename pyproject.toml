@@ -80,6 +80,9 @@ knot_resolver = [
 [tool.setuptools.dynamic]
 version = {file = "PROJECT_VERSION"}
 
+[tool.poe.executor]
+type = "simple"
+
 [tool.poe.tasks]
 # Tasks to configure, build and run
 configure = { cmd = "scripts/poe-tasks/configure", help = "(Re)configure Meson build directory." }
