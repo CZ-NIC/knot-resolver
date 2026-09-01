@@ -13,40 +13,6 @@
 
 #define BUCKETS_PER_CONNS 8 // Each connecion has several dCIDs, and each CID takes one hash table bucket.
 
-void kr_quic_table_rem(struct pl_quic_conn_sess_data *conn, kr_quic_table_t *table);
-
-static int cmp_expiry_heap_nodes(void *c1, void *c2)
-{
-	if (((struct pl_quic_conn_sess_data *)c1)->h.heap_value >
-			((struct pl_quic_conn_sess_data *)c2)->h.heap_value)
-		return 1;
-
-	if (((struct pl_quic_conn_sess_data *)c1)->h.heap_value <
-			((struct pl_quic_conn_sess_data *)c2)->h.heap_value)
-		return -1;
-
-	return 0;
-}
-
-static void conn_heap_reschedule(struct pl_quic_conn_sess_data *conn,
-		struct kr_quic_table *table)
-{
-	heap_replace(table->expiry_heap,
-			heap_find(table->expiry_heap,
-			(heap_val_t *)conn), (heap_val_t *)conn);
-}
-
-void quic_conn_mark_used(struct pl_quic_conn_sess_data *conn,
-		kr_quic_table_t *table)
-{
-	if (table == NULL || conn == NULL || conn->conn == NULL) {
-		return;
-	}
-
-	conn->h.heap_value = ngtcp2_conn_get_expiry(conn->conn) * quic_not_draining(conn);
-	conn_heap_reschedule(conn, table);
-}
-
 void kr_quic_table_rem(struct pl_quic_conn_sess_data *conn,
 		kr_quic_table_t *table)
 {
@@ -96,9 +62,9 @@ void kr_quic_table_rem(struct pl_quic_conn_sess_data *conn,
 		}
 	}
 
-	int pos = heap_find(table->expiry_heap, (heap_val_t *)conn);
-	if (pos != 0) {
-		heap_delete(table->expiry_heap, pos);
+	if (conn->table_node.next != NULL) {
+		rem_node(&conn->table_node);
+		conn->table_node.next = conn->table_node.prev = NULL;
 		table->usage--;
 	}
 }
@@ -114,8 +80,6 @@ void kr_quic_table_free(kr_quic_table_t *table)
 	kr_assert(table->pointers == 0);
 
 	gnutls_priority_deinit(table->priority);
-	heap_deinit(table->expiry_heap);
-	free(table->expiry_heap);
 	free(table);
 }
 
@@ -336,10 +300,7 @@ kr_quic_table_t *kr_quic_table_new(size_t max_conns, size_t udp_payload,
 		goto fail;
 	}
 
-	new_table->expiry_heap = malloc(sizeof(struct heap));
-	if (new_table->expiry_heap == NULL ||
-			!heap_init(new_table->expiry_heap, cmp_expiry_heap_nodes, 0))
-		goto fail;
+	init_list(&new_table->conn_list);
 
 	new_table->hash_secret[0] = dnssec_random_uint64_t();
 	new_table->hash_secret[1] = dnssec_random_uint64_t();
@@ -351,9 +312,6 @@ kr_quic_table_t *kr_quic_table_new(size_t max_conns, size_t udp_payload,
 fail:
 	if (new_table->priority) {
 		gnutls_priority_deinit(new_table->priority);
-	}
-	if (new_table->expiry_heap) {
-		free(new_table->expiry_heap);
 	}
 
 	free(new_table);
@@ -421,9 +379,10 @@ static enum protolayer_event_cb_result pl_quic_demux_event_unwrap(
 			ngtcp2_ccerr_set_application_error(&c->ccerr,
 					DOQ_NO_ERROR, NULL, 0);
 			session2_event(c->h.session, event, NULL);
+			if (kr_fails_assert(--guard > 0))
+				break;
 		}
 	}
-
 	return PROTOLAYER_EVENT_PROPAGATE;
 }
 
