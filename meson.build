@@ -375,7 +375,7 @@ if clangtidy.found()
       clangtidy,
       '-quiet',
       '-extra-arg=-Wno-unknown-warning-option', # version in CI is weird in this
-      '-p', meson.build_root(),
+      '-p', meson.project_build_root(),
     ] + c_src_lint
   )
 endif
