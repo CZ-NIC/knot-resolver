@@ -68,16 +68,14 @@ function meson_setup_configure {
 }
 
 function meson_setup_configure_dev {
-	local reconfigure=''
 	if [ -d $build_dev_dir ]; then
-		reconfigure='--reconfigure'
+		rm -rf $build_dev_dir
 	fi
 	echo ---------------------------------------
 	echo Configuring build directory using Meson
 	echo ---------------------------------------
 	meson setup \
 		$build_dev_dir \
-		$reconfigure \
 		--prefix=$KRES_DEV_INSTALL_DIR \
 		-D user=$(id -un) \
 		-D group=$(id -gn) \
