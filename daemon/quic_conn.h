@@ -6,7 +6,6 @@
 #include <ngtcp2/ngtcp2.h>
 #include <ngtcp2/ngtcp2_crypto.h>
 
-#include <contrib/ucw/heap.h>
 #include <contrib/ucw/lists.h>
 
 #include "quic_common.h"
@@ -62,6 +61,7 @@ struct stream_item {
 
 struct pl_quic_conn_sess_data {
 	struct protolayer_data h;
+	node_t table_node;
 	nc_conn_ref_placeholder_t conn_ref;
 	struct ngtcp2_conn *conn;
 	struct kr_quic_conn *next;

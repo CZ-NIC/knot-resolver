@@ -24,6 +24,7 @@
 #include <sched.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ucw/lists.h>
 #include <uv.h>
 
 #define EPHEMERAL_CERT_EXPIRATION_SECONDS_RENEW_BEFORE ((time_t)60*60*24*7)
@@ -1289,6 +1290,7 @@ static int pl_quic_conn_sess_init(struct session2 *session, void *sess_data,
 	conn->retry_sent = p->retry_sent;
 	conn->table_ref = p->table;
 	conn->token_present = p->token_present;
+	conn->table_node.next = conn->table_node.prev = NULL;
 	ngtcp2_ccerr_default(&conn->ccerr);
 
 	conn->version = p->dec_cids ? p->dec_cids->version : NGTCP2_PROTO_VER_V1;

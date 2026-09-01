@@ -16,6 +16,7 @@
 #include <gnutls/x509.h>
 #include <gnutls/gnutls.h>
 #include <gnutls/crypto.h>
+#include <ucw/lists.h>
 
 #include "session2.h"
 #include "network.h"
@@ -105,7 +106,7 @@ typedef struct kr_quic_table {
 	uint64_t hash_secret[4];
 	struct tls_credentials *creds;
 	struct gnutls_priority_st *priority;
-	struct heap *expiry_heap;
+	list_t conn_list;
 	struct kr_quic_cid *conns[];
 } kr_quic_table_t;
 
@@ -186,7 +187,7 @@ int set_application_error(struct pl_quic_conn_sess_data *conn,
 kr_quic_cid_t **kr_quic_table_insert(struct pl_quic_conn_sess_data *conn,
 		const ngtcp2_cid *cid, kr_quic_table_t *table);
 
-/* Registeres a new connection in the table and expiry heap.
+/* Registeres a new connection in the table and the connection list.
  * Only call once when the connection is created. Calls kr_quic_table_insert
  * to add a reference from cid to the connection. */
 int kr_quic_table_add(struct pl_quic_conn_sess_data *conn_sess,

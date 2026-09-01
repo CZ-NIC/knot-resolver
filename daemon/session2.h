@@ -570,8 +570,6 @@ size_t protolayer_iter_size_est(struct protolayer_iter_ctx *ctx, bool incl_paylo
 /** Layer-specific data - the generic struct. To be added as the first member of
  * each specific struct. */
 struct protolayer_data {
-	int heap_node_placeholder; // MUST be first field of the struct
-	uint64_t heap_value;
 	struct session2 *session; /**< Pointer to the owner session. */\
 };
 

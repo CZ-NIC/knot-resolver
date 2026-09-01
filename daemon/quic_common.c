@@ -253,18 +253,12 @@ int kr_quic_table_add(struct pl_quic_conn_sess_data *conn_sess,
 		return kr_error(EINVAL);
 	}
 
-	conn_sess->h.heap_value = UINT64_MAX;
-	if (!heap_insert(table->expiry_heap, (heap_val_t *)conn_sess)) {
-		return kr_error(ENOMEM);
-	}
-
 	kr_quic_cid_t **addto = kr_quic_table_insert(conn_sess, cid, table);
 	if (addto == NULL) {
-		heap_delete(table->expiry_heap, heap_find(table->expiry_heap,
-					(heap_val_t *)conn_sess));
 		return kr_error(ENOMEM);
 	}
 
+	add_tail(&table->conn_list, &conn_sess->table_node);
 	table->usage++;
 	return kr_ok();
 }
