@@ -34,7 +34,7 @@ makedepends=(
     pkgconf
     python-build
     python-installer
-    python-poetry-core
+    python-setuptools
     python-wheel
 )
 

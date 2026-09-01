@@ -24,7 +24,7 @@ prepare_deckard = find_program('../../scripts/meson/test-integration-prepare.sh'
 deckard_env = environment()
 deckard_env.prepend('PATH', sbin_dir)
 
-junitxml_prefix = '--junitxml=' + meson.build_root() + '/meson-logs'
+junitxml_prefix = '--junitxml=' + meson.project_build_root() + '/meson-logs'
 
 deckard_kresd_run = find_program('deckard/kresd_run.sh')
 test(

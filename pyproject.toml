@@ -1,72 +1,87 @@
-[tool.poetry]
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
 name = "knot-resolver"
-version = "6.4.2"
+dynamic = ["version"]
 description = "Knot Resolver Manager - a Python program that automatically manages the other components of the resolver"
-license = "GPL-3.0-or-later"
-authors = [
-    "Aleš Mrázek <ales.mrazek@nic.cz>",
-    "Václav Šraier <vaclav.sraier@nic.cz>"
-]
+license = { file = "COPYING" }
+requires-python = ">=3.9,<4.0"
 maintainers = [
-    "Aleš Mrázek <ales.mrazek@nic.cz>"
+    { name = "Knot Resolver team", email = "knot-resolver@labs.nic.cz" },
 ]
-readme = "README.md"
-homepage = "https://www.knot-resolver.cz"
-repository = "https://gitlab.nic.cz/knot/knot-resolver"
-documentation = "https://www.knot-resolver.cz/documentation"
-
-packages = [
-    {include = "knot_resolver", from = "python"}
+dependencies = [
+    "aiohttp",
+    "jinja2",
+    "pyyaml",
+    "supervisor",
+    "typing-extensions",
 ]
-exclude = ["**/*.in", "**/meson.build"]
 
-[tool.poetry.dependencies]
-python = "^3.9"
-aiohttp = "*"
-jinja2 = "*"
-pyyaml = "*"
-supervisor = "*"
-typing-extensions = "*"
-prometheus-client = { version = "*", optional = true }
-watchdog = { version = "*", optional = true }
-
-[tool.poetry.extras]
+[project.optional-dependencies]
 prometheus = ["prometheus-client"]
 watchdog = ["watchdog"]
 
-[tool.poetry.group.build.dependencies]
-poetry-core = ">=1.9.1"
-setuptools = ">=75.3.2"
+[dependency-groups]
+all = [
+    { include-group = "dev" },
+    { include-group = "test" },
+    { include-group = "lint" },
+    { include-group = "docs" },
+]
+dev = [
+    "pyparsing>=3.1.4,<4",
+    "poethepoet>=0.24.4,<1",
+    "debugpy>=1.8.18,<2",
+    "setuptools>=75.3.2",
+]
+test = [
+    "pytest>=8.3.5,<9",
+    "pytest-cov>=4.1.0,<5",
+    "pytest-asyncio>=0.23.8,<1",
+]
+lint = [
+    "ruff>=0.6.9,<1",
+    "mypy>=1.14.1,<2",
+    "types-pyyaml>=6.0.12.20241230,<7",
+]
+docs = [
+    "sphinx>=5.3.0,<6",
+    "sphinx-rtd-theme>=2.0.0,<3",
+    "breathe>=4.35.0,<5",
+    # 'imghdr' was removed from a standard library in Python 3.13 (https://peps.python.org/pep-0594/).
+    # 'standard-imghdr' is a replacement for missing 'imghdr' module for projects that depend on it.
+    # https://pypi.org/project/standard-imghdr/
+    "standard-imghdr",
+]
 
-[tool.poetry.group.dev.dependencies]
-poetry = "^1.8.5"
-pyparsing = "^3.1.4"
-poethepoet = "^0.24.4"
-debugpy = "^1.8.18"
+[project.urls]
+homepage = "https://www.knot-resolver.cz"
 
-[tool.poetry.group.test.dependencies]
-pytest = "^8.3.5"
-pytest-cov = "^4.1.0"
-pytest-asyncio = "^0.23.8"
-toml = "^0.10.2"
+[project.scripts]
+kresctl = "knot_resolver.client.main:main"
+knot-resolver = "knot_resolver.manager.main:main"
 
-[tool.poetry.group.lint.dependencies]
-ruff = "^0.6.9"
-mypy = "^1.14.1"
-types-pyyaml = "^6.0.12.20241230"
+[tool.setuptools]
+package-dir = {"" = "python"}
 
-[tool.poetry.group.docs.dependencies]
-sphinx = "^5.3.0"
-sphinx-rtd-theme = "^2.0.0"
-breathe = "^4.35.0"
-# 'imghdr' was removed from a standard library in Python 3.13 (https://peps.python.org/pep-0594/).
-# 'standard-imghdr' is a replacement for missing 'imghdr' module for projects that depend on it.
-# https://pypi.org/project/standard-imghdr/
-standard-imghdr = "*"
+[tool.setuptools.packages.find]
+where = ["python"]
+include = ["knot_resolver*"]
 
-[tool.poetry.scripts]
-kresctl = 'knot_resolver.client.main:main'
-knot-resolver = 'knot_resolver.manager.main:main'
+[tool.setuptools.package-data]
+knot_resolver = [
+    "controller/supervisord/*.j2",
+    "datamodel/templates/*.j2",
+    "datamodel/templates/macros/*.j2",
+]
+
+[tool.setuptools.dynamic]
+version = {file = "PROJECT_VERSION"}
+
+[tool.poe.executor]
+type = "simple"
 
 [tool.poe.tasks]
 # Tasks to configure, build and run
@@ -115,8 +130,7 @@ extend-select = [
     "RET",    # improve return statement consistency
     "RUF",    # Ruff-specific improvements
     "SIM",    # simplify code
-    # TODO(amrazek): replace TCH with TC for newer version of Ruff
-    "TCH",    # move type-only imports under TYPE_CHECKING
+    "TC",     # move type-only imports under TYPE_CHECKING
     "TID",    # import hygiene
     "UP",     # use modern Python syntax
     "W",      # pycodestyle warnings
@@ -145,13 +159,4 @@ warn_unreachable = true
 namespace_packages = true
 explicit_package_bases = true
 
-# TODO(amrazek): remove disable_error_code after refactoring
-disable_error_code = ["no-any-return", "unreachable"]
 enable_error_code = ["ignore-without-code"]
-
-[build-system]
-requires = [
-    "poetry-core",
-    "setuptools"
-]
-build-backend = "poetry.core.masonry.api"

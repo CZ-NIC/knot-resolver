@@ -20,19 +20,9 @@ we develop against the oldest supported version and then check in our CI that it
 In your distro, there may be a Python runtime of a different version than the one we are targeting.
 So we try to isolate everything from the system we are running on.
 
-To start working on the manager, you need to install the following tools:
-
-- Python: One of the supported versions.
-  You may optionally use `pyenv <https://github.com/pyenv/pyenv#installation>`_ to install and manage multiple versions of Python without affecting your system.
-  Alternatively, some Linux distributions ship packages for older Python versions as well.
-- `Poetry <https://python-poetry.org/docs/#installation>`_: We use it to manage our dependencies and virtual environments.
-  Do not install the package via ``pip``, follow instructions in Poetry's official documentation.
-
-  Note that you need the latest version of Poetry.
-  The setup has been tested with Poetry version 1.1.7 because of it's able to switch between Python versions,
-  it must be installed separately to work correctly.
-
-After installing the above tools, the actual fully-featured development environment is ready to be set up.
+To start working on the manager, you just need to install Python and create virtualenvironment.
+You may optionally use `pyenv <https://github.com/pyenv/pyenv#installation>`_ to install and manage multiple versions of Python without affecting your system.
+Alternatively, some Linux distributions ship packages for older Python versions as well.
 
 
 Running the manager from source for the first time
@@ -40,21 +30,22 @@ Running the manager from source for the first time
 
 1. Clone the Knot Resolver `GitLab repository <https://gitlab.nic.cz/knot/knot-resolver>`_.
 2. Use ``apkg build-dep`` as described in the :ref:`kresd-dep` section to automatically install development dependencies for the Knot Resolver daemon.
-3. In the repository, change to the ``manager/`` directory and  perform all of the following tasks in that directory.
-4. (Optional) Run ``poetry env use $(which python3.12)`` to configure Poetry to use a Python interpreter other than the system default.
+3. Create virtual environment for your choosen Python version: ``python3 -m venv .venv``.
 
    As mentioned above it is possible to use ``pyenv`` to manage other Python versions.
-   Then poetry needs to be told where to look for that version of Python, e.g.:
+   Then virtualenv needs to be told where to look for that version of Python, e.g.:
 
    .. code-block:: bash
 
-      $ poetry env use ~/.pyenv/versions/3.12.1/bin/python3.12
+      $ ~/.pyenv/versions/3.9.25/bin/python3.9 -m venv .venv
 
-5. Run ``poetry install --all-extras`` to install all dependencies, including all optional ones (omit ``--all-extras`` flag to exclude those), in a newly created virtual environment.
+4. Activate virtualenvironment: ``source .venv/bin/activate``
+5. Upgrade ``pip`` to the latest version: ``pip install --upgrade pip``
+6. Install all development dependencies: ``pip install -e ".[watchdog,prometheus]" --group all``
    All dependencies can be seen in ``pyproject.toml``.
-6. Use ``./poe configure`` to set up the build directory of the Knot Resolver daemon (``kresd``).
+7. Use ``./poe configure`` to set up the build directory of the Knot Resolver daemon (``kresd``).
    This command optionally takes the same arguments as ``meson configure``, but may just as well be run with none to get some sane defaults.
-7. Use ``./poe run`` to run the manager in development mode (Ctrl+C to exit).
+8. Use ``./poe run`` to run the manager in development mode (Ctrl+C to exit).
    The manager is started with the configuration located in ``manager/etc/knot-resolver/config.dev.yaml``.
 
 
@@ -125,9 +116,9 @@ for distros that package development files separately, you will typically need t
 Packaging
 =========
 
-Packaging is handled by `apkg <https://apkg.readthedocs.io/en/latest/>`_ cooperating with Poetry.
+Packaging is handled by `apkg <https://apkg.readthedocs.io/en/latest/>`_ cooperating with Setuptools.
 To allow for backwards compatibility with Python tooling not supporting `PEP-517 <https://peps.python.org/pep-0517/>`_,
-we generate ``setup.py`` file with the command ``poe gen-setuppy``, so our project is compatible with ``setuptools`` as well.
+we generate ``setup.py`` file with the command ``poe gen-setuppy``.
 
 
 Testing
@@ -143,7 +134,7 @@ Code editor
 Feel free to use any text editor you like.
 However, we recommend using `Visual Studio Code <https://code.visualstudio.com/>`_ with `Pylance <https://marketplace.visualstudio.com/items?itemName=ms-python.vscode-pylance>`_ extension.
 That's what we use to work on the manager and we know that it works really well for us.
-Just make sure to configure the extension so that it uses Poetry's virtual environment.
+Just make sure to configure the extension so that it uses virtual environment.
 
 
 FAQ
@@ -164,24 +155,9 @@ Core dependencies which you have to install manually:
   Written in pure shell, no dependencies on Python.
   Should therefore work on any Unix-like system.
 
-- **Poetry**: A dependency management system for Python libraries.
-  Normally, all libraries in Python are installed system-wide and dependent on system's Python version.
-  By using virtual environments managed by Poetry, configured to use a the correct Python version through pyenv, we can specify versions of the dependencies in any way we like.
-
-  Follows PEP 518 and uses the ``pyproject.toml`` file for all of it's configuration.
-  Written in Python, therefore it's problematic if installed system-wide as an ordinary Python package (because it would be unavailable in its own virtual environment).
-
-Automatically managed dependencies:
-
 - **PoeThePoet**: A task management system, or in other words glorified switch statement calling other tools.
   Used for simplifying interactions with the project.
 
 - ``pytest``, ``pytest-cov``: unit testing
 - ``ruff``: linting and formatting
 - ``mypy``: type checking
-
-
-Why Poetry? Why should I learn a new tool?
-------------------------------------------
-
-This blog post explains it nicely - https://muttdata.ai/blog/2020/08/21/a-poetic-apology.html.

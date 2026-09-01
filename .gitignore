@@ -26,6 +26,9 @@
 .libs
 .mypy_cache
 .pytest_cache
+.ruff_cache
+.venv*
+.wheelhouse
 /.build*/
 /.cache
 /.install_dev
@@ -67,6 +70,7 @@
 /missing
 /modules/dnstap/dnstap.pb-c.d
 /pkg
+/python/knot_resolver.egg-info
 /self.crt
 /self.key
 /stamp-h1
@@ -90,4 +94,3 @@ _obj
 kresd.amalg.c
 libkres.amalg.c
 luacov.*.out
-poetry.lock

@@ -28,7 +28,8 @@ Build-Depends:
  pkgconf,
  protobuf-compiler,
  protobuf-c-compiler,
- python3-dev:any
+ python3-all,
+ python3-setuptools
 
 Package: knot-resolver6
 Architecture: any

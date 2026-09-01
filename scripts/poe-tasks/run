@@ -11,12 +11,23 @@ echo
 echo ------------------------------------
 echo Creating missing runtime directories
 echo ------------------------------------
-mkdir -vp $KRES_DEV_INSTALL_DIR/run/knot-resolver $KRES_DEV_INSTALL_DIR/var/cache/knot-resolver
+mkdir -vp \
+    $KRES_DEV_INSTALL_DIR/run/knot-resolver \
+    $KRES_DEV_INSTALL_DIR/var/cache/knot-resolver
 echo
-echo ---------------------------------------
-echo Building Python komponents using Poetry
-echo ---------------------------------------
-poetry build
+echo ------------------------------------------------------
+echo Building/installing Python components using setuptools
+echo ------------------------------------------------------
+# Download packages needed for offline installation into the local .wheelhouse.
+[[ -e .wheelhouse ]] || \
+    python -m pip download \
+        --dest .wheelhouse \
+        ".[prometheus,watchdog]" setuptools \
+        --group all
+python -m pip install -e . \
+    --no-index \
+    --find-links .wheelhouse
+
 # copy native modules from build directory to source directory
 shopt -s globstar
 shopt -s nullglob
@@ -27,9 +38,10 @@ for d in build/lib*; do
 done
 shopt -u globstar
 shopt -u nullglob
-
 echo
-echo --------------------------------------
-echo Starting Knot Resolver wit the Manager
-echo --------------------------------------
-python3 -m knot_resolver.manager --config "$KRES_DEV_CONFIG_FILE" "$@"
+echo ---------------------------------------
+echo Starting Knot Resolver with the Manager
+echo ---------------------------------------
+python3 -m knot_resolver.manager \
+    --config "$KRES_DEV_CONFIG_FILE" \
+    "$@"
