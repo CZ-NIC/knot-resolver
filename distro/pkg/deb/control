@@ -14,7 +14,7 @@ Build-Depends:
  libfstrm-dev,
  libgnutls28-dev,
  libjemalloc-dev,
- libknot-dev,
+ libknot-dev (>= 3.3),
  liblmdb-dev,
  libluajit-5.1-dev,
  libnghttp2-dev,
