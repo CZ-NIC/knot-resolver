@@ -18,14 +18,30 @@ endif
 
 
 message('--- required dependencies ---')
+# We try to give better hints when libknot dependency isn't satisfied.
 knot_version = '>=3.3'
-libknot = dependency('libknot', version: knot_version)
+libknot = dependency('libknot', required: false)
+if not libknot.found()
+  error('libknot dependency was NOT found; please install it:\n  https://www.knot-dns.cz/docs/latest/html/installation.html')
+elif not libknot.version().version_compare(knot_version)
+  dpkg = find_program('dpkg', required: false)
+  rpm = find_program('rpm', required: false)
+  if dpkg.found() and not rpm.found()
+    error('libknot dependency is too old; please consider\n  https://pkg.labs.nic.cz/doc/?project=knot-dns')
+  elif rpm.found() and not dpkg.found()
+    error('libknot dependency is too old; please consider\n  https://copr.fedorainfracloud.org/coprs/g/cznic/knot-dns/')
+  else
+    error('libknot dependency is too old; please upgrade it:\n  https://www.knot-dns.cz/docs/latest/html/installation.html')
+  endif
+endif
+
 if libknot.version() < '3.6'
   libdnssec = dependency('libdnssec', version: knot_version)
 else
   libdnssec = libknot # the libraries merged
 endif
 libzscanner = dependency('libzscanner', version: knot_version)
+
 libuv = dependency('libuv', version: '>=1.27')  # need uv_udp_connect()
 lmdb = dependency('lmdb', required: false)
 if not lmdb.found()  # darwin workaround: missing pkgconfig
