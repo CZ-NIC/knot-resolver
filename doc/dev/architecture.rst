@@ -34,11 +34,11 @@ You may notice this when reading the manager's logs immediately after startup.
 
 What happens on cold start is:
 
-1. The manager starts, reads its configuration and generates a new supervisord configuration.
-   Then, it starts supervisord with the ``exec`` syscall, which causes supervisord to *replace* the manager process.
-2. The supervisord loads its configuration, loads our custom extensions and starts a new instance of the manager.
-3. The manager starts again, this time as a child of the supervisord instance.
-   Since this is the desired state, it reloads the configuration again and instructs the supervisord to start the other components of the resolver.
+1. The initial Knot Resolver program starts, reads its configuration and generates a new supervisord configuration.
+   Then, it starts supervisord with the ``exec`` syscall, which causes supervisord to *replace* the initial Knot Resolver process.
+2. The supervisord loads its configuration, loads our custom extensions and starts the manager.
+3. The manager starts as a child of the supervisord instance.
+   Since this is the desired state, it loads the configuration again and instructs the supervisord to start the other components of the resolver.
 
 
 Failure handling
