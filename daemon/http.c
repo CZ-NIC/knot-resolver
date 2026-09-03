@@ -76,7 +76,7 @@ struct pl_http_sess_data {
 	queue_http_stream streams;
 
 	trie_t *stream_write_queues;  /* Dictionary of stream data that needs to be freed after write. */
-	int32_t incomplete_stream;
+	int32_t incomplete_stream;  /** The currently processed stream.  Fields below relate to that one. */
 	int32_t last_stream;   /* The last used stream - mostly the same as incomplete_stream, but can be used after
 				  completion for sending HTTP status codes. */
 	enum http_method current_method;
@@ -200,6 +200,11 @@ static int process_uri_path(struct pl_http_sess_data *ctx, const char* path, int
 		kr_log_debug(DOH, "[%p] base64url decode failed %s\n", (void *)ctx->h2, kr_strerror(ret));
 		return ret;
 	}
+	if (ret < KNOT_WIRE_HEADER_SIZE) {
+		wire_buf_reset(wb);
+		kr_log_debug(DOH, "[%p] URL decoded into too short wire: %d B\n", (void *)ctx->h2, ret);
+		return kr_error(ERANGE);
+	}
 
 	wire_buf_consume(wb, ret);
 
@@ -235,6 +240,7 @@ void http_free_headers(kr_http_header_array_t *headers)
 static void http_cleanup_stream(struct pl_http_sess_data *ctx)
 {
 	ctx->incomplete_stream = -1;
+	wire_buf_reset(&ctx->wire_buf);
 	ctx->current_method = HTTP_METHOD_NONE;
 	ctx->status = HTTP_STATUS_OK;
 	free(ctx->uri_path);
@@ -383,7 +389,7 @@ static ssize_t send_callback(nghttp2_session *h2, const uint8_t *data, size_t le
 			     int flags, void *user_data)
 {
 	struct pl_http_sess_data *http = user_data;
-	struct http_send_ctx *send_ctx = malloc(sizeof(*send_ctx) + length);
+	struct http_send_ctx *send_ctx = malloc(offsetof(struct http_send_ctx, data) + length);
 	kr_require(send_ctx);
 	send_ctx->sess_data = http;
 	memcpy(send_ctx->data, data, length);
@@ -467,7 +473,8 @@ static int send_data_callback(nghttp2_session *h2, nghttp2_frame *frame, const u
 	}
 
 	int iovcnt = 1 + dataiovcnt + (2 * has_padding);
-	struct http_send_data_ctx *sdctx = calloc(iovcnt, sizeof(*ctx) + sizeof(struct iovec[iovcnt]));
+	struct http_send_data_ctx *sdctx = malloc(offsetof(struct http_send_data_ctx, iov)
+						+ sizeof(struct iovec[iovcnt]));
 	sdctx->padlen = padlen;
 
 	struct iovec *dest_iov = sdctx->iov;
@@ -659,7 +666,6 @@ static int data_chunk_recv_callback(nghttp2_session *h2, uint8_t flags, int32_t 
 		kr_log_debug(DOH, "[%p] stream %d incomplete, refusing (data_chunk_recv_callback)\n",
 			(void *)h2, ctx->incomplete_stream);
 		refuse_stream(h2, stream_id);
-		ctx->incomplete_stream = -1;
 		return 0;
 	}
 
@@ -674,6 +680,7 @@ static int data_chunk_recv_callback(nghttp2_session *h2, uint8_t flags, int32_t 
 	if (required > remaining) {
 		kr_log_error(DOH, "[%p] insufficient space in buffer\n", (void *)h2);
 		ctx->incomplete_stream = -1;
+		wire_buf_reset(wb);
 		return NGHTTP2_ERR_CALLBACK_FAILURE;
 	}
 
@@ -1006,6 +1013,12 @@ static enum protolayer_event_cb_result pl_http_event_unwrap(
 	struct pl_http_sess_data *http = sess_data;
 
 	if (event == PROTOLAYER_EVENT_MALFORMED) {
+		// Pop the malformed stream, after a sanity check.
+		if (queue_len(http->streams) > 0
+				&& queue_head(http->streams).id == http->last_stream) {
+			http_free_headers(queue_head(http->streams).headers);
+			queue_pop(http->streams);
+		}
 		http_send_status(http, HTTP_STATUS_BAD_REQUEST);
 		return PROTOLAYER_EVENT_PROPAGATE;
 	}
