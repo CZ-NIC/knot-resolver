@@ -942,7 +942,7 @@ int io_create(uv_loop_t *loop, uv_handle_t **handle,
 		uv_tcp_t *tcp = malloc(sizeof(uv_tcp_t));
 		kr_require(tcp);
 		ret = uv_tcp_init_ex(loop, tcp, family);
-		if (ret != 0) {
+		if (ret == 0) {
 			uv_tcp_nodelay(tcp, 1);
 		}
 		*handle = (uv_handle_t *)tcp;
