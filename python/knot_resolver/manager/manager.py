@@ -131,6 +131,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                 config.rate_limiting,
                 config.defer,
                 config.tunnel_filter,
+                config.dga_filter,
                 config.lua,
             ]
 

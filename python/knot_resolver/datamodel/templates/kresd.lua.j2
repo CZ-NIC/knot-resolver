@@ -49,6 +49,9 @@ nsid.name('{{ cfg.nsid }}' .. worker.id)
 -- TUNNEL-FILTER section ------------------------
 {% include "tunnel_filter.lua.j2" %}
 
+-- DGA-FILTER section ---------------------------
+{% include "dga_filter.lua.j2" %}
+
 {% endif %}
 
 -- LUA section --------------------------------------
