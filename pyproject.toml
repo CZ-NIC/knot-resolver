@@ -88,7 +88,6 @@ type = "simple"
 # Tasks to configure, build and run
 configure = { cmd = "scripts/poe-tasks/configure", help = "(Re)configure Meson build directory." }
 run = { cmd = "scripts/poe-tasks/run", help = "Run Knot Resolver." }
-run-debug = { cmd = "scripts/poe-tasks/run-debug", help = "Debug Knot Resolver with debugpy." }
 kresctl = { cmd = "scripts/poe-tasks/kresctl", help="Run kresctl utility" }
 docs = { cmd = "scripts/poe-tasks/docs", help = "Build Knot Resolver's HTML documentation." }
 # Tasks to generate files

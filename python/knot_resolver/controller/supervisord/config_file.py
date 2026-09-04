@@ -159,12 +159,6 @@ class ProcessTypeConfig:
             ]
 
         environment = f"{NO_PREFIX_FORMAT_ENV_VAR}=true"
-        # if os.environ.get("KRES_DEBUG_MANAGER"):
-        #     logger.warning("Injecting debugger into the supervisord config")
-        #     # the args array looks like this:
-        #     # [PYTHON_PATH, "-m", "knot_resolver", ...]
-        #     args = args[:1] + ["-m", "debugpy", "--listen", "0.0.0.0:5678", "--wait-for-client"] + args[2:]
-
         if NOTIFY_SUPPORT:
             environment += ",X-SUPERVISORD-TYPE=notify"
 
