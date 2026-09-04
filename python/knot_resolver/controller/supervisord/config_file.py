@@ -160,13 +160,6 @@ class ProcessTypeConfig:
                 *map(str, args.config),
             ]
 
-        # # insert debugger when asked
-        # if os.environ.get("KRES_DEBUG_MANAGER"):
-        #     logger.warning("Injecting debugger into the supervisord config")
-        #     # the args array looks like this:
-        #     # [PYTHON_PATH, "-m", "knot_resolver", ...]
-        #     args = args[:1] + ["-m", "debugpy", "--listen", "0.0.0.0:5678", "--wait-for-client"] + args[2:]
-
         environment = "KRES_SUPRESS_LOG_PREFIX=true"
         if NOTIFY_SUPPORT:
             environment += ",X-SUPERVISORD-TYPE=notify"
