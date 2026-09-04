@@ -30,6 +30,7 @@ Build-Depends:
  python3-setuptools,
  libtorch-dev,
  libpsl-dev,
+ libonnxruntime-dev,
 Standards-Version: 4.7.3
 Homepage: https://www.knot-resolver.cz/
 

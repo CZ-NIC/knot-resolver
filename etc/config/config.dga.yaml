@@ -1,0 +1,11 @@
+workers: 1
+network:
+  listen:
+    - interface: 127.0.0.1@53
+logging:
+  level: info
+  groups: [dga]
+dga-filter:
+  enable: true
+  file: /home/dgad.onnx
+  threshold: 31

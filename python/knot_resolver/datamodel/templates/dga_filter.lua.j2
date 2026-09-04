@@ -1,0 +1,12 @@
+{% from 'macros/policy_macros.lua.j2' import policy_get_tagset %}
+{% if cfg.dga_filter.enable -%}
+modules.load('dga_filter')
+ffi.cdef([[
+int dga_filter_setup(const char *model, kr_rule_tags_t tags, uint16_t threshold);
+]])
+assert(C.dga_filter_setup(
+	'{{ cfg.dga_filter.file }}',
+	{{ policy_get_tagset(cfg.dga_filter.tags) }},
+        {{ cfg.dga_filter.threshold}}
+) == 0);
+{%- endif %}
