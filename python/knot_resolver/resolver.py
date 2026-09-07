@@ -7,7 +7,7 @@ from pathlib import Path
 from pwd import getpwuid
 from typing import TYPE_CHECKING, Any
 
-from .constants import USER
+from .constants import USER, VERSION
 from .controller import get_best_controller_implementation
 from .controller.exceptions import KresSubprocessControllerError, KresSubprocessControllerExec
 from .datamodel.config_schema import KresConfig, get_rundir_without_validation
@@ -24,7 +24,7 @@ logger = get_logger(__name__)
 
 
 async def start_resolver(args: KresArgs) -> int:
-    logger.notice("Starting Knot Resolver...")
+    logger.notice(f"Starting Knot Resolver {VERSION}...")
 
     # Block signals during initialization
     blocked_signals = {signal.SIGHUP, signal.SIGINT, signal.SIGTERM}
