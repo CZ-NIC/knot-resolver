@@ -1,9 +1,9 @@
 from typing import List
 
-from knot_resolver import KresBaseError
+from knot_resolver.exceptions import KresError
 
 
-class KresSubprocessControllerError(KresBaseError):
+class KresSubprocessControllerError(KresError):
     """Class for errors that are raised in the controller module."""
 
 

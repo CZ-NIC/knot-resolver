@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Dict, Iterable, Optional, Type, TypeVar
 from weakref import WeakValueDictionary
 
+from knot_resolver.args import KresArgs
 from knot_resolver.controller.exceptions import KresSubprocessControllerError
 from knot_resolver.controller.registered_workers import register_worker, unregister_worker
 from knot_resolver.datamodel.config_schema import KresConfig
@@ -252,7 +253,7 @@ class SubprocessController(ABC):
         """Return bool, whether the controller is available with the given config."""
 
     @abstractmethod
-    async def initialize_controller(self, config: KresConfig) -> None:
+    async def initialize_controller(self, args: KresArgs, config: KresConfig) -> None:
         """
         Initialize the Subprocess Controller.
 

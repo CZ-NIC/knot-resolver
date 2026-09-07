@@ -1,9 +1,9 @@
 from typing import Iterable, Iterator
 
-from knot_resolver import KresBaseError
+from knot_resolver.exceptions import KresError
 
 
-class ModelingBaseError(KresBaseError):
+class ModelingBaseError(KresError):
     """Base class for all errors used in data modeling."""
 
 

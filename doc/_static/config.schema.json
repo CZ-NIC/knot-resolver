@@ -1533,24 +1533,14 @@
                     "default": "notice"
                 },
                 "target": {
-                    "anyOf": [
-                        {
-                            "type": "string",
-                            "enum": [
-                                "syslog",
-                                "stderr",
-                                "stdout"
-                            ]
-                        },
-                        {
-                            "type": "string",
-                            "enum": [
-                                "from-env"
-                            ]
-                        }
+                    "type": "string",
+                    "enum": [
+                        "syslog",
+                        "stderr",
+                        "stdout"
                     ],
-                    "description": "Global logging stream target. \"from-env\" uses $KRES_LOGGING_TARGET and defaults to \"stdout\".",
-                    "default": "from-env"
+                    "description": "Global logging stream target.",
+                    "default": "stdout"
                 },
                 "groups": {
                     "type": [

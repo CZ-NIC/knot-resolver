@@ -246,6 +246,7 @@ getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysc
 %ghost %{_localstatedir}/cache/%{name}
 %attr(750,knot-resolver,knot-resolver) %dir %{_libdir}/%{name}
 %{_bindir}/kresctl
+%{_bindir}/kres-manager
 %{_bindir}/knot-resolver
 %{_sbindir}/kresd
 %{_sbindir}/kres-cache-gc
