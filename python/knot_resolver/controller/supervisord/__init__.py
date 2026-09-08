@@ -1,7 +1,10 @@
+import asyncio
 import logging
+import shutil
+from collections.abc import Coroutine, Iterable
 from os import getppid, kill  # pylint: disable=[no-name-in-module]
 from pathlib import Path
-from typing import Any, Dict, Iterable, NoReturn, Optional, Union, cast
+from typing import Any, Callable, Dict, NoReturn, Optional, TypeVar, Union, cast
 from xmlrpc.client import Fault, ServerProxy
 
 import supervisor.xmlrpc  # type: ignore[import]
@@ -18,29 +21,33 @@ from knot_resolver.controller.interface import (
 from knot_resolver.controller.supervisord.config_file import SupervisordKresID, write_config_file
 from knot_resolver.datamodel.config_schema import KresConfig, workers_max_count
 from knot_resolver.manager.constants import supervisord_config_file, supervisord_pid_file, supervisord_sock_file
-from knot_resolver.utils import which
-from knot_resolver.utils.async_utils import call, readfile
-from knot_resolver.utils.compat.asyncio import async_in_a_thread
+from knot_resolver.utils.async_utils import readfile
+
+T = TypeVar("T")
 
 logger = logging.getLogger(__name__)
 
 
-async def _start_supervisord(config: KresConfig) -> None:
-    logger.debug("Writing supervisord config")
-    await write_config_file(config)
-    logger.debug("Starting supervisord")
-    res = await call(["supervisord", "--configuration", str(supervisord_config_file(config).absolute())])
-    if res != 0:
-        raise KresSubprocessControllerError(f"Supervisord exited with exit code {res}")
+def async_in_a_thread(func: Callable[..., T]) -> Callable[..., Coroutine[None, None, T]]:
+    async def wrapper(*args: Any, **kwargs: Any) -> T:
+        return await asyncio.to_thread(func, *args, **kwargs)
+
+    return wrapper
 
 
 async def _exec_supervisord(args: KresArgs, config: KresConfig) -> NoReturn:
     logger.debug("Writing supervisord config")
     await write_config_file(args, config)
     logger.debug("Execing supervisord")
+
+    supervisord = shutil.which("supervisord")
+    if supervisord is None:
+        msg = "The executable 'supervisord' was not found in $PATH"
+        raise RuntimeError(msg)
+
     raise KresSubprocessControllerExec(
         [
-            str(which.which("supervisord")),
+            supervisord,
             "supervisord",
             "--configuration",
             str(supervisord_config_file(config).absolute()),
@@ -83,10 +90,9 @@ async def _is_supervisord_available() -> bool:
     # yes, it is! The code in this file wouldn't be running without it due to imports :)
 
     # so let's just check that we can find supervisord and supervisorctl binaries
-    try:
-        which.which("supervisord")
-        which.which("supervisorctl")
-    except RuntimeError:
+    supervisord = shutil.which("supervisord")
+    supervisorctl = shutil.which("supervisorctl")
+    if supervisord is None or supervisorctl is None:
         logger.error("Failed to find supervisord or supervisorctl executables in $PATH")
         return False
 

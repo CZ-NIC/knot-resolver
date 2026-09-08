@@ -5,11 +5,12 @@ import logging
 import os
 import signal
 import sys
+from collections.abc import Coroutine
 from functools import partial
 from http import HTTPStatus
 from pathlib import Path
 from time import time
-from typing import Any, Dict, List, Literal, Optional, Set, Union, cast
+from typing import Any, Callable, Dict, List, Literal, Optional, Set, Union, cast
 
 from aiohttp import web
 from aiohttp.web import middleware
@@ -31,9 +32,7 @@ from knot_resolver.exceptions import KresError
 from knot_resolver.logging import reconfigure_logging
 from knot_resolver.manager import files, metrics
 from knot_resolver.manager.config_store import only_on_real_changes_update
-from knot_resolver.utils import ignore_exceptions_optional
 from knot_resolver.utils.async_utils import readfile
-from knot_resolver.utils.compat import asyncio as asyncio_compat
 from knot_resolver.utils.etag import structural_etag
 from knot_resolver.utils.functional import Result
 from knot_resolver.utils.modeling.exceptions import AggregateDataValidationError, DataParsingError, DataValidationError
@@ -46,6 +45,16 @@ from .exceptions import KresManagerBaseError
 from .manager import KresManager
 
 logger = logging.getLogger(__name__)
+
+
+def add_async_signal_handler(signal: int, callback: Callable[[], Coroutine[Any, Any, None]]) -> None:
+    loop = asyncio.get_event_loop()
+    loop.add_signal_handler(signal, lambda: asyncio.create_task(callback()))
+
+
+def remove_signal_handler(signal: int) -> bool:
+    loop = asyncio.get_event_loop()
+    return loop.remove_signal_handler(signal)
 
 
 @middleware
@@ -178,14 +187,14 @@ class Server:
         return {signal.SIGHUP, signal.SIGINT, signal.SIGTERM}
 
     def bind_signal_handlers(self) -> None:
-        asyncio_compat.add_async_signal_handler(signal.SIGTERM, self.sigterm_handler)
-        asyncio_compat.add_async_signal_handler(signal.SIGINT, self.sigint_handler)
-        asyncio_compat.add_async_signal_handler(signal.SIGHUP, self.sighup_handler)
+        add_async_signal_handler(signal.SIGTERM, self.sigterm_handler)
+        add_async_signal_handler(signal.SIGINT, self.sigint_handler)
+        add_async_signal_handler(signal.SIGHUP, self.sighup_handler)
 
     def unbind_signal_handlers(self) -> None:
-        asyncio_compat.remove_signal_handler(signal.SIGTERM)
-        asyncio_compat.remove_signal_handler(signal.SIGINT)
-        asyncio_compat.remove_signal_handler(signal.SIGHUP)
+        remove_signal_handler(signal.SIGTERM)
+        remove_signal_handler(signal.SIGINT)
+        remove_signal_handler(signal.SIGHUP)
 
     async def start(self) -> None:
         self._setup_routes()
@@ -221,9 +230,16 @@ class Server:
         else:
             update_with = parse_from_mime_type(await request.text(), request.content_type)
         document_path = request.match_info["path"]
-        getheaders = ignore_exceptions_optional(KeyError, None)(request.headers.getall)
-        etags = getheaders("if-match")
-        not_etags = getheaders("if-none-match")
+
+        def get_header_values(name: str) -> Optional[List[str]]:
+            try:
+                return request.headers.getall(name)
+            except KeyError:
+                return None
+
+        etags = get_header_values("if-match")
+        not_etags = get_header_values("if-none-match")
+
         current_config: Dict[str, Any] = self.config_store.get().get_unparsed_data()
 
         # stop processing if etags
@@ -613,8 +629,8 @@ async def start_server(args: KresArgs) -> int:
     signal.pthread_sigmask(signal.SIG_BLOCK, Server.all_handled_signals())
     server.unbind_signal_handlers()
     # on the other hand, we want to immediatelly stop when the user really wants us to stop
-    asyncio_compat.add_async_signal_handler(signal.SIGTERM, _sigterm_while_shutting_down)
-    asyncio_compat.add_async_signal_handler(signal.SIGINT, _sigint_while_shutting_down)
+    add_async_signal_handler(signal.SIGTERM, _sigterm_while_shutting_down)
+    add_async_signal_handler(signal.SIGINT, _sigint_while_shutting_down)
     signal.pthread_sigmask(signal.SIG_UNBLOCK, {signal.SIGTERM, signal.SIGINT})
 
     # After triggering shutdown, we neet to clean everything up
