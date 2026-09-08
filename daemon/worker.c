@@ -2734,7 +2734,8 @@ static enum protolayer_event_cb_result pl_dns_stream_disconnected(
 				struct kr_request *req = &task->ctx->req;
 				struct kr_rplan *rplan = &req->rplan;
 				struct kr_query *qry = array_tail(rplan->pending);
-				qry->flags.TCP = false;
+				qry->flags.TCP = task->transport->protocol
+					== KR_TRANSPORT_DOQ;
 			}
 			qr_task_step(task, NULL, NULL);
 			defer_sample_restart();
@@ -2751,7 +2752,8 @@ static enum protolayer_event_cb_result pl_dns_stream_disconnected(
 				struct kr_request *req = &task->ctx->req;
 				struct kr_rplan *rplan = &req->rplan;
 				struct kr_query *qry = array_tail(rplan->pending);
-				qry->flags.TCP = false;
+				qry->flags.TCP = task->transport->protocol
+					== KR_TRANSPORT_DOQ;
 			}
 			qr_task_step(task, NULL, NULL);
 			defer_sample_restart();

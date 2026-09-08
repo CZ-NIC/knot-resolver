@@ -228,7 +228,10 @@ function policy.DOQ_FORWARD(targets)
 		qry.flags.NO_MINIMIZE = true
 		qry.flags.AWAIT_CUT = true
 		req.options.TCP = false
-		qry.flags.TCP = false
+		-- DoQ sets flags.TCP to true despite running atop UDP, this is
+		-- correct because this flag doesn't affect socket type and the
+		-- name doesn't precisely represent it's meaning.
+		qry.flags.TCP = true
 		set_nslist(req, nslist)
 		return state
 	end

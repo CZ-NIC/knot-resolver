@@ -314,7 +314,8 @@ void iter_choose_transport(struct kr_query *qry, struct kr_transport **transport
 		    qry->server_selection.local_state->force_udp) {
 			// Last chance on broken TCP.
 			(*transport)->protocol = KR_TRANSPORT_UDP;
-			qry->flags.TCP = false;
+			qry->flags.TCP =
+				(*transport)->protocol == KR_TRANSPORT_DOQ;
 		}
 	}
 

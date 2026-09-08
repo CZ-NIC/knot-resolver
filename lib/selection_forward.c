@@ -97,7 +97,10 @@ void forward_choose_transport(struct kr_query *qry,
 		/* We need to propagate this to flags since it's used in other
 		 * parts of the resolver (e.g. logging and stats). */
 		qry->flags.TCP = (*transport)->protocol == KR_TRANSPORT_TCP
-			      || (*transport)->protocol == KR_TRANSPORT_TLS;
+			      || (*transport)->protocol == KR_TRANSPORT_TLS
+			      /* DoQ also sets flags.TCP to true, see
+			       * policy.DOQ_FORWARD for more info. */
+			      || (*transport)->protocol == KR_TRANSPORT_DOQ;
 	}
 cleanup:
 	kr_cache_commit(&qry->request->ctx->cache);
