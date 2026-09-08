@@ -932,7 +932,8 @@ int kr_resolve_checkout(struct kr_request *request, const struct sockaddr *src,
 			"=> id: '%05u' querying: '%s'@'%s' zone cut: '%s' "
 			"qname: '%s' qtype: '%s' proto: '%s'\n",
 			qry->id, ns_name, ns_str ? ns_str : "", zonecut_str,
-			qname_str, type_str, (qry->flags.TCP) ? "tcp" : "udp");
+			qname_str, type_str,
+			(qry->flags.TCP && transport->protocol != KR_TRANSPORT_DOQ) ? "tcp" : "udp");
 	}
 
 	return kr_ok();
