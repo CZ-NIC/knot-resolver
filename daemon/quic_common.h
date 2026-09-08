@@ -21,7 +21,8 @@
 #include "session2.h"
 #include "network.h"
 
-/* option to turn of ngtcp2 log which is by default enabled for log_level = debug */
+/* option to turn of ngtcp2 log which is by default disabled for all log levels
+ * setting this to true will only print ngtcp2 log for 'deve' log_level. */
 #define DEBUG_NGTCP2 false
 
 /** RFC 9250 4.3 DoQ Error Codes for use as application protocol error codes */
