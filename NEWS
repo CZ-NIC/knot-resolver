@@ -7,6 +7,8 @@ Bugfixes
 - watchdog: detect file-changes done via rename*() syscall (!1895)
   This is relevant for RPZ files and TLS certs+keys.
 - DoH fixes for sharing connections among different users (!1844)
+- TCP-based connections used Nagle's algorithm since 6.2.0 (!1903)
+  This mistake significantly increased latencies of such transports.
 
 Packaging
 ---------
