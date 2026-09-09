@@ -78,7 +78,7 @@ local function serve_doh(h, stream)
 		return 500, 'internal server error'
 	end
 
-	local result = ffi.C.knot_pkt_parse(pkt, 0)
+	local result = ffi.C.knot_pkt_parse(pkt, 512)
 	if result ~= 0 then
 		return 400, 'unparseable DNS message'
 	end
