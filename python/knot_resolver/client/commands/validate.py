@@ -1,10 +1,12 @@
-# noqa: INP001
-import argparse
-import sys
-from pathlib import Path
-from typing import Any, Dict, List, Tuple, Type
+from __future__ import annotations
 
-from knot_resolver.client.command import Command, CommandArgs, CompWords, comp_get_words, register_command
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
+
+from knot_resolver.client.args import KresClientArgs
+from knot_resolver.client.command import KresClientCommand
 from knot_resolver.constants import CONFIG_FILE
 from knot_resolver.datamodel import KresConfig
 from knot_resolver.datamodel.globals import Context, reset_global_validation_context, set_global_validation_context
@@ -12,56 +14,54 @@ from knot_resolver.utils.modeling import try_to_parse
 from knot_resolver.utils.modeling.exceptions import DataParsingError, DataValidationError
 from knot_resolver.utils.modeling.parsing import data_combine
 
+if TYPE_CHECKING:
+    import argparse
 
-@register_command
-class ValidateCommand(Command):
-    def __init__(self, namespace: argparse.Namespace) -> None:
-        super().__init__(namespace)
-        self.input_file: str = namespace.input_file
-        self.strict: bool = namespace.strict
 
-    @staticmethod
-    def register_args_subparser(
-        subparser: "argparse._SubParsersAction[argparse.ArgumentParser]",
-    ) -> Tuple[argparse.ArgumentParser, "Type[Command]"]:
-        validate = subparser.add_parser("validate", help="Validates configuration in JSON or YAML format.")
-        validate.set_defaults(strict=False)
-        validate.add_argument(
-            "--strict",
-            help="Enable strict rules during validation, e.g. paths/files existence and permissions.",
-            action="store_true",
-            dest="strict",
-        )
-        validate.add_argument(
-            "input_file",
-            type=str,
-            nargs="*",
-            help="File or combination of files with the declarative configuration in YAML or JSON format.",
-            default=[CONFIG_FILE],
-        )
+@dataclass(frozen=True)
+class ValidateCommandArgs(KresClientArgs):
+    strict: bool
+    input_file: tuple[Path, ...]
 
-        return validate, ValidateCommand
 
-    @staticmethod
-    def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
-        return comp_get_words(args, parser)
+def register_subparser(subparser: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    validate_parser = subparser.add_parser("validate", help="Validates configuration in JSON or YAML format.")
+    validate_parser.add_argument(
+        "--strict",
+        action="store_true",
+        default=False,
+        help="Enable strict rules during validation, e.g. paths/files existence and permissions.",
+    )
+    validate_parser.add_argument(
+        "input_file",
+        type=Path,
+        nargs="*",
+        default=(CONFIG_FILE,),
+        help="File or combination of files with the declarative configuration in YAML or JSON format.",
+    )
+    validate_parser.set_defaults(command=ValidateCommand, command_args=ValidateCommandArgs)
 
-    def run(self, args: CommandArgs) -> None:
-        data: Dict[str, Any] = {}
+
+class ValidateCommand(KresClientCommand):
+    def __init__(self, args: ValidateCommandArgs) -> None:
+        self._args = args
+
+    def run(self) -> None:
+        data: dict[str, Any] = {}
         try:
-            for file in self.input_file:
-                with open(file, "r") as f:
+            for file in self._args.input_file:
+                with file.open() as f:
                     raw = f.read()
                 parsed = try_to_parse(raw)
                 data = data_combine(data, parsed)
 
-            set_global_validation_context(Context(Path(self.input_file[0]).parent, self.strict))
+            set_global_validation_context(Context(Path(self._args.input_file[0]).parent, self._args.strict))
             KresConfig(data)
             reset_global_validation_context()
-        except (DataParsingError, DataValidationError) as e:
+        except (FileNotFoundError, DataParsingError, DataValidationError) as e:
             print(e, file=sys.stderr)
             sys.exit(1)
-        if not self.strict:
+        if not self._args.strict:
             print(
                 "Basic validation was successful."
                 "\nIf you want more strict validation, you can use the '--strict' switch."

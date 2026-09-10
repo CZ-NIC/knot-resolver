@@ -1,42 +1,45 @@
-# noqa: INP001
-import argparse
-import sys
-from typing import List, Tuple, Type
+from __future__ import annotations
 
-from knot_resolver.client.command import Command, CommandArgs, CompWords, register_command
+import sys
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+from knot_resolver.client.args import KresClientArgs
+from knot_resolver.client.command import KresClientCommand, get_socket
 from knot_resolver.utils.requests import request
 
+if TYPE_CHECKING:
+        import argparse
 
-@register_command
-class ReloadCommand(Command):
-    def __init__(self, namespace: argparse.Namespace) -> None:
-        super().__init__(namespace)
-        self.force: bool = namespace.force
 
-    @staticmethod
-    def register_args_subparser(
-        subparser: "argparse._SubParsersAction[argparse.ArgumentParser]",
-    ) -> Tuple[argparse.ArgumentParser, "Type[Command]"]:
-        reload = subparser.add_parser(
-            "reload",
-            help="Tells the resolver to reload YAML configuration file."
-            " Old processes are replaced by new ones (with updated configuration) using rolling restarts."
-            " So there will be no DNS service unavailability during reload operation.",
-        )
-        reload.add_argument(
-            "--force",
-            help="Force a reload, even if the configuration hasn't changed.",
-            action="store_true",
-            default=False,
-        )
-        return reload, ReloadCommand
+@dataclass(frozen=True)
+class ReloadCommandArgs(KresClientArgs):
+     force: bool
 
-    @staticmethod
-    def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
-        return {}
 
-    def run(self, args: CommandArgs) -> None:
-        response = request(args.socket, "POST", "reload/force" if self.force else "reload")
+def register_subparser(subparser: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    reload_parser = subparser.add_parser(
+        "reload",
+        help="Tells the resolver to reload YAML configuration file."
+        " Old processes are replaced by new ones (with updated configuration) using rolling restarts."
+        " So there will be no DNS service unavailability during reload operation.",
+    )
+    reload_parser.add_argument(
+        "--force",
+        action="store_true",
+        default=False,
+        help="Force a reload, even if the configuration hasn't changed.",
+    )
+    reload_parser.set_defaults(command=ReloadCommand, command_args=ReloadCommandArgs)
+
+
+class ReloadCommand(KresClientCommand):
+    def __init__(self, args: ReloadCommandArgs) -> None:
+        self._socket = get_socket(args)
+        self._args = args
+
+    def run(self) -> None:
+        response = request(self._socket, "POST", "reload/force" if self._args.force else "reload")
 
         if response.status != 200:
             print(response, file=sys.stderr)

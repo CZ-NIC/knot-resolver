@@ -1,16 +1,63 @@
-# noqa: INP001
-import argparse
+from __future__ import annotations
+
 import copy
 import sys
-from typing import Any, Dict, List, Optional, Tuple, Type
+from dataclasses import dataclass
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
-from knot_resolver.client.command import Command, CommandArgs, CompWords, comp_get_words, register_command
+from knot_resolver.client.args import KresClientArgs
+from knot_resolver.client.command import KresClientCommand
 from knot_resolver.constants import VERSION
 from knot_resolver.utils.modeling.exceptions import DataParsingError
 from knot_resolver.utils.modeling.parsing import DataFormat, try_to_parse
 
+if TYPE_CHECKING:
+    import argparse
 
-def _remove(config: Dict[str, Any], path: str) -> Optional[Any]:
+
+@dataclass(frozen=True)
+class MigrateCommandArgs(KresClientArgs):
+    output_format: DataFormat
+    input_file: Path
+    output_file: Path | None
+
+
+def register_subparser(subparser: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    migrate_parser = subparser.add_parser("migrate", help="Migrates JSON or YAML configuration to the newer version.")
+
+    output_formats = migrate_parser.add_mutually_exclusive_group()
+    output_formats.add_argument(
+        "--json",
+        help="Get migrated configuration data in JSON format.",
+        const=DataFormat.JSON,
+        action="store_const",
+        dest="output_format",
+    )
+    output_formats.add_argument(
+        "--yaml",
+        help="Get migrated configuration data in YAML format, default.",
+        const=DataFormat.YAML,
+        action="store_const",
+        dest="output_format",
+    )
+
+    migrate_parser.add_argument(
+        "input_file",
+        type=Path,
+        help="File with configuration in YAML or JSON format.",
+    )
+    migrate_parser.add_argument(
+        "output_file",
+        type=Path,
+        nargs="?",
+        help="Optional, output file for migrated configuration in desired output format."
+        " If not specified, migrated configuration is printed.",
+    )
+    migrate_parser.set_defaults(output_format=DataFormat.YAML, command=MigrateCommand, command_args=MigrateCommandArgs)
+
+
+def _remove(config: dict[str, Any], path: str) -> Any | None:
     keys = path.split("/")
     last = keys[-1]
 
@@ -28,13 +75,13 @@ def _remove(config: Dict[str, Any], path: str) -> Optional[Any]:
     return None
 
 
-def _add(config: Dict[str, Any], path: str, val: Any, rewrite: bool = False) -> None:
+def _add(config: dict[str, Any], path: str, val: Any, rewrite: bool = False) -> None:
     keys = path.split("/")
     last = keys[-1]
 
     current = config
     for key in keys[1:-1]:
-        if key not in current or key in current and not isinstance(current[key], dict):
+        if key not in current or (key in current and not isinstance(current[key], dict)):
             current[key] = {}
         current = current[key]
 
@@ -43,64 +90,18 @@ def _add(config: Dict[str, Any], path: str, val: Any, rewrite: bool = False) -> 
         print(f"added {path}")
 
 
-def _rename(config: Dict[str, Any], path: str, new_path: str) -> None:
-    val: Optional[Any] = _remove(config, path)
+def _rename(config: dict[str, Any], path: str, new_path: str) -> None:
+    val: Any | None = _remove(config, path)
     if val:
         _add(config, new_path, val)
 
 
-@register_command
-class MigrateCommand(Command):
-    def __init__(self, namespace: argparse.Namespace) -> None:
-        super().__init__(namespace)
-        self.input_file: str = namespace.input_file
-        self.output_file: Optional[str] = namespace.output_file
-        self.output_format: DataFormat = namespace.output_format
+class MigrateCommand(KresClientCommand):
+    def __init__(self, args: MigrateCommandArgs) -> None:
+        self._args = args
 
-    @staticmethod
-    def register_args_subparser(
-        subparser: "argparse._SubParsersAction[argparse.ArgumentParser]",
-    ) -> Tuple[argparse.ArgumentParser, "Type[Command]"]:
-        migrate = subparser.add_parser("migrate", help="Migrates JSON or YAML configuration to the newer version.")
-
-        migrate.set_defaults(output_format=DataFormat.YAML)
-        output_formats = migrate.add_mutually_exclusive_group()
-        output_formats.add_argument(
-            "--json",
-            help="Get migrated configuration data in JSON format.",
-            const=DataFormat.JSON,
-            action="store_const",
-            dest="output_format",
-        )
-        output_formats.add_argument(
-            "--yaml",
-            help="Get migrated configuration data in YAML format, default.",
-            const=DataFormat.YAML,
-            action="store_const",
-            dest="output_format",
-        )
-
-        migrate.add_argument(
-            "input_file",
-            type=str,
-            help="File with configuration in YAML or JSON format.",
-        )
-        migrate.add_argument(
-            "output_file",
-            type=str,
-            nargs="?",
-            help="Optional, output file for migrated configuration in desired output format."
-            " If not specified, migrated configuration is printed.",
-            default=None,
-        )
-        return migrate, MigrateCommand
-
-    @staticmethod
-    def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
-        return comp_get_words(args, parser)
-
-    def run(self, args: CommandArgs) -> None:  # noqa: C901, PLR0912, PLR0915
-        with open(self.input_file, "r") as f:
+    def run(self) -> None:
+        with self._args.input_file.open() as f:
             data = f.read()
 
         try:
@@ -197,9 +198,9 @@ class MigrateCommand(Command):
         # remove empty dicts
         new = {k: v for k, v in new.items() if v}
 
-        dumped = self.output_format.dict_dump(new)
-        if self.output_file:
-            with open(self.output_file, "w") as f:
+        dumped = self._args.output_format.dict_dump(new)
+        if self._args.output_file:
+            with self._args.output_file.open("w") as f:
                 f.write(dumped)
         else:
             print(f"\nNew migrated configuration (v{VERSION}):")
