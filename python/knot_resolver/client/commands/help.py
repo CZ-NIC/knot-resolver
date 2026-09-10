@@ -1,25 +1,23 @@
-# noqa: INP001
-import argparse
-from typing import List, Tuple, Type
+from __future__ import annotations
 
-from knot_resolver.client.command import Command, CommandArgs, CompWords, comp_get_words, register_command
+from typing import TYPE_CHECKING
+
+from knot_resolver.client.args import KresClientArgs, get_client_parser
+from knot_resolver.client.command import KresClientCommand
+
+if TYPE_CHECKING:
+    import argparse
 
 
-@register_command
-class HelpCommand(Command):
-    def __init__(self, namespace: argparse.Namespace) -> None:
-        super().__init__(namespace)
+def register_subparser(subparser: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    help_parser = subparser.add_parser("help", help="show this help message and exit")
+    help_parser.set_defaults(command=HelpCommand, command_args=KresClientArgs)
 
-    def run(self, args: CommandArgs) -> None:
-        args.parser.print_help()
 
-    @staticmethod
-    def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
-        return comp_get_words(args, parser)
+class HelpCommand(KresClientCommand):
+    def __init__(self, _args: KresClientArgs) -> None:
+        pass
 
-    @staticmethod
-    def register_args_subparser(
-        subparser: "argparse._SubParsersAction[argparse.ArgumentParser]",
-    ) -> Tuple[argparse.ArgumentParser, "Type[Command]"]:
-        stop = subparser.add_parser("help", help="show this help message and exit")
-        return stop, HelpCommand
+    def run(self) -> None:
+        parser = get_client_parser()
+        parser.print_help()

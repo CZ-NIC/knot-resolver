@@ -1,33 +1,30 @@
-# noqa: INP001
-import argparse
-import sys
-from typing import List, Tuple, Type
+from __future__ import annotations
 
-from knot_resolver.client.command import Command, CommandArgs, CompWords, register_command
+import sys
+from typing import TYPE_CHECKING
+
+from knot_resolver.client.args import KresClientArgs
+from knot_resolver.client.command import KresClientCommand, get_socket
 from knot_resolver.utils.requests import request
 
+if TYPE_CHECKING:
+        import argparse
 
-@register_command
-class StopCommand(Command):
-    def __init__(self, namespace: argparse.Namespace) -> None:
-        super().__init__(namespace)
 
-    @staticmethod
-    def register_args_subparser(
-        subparser: "argparse._SubParsersAction[argparse.ArgumentParser]",
-    ) -> Tuple[argparse.ArgumentParser, "Type[Command]"]:
-        stop = subparser.add_parser(
-            "stop", help="Tells the resolver to shutdown everthing. No process will run after this command."
-        )
-        return stop, StopCommand
+def register_subparser(subparser: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    stop_parser = subparser.add_parser(
+        "stop", help="Tells the resolver to shutdown everthing. No process will run after this command."
+    )
+    stop_parser.set_defaults(command=StopCommand, command_args=KresClientArgs)
 
-    def run(self, args: CommandArgs) -> None:
-        response = request(args.socket, "POST", "stop")
+
+class StopCommand(KresClientCommand):
+    def __init__(self, args: KresClientArgs) -> None:
+        self._socket = get_socket(args)
+
+    def run(self) -> None:
+        response = request(self._socket, "POST", "stop")
 
         if response.status != 200:
             print(response, file=sys.stderr)
             sys.exit(1)
-
-    @staticmethod
-    def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
-        return {}
