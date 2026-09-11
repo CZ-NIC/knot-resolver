@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 from knot_resolver.client.args import KresClientArgs
 from knot_resolver.client.command import KresClientCommand, get_socket
+from knot_resolver.client.completion import CompletionWords, comp_get_words
 from knot_resolver.datamodel import kres_config_json_schema
 from knot_resolver.utils.requests import request
 
@@ -61,3 +62,7 @@ class SchemaCommand(KresClientCommand):
                 f.write(schema)
         else:
             print(schema)
+
+    @staticmethod
+    def completion(args: list[str], parser: argparse.ArgumentParser) -> CompletionWords:
+        return comp_get_words(args, parser)

@@ -9,12 +9,14 @@ from knot_resolver.client.command import KresClientCommand, get_socket
 from knot_resolver.utils.requests import request
 
 if TYPE_CHECKING:
-        import argparse
+    import argparse
+
+    from knot_resolver.client.completion import CompletionWords
 
 
 @dataclass(frozen=True)
 class ReloadCommandArgs(KresClientArgs):
-     force: bool
+    force: bool
 
 
 def register_subparser(subparser: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
@@ -44,3 +46,7 @@ class ReloadCommand(KresClientCommand):
         if response.status != 200:
             print(response, file=sys.stderr)
             sys.exit(1)
+
+    @staticmethod
+    def completion(_args: list[str], _parser: argparse.ArgumentParser) -> CompletionWords:
+        return {}

@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from knot_resolver.client.args import KresClientArgs
 from knot_resolver.client.command import KresClientCommand, get_socket
+from knot_resolver.client.completion import CompletionWords, comp_get_words
 from knot_resolver.datamodel.cache_schema import CacheClearRPCSchema
 from knot_resolver.utils.modeling.exceptions import AggregateDataValidationError, DataValidationError
 from knot_resolver.utils.modeling.parsing import DataFormat, parse_json
@@ -34,9 +35,7 @@ def register_subparser(subparser: argparse._SubParsersAction[argparse.ArgumentPa
     cache_parser = subparser.add_parser("cache", help="Performs operations on the cache of the running resolver.")
     cache_subparsers = cache_parser.add_subparsers(dest="operation", help="operation type", required=True)
 
-    clear_subparser = cache_subparsers.add_parser(
-        "clear", help="Purge cache records that match specified criteria."
-    )
+    clear_subparser = cache_subparsers.add_parser("clear", help="Purge cache records that match specified criteria.")
     clear_subparser.set_defaults(operation=CacheOperation.CLEAR)
     clear_subparser.add_argument(
         "--exact-name",
@@ -85,14 +84,12 @@ def register_subparser(subparser: argparse._SubParsersAction[argparse.ArgumentPa
 
 
 class CacheCommand(KresClientCommand):
-
     def __init__(self, args: CacheCommandArgs) -> None:
         self._socket = get_socket(args)
         self._args = args
 
     def run(self) -> None:
         if self._args.operation == CacheOperation.CLEAR:
-
             clear_dict: dict[str, str | int | bool] = {}
             if self._args.exact_name:
                 clear_dict["exact-name"] = self._args.exact_name
@@ -117,3 +114,7 @@ class CacheCommand(KresClientCommand):
             print(response, file=sys.stderr)
             sys.exit(1)
         print(self._args.output_format.dict_dump(body_dict, indent=4))
+
+    @staticmethod
+    def completion(args: list[str], parser: argparse.ArgumentParser) -> CompletionWords:
+        return comp_get_words(args, parser)

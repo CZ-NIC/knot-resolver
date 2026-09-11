@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 from knot_resolver.client.args import KresClientArgs
 from knot_resolver.client.command import KresClientCommand
+from knot_resolver.client.completion import CompletionWords, comp_get_words
 from knot_resolver.constants import VERSION
 from knot_resolver.utils.modeling.exceptions import DataParsingError
 from knot_resolver.utils.modeling.parsing import DataFormat, try_to_parse
@@ -206,3 +207,7 @@ class MigrateCommand(KresClientCommand):
             print(f"\nNew migrated configuration (v{VERSION}):")
             print("---")
             print(dumped)
+
+    @staticmethod
+    def completion(args: list[str], parser: argparse.ArgumentParser) -> CompletionWords:
+        return comp_get_words(args, parser)

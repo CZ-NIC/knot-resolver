@@ -9,11 +9,13 @@ from typing import TYPE_CHECKING, Literal
 
 from knot_resolver.client.args import KresClientArgs
 from knot_resolver.client.command import KresClientCommand, get_socket
+from knot_resolver.client.completion import COMP_NOSPACE, CompletionWords, comp_get_words
+from knot_resolver.datamodel import KresConfig
 from knot_resolver.utils.modeling.parsing import DataFormat, parse_json, try_to_parse
 from knot_resolver.utils.requests import request
 
 if TYPE_CHECKING:
-        import argparse
+    import argparse
 
 
 @dataclass(frozen=True)
@@ -147,3 +149,46 @@ class ConfigCommand(KresClientCommand):
             print(f"saved to: {self._args.output_file}")
         elif response.body:
             print(self._args.format.dict_dump(parse_json(response.body), indent=4))
+
+    @staticmethod
+    def completion(args: list[str], parser: argparse.ArgumentParser) -> CompletionWords:
+        nargs = len(args)
+
+        if nargs > 1 and args[-2] in ["-p", "--path"]:
+            words: CompletionWords = {}
+            words[COMP_NOSPACE] = None
+
+            path = args[-1]
+            path_nodes = path.split("/")
+
+            prefix = ""
+            properties = KresConfig.json_schema()["properties"]
+            is_list = False
+            for i, node in enumerate(path_nodes):
+                # first node is empty string
+                if i == 0:
+                    continue
+
+                if node in properties:
+                    is_list = False
+                    if "properties" in properties[node]:
+                        properties = properties[node]["properties"]
+                        prefix += f"/{node}"
+                        continue
+                    if "items" in properties[node]:
+                        properties = properties[node]["items"]["properties"]
+                        prefix += f"/{node}"
+                        is_list = True
+                        continue
+                    del words[COMP_NOSPACE]
+                    break
+                if is_list and node.isnumeric():
+                    prefix += f"/{node}"
+                    continue
+
+            for key in properties:
+                words[f"{prefix}/{key}"] = properties[key]["description"]
+
+            return words
+
+        return comp_get_words(args, parser)

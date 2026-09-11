@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 from knot_resolver.client.args import KresClientArgs, get_client_parser
 from knot_resolver.client.command import KresClientCommand
+from knot_resolver.client.completion import CompletionWords, comp_get_words
 
 if TYPE_CHECKING:
     import argparse
@@ -21,3 +22,7 @@ class HelpCommand(KresClientCommand):
     def run(self) -> None:
         parser = get_client_parser()
         parser.print_help()
+
+    @staticmethod
+    def completion(args: list[str], parser: argparse.ArgumentParser) -> CompletionWords:
+        return comp_get_words(args, parser)
