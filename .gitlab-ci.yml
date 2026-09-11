@@ -771,8 +771,8 @@ pkg:opensuse-16.0:
   <<: *pkg_test
   image: $CI_REGISTRY/packaging/apkg/full/opensuse-16.0
   before_script:
-    # openSUSE excludes docs installation by default
-    - echo "rpm.install.excludedocs = no" > /etc/zypp/zypp.conf.d/no-excludedocs.conf
+    # # openSUSE excludes docs installation by default
+    # - echo "rpm.install.excludedocs = no" > /etc/zypp/zypp.conf.d/no-excludedocs.conf
     # add the Python development repository to fetch Supervisor
     - zypper addrepo https://download.opensuse.org/repositories/devel:languages:python/16.0/devel:languages:python.repo
     # prometheus and watchdog are optional dependencies, but our `apkg test` needs them
@@ -783,8 +783,8 @@ pkg:opensuse-tumbleweed:
   <<: *pkg_test
   image: $CI_REGISTRY/packaging/apkg/full/opensuse-tumbleweed
   before_script:
-    # openSUSE excludes docs installation by default
-    - echo "rpm.install.excludedocs = no" > /etc/zypp/zypp.conf.d/no-excludedocs.conf
+    # # openSUSE excludes docs installation by default
+    # - echo "rpm.install.excludedocs = no" > /etc/zypp/zypp.conf.d/no-excludedocs.conf
     # prometheus and watchdog are optional dependencies, but our `apkg test` needs them
     - zypper refresh
     - zypper install -y python3-prometheus_client python3-watchdog
