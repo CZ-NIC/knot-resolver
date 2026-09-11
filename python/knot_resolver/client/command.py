@@ -12,13 +12,11 @@ from knot_resolver.utils.modeling.exceptions import DataValidationError
 from knot_resolver.utils.requests import SocketDesc
 
 if TYPE_CHECKING:
-    # import argparse
+    import argparse
     from pathlib import Path
-    # from typing import Optional
 
     from .args import KresClientArgs
-
-    # CompletionWords = dict[str, Optional[str]]
+    from .completion import CompletionWords
 
 
 def get_socket_from_config(config: Path) -> SocketDesc | None:
@@ -45,8 +43,7 @@ def get_socket_from_config(config: Path) -> SocketDesc | None:
             encoded_sock = quote(str(sock), safe="")
             return SocketDesc(
                 f"http+unix://{encoded_sock}",
-                f"/{management_key}/{unix_socket_key} from "
-                f"'{config}' config file (--config argument)",
+                f"/{management_key}/{unix_socket_key} from '{config}' config file (--config argument)",
             )
 
         if management and inteface_key in management:
@@ -56,8 +53,7 @@ def get_socket_from_config(config: Path) -> SocketDesc | None:
             )
             return SocketDesc(
                 f"http://{ip.addr}:{ip.port}",
-                f"/{management_key}/{inteface_key} from "
-                f"'{config}' config file (--config argument)",
+                f"/{management_key}/{inteface_key} from '{config}' config file (--config argument)",
             )
     except ValueError as e:
         raise DataValidationError(*e.args) from e
@@ -91,7 +87,7 @@ class KresClientCommand(ABC):
     def run(self) -> None:
         raise NotImplementedError
 
-    # @staticmethod
-    # @abstractmethod
-    # def completion(args: list[str], parser: argparse.ArgumentParser) -> CompletionWords:
-    #     raise NotImplementedError
+    @staticmethod
+    @abstractmethod
+    def completion(args: list[str], parser: argparse.ArgumentParser) -> CompletionWords:
+        raise NotImplementedError

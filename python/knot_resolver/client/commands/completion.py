@@ -1,66 +1,58 @@
-# # noqa: INP001
-# import argparse
-# from enum import Enum
-# from typing import List, Tuple, Type
+from __future__ import annotations
 
-# from knot_resolver.client.command import (
-#     Command,
-#     CommandArgs,
-#     CompWords,
-#     comp_get_words,
-#     register_command,
-# )
+import argparse
+from dataclasses import dataclass
+from enum import Enum
+
+from knot_resolver.client.args import KresClientArgs, get_client_parser
+from knot_resolver.client.command import KresClientCommand
+from knot_resolver.client.completion import CompletionWords, comp_get_words
 
 
-# class Shells(Enum):
-#     BASH = 0
-#     FISH = 1
+@dataclass(frozen=True)
+class CompletionCommandArgs(KresClientArgs):
+    shell: Shell
+    args: list[str]
 
 
-# @register_command
-# class CompletionCommand(Command):
-#     def __init__(self, namespace: argparse.Namespace) -> None:
-#         super().__init__(namespace)
-#         self.shell: Shells = namespace.shell
-#         self.args: List[str] = namespace.args
-#         if namespace.extra is not None:
-#             self.args.append("--")
+class Shell(int, Enum):
+    BASH = 0
+    FISH = 1
 
-#     @staticmethod
-#     def register_args_subparser(
-#         subparser: "argparse._SubParsersAction[argparse.ArgumentParser]",
-#     ) -> Tuple[argparse.ArgumentParser, "Type[Command]"]:
-#         completion = subparser.add_parser(
-#             "completion",
-#             help="commands auto-completion",
-#         )
 
-#         shells_dest = "shell"
-#         shells = completion.add_mutually_exclusive_group()
-#         shells.add_argument("--bash", action="store_const", dest=shells_dest, const=Shells.BASH, default=Shells.BASH)
-#         shells.add_argument("--fish", action="store_const", dest=shells_dest, const=Shells.FISH)
+def register_subparser(subparser: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    completion_parser = subparser.add_parser(
+        "completion",
+        help="commands auto-completion",
+    )
+    shell_dest = "shell"
+    shell = completion_parser.add_mutually_exclusive_group()
+    shell.add_argument("--bash", action="store_const", dest=shell_dest, const=Shell.BASH, default=Shell.BASH)
+    shell.add_argument("--fish", action="store_const", dest=shell_dest, const=Shell.FISH)
 
-#         completion.add_argument("--args", help="arguments to complete", nargs=argparse.REMAINDER, default=[])
+    completion_parser.add_argument("--args", help="arguments to complete", nargs=argparse.REMAINDER, default=[])
+    completion_parser.set_defaults(command=CompletionCommand, command_args=CompletionCommandArgs)
 
-#         return completion, CompletionCommand
 
-#     @staticmethod
-#     def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
-#         return comp_get_words(args, parser)
+class CompletionCommand(KresClientCommand):
+    def __init__(self, args: CompletionCommandArgs) -> None:
+        self._args = args
 
-#     def run(self, args: CommandArgs) -> None:
-#         words: CompWords = {}
+    def run(self) -> None:
+        parser = get_client_parser()
+        words: CompletionWords = {}
 
-#         parser = args.parser
-#         if parser:
-#             words = comp_get_words(self.args, args.parser)
+        if parser:
+            words = comp_get_words(self._args.args, parser)
 
-#         # print completion words
-#         # based on required bash/fish shell format
-#         if self.shell == Shells.BASH:
-#             print(" ".join(words))
-#         elif self.shell == Shells.FISH:
-#             # TODO: FISH completion implementation
-#             pass
-#         else:
-#             raise ValueError(f"unexpected value of {Shells}: {self.shell}")
+        # print completion words
+        # based on required bash/fish shell format
+        if self._args.shell == Shell.BASH:
+            print(" ".join(words))
+        if self._args.shell == Shell.FISH:
+            # TODO: FISH completion implementation
+            pass
+
+    @staticmethod
+    def completion(args: list[str], parser: argparse.ArgumentParser) -> CompletionWords:
+        return comp_get_words(args, parser)

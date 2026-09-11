@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from knot_resolver.client.args import KresClientArgs
 from knot_resolver.client.command import KresClientCommand
+from knot_resolver.client.completion import CompletionWords, comp_get_words
 from knot_resolver.constants import CONFIG_FILE
 from knot_resolver.datamodel import KresConfig
 from knot_resolver.datamodel.globals import Context, reset_global_validation_context, set_global_validation_context
@@ -71,3 +72,7 @@ class ValidateCommand(KresClientCommand):
                 "\nThis is because the validation runs under a different user/group than the resolver itself"
                 "\nand attempts to access the configured paths directly."
             )
+
+    @staticmethod
+    def completion(args: list[str], parser: argparse.ArgumentParser) -> CompletionWords:
+        return comp_get_words(args, parser)

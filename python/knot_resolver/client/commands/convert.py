@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from knot_resolver.client.args import KresClientArgs
 from knot_resolver.client.command import KresClientCommand
+from knot_resolver.client.completion import CompletionWords, comp_get_words
 from knot_resolver.constants import CONFIG_FILE
 from knot_resolver.datamodel import KresConfig
 from knot_resolver.datamodel.globals import Context, reset_global_validation_context, set_global_validation_context
@@ -87,3 +88,7 @@ class ConvertCommand(KresClientCommand):
                 f.write(lua)
         else:
             print(lua)
+
+    @staticmethod
+    def completion(args: list[str], parser: argparse.ArgumentParser) -> CompletionWords:
+        return comp_get_words(args, parser)

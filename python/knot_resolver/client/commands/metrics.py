@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 from knot_resolver.client.args import KresClientArgs
 from knot_resolver.client.command import KresClientCommand, get_socket
+from knot_resolver.client.completion import CompletionWords, comp_get_words
 from knot_resolver.utils.modeling.parsing import DataFormat, parse_json
 from knot_resolver.utils.requests import request
 
@@ -69,3 +70,7 @@ class MetricsCommand(KresClientCommand):
             if self._args.prometheus and response.status == 404:
                 print("Prometheus is unavailable due to missing optional dependencies", file=sys.stderr)
             sys.exit(1)
+
+    @staticmethod
+    def completion(args: list[str], parser: argparse.ArgumentParser) -> CompletionWords:
+        return comp_get_words(args, parser)
