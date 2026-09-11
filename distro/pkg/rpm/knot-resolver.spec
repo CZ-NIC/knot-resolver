@@ -286,8 +286,8 @@ getent passwd knot-resolver >/dev/null || useradd -r -g knot-resolver -d %{_sysc
 %{_libdir}/knot-resolver/kres_modules/watchdog.lua
 %{_libdir}/knot-resolver/kres_modules/workarounds.lua
 %{python3_sitelib}/knot_resolver*
-%{_mandir}/man8/kresd.8.gz
-%{_mandir}/man8/kresctl.8.gz
+%doc %{_mandir}/man8/kresd.8.gz
+%doc %{_mandir}/man8/kresctl.8.gz
 %{_datadir}/bash-completion/completions/kresctl
 
 %files devel
