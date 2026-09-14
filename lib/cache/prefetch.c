@@ -236,7 +236,12 @@ void timer_callback(uv_timer_t *handle)
 	}
 
 	struct timespec ts;
-	int ret = clock_gettime(CLOCK_REALTIME_COARSE, &ts);
+	int ret;
+#ifdef CLOCK_REALTIME_COARSE
+	ret = clock_gettime(CLOCK_REALTIME_COARSE, &ts); // Linux-specific
+#else
+	ret = clock_gettime(CLOCK_REALTIME, &ts);
+#endif
 	kr_assert(ret == 0);
 	uint32_t time_now = ts.tv_sec;
 	uint64_t time_now_msec = 1000l * time_now + ts.tv_nsec / 1000000;
