@@ -170,20 +170,23 @@ struct worker_ctx {
 	trie_t *tcp_connected;
 	/** List of outbound TCP sessions waiting to be accepted */
 	trie_t *tcp_waiting;
+#if ENABLE_QUIC
 	/** List of active outbound QUIC sessions */
 	trie_t *quic_connected;
 	/** List of outbound QUIC sessions waiting to be accepted */
 	trie_t *quic_waiting;
+#endif /* ENABLE_QUIC */
 	/** Subrequest leaders (struct qr_task*), indexed by qname+qtype+qclass. */
 	trie_t *subreq_out;
 	knot_mm_t pkt_pool;
 	unsigned int next_request_uid;
 
+#if ENABLE_QUIC
 	/* session for all ipv4 outgoing DoQ requests. */
 	struct session2 *doq_out_session4;
 	/* session for all ipv6 outgoing DoQ requests. */
 	struct session2 *doq_out_session6;
-
+#endif /* ENABLE_QUIC */
 	/* HTTP Headers for DoH. */
 	doh_headerlist_t doh_qry_headers;
 };

@@ -4,11 +4,8 @@
 
 #include "kresconfig.h"
 #include "network.h"
-#include "quic_conn.h"
-#include "quic_demux.h"
 #include <libknot/wire.h>
 #include <netinet/in.h>
-#include <ngtcp2/ngtcp2.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <uv.h>
@@ -29,6 +26,11 @@
 #if ENABLE_XDP
 	#include <libknot/xdp/xdp.h>
 #endif
+#if ENABLE_QUIC
+#include "quic_conn.h"
+#include "quic_demux.h"
+#include <ngtcp2/ngtcp2.h>
+#endif /* ENABLE_QUIC */
 
 #include "daemon/bindings/api.h"
 #include "daemon/engine.h"
@@ -133,6 +135,7 @@ static int worker_add_tcp_waiting(const struct sockaddr* addr,
 				  struct session2 *session);
 static int worker_del_tcp_waiting(const struct sockaddr* addr);
 static struct session2* worker_find_tcp_waiting(const struct sockaddr* addr);
+#if ENABLE_QUIC
 static int worker_add_quic_connected(const struct sockaddr* addr,
 				    struct session2 *session);
 static int worker_del_quic_connected(const struct sockaddr* addr);
@@ -141,6 +144,7 @@ static int worker_add_quic_waiting(const struct sockaddr* addr,
 				  struct session2 *session);
 static int worker_del_quic_waiting(const struct sockaddr* addr);
 static struct session2* worker_find_quic_waiting(const struct sockaddr* addr);
+#endif /* ENABLE_QUIC */
 
 static void subreq_finalize(struct qr_task *task, const struct sockaddr *packet_source, knot_pkt_t *pkt);
 
@@ -601,6 +605,7 @@ int qr_task_on_send(struct qr_task *task, struct session2 *s, int status)
 			return status;
 		size_t timeout = task->transport->timeout;
 		int ret = 0;
+#if ENABLE_QUIC
 		if (s->proto == KR_PROTO_DOQ_CONN) {
 			if (status == 0) {
 				struct pl_quic_conn_sess_data *conn =
@@ -616,6 +621,10 @@ int qr_task_on_send(struct qr_task *task, struct session2 *s, int status)
 					PROTOLAYER_EVENT_GENERAL_TIMEOUT,
 					timeout, 0);
 		}
+#else
+		ret = session2_timer_start(s, PROTOLAYER_EVENT_GENERAL_TIMEOUT,
+				timeout, 0);
+#endif /* ENABLE_QUIC */
 		/* Start next step with timeout, fatal if can't start a timer. */
 		if (ret != 0) {
 			subreq_finalize(task, &task->transport->address.ip, task->pktbuf);
@@ -691,6 +700,7 @@ static int qr_task_send(struct qr_task *task, struct session2 *session,
 			return kr_error(ENOENT);
 		worker_task_pkt_set_msgid(task, msg_id);
 	}
+#if ENABLE_QUIC
 	if (session->proto == KR_PROTO_DOQ_CONN) {
 		struct pl_quic_conn_sess_data *conn =
 			protolayer_sess_data_get_proto(session,
@@ -710,6 +720,7 @@ static int qr_task_send(struct qr_task *task, struct session2 *session,
 		 * required in RFC 9250 4.2.1 */
 		knot_wire_set_id(pkt->wire, 0);
 	}
+#endif /* ENABLE_QUIC */
 
 	/* Note time for upstream RTT */
 	task->send_time = kr_now();
@@ -747,11 +758,15 @@ static int qr_task_send(struct qr_task *task, struct session2 *session,
 	}
 
 	/* Update outgoing query statistics */
-	if (session->outgoing) {
-		const struct sockaddr *sa =
-			comm ? comm->comm_addr : quic_get_peer(session);
-		session2_event(session, PROTOLAYER_EVENT_STATS_QRY_OUT, NULL);
 
+	const struct sockaddr *sa = comm ? comm->comm_addr :
+#if ENABLE_QUIC
+		quic_get_peer(session);
+#else
+		NULL;
+#endif /* ENABLE_QUIC */
+	if (session->outgoing && sa) {
+		session2_event(session, PROTOLAYER_EVENT_STATS_QRY_OUT, NULL);
 		if (sa && sa->sa_family == AF_INET6)
 			the_worker->stats.ipv6 += 1;
 		else if (sa && sa->sa_family == AF_INET)
@@ -769,52 +784,7 @@ static struct kr_query *task_get_last_pending_query(struct qr_task *task)
 	return array_tail(task->ctx->req.rplan.pending);
 }
 
-// /* Only used by DoQ, each layer in DoQ represents a more granular
-//  * separation of the transport, with stream session representing
-//  * only a single query. The queue is therefore stored in the CONN layer
-//  * since it encompasses the entire upstream communication */
-// static int send_waiting_subsession_term(struct session2 *session)
-// {
-// 	struct session2 *s_waiting = session;
-// 	while (s_waiting && s_waiting->proto != KR_PROTO_DOQ_CONN) {
-// 		s_waiting = s_waiting->transport.parent;
-// 	}
-// 	if (!s_waiting) {
-// 		return kr_error(EINVAL);
-// 	}
-// 	if (session2_waitinglist_is_empty(s_waiting)) {
-// 		return 0;
-// 	}
-//
-// 	defer_sample_state_t defer_prev_sample_state;
-// 	defer_sample_start(&defer_prev_sample_state);
-// 	int ret = 0;
-// 	do {
-// 		struct qr_task *t = session2_waitinglist_get(s_waiting);
-// 		defer_sample_task(t);
-// 		ret = qr_task_send(t, session, NULL, NULL);
-// 		defer_sample_restart();
-// 		if (ret != 0) {
-// 			// struct sockaddr *peer = session2_get_peer(session);
-// 			session2_waitinglist_finalize(session, KR_STATE_FAIL);
-// 			session2_tasklist_finalize(session, KR_STATE_FAIL);
-// 			// worker_del_tcp_connected(peer);
-// 			// session2_close(session);
-// 			break;
-// 		}
-// 		// Let's be a bit defensive and check that nothing's changed before _pop()
-// 		// and recover if it has, as qr_task_send() is rather complex.
-// 		if (session2_waitinglist_get(s_waiting) == t) {
-// 			session2_waitinglist_pop(s_waiting, true);
-// 		} else { // a normal assertion could kr_error_log() too much in some rarer cases
-// 			VERBOSE_MSG(NULL, "soft assertion: waitinglist mismatch in send_waiting_subsession()\n");
-// 		}
-// 	} while (!session2_waitinglist_is_empty(s_waiting));
-// 	defer_sample_stop(&defer_prev_sample_state, true);
-//
-// 	return ret;
-// }
-
+#if ENABLE_QUIC
 /* Only used by DoQ, each layer in DoQ represents a more granular
  * separation of the transport, with stream session representing
  * only a single query. The queue is therefore stored in the CONN layer
@@ -852,6 +822,7 @@ int send_waiting_subsession(struct session2 *session)
 
 	return ret;
 }
+#endif /* ENABLE_QUIC */
 
 static int send_waiting(struct session2 *session)
 {
@@ -973,6 +944,7 @@ static void on_connect(uv_connect_t *req, int status)
 			MAX_TCP_INACTIVITY, MAX_TCP_INACTIVITY);
 }
 
+#if ENABLE_QUIC
 void quic_handshake_timeout(struct session2 *session,
 		enum kr_selection_error sel_err)
 {
@@ -1104,6 +1076,7 @@ void doq_on_connect(struct pl_quic_conn_sess_data *conn, int status)
 	session2_timer_stop(session);
 	quic_set_idle_timeout(session, quic_ns_to_ms_ceil(QUIC_MAX_IDLE_TIMEOUT));
 }
+#endif /* ENABLE_QUIC */
 
 static int transmit(struct qr_task *task)
 {
@@ -1537,6 +1510,7 @@ static int tcp_task_step(struct qr_task *task,
 	return ret;
 }
 
+#if ENABLE_QUIC
 /* Add the addr passed as baton to the workers waiting list
  * once the initial packet has been sent to the peer. */
 void sent_quic_hello_cb(int status, struct session2 *session,
@@ -1814,6 +1788,7 @@ static int doq_task_step(struct qr_task *task,
 	}
 	return ret;
 }
+#endif /* ENABLE_QUIC */
 
 static int qr_task_step(struct qr_task *task,
 			const struct sockaddr *packet_source, knot_pkt_t *packet)
@@ -1898,8 +1873,10 @@ static int qr_task_step(struct qr_task *task,
 	{
 	case KR_TRANSPORT_UDP:
 		return udp_task_step(task, packet_source, packet);
+#if ENABLE_QUIC
 	case KR_TRANSPORT_DOQ:
 		return doq_task_step(task, packet_source, packet);
+#endif /* ENABLE_QUIC */
 	case KR_TRANSPORT_TCP: // fall through
 	case KR_TRANSPORT_TLS:
 		return tcp_task_step(task, packet_source, packet);
@@ -1928,6 +1905,7 @@ static int worker_submit(struct session2 *session, struct comm_info *comm, knot_
 	bool task_matched_id = false;
 	if (is_outgoing && pkt->size >= 2) {
 		const uint16_t id = knot_wire_get_id(pkt->wire);
+#if ENABLE_QUIC
 		if (session->proto != KR_PROTO_DOQ_STREAM) {
 			task = session2_tasklist_del_msgid(session, id);
 			task_matched_id = task != NULL;
@@ -1945,6 +1923,12 @@ static int worker_submit(struct session2 *session, struct comm_info *comm, knot_
 		}
 
 		if (task_matched_id) { // Note receive time for RTT calculation
+#else
+		task = session2_tasklist_del_msgid(session, id);
+		task_matched_id = task != NULL;
+		if (task_matched_id) {// Note receive time for RTT calculation
+
+#endif /* ENABLE_QUIC */
 			task->recv_time = kr_now();
 		}
 		if (!task_matched_id) {
@@ -1974,6 +1958,7 @@ static int worker_submit(struct session2 *session, struct comm_info *comm, knot_
 			VERBOSE_MSG(qry, "=> DNS message failed to parse, %s\n",
 					knot_strerror(ret));
 		}
+#if ENABLE_QUIC
 		if (knot_pkt_has_edns(pkt) &&
 				knot_pkt_edns_option(pkt, KNOT_EDNS_OPTION_TCP_KEEPALIVE) &&
 				session->proto == KR_PROTO_DOQ_STREAM) {
@@ -1995,6 +1980,9 @@ static int worker_submit(struct session2 *session, struct comm_info *comm, knot_
 	/* Only pop the task once no DoQ specific errors were found */
 	if (is_outgoing && pkt->size >= 2 && session->proto == KR_PROTO_DOQ_STREAM)
 		session2_tasklist_del_first(session, true);
+#else
+	}
+#endif /* ENABLE_QUIC */
 
 	if (ret && !is_outgoing)
 		the_worker->stats.dropped += 1;
@@ -2129,6 +2117,7 @@ static struct session2* worker_find_tcp_waiting(const struct sockaddr* addr)
 	return trie_find_tcp_session(the_worker->tcp_waiting, addr);
 }
 
+#if ENABLE_QUIC
 static int worker_add_quic_connected(const struct sockaddr* addr, struct session2 *session)
 {
 	return trie_add_tcp_session(the_worker->quic_connected, addr, session);
@@ -2159,7 +2148,7 @@ static struct session2* worker_find_quic_waiting(const struct sockaddr* addr)
 {
 	return trie_find_tcp_session(the_worker->quic_waiting, addr);
 }
-
+#endif /* ENABLE_QUIC */
 
 knot_pkt_t *worker_resolve_mk_pkt_dname(knot_dname_t *qname, uint16_t qtype, uint16_t qclass,
 				   const struct kr_qflags *options)
@@ -2349,8 +2338,10 @@ static int worker_reserve(void)
 {
 	the_worker->tcp_connected = trie_create(NULL);
 	the_worker->tcp_waiting = trie_create(NULL);
+#if ENABLE_QUIC
 	the_worker->quic_connected = trie_create(NULL);
 	the_worker->quic_waiting = trie_create(NULL);
+#endif /* ENABLE_QUIC */
 	the_worker->subreq_out = trie_create(NULL);
 
 	mm_ctx_mempool(&the_worker->pkt_pool, 4 * sizeof(knot_pkt_t));
@@ -2365,8 +2356,10 @@ void worker_deinit(void)
 	trie_free(the_worker->tcp_connected);
 	trie_free(the_worker->tcp_waiting);
 	trie_free(the_worker->subreq_out);
+#if ENABLE_QUIC
 	trie_free(the_worker->quic_waiting);
 	trie_free(the_worker->quic_connected);
+#endif /* ENABLE_QUIC */
 	the_worker->subreq_out = NULL;
 
 	for (int i = 0; i < the_worker->doh_qry_headers.len; i++)
@@ -2622,6 +2615,7 @@ static enum protolayer_event_cb_result pl_dns_stream_connection_fail(
 	kr_assert(session2_tasklist_is_empty(session));
 
 	const struct sockaddr *peer;
+#if ENABLE_QUIC
 	if (session->proto == KR_PROTO_DOQ_STREAM) {
 		peer = quic_get_peer(session);
 		worker_del_quic_waiting(peer);
@@ -2629,6 +2623,10 @@ static enum protolayer_event_cb_result pl_dns_stream_connection_fail(
 		peer = session2_get_peer(session);
 		worker_del_tcp_waiting(peer);
 	}
+#else
+	peer = session2_get_peer(session);
+	worker_del_tcp_waiting(peer);
+#endif /* ENABLE_QUIC */
 
 	struct qr_task *task = session2_waitinglist_get(session);
 	if (!task) {
@@ -2666,6 +2664,7 @@ static enum protolayer_event_cb_result pl_dns_stream_connection_fail(
 	return PROTOLAYER_EVENT_PROPAGATE;
 }
 
+#if ENABLE_QUIC
 static enum protolayer_event_cb_result pl_dns_quic_stream_disconnected(
 		struct session2 *session, struct pl_quic_stream_sess_data *stream,
 		enum protolayer_event_type event)
@@ -2702,6 +2701,7 @@ static enum protolayer_event_cb_result pl_dns_quic_stream_disconnected(
 	}
 	return PROTOLAYER_EVENT_PROPAGATE;
 }
+#endif /* ENABLE_QUIC */
 
 static enum protolayer_event_cb_result pl_dns_stream_disconnected(
 		struct session2 *session, struct pl_dns_stream_sess_data *stream)
@@ -2810,6 +2810,7 @@ static enum protolayer_event_cb_result pl_dns_stream_event_unwrap(
 	case PROTOLAYER_EVENT_DISCONNECT:
 	case PROTOLAYER_EVENT_CLOSE:
 	case PROTOLAYER_EVENT_FORCE_CLOSE:
+#if ENABLE_QUIC
 		if (session->proto == KR_PROTO_DOQ_STREAM) {
 			struct pl_quic_stream_sess_data *qstream = 
 				protolayer_sess_data_get_proto(session,
@@ -2818,6 +2819,9 @@ static enum protolayer_event_cb_result pl_dns_stream_event_unwrap(
 		} else {
 			return pl_dns_stream_disconnected(session, stream);
 		}
+#else
+		return pl_dns_stream_disconnected(session, stream);
+#endif /* ENABLE_QUIC */
 
 	case PROTOLAYER_EVENT_EOF:
 		return pl_dns_stream_eof(session, stream);
@@ -3107,8 +3111,10 @@ int worker_init(void)
 	the_worker->tcp_pipeline_max = MAX_PIPELINED;
 	the_worker->out_addr4.sin_family = AF_UNSPEC;
 	the_worker->out_addr6.sin6_family = AF_UNSPEC;
+#if ENABLE_QUIC
 	the_worker->doq_out_session4 = NULL;
 	the_worker->doq_out_session6 = NULL;
+#endif /* ENABLE_QUIC */
 
 	array_init(the_worker->doh_qry_headers);
 

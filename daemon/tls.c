@@ -23,7 +23,9 @@
 #include "daemon/tls.h"
 #include "daemon/worker.h"
 #include "daemon/session2.h"
+#if ENABLE_QUIC
 #include "daemon/quic_conn.h"
+#endif /* ENABLE_QUIC */
 
 #define EPHEMERAL_CERT_EXPIRATION_SECONDS_RENEW_BEFORE ((time_t)60*60*24*7)
 #define GNUTLS_PIN_MIN_VERSION  0x030400
@@ -69,7 +71,9 @@ struct pl_tls_sess_data {
 struct tls_credentials * tls_get_ephemeral_credentials(void);
 void tls_credentials_log_pins(struct tls_credentials *tls_credentials);
 static int client_verify_certificate(gnutls_session_t tls_session);
+#if ENABLE_QUIC
 static int quic_client_verify_certificate(gnutls_session_t tls_session);
+#endif /* ENABLE_QUIC */
 static struct tls_credentials *tls_credentials_reserve(struct tls_credentials *tls_credentials);
 
 /**
@@ -651,6 +655,7 @@ tls_client_param_t * tls_client_param_new(void)
 	return e;
 }
 
+#if ENABLE_QUIC
 tls_client_param_t * doq_client_param_new(void)
 {
 	tls_client_param_t *e = calloc(1, sizeof(*e));
@@ -672,6 +677,7 @@ tls_client_param_t * doq_client_param_new(void)
 			quic_client_verify_certificate);
 	return e;
 }
+#endif /* ENABLE_QUIC */
 
 /**
  * Convert an IP address and port number to binary key.
@@ -867,6 +873,7 @@ static int client_verify_certchain(struct pl_tls_sess_data *tls, const char *hos
 	return GNUTLS_E_CERTIFICATE_ERROR;
 }
 
+#if ENABLE_QUIC
 static int quic_client_verify_certchain(struct pl_quic_conn_sess_data *conn,
 		const char *hostname)
 {
@@ -907,6 +914,7 @@ static int quic_client_verify_certchain(struct pl_quic_conn_sess_data *conn,
 	} /* gnutls_certificate_verify_peers3 end */
 	return GNUTLS_E_CERTIFICATE_ERROR;
 }
+#endif /* ENABLE_QUIC */
 
 /**
  * Verify that actual TLS security parameters of \param tls_session
@@ -944,6 +952,7 @@ static int client_verify_certificate(gnutls_session_t tls_session)
 		return client_verify_certchain(tls, tls->client_params->hostname);
 }
 
+#if ENABLE_QUIC
 static int quic_client_verify_certificate(gnutls_session_t tls_session)
 {
 	nc_conn_ref_placeholder_t *conn_ref = gnutls_session_get_ptr(tls_session);
@@ -976,6 +985,7 @@ static int quic_client_verify_certificate(gnutls_session_t tls_session)
 	else
 		return quic_client_verify_certchain(conn, conn->client_params->hostname);
 }
+#endif /* ENABLE_QUIC */
 
 void kr_tls_session_set_verify(gnutls_session_t session, bool quic)
 {
@@ -984,8 +994,10 @@ void kr_tls_session_set_verify(gnutls_session_t session, bool quic)
 	 * callbacks expect different things from gnutls_session_get_ptr():
 	 * struct pl_tls_sess_data vs nc_conn_ref_placeholder_t. */
 	gnutls_session_set_verify_function(session,
-			quic ? quic_client_verify_certificate
-			: client_verify_certificate);
+#if ENABLE_QUIC
+			quic ? quic_client_verify_certificate :
+#endif /* ENABLE_QUIC */
+			client_verify_certificate);
 }
 
 static int tls_pull_timeout_func(gnutls_transport_ptr_t h, unsigned int ms)

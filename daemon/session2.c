@@ -6,7 +6,6 @@
 #include "lib/generic/trie.h"
 #include "lib/proto.h"
 #include "network.h"
-#include "quic_stream.h"
 
 #include <stdint.h>
 #include <ucw/lib.h>
