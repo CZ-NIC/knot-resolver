@@ -25,7 +25,6 @@ impact than cache settings and number of workers.
    :maxdepth: 1
 
    daemon-bindings-cache
-   systemd-multiinst
    cache-prefetch
    modules-prefill
    modules-serve_stale
