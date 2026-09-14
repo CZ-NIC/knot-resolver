@@ -31,6 +31,7 @@ Improvements
   - `knot-resolver` executable: added `--loglevel` and `--logtarget` startup arguments.
   - New `kres-manager` executable with same arguments as `knot-resolver` that starts only the manager.
 - python: utils: refactoring and cleanup (!1894)
+- python: client: refactoring and cleanup (!1908)
 
 Incompatible changes
 --------------------
