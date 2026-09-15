@@ -1962,6 +1962,8 @@ static int worker_submit(struct session2 *session, struct comm_info *comm, knot_
 		if (knot_pkt_has_edns(pkt) &&
 				knot_pkt_edns_option(pkt, KNOT_EDNS_OPTION_TCP_KEEPALIVE) &&
 				session->proto == KR_PROTO_DOQ_STREAM) {
+			if (!is_outgoing)
+				the_worker->stats.dropped += 1;
 			VERBOSE_MSG(qry, "=> DoQ response contains EDNS TCP keepalive, EPROTO\n");
 			/* We failed to handle the task, push back onto the
 			 * tasklist to let dns layer lean it up */
@@ -1970,6 +1972,8 @@ static int worker_submit(struct session2 *session, struct comm_info *comm, knot_
 		}
 		if (unlikely(session->proto == KR_PROTO_DOQ_STREAM &&
 				knot_wire_get_id(pkt->wire) != 0)) {
+			if (!is_outgoing)
+				the_worker->stats.dropped += 1;
 			VERBOSE_MSG(NULL, "=> DoQ response contains non-zero ID %d, EPROTO\n",
 					knot_wire_get_id(pkt->wire));
 			doq_protocol_error(session, "non-zero Message ID");
