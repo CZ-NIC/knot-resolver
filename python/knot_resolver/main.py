@@ -11,6 +11,5 @@ from .resolver import start_resolver
 def main() -> None:
     args = parse_args()
     start_logging(args)
-
     exit_code = asyncio.run(start_resolver(args))
     sys.exit(exit_code)
