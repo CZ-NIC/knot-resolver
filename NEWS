@@ -1,6 +1,11 @@
 Knot Resolver 5.7.9 (2026-1m-dd)
 ================================
 
+Security
+--------
+- fix crash when forwarding - DoS via NULL deref
+  Reporters: Yuqi Qiu and Xiang Li, Nankai University (AOSP Lab).
+
 Improvements
 ------------
 - rpm: fix source build against libknot >= 3.6 (!1916)
