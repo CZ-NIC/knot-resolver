@@ -1,6 +1,11 @@
 Knot Resolver 6.5.1 (2026-1m-dd)
 ================================
 
+Security
+--------
+- fix crash when forwarding - DoS via NULL deref
+  Reporters: Yuqi Qiu and Xiang Li, Nankai University (AOSP Lab).
+
 Bugfixes
 --------
 - python: fix logging level mapping bug, regressed in 6.5.0 (!1918)
