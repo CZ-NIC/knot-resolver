@@ -55,7 +55,16 @@ if LINUX_SYS:
             return
         errno = ctypes.get_errno()
 
-        if prctl(PR_SET_THP_DISABLE, ctypes.c_long(1), ctypes.c_ulong(0), ctypes.c_ulong(0), ctypes.c_ulong(0)) == 0:
+        if (
+            prctl(
+                PR_SET_THP_DISABLE,
+                ctypes.c_long(1),
+                ctypes.c_ulong(0),
+                ctypes.c_ulong(0),
+                ctypes.c_ulong(0),
+            )
+            == 0
+        ):
             logger.info("THP (Transparent Huge Pages) disabled.")
             return
         fallback_errno = ctypes.get_errno()
