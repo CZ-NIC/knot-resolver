@@ -57,7 +57,7 @@ entry_points = {
 
 setup_kwargs = {
     "name": "knot-resolver",
-    "version": "6.4.2",
+    "version": "6.5.0",
     "description": "Knot Resolver Manager - a Python program that automatically manages the other components of the resolver",
     "maintainer": "Knot Resolver team",
     "maintainer_email": "knot-resolver@labs.nic.cz",
