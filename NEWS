@@ -4,10 +4,10 @@ Knot Resolver 6.5.0 (2026-09-17)
 Bugfixes
 --------
 - views: fix "unused tags" error when repeating a tag in views (!1883)
-- watchdog: detect file-changes done via rename*() syscall (!1895)
+- watchdog: detect file-changes done via rename*() syscall (!1895)  
   This is relevant for RPZ files and TLS certs+keys.
 - DoH fixes for sharing connections among different users (!1844)
-- TCP-based connections used Nagle's algorithm since 6.2.0 (!1903)
+- TCP-based connections used Nagle's algorithm since 6.2.0 (!1903)  
   This mistake significantly increased latencies of such transports.
 
 Packaging
@@ -19,15 +19,17 @@ Packaging
 - Add a `PROJECT_VERSION` file as the single source of truth for the project version (!1889)
 - pyproject.toml: migrate from Poetry to `setuptools` (!1889)
 - python: removed typing-extensions dependency (!1910)
+- Debian 11 no longer supported
+- debian,ubuntu: i386 and armhf architectures no longer supported
 
 Improvements
 ------------
 - local-data: increase capacity to 63 GiB (logged MDB_MAP_FULL, !1885)
 - systemd: use unit's {Runtime,State,Cache}Directory directives instead of tmpfiles.d (!1853)
-- controller: reimplemented the notify socket in Python (!1875)
+- controller: reimplemented the notify socket in Python (!1875)  
   The `knot_resolver` Python package no longer contains native extensions and is now implemented entirely in Python.
-- python: improve Knot Resolver startup procedure (!1893)
-  Some startup actions previously handled by the manager have been moved to a separate startup program.
+- python: improve Knot Resolver startup procedure (!1893)  
+  Some startup actions previously handled by the manager have been moved to a separate startup program.  
   This simplifies the manager's startup logic and isolates Knot Resolver's initialization steps.
   - `knot-resolver` executable: added `--loglevel` and `--logtarget` startup arguments.
   - New `kres-manager` executable with same arguments as `knot-resolver` that starts only the manager.
@@ -37,7 +39,7 @@ Improvements
 Incompatible changes
 --------------------
 - remove legacy systemd unit files (kresd@.service, kres-cache-gc.service) (!1853)
-- remove $KRES_LOGGING_TARGET environment variable (!1893)
+- remove $KRES_LOGGING_TARGET environment variable (!1893)  
   /logging/target: removed `from-env` choice
 - docker: remove cross-platform build for linux/arm/v7 (!1904)
 
