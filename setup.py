@@ -35,8 +35,7 @@ install_requires = [
     "aiohttp",
     "jinja2",
     "pyyaml",
-    "supervisor",
-    "typing-extensions"
+    "supervisor"
 ]
 
 extras_require = {
