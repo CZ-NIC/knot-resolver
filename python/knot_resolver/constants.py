@@ -4,7 +4,7 @@ import re
 import sysconfig
 from pathlib import Path
 
-VERSION = "6.4.2"
+VERSION = "6.5.0"
 USER = "knot-resolver"
 GROUP = "knot-resolver"
 
