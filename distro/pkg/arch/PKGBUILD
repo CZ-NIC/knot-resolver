@@ -22,7 +22,6 @@ depends=(
     python
     python-aiohttp
     python-jinja
-    python-typing_extensions
     python-yaml
     supervisor
     systemd
