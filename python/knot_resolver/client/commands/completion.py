@@ -1,66 +1,58 @@
-# noqa: INP001
+from __future__ import annotations
+
 import argparse
+from dataclasses import dataclass
 from enum import Enum
-from typing import List, Tuple, Type
 
-from knot_resolver.client.command import (
-    Command,
-    CommandArgs,
-    CompWords,
-    comp_get_words,
-    register_command,
-)
+from knot_resolver.client.args import KresClientArgs, get_client_parser
+from knot_resolver.client.command import KresClientCommand
+from knot_resolver.client.completion import CompletionWords, comp_get_words
 
 
-class Shells(Enum):
+@dataclass(frozen=True)
+class CompletionCommandArgs(KresClientArgs):
+    shell: Shell
+    args: list[str]
+
+
+class Shell(int, Enum):
     BASH = 0
     FISH = 1
 
 
-@register_command
-class CompletionCommand(Command):
-    def __init__(self, namespace: argparse.Namespace) -> None:
-        super().__init__(namespace)
-        self.shell: Shells = namespace.shell
-        self.args: List[str] = namespace.args
-        if namespace.extra is not None:
-            self.args.append("--")
+def register_subparser(subparser: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    completion_parser = subparser.add_parser(
+        "completion",
+        help="commands auto-completion",
+    )
+    shell_dest = "shell"
+    shell = completion_parser.add_mutually_exclusive_group()
+    shell.add_argument("--bash", action="store_const", dest=shell_dest, const=Shell.BASH, default=Shell.BASH)
+    shell.add_argument("--fish", action="store_const", dest=shell_dest, const=Shell.FISH)
 
-    @staticmethod
-    def register_args_subparser(
-        subparser: "argparse._SubParsersAction[argparse.ArgumentParser]",
-    ) -> Tuple[argparse.ArgumentParser, "Type[Command]"]:
-        completion = subparser.add_parser(
-            "completion",
-            help="commands auto-completion",
-        )
+    completion_parser.add_argument("--args", help="arguments to complete", nargs=argparse.REMAINDER, default=[])
+    completion_parser.set_defaults(command=CompletionCommand, command_args=CompletionCommandArgs)
 
-        shells_dest = "shell"
-        shells = completion.add_mutually_exclusive_group()
-        shells.add_argument("--bash", action="store_const", dest=shells_dest, const=Shells.BASH, default=Shells.BASH)
-        shells.add_argument("--fish", action="store_const", dest=shells_dest, const=Shells.FISH)
 
-        completion.add_argument("--args", help="arguments to complete", nargs=argparse.REMAINDER, default=[])
+class CompletionCommand(KresClientCommand):
+    def __init__(self, args: CompletionCommandArgs) -> None:
+        self._args = args
 
-        return completion, CompletionCommand
+    def run(self) -> None:
+        parser = get_client_parser()
+        words: CompletionWords = {}
 
-    @staticmethod
-    def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
-        return comp_get_words(args, parser)
-
-    def run(self, args: CommandArgs) -> None:
-        words: CompWords = {}
-
-        parser = args.parser
         if parser:
-            words = comp_get_words(self.args, args.parser)
+            words = comp_get_words(self._args.args, parser)
 
         # print completion words
         # based on required bash/fish shell format
-        if self.shell == Shells.BASH:
+        if self._args.shell == Shell.BASH:
             print(" ".join(words))
-        elif self.shell == Shells.FISH:
+        if self._args.shell == Shell.FISH:
             # TODO: FISH completion implementation
             pass
-        else:
-            raise ValueError(f"unexpected value of {Shells}: {self.shell}")
+
+    @staticmethod
+    def completion(args: list[str], parser: argparse.ArgumentParser) -> CompletionWords:
+        return comp_get_words(args, parser)
