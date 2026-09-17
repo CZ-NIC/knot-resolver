@@ -210,19 +210,6 @@ static void ioreq_kill_pending(struct qr_task *task)
 	task->pending_count = 0;
 }
 
-/** Get a mempool. */
-static inline struct mempool *pool_borrow(void)
-{
-	/* The implementation used to have extra caching layer,
-	 * but it didn't work well.  Now it's very simple. */
-	return mp_new((size_t) 16 * 1024);
-}
-/** Return a mempool. */
-static inline void pool_release(struct mempool *mp)
-{
-	mp_delete(mp);
-}
-
 /** Create a key for an outgoing subrequest: qname, qclass, qtype.
  * @param key Destination buffer for key size, MUST be SUBREQ_KEY_LEN or larger.
  * @return key length if successful or an error
@@ -310,27 +297,27 @@ static struct request_ctx *request_create(struct session2 *session,
                                           uint32_t uid)
 {
 	knot_mm_t pool = {
-		.ctx = pool_borrow(),
-		.alloc = (knot_mm_alloc_t) mp_alloc
+		.ctx = mp_new(16 * 1024),
+		.alloc = (knot_mm_alloc_t)mp_alloc
 	};
 
 	/* Create request context */
 	struct request_ctx *ctx = mm_calloc(&pool, 1, sizeof(*ctx));
 	if (!ctx) {
-		pool_release(pool.ctx);
+		mp_delete(pool.ctx);
 		return NULL;
 	}
 
 	/* TODO Relocate pool to struct request */
 	if (session && kr_fails_assert(session->outgoing == false)) {
-		pool_release(pool.ctx);
+		mp_delete(pool.ctx);
 		return NULL;
 	}
 	ctx->source.session = session;
 	if (comm && comm->xdp) {
 	#if ENABLE_XDP
 		if (kr_fails_assert(session)) {
-			pool_release(pool.ctx);
+			mp_delete(pool.ctx);
 			return NULL;
 		}
 		memcpy(ctx->source.eth_to,   comm->eth_to,   sizeof(ctx->source.eth_to));
@@ -338,7 +325,7 @@ static struct request_ctx *request_create(struct session2 *session,
 		ctx->req.alloc_wire_cb = alloc_wire_cb;
 	#else
 		kr_assert(!EINVAL);
-		pool_release(pool.ctx);
+		mp_delete(pool.ctx);
 		return NULL;
 	#endif
 	}
@@ -458,7 +445,7 @@ static void request_free(struct request_ctx *ctx)
 	#endif
 	}
 	/* Return mempool to ring or free it if it's full */
-	pool_release(ctx->req.pool.ctx);
+	mp_delete(ctx->req.pool.ctx);
 	/* @note The 'task' is invalidated from now on. */
 	the_worker->stats.rconcurrent -= 1;
 }
