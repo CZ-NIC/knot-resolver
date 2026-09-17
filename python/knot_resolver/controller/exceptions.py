@@ -1,29 +1,15 @@
-from typing import List
+from __future__ import annotations
 
 from knot_resolver.exceptions import KresError
 
 
-class KresSubprocessControllerError(KresError):
-    """Class for errors that are raised in the controller module."""
+class ControllerError(KresError):
+    """Class for all errors that are raised in the controller submodules."""
 
 
-class KresSubprocessControllerErrorNotifySocketError(KresSubprocessControllerError):
-    """Exception class for notify socket errors."""
+class ControllerNotifySocketError(ControllerError):
+    """Class for notify socket errors."""
 
     def __init__(self, msg: str) -> None:
         msg = f"notify socket error: {msg}"
         super().__init__(msg)
-
-
-class KresSubprocessControllerExec(Exception):  # noqa: N818
-    """
-    Custom non-error exception that indicates the need for exec().
-
-    Raised by the controller (supervisord) and caught by the controlled process (manager).
-    The exception says that the process needs to perform a re-exec during startup.
-    This ensures that the process runs under the controller (supervisord) in a process tree hierarchy.
-    """
-
-    def __init__(self, exec_args: List[str], *args: object) -> None:
-        self.exec_args = exec_args
-        super().__init__(*args)
