@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import logging
 import os
 import socket
 import struct
 from pathlib import Path
 
-from knot_resolver.controller.exceptions import KresSubprocessControllerErrorNotifySocketError
+from knot_resolver.controller.exceptions import ControllerNotifySocketError
+from knot_resolver.logging import get_logger
 
 NOTIFY_SOCKET = "NOTIFY_SOCKET"
 NOTIFY_SOCKET_NAME = "supervisor-notify-socket"
@@ -15,7 +15,7 @@ CREDENTIALS_FORMAT = "3i"
 CREDENTIALS_SIZE = struct.calcsize(CREDENTIALS_FORMAT)
 RECEIVE_BUFFER_SIZE = 2048
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def init_notify_socket() -> int:
@@ -30,10 +30,10 @@ def init_notify_socket() -> int:
         notify_socket.close()
         notify_socket_path.unlink(missing_ok=True)
         msg = f"failed to initialize notify socket at '{notify_socket_path}'"
-        raise KresSubprocessControllerErrorNotifySocketError(msg) from e
+        raise ControllerNotifySocketError(msg) from e
 
     if NOTIFY_SOCKET in os.environ:
-        logger.info("running under systemd, overwriting 'NOTIFY_SOCKET' environment variable")
+        logger.info("Running under systemd, overwriting '$NOTIFY_SOCKET' environment variable")
 
     os.environ[NOTIFY_SOCKET] = str(notify_socket_path)
     return notify_socket.detach()
@@ -54,7 +54,7 @@ def read_notify_socket(fd: int) -> tuple[int, bytes] | None:
 
     if flags & socket.MSG_TRUNC:
         msg = "received datagram was truncated"
-        raise KresSubprocessControllerErrorNotifySocketError(msg)
+        raise ControllerNotifySocketError(msg)
 
     pid = next(
         (
@@ -66,7 +66,7 @@ def read_notify_socket(fd: int) -> tuple[int, bytes] | None:
     )
 
     if pid is None:
-        logger.warning("ignoring received data without credentials: %s", data)
+        logger.warning("Ignoring received data without credentials: %s", data)
         return None
 
     return pid, data
@@ -76,7 +76,7 @@ def send_notify_socket_message(notify_socket_path: str | None = None, **values: 
     if notify_socket_path is None:
         notify_socket_path = os.getenv(NOTIFY_SOCKET)
         if notify_socket_path is None:
-            logger.warning("failed to get $NOTIFY_SOCKET environment variable")
+            logger.warning("Failed to get '$NOTIFY_SOCKET' environment variable")
             return
 
     if notify_socket_path.startswith("@"):
@@ -86,13 +86,13 @@ def send_notify_socket_message(notify_socket_path: str | None = None, **values: 
         notify_socket = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
         notify_socket.connect(notify_socket_path)
     except OSError:
-        logger.exception("failed to connect to $NOTIFY_SOCKET at '%s'", notify_socket_path)
+        logger.exception("Failed to connect to notify socket at '%s'", notify_socket_path)
         return
 
     payload = "\n".join((f"{key}={value}" for key, value in values.items()))
     try:
         notify_socket.send(payload.encode("utf8"))
     except OSError:
-        logger.exception("failed to send notify message to $NOTIFY_SOCKET at '%s'", notify_socket_path)
+        logger.exception("Failed to send notify message to notify socket at '%s'", notify_socket_path)
 
     notify_socket.close()
