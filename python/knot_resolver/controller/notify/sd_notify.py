@@ -1,232 +1,238 @@
-# type: ignore
-# ruff: noqa: SLF001
-# pylint: disable=c-extension-no-member
+# ruff: noqa: G004, G010
+# mypy: disable-error-code=import-untyped
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from knot_resolver.constants import NOTIFY_SUPPORT
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from typing import Any, TypeVar
+
+    from supervisor.loggers import Logger as SupervisorLogger
+    from supervisor.supervisord import Supervisor
+
+    T = TypeVar("T")
+    U = TypeVar("U")
+
+
+def chain_call(
+    first: Callable[..., U | tuple[Any, ...]],
+    second: Callable[..., T],
+) -> Callable[..., T]:
+    @wraps(first)
+    def wrapper(*args: Any, **kwargs: Any) -> T:
+        result = first(*args, **kwargs)
+        if isinstance(result, tuple):
+            return second(*result)
+        return second(result)
+
+    return wrapper
+
+
+def append_call(
+    first: Callable[..., T],
+    second: Callable[..., object],
+) -> Callable[..., T]:
+    @wraps(first)
+    def wrapper(*args: Any, **kwargs: Any) -> T:
+        result = first(*args, **kwargs)
+        second(*args, **kwargs)
+        return result
+
+    return wrapper
+
 
 if NOTIFY_SUPPORT:
     import os
     import signal
     import time
-    from functools import partial
+    from functools import partial, wraps
     from pathlib import Path
-    from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar
+    from typing import TYPE_CHECKING
 
     from supervisor.events import ProcessStateEvent, ProcessStateStartingEvent, subscribe
     from supervisor.medusa.asyncore_25 import compact_traceback
     from supervisor.process import Subprocess
     from supervisor.states import ProcessStates
-    from supervisor.supervisord import Supervisor
 
-    from knot_resolver.controller.supervisord.plugin.notify_socket import (
-        init_notify_socket,
-        read_notify_socket,
-        NOTIFY_SOCKET,
-        NOTIFY_SOCKET_NAME,
-    )
+    from .notify_socket import NOTIFY_SOCKET, NOTIFY_SOCKET_NAME, init_notify_socket, read_notify_socket
 
-    starting_processes: List[Subprocess] = []
+    READY_1 = b"READY=1"
+    STOPPING_1 = b"STOPPING=1"
 
-    def is_type_notify(proc: Subprocess) -> bool:
-        return (
-            proc.config.environment is not None and proc.config.environment.get("X-SUPERVISORD-TYPE", None) == "notify"
-        )
+    def is_subprocess_x_type_notify(subprocess: Subprocess) -> bool:
+        env: dict[str, str] = subprocess.config.environment
+        return bool(env and env.get("X-SUPERVISORD-TYPE") == "notify")
 
-    class NotifySocketDispatcher:
-        """
-        See supervisor.dispatcher
-        """
+    class NotifyPlugin:
+        def __init__(self) -> None:
+            self.starting_subprocesses: dict[str, Subprocess] = {}
+            self.notify_dispatcher: NotifyDispatcher | None = None
 
-        def __init__(self, supervisor: Supervisor, fd: int):
+        def track_starting_subprocesses(self, event: ProcessStateEvent) -> None:
+            subprocess: Subprocess = event.process
+            subprocess_name: str = subprocess.config.name
+
+            if isinstance(event, ProcessStateStartingEvent):
+                # subprocess is starting
+                self.starting_subprocesses[subprocess_name] = subprocess
+            else:
+                # subprocess is not starting; remove from starting processes
+                self.starting_subprocesses.pop(subprocess_name, None)
+
+        def supervisord_get_process_map(self, supervisord: Supervisor, mp: dict[int, object]) -> dict[int, object]:
+            logger: SupervisorLogger = supervisord.options.logger
+            if self.notify_dispatcher is None:
+                self.notify_dispatcher = NotifyDispatcher(supervisord, self)
+                logger.info("Injected notify support into event loop")
+
+            mp[self.notify_dispatcher.fd] = self.notify_dispatcher
+            return mp
+
+    class NotifyDispatcher:
+        def __init__(self, supervisor: Supervisor, plugin: NotifyPlugin):
             self._supervisor = supervisor
-            self.fd = fd
-            self.closed: bool = False  # True if close() has been called
+            self._plugin = plugin
 
-        def __repr__(self):
-            return f"<{self.__class__.__name__} with fd={self.fd}>"
+            self.fd = init_notify_socket()
+            self.closed: bool = False
 
-        def readable(self):
+        def readable(self) -> bool:
             return True
 
-        def writable(self):
+        def writable(self) -> bool:
             return False
 
-        def handle_read_event(self):
-            logger: Any = self._supervisor.options.logger
+        def handle_read_event(self) -> None:
+            logger: SupervisorLogger = self._supervisor.options.logger
 
-            result: tuple[int, bytes, None] = read_notify_socket(self.fd)
+            result: tuple[int, bytes] | None = read_notify_socket(self.fd)
             if result is None:
-                return  # there was some junk
+                return
 
             pid, data = result
 
-            # pylint: disable=undefined-loop-variable
-            for proc in starting_processes:
-                if proc.pid == pid:
-                    break
-            else:
-                logger.warn(f"ignoring ready notification from unregistered PID={pid}")
+            # find subprocess by PID
+            subprocess: Subprocess | None = None
+            for starting_subprocess in self._plugin.starting_subprocesses.values():
+                if starting_subprocess.pid == pid:
+                    subprocess = starting_subprocess
+
+            if not subprocess:
+                logger.warn(f"Ignoring notify message from unregistered subprocess PID={pid}")
                 return
 
-            if data.startswith(b"READY=1"):
-                # handle case, when some process is really ready
-
-                if is_type_notify(proc):
-                    proc._assertInState(ProcessStates.STARTING)
-                    proc.change_state(ProcessStates.RUNNING)
-                    logger.info(
-                        f"success: {proc.config.name} entered RUNNING state, process sent notification via $NOTIFY_SOCKET"
-                    )
-                else:
-                    logger.warn(
-                        f"ignoring READY notification from {proc.config.name}, which is not configured to send it"
-                    )
-
-            elif data.startswith(b"STOPPING=1"):
-                # just accept the message, filter unwanted notifications and do nothing else
-
-                if is_type_notify(proc):
-                    logger.info(
-                        f"success: {proc.config.name} entered STOPPING state, process sent notification via $NOTIFY_SOCKET"
-                    )
-                else:
-                    logger.warn(
-                        f"ignoring STOPPING notification from {proc.config.name}, which is not configured to send it"
-                    )
-
-            else:
-                # handle case, when we got something unexpected
-                logger.warn(f"ignoring unrecognized data on $NOTIFY_SOCKET sent from PID={pid}, data='{data!r}'")
+            if not is_subprocess_x_type_notify(subprocess):
+                logger.warn(
+                    f"Ignoring notify message {data!r} from {subprocess.config.name}, that is not configured to send it"
+                )
                 return
 
-        def handle_write_event(self):
-            raise ValueError("this dispatcher is not writable")
+            if data.startswith(READY_1):
+                subprocess._assertInState(ProcessStates.STARTING)
+                subprocess.change_state(ProcessStates.RUNNING)
+                logger.info(f"Subprocess {subprocess.config.name} entered RUNNING state, received READY notification")
+            elif data.startswith(STOPPING_1):
+                logger.info(
+                    f"Subprocess {subprocess.config.name} entered STOPPING state, received STOPPING notification"
+                )
+            else:
+                logger.warn(
+                    "Ignoring unrecognized data on notify socket sent from"
+                    f" {subprocess.config.name}, PID={pid}, data={data!r}"
+                )
 
-        def handle_error(self):
-            _nil, t, v, tbinfo = compact_traceback()
+        def handle_write_event(self) -> None:
+            msg = "Write events are not supported by NotifyDispatcher."
+            raise RuntimeError(msg)
 
-            self._supervisor.options.logger.error(
-                f"uncaptured python exception, closing notify socket {repr(self)} ({t}:{v} {tbinfo})"
+        def handle_error(self) -> None:
+            logger: SupervisorLogger = self._supervisor.options.logger
+
+            _, ex_class, ex_instance, tb_info = compact_traceback()
+            logger.error(
+                f"Uncaptured error, closing notify socket {self!r} ({ex_class.__name__}: {ex_instance})\n{tb_info})"
             )
             self.close()
 
-        def close(self):
+        def close(self) -> None:
             if not self.closed:
                 os.close(self.fd)
                 self.closed = True
 
-        def flush(self):
-            pass
+        def flush(self) -> None:
+            return
 
-    def keep_track_of_starting_processes(event: ProcessStateEvent) -> None:
-        global starting_processes
+    def _subprocess_transition(subprocess: Subprocess) -> Subprocess:
+        logger: SupervisorLogger = subprocess.config.options.logger
 
-        proc: Subprocess = event.process
+        if not is_subprocess_x_type_notify(subprocess):
+            return subprocess
 
-        if isinstance(event, ProcessStateStartingEvent):
-            # process is starting
-            # if proc not in starting_processes:
-            starting_processes.append(proc)
+        if (
+            subprocess.state == ProcessStates.STARTING
+            and time.time() - subprocess.laststart > subprocess.config.startsecs
+        ):
+            # If the process has not sent READY notification within 'proc.config.startsecs'
+            # STARTING -> STOPPING
+            logger.warn(
+                f"Subprocess {subprocess.config.name} did not send READY notification within"
+                f" {subprocess.config.startsecs} secs; killing subprocess"
+            )
+            subprocess.kill(signal.SIGKILL)
+            subprocess.x_notifykilled = True  # used in finish() function to set to FATAL state
+            subprocess.laststart = time.time() + 1  # prevent immediate state transition to RUNNING from happening
 
-        else:
-            # not starting
-            starting_processes = [p for p in starting_processes if p.pid is not proc.pid]
+        return subprocess
 
-    notify_dispatcher: Optional[NotifySocketDispatcher] = None
+    def _subprocess_finish_tail(subprocess: Subprocess, pid: int, sts: object) -> tuple[Subprocess, int, object]:
+        if getattr(subprocess, "x_notifykilled", False):
+            # Use FATAL rather than STOPPED after a startup notification timeout.
+            # A process that fails to notify during startup is unlikely to succeed if
+            # Supervisor immediately tries to start it again.
+            subprocess.change_state(ProcessStates.FATAL)
 
-    def process_transition(slf: Subprocess) -> None:
-        if not is_type_notify(slf):
-            return slf
+            del subprocess.x_notifykilled
+        return subprocess, pid, sts
 
-        # modified version of upstream process transition code
-        if slf.state == ProcessStates.STARTING:
-            if time.time() - slf.laststart > slf.config.startsecs:
-                # STARTING -> STOPPING if the process has not sent ready notification
-                # within proc.config.startsecs
-                slf.config.options.logger.warn(
-                    f"process '{slf.config.name}' did not send ready notification within {slf.config.startsecs} secs, killing"
-                )
-                slf.kill(signal.SIGKILL)
-                slf.x_notifykilled = True  # used in finish() function to set to FATAL state
-                slf.laststart = time.time() + 1  # prevent immediate state transition to RUNNING from happening
+    def _subprocess_spawn_as_child_add_notify_socket_env_var(
+        subprocess: Subprocess, *args: Any
+    ) -> tuple[Subprocess, Any]:
+        if is_subprocess_x_type_notify(subprocess):
+            subprocess.config.environment[NOTIFY_SOCKET] = str(Path.cwd() / NOTIFY_SOCKET_NAME)
+        return (subprocess, *args)
 
-        # return self for chaining
-        return slf
+    def notify_support_patch(supervisord: Supervisor) -> None:
+        notify_plugin = NotifyPlugin()
 
-    def subprocess_finish_tail(slf, pid, sts) -> Tuple[Any, Any, Any]:
-        if getattr(slf, "x_notifykilled", False):
-            # we want FATAL, not STOPPED state after timeout waiting for startup notification
-            # why? because it's likely not gonna help to try starting the process up again if
-            # it failed so early
-            slf.change_state(ProcessStates.FATAL)
-
-            # clear the marker value
-            del slf.x_notifykilled
-
-        # return for chaining
-        return slf, pid, sts
-
-    def supervisord_get_process_map(supervisord: Any, mp: Dict[Any, Any]) -> Dict[Any, Any]:
-        global notify_dispatcher
-        if notify_dispatcher is None:
-            notify_dispatcher = NotifySocketDispatcher(supervisord, init_notify_socket())
-            supervisord.options.logger.info("notify: injected $NOTIFY_SOCKET into event loop")
-
-        # add our dispatcher to the result
-        assert notify_dispatcher.fd not in mp
-        mp[notify_dispatcher.fd] = notify_dispatcher
-
-        return mp
-
-    def process_spawn_as_child_add_env(slf: Subprocess, *args: Any) -> Tuple[Any, ...]:
-        if is_type_notify(slf):
-            slf.config.environment[NOTIFY_SOCKET] = str(Path.cwd() / NOTIFY_SOCKET_NAME)
-        else:
-            slf.config.environment[NOTIFY_SOCKET] = ""
-        return (slf, *args)
-
-    T = TypeVar("T")
-    U = TypeVar("U")
-
-    def chain(first: Callable[..., U], second: Callable[[U], T]) -> Callable[..., T]:
-        def wrapper(*args: Any, **kwargs: Any) -> T:
-            res = first(*args, **kwargs)
-            if isinstance(res, tuple):
-                return second(*res)
-            return second(res)
-
-        return wrapper
-
-    def append(first: Callable[..., T], second: Callable[..., None]) -> Callable[..., T]:
-        def wrapper(*args: Any, **kwargs: Any) -> T:
-            res = first(*args, **kwargs)
-            second(*args, **kwargs)
-            return res
-
-        return wrapper
-
-    def monkeypatch(supervisord: Supervisor) -> None:
-        """Inject ourselves into supervisord code"""
-
-        # append notify socket handler to event loop
-        supervisord.get_process_map = chain(
-            supervisord.get_process_map, partial(supervisord_get_process_map, supervisord)
+        # append notify handler to event loop
+        supervisord.get_process_map = chain_call(
+            supervisord.get_process_map,
+            partial(notify_plugin.supervisord_get_process_map, supervisord),
         )
 
-        # prepend timeout handler to transition method
-        Subprocess.transition = chain(process_transition, Subprocess.transition)
-        Subprocess.finish = append(Subprocess.finish, subprocess_finish_tail)
+        # chain timeout handler to transition method
+        Subprocess.transition = chain_call(_subprocess_transition, Subprocess.transition)
+        Subprocess.finish = append_call(Subprocess.finish, _subprocess_finish_tail)
 
         # add environment variable $NOTIFY_SOCKET to starting processes
-        Subprocess._spawn_as_child = chain(process_spawn_as_child_add_env, Subprocess._spawn_as_child)
+        Subprocess._spawn_as_child = chain_call(
+            _subprocess_spawn_as_child_add_notify_socket_env_var,
+            Subprocess._spawn_as_child,
+        )
 
-        # keep references to starting subprocesses
-        subscribe(ProcessStateEvent, keep_track_of_starting_processes)
+        # track starting subprocesses
+        subscribe(ProcessStateEvent, notify_plugin.track_starting_subprocesses)
 
-    def inject(supervisord: Supervisor, **_config: Any) -> Any:  # pylint: disable=useless-return
-        monkeypatch(supervisord)
 
-        # this method is called by supervisord when loading the plugin,
-        # it should return XML-RPC object, which we don't care about
-        # That's why why are returning just None
-        return None
+def inject(supervisord: Supervisor, **_config: object) -> None:
+    logger: SupervisorLogger = supervisord.options.logger
+
+    if NOTIFY_SUPPORT:
+        logger.info("The 'notify' feature is supported on this system. Patching supervisord to support it ...")
+        notify_support_patch(supervisord)
+    else:
+        logger.warn("The 'notify' feature is not supported on this system. It is available only on Linux systems.")
