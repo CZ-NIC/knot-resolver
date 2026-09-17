@@ -58,8 +58,6 @@ def get_logger(name: str | None = None) -> KresLogger:
     return cast("KresLogger", logger)
 
 
-SERVICE_NAME_LEN = 10
-
 BASIC_FORMAT = "%(name)s: %(message)s"
 NO_PREFIX_FORMAT = f"[%(levelname)s] {BASIC_FORMAT}"
 
