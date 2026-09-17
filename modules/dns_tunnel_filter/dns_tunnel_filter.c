@@ -61,6 +61,16 @@ struct {
 	kr_rule_tags_t rpz_tags;
 } config = {0};
 
+static inline bool domain_hit_is_colliding(uint64_t stored_hash, uint64_t h, uint32_t time_now, uint32_t last)
+{
+	return stored_hash != 0 && (time_now - last) <= config.hit_time_window_ms && stored_hash != h;
+}
+
+static inline bool domain_hit_should_init(uint64_t stored_hash, uint64_t h, uint32_t time_now, uint32_t last)
+{
+	return stored_hash != h || (time_now > last && (time_now - last) > config.hit_time_window_ms);
+}
+
 static uint32_t domain_hit_increment(const knot_dname_t *registrable, uint32_t time_now)
 {
 	uint64_t h = KRU.hash_bytes(
@@ -76,10 +86,10 @@ static uint32_t domain_hit_increment(const knot_dname_t *registrable, uint32_t t
 	uint32_t last = atomic_load_explicit(&e->last_seen, memory_order_relaxed);
 
 	// collision leads to overwrite and could mean undercounting
-	if (stored_hash != 0 && (time_now - last) <= config.hit_time_window_ms && stored_hash != h) {
+	if (domain_hit_is_colliding(stored_hash, h, time_now, last)) {
 		kr_log_warning(TUNNEL, "Domain hit collision: new hash %lu, stored hash %lu\n", h, stored_hash);
 	}
-	if (stored_hash != h || (time_now - last) > config.hit_time_window_ms) {
+	if (domain_hit_should_init(stored_hash, h, time_now, last)) {
 		atomic_store_explicit(&e->name_hash, h, memory_order_relaxed);
 		atomic_store_explicit(&e->count, 0, memory_order_relaxed);
 	}
