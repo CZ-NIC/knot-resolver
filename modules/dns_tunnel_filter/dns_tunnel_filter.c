@@ -229,7 +229,7 @@ static void write_stats_line(FILE *f, float tunnel_prob, struct kr_query *qry)
 		(void)fprintf(f, "|%f", tunnel_prob);
 	}
 
-	char buf[KNOT_DNAME_MAXLEN];
+	char buf[KNOT_DNAME_MAXLEN * 4];
 	if (knot_dname_to_str(buf, qry->sname, sizeof(buf)))
 		(void)fprintf(f, "|%s|\n", buf);
 	else
