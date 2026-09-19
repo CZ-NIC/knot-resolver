@@ -6,6 +6,55 @@ local kres = require('kres')
 local renumber = require('kres_modules.renumber')
 local policy = require('kres_modules.policy')
 
+local WhiteListEntry = {}
+WhiteListEntry.__index = WhiteListEntry
+
+setmetatable(WhiteListEntry, {
+	__call = function(cls, ...)
+		return cls:new(...)
+	end
+})
+
+local function add_subnet(rr_list, subnet)
+	local addr = string.find(subnet, ':', 1, true) and '::' or '0.0.0.0'
+	table.insert(rr_list, renumber.prefix(subnet, addr))
+end
+
+function WhiteListEntry:new(str_dname, ...)
+	local rr_list = {}
+	for _, v in ipairs({...}) do
+		add_subnet(rr_list, v)
+	end
+
+	-- normalize domain name (add '.') at end, as that is what incoming queries have
+	if str_dname[#str_dname] ~= '.' then
+		str_dname = str_dname .. '.'
+	end
+	local dname = kres.str2dname(str_dname)
+
+	return setmetatable({dname = dname, rr_list = rr_list}, self);
+end
+
+local function is_rr_match(rr_list, rr)
+	for i = 1, #rr_list do
+		local prefix = rr_list[i]
+		-- Match record type to address family and record address to given subnet
+		if renumber.match_subnet(prefix[1], prefix[2], prefix[4], rr) then
+			return true
+		end
+	end
+	return false
+end
+
+function WhiteListEntry:match(rr)
+	local dname = self.dname
+	if not string.find(rr.owner, dname, -string.len(dname), true) then
+		return false
+	end
+	log_info(ffi.C.LOG_GRP_REBIND, 'checking whitelist match for %s', kres.rr2str(rr))
+	return is_rr_match(self.rr_list, rr)
+end
+
 local M = {}
 M.layer = {}
 M.blacklist = {
@@ -31,14 +80,21 @@ M.blacklist = {
 	renumber.prefix('fc00::/7', '::'),
 	renumber.prefix('fe80::/10', '::'),
 } -- second parameter for renumber module is ignored except for being v4 or v6
+M.whitelist = {}
+
+function M.add_whitelist_entry(str_dname, ...)
+	table.insert(M.whitelist, WhiteListEntry(str_dname, ...))
+end
 
 local function is_rr_blacklisted(rr)
-	for i = 1, #M.blacklist do
-		local prefix = M.blacklist[i]
-		-- Match record type to address family and record address to given subnet
-		if renumber.match_subnet(prefix[1], prefix[2], prefix[4], rr) then
-			return true
+	if is_rr_match(M.blacklist, rr) then
+		local whitelist = M.whitelist
+		for i = 1, #whitelist do
+			if whitelist[i]:match(rr) then
+				return false
+			end
 		end
+		return true
 	end
 	return false
 end
@@ -78,7 +134,7 @@ local function refuse(req)
 
 	local msg = 'blocked by DNS rebinding protection'
 	pkt:put('\11explanation\7invalid\0', 10800, pkt:qclass(), kres.type.TXT,
-	string.char(#msg) .. msg)
+			string.char(#msg) .. msg)
 	return kres.DONE
 end
 
