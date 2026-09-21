@@ -38,9 +38,9 @@ struct mp_unused {
  * A _mempool_ consists of mmapped chunks of different sizes.
  * We use _chunk_ to refer the mempool_chunk struct located after the data area of size chunk->size,
  * which contains data already allocated to the application followed by chunk->free bytes of available space.
- * Normal chunks with sizes of at least one page are mmaped on their own,
+ * Normal chunks with sizes of at least one page are mmaped on their own;
  * small chunks are allocated by single whole pages consecutively containing several of them.
- * See mp_reusable_ext_sizes[] in the configuration section below for the specific sizes of reusable chunks,
+ * See mp_reusable_ext_sizes[] in the configuration section below for the specific sizes of reusable chunks;
  * each chunk has its size rounded up to those values, or if it is greater, it is munmapped immediatelly when unneed.
  *
  * When allocating memory to the application,
@@ -70,7 +70,7 @@ struct mp_unused {
  *   * UNDEFINED (unlocked but uninitialized), or
  *   * DEFINED (unlocked and initialized).
  * ASan then disallows access to poisoned (NOACCESS) memory,
- * Valgrind in addittion to that detects decisions based on uninitialized memory.
+ * Valgrind addittionally detects decisions based on uninitialized memory.
  *
  * Desired state outside of our code:
  *   * mempool structure is accessible,
@@ -110,7 +110,9 @@ const uint32_t mp_reusable_ext_sizes[] = {
 	16 * 1024,
 	68 * 1024,  // support 64K allocations
 };
-#define MP_REUSABLE_CNT ARRAY_SIZE(mp_reusable_ext_sizes)
+enum {
+	MP_REUSABLE_CNT = ARRAY_SIZE(mp_reusable_ext_sizes),
+}; // TODO(nit): I like that it's visibly a truly constant int.
 
 /* Call munmap on chunks which were not used for at least this time period. */
 #define MP_REUSABLE_HOLD_TIME            60000  // ms
@@ -306,6 +308,7 @@ GLOBAL_STORAGE_CLASS struct mp_reusable {
 	struct mp_unused head, sep;
 	uint32_t chunk_size, chunks_per_block;
 } mp_reusable[MP_REUSABLE_CNT] = {0};
+/// true disables automatic mp_balance_internal() calls
 GLOBAL_STORAGE_CLASS bool mp_balance_on_demand = false;
 
 __attribute__((constructor))
@@ -422,11 +425,13 @@ static void log_global_stats(void)
 }
 #endif
 
+/// see (docs for) mp_balance_reusable()
 static uint64_t mp_balance_internal(uint32_t now)
 {
 	// MEMCHECK: all data locked, chunks defined, unused defined
 	uint32_t longest_unused = 0;
 	int max_frees = MP_REUSABLE_MAX_CONSECUTIVE_FREES;
+ 	// TODO: reverse iterate?
 	for (int i = 0; i < MP_REUSABLE_CNT; i++) {
 		struct mp_unused *unused;
 		while ((unused = mp_reusable[i].head.next)->count > 0) {
@@ -661,6 +666,7 @@ static void chunk_move_to(struct mempool_chunk **pchunk, struct mempool_chunk **
 	*where = chunk;
 }
 
+/// Implements the less typical flows, e.g. no searching pool->last again (if exists).
 static void *mp_alloc_internal(struct mempool *pool, size_t size)
 {
 	// MEMCHECK: pool defined, pool chunks locked

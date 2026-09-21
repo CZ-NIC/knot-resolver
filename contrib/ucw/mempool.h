@@ -35,27 +35,30 @@ struct mempool_chunk {
 	struct mempool *pool;         // Can be useful when analysing coredump for memory leaks
 #endif
 };
-#define MP_CHUNK_TAIL ALIGN_TO(sizeof(struct mempool_chunk), CPU_STRUCT_ALIGN)
+enum {
+	MP_CHUNK_TAIL = ALIGN_TO(sizeof(struct mempool_chunk), CPU_STRUCT_ALIGN),
+}; // TODO(nit): I like that it's visibly a truly constant int.
 
 /**
  * Memory pool.
  * You should use this one as an opaque handle only, the insides are internal.
  **/
 struct mempool {
-	struct mempool_chunk *last;
+	struct mempool_chunk *last; /// linked list, continuing via mempool_chunk::prev
 	size_t ext_chunk_size; /// see mp_init() docs
 	size_t total_size;
 };
 
-struct mempool_stats {          /** Mempool statistics. See mp_stats(). **/
-	size_t total_size;          /** Real allocated size in bytes. */
-	size_t used_size;           /** Size allocated from mempool to application. */
-	unsigned chunks_count;      /** Number of allocated chunks. */
+/// Mempool statistics. See mp_stats().
+struct mempool_stats {
+	size_t total_size;          /// Real allocated size in bytes.
+	size_t used_size;           /// Size allocated from mempool to application.
+	unsigned chunks_count;      /// Number of allocated chunks.
 };
 
 // --- configuration ---  (see also many other options in C file)
 
-/* A printf-like function for debug logging;
+/** A printf-like function for debug logging;
  * called only if global or pool stats in C file or consistency checks below are enabled. */
 #define MP_LOG_LINE(fmt, ...) printf(fmt "\n", ##__VA_ARGS__)
 
@@ -68,6 +71,7 @@ struct mempool_stats {          /** Mempool statistics. See mp_stats(). **/
 }
 
 /* Check consistency of internal structures before and after our modifications; possibly slow. */
+// TODO(nit): un-macro these functions?
 //#define MP_DEBUG_CONSISTENCY_CHECKS
 #ifdef MP_DEBUG_CONSISTENCY_CHECKS
 #define MP_CHUNK_CHECK(c) MP_CHUNK_CHECKi(c, 0)
@@ -124,6 +128,8 @@ uint64_t mp_balance_reusable(void);
  * The function is set globally for all threads
  * and it is called once during flushing or deleting mempool and during balancing,
  * which is called also from other operations unless mp_balance_reusable is used.
+ *
+ * TODO: document that it's OK to pass NULL?
  */
 void mp_set_time(uint32_t (*get_stamp_cb)(void));
 
