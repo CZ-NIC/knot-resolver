@@ -633,6 +633,34 @@ void mp_stats(struct mempool *pool, struct mempool_stats *stats)
 
 // --- allocating space from pools ---
 
+/// set NOACCESS on chunks until `c_end`
+static void chunks_NOACCESS(struct mempool *pool, struct mempool_chunk *c_end)
+{
+	if (!MEMCHECK_ACTIVE) // This may not be a compile-time constant!
+		return;
+	struct mempool_chunk *c = pool->last;
+	while (c != c_end) {
+		struct mempool_chunk *prev = c->prev;
+		MEMCHECK_NOACCESS(c, MP_CHUNK_TAIL);
+		c = prev;
+	}
+}
+
+/// Move *pchunk in the list to *where. (*pchunk != NULL && where != NULL)
+static void chunk_move_to(struct mempool_chunk **pchunk, struct mempool_chunk **where)
+{
+	if (pchunk == where)
+		return; // it should work anyway, but it's easier to see this way
+	if ((*pchunk)->prev == *where)
+		return; // moving next to itself; this case would break
+	// remove *pchunk from the list
+	struct mempool_chunk *chunk = *pchunk;
+	*pchunk = chunk->prev;
+	// insert it
+	chunk->prev = *where;
+	*where = chunk;
+}
+
 static void *mp_alloc_internal(struct mempool *pool, size_t size)
 {
 	// MEMCHECK: pool defined, pool chunks locked
@@ -644,28 +672,23 @@ static void *mp_alloc_internal(struct mempool *pool, size_t size)
 
 	// try finding space within MP_ACTIVE_CHUNKS chunks (excl. the first one)
 	if (pool->last) {
-		struct mempool_chunk **pchunk, **pfullest;
-		pfullest = pchunk = &pool->last;
-		MEMCHECK_DEFINED(*pchunk, MP_CHUNK_TAIL);
-		for (int i = 1; *(pchunk = &(*pchunk)->prev) && (i < MP_ACTIVE_CHUNKS) ; i++) {
-			MEMCHECK_DEFINED(*pchunk, MP_CHUNK_TAIL);
-			size_t avail = (*pchunk)->free & ~(size_t)(CPU_STRUCT_ALIGN - 1);
-			if (size <= avail) {
-				struct mempool_chunk *chunk = *pchunk;
+		MEMCHECK_DEFINED(pool->last, MP_CHUNK_TAIL);
+		struct mempool_chunk **pfullest = &pool->last;
+		struct mempool_chunk **pchunk = &pool->last->prev;
+		for (int i = 1; i < MP_ACTIVE_CHUNKS && *pchunk; ++i, pchunk = &(*pchunk)->prev) {
+			// This iteration we work on chunk==*pchunk which is i-th last (0-based).
+			struct mempool_chunk *chunk = *pchunk;
+			MEMCHECK_DEFINED(chunk, MP_CHUNK_TAIL);
+
+			size_t avail = chunk->free & ~(size_t)(CPU_STRUCT_ALIGN - 1);
+			if (size <= avail) { // found space
 				chunk->free = avail - size;
 				uint8_t *ptr = (uint8_t *)chunk - avail;
+				// make chunk the last one (i.e. first the list)
+				chunk_move_to(pchunk, &pool->last);
+ 				// *pchunk now points to what was chunk->prev
+				chunks_NOACCESS(pool, *pchunk);
 
-				// make pchunk the last one
-				*pchunk = chunk->prev;
-				chunk->prev = pool->last;
-				pool->last = chunk;
-
-				chunk = *pchunk;
-				for (struct mempool_chunk *c = pool->last; MEMCHECK_ACTIVE && c != chunk; ) {
-					struct mempool_chunk *prev = c->prev;
-					MEMCHECK_NOACCESS(c, MP_CHUNK_TAIL);
-					c = prev;
-				}
 				MP_POOL_CHECK(pool);
 				if (!mp_balance_on_demand) {
 					const uint32_t now = get_stamp ? get_stamp() : 0;
@@ -673,22 +696,14 @@ static void *mp_alloc_internal(struct mempool *pool, size_t size)
 				}
 				return ptr;
 			}
-			if ((*pchunk)->free < (*pfullest)->free) {
+			if (chunk->free <= (*pfullest)->free) { // we prefer older ones here
 				pfullest = pchunk;
 			}
 		}
-
-		// make pfullest the farthest chunk out of the active ones (no-op if satisfied); it becomes inactive shortly
-		struct mempool_chunk *chunk = *pchunk, *fullest = *pfullest;
-		*pchunk = fullest;
-		*pfullest = fullest->prev;
-		fullest->prev = chunk;
-
-		for (struct mempool_chunk *c = pool->last; MEMCHECK_ACTIVE && c != chunk; ) {
-			struct mempool_chunk *prev = c->prev;
-			MEMCHECK_NOACCESS(c, MP_CHUNK_TAIL);
-			c = prev;
-		}
+		// Now *pchunk is either the "last" inACTIVE chunk or NULL;
+		// and we move *pfullest on that place; it may become inactive shortly.
+		chunk_move_to(pfullest, pchunk);
+		chunks_NOACCESS(pool, (*pfullest)->prev);
 	}
 
 	// allocate a new chunk
