@@ -327,6 +327,7 @@ void mp_reusable_init(void)
 	}
 }
 
+/// Find a suitable list of reusable chunks (or NULL).
 struct mp_reusable *mp_get_reusable(uint32_t *size)
 {
 	for (int i = 0; i < MP_REUSABLE_CNT; i++) {
@@ -338,16 +339,19 @@ struct mp_reusable *mp_get_reusable(uint32_t *size)
 	return NULL;
 }
 
-static void *mp_new_reusable_chunk(uint32_t requested_size, size_t pool_ext_chunk_size, size_t pool_size)
+static struct mempool_chunk *mp_new_reusable_chunk(uint32_t requested_size,
+					size_t pool_ext_chunk_size, size_t pool_size)
 {
 	struct mempool_chunk *chunk = NULL;
 	uint32_t size;  // size excl. chunk tail
 	{
 		uint32_t ext_size;  // external size, incl. chunk tail
-		ext_size = MIN((pool_size >> 3) + 1, mp_reusable_ext_sizes[MP_REUSABLE_CNT - 1]);  // minimum growing with pool_size
-		ext_size = MAX(ext_size, pool_ext_chunk_size);                                     // requested pool_size bound
-		ext_size = MAX(ext_size, requested_size + MP_CHUNK_TAIL);                          // requested space in chunk
-		size = ext_size - MP_CHUNK_TAIL;
+		// minimum growing with pool_size
+		ext_size = MIN((pool_size >> 3) + 1, mp_reusable_ext_sizes[MP_REUSABLE_CNT - 1]);
+		// requested pool_size bound
+		ext_size = MAX(ext_size, pool_ext_chunk_size);
+		// requested space in chunk
+		size = MAX(ext_size - MP_CHUNK_TAIL, requested_size);
 	}
 	struct mp_reusable *reusable = mp_get_reusable(&size);
 	if (reusable) {

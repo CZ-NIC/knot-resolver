@@ -46,7 +46,7 @@ enum {
 struct mempool {
 	struct mempool_chunk *last; /// linked list, continuing via mempool_chunk::prev
 	size_t ext_chunk_size; /// see mp_init() docs
-	size_t total_size;
+	size_t total_size; /// real allocated size in bytes.
 };
 
 /// Mempool statistics. See mp_stats().
