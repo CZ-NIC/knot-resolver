@@ -346,6 +346,7 @@ void mp_reusable_init(void)
 #endif
 }
 
+/// Find mp_reusable with the same size or closest larger (*size may increase) or NULL.
 struct mp_reusable *mp_get_reusable(uint32_t *size)
 {
 	for (int i = 0; i < MP_REUSABLE_CNT; i++) {
@@ -354,6 +355,14 @@ struct mp_reusable *mp_get_reusable(uint32_t *size)
 			return mp_reusable + i;
 		}
 	}
+	return NULL;
+}
+/// Find mp_reusable with the same size or NULL.
+struct mp_reusable *mp_get_reusable_exact(uint32_t size)
+{
+	for (int i = 0; i < MP_REUSABLE_CNT; i++)
+		if (size == mp_reusable[i].chunk_size)
+			return mp_reusable + i;
 	return NULL;
 }
 
@@ -413,7 +422,7 @@ static void *mp_new_reusable_chunk(uint32_t requested_size, size_t pool_ext_chun
 static void mp_free_reusable_chunk(struct mempool_chunk *chunk, uint32_t now)
 {
 	// MEMCHECK: data unknown, chunk defined, unused defined if small
-	struct mp_reusable *reusable = mp_get_reusable(&chunk->size);
+	struct mp_reusable *reusable = mp_get_reusable_exact(chunk->size);
 	if (reusable) {
 		MEMCHECK_NOACCESS((uint8_t *)chunk - chunk->size, chunk->size);
 		reusable->unused_cnt++;
