@@ -33,13 +33,20 @@
 #pragma GCC diagnostic ignored "-Wpointer-arith"
 #define MP_SIZE_MAX (UINT32_MAX - MP_CHUNK_TAIL - CPU_PAGE_SIZE)
 
-/// Unused normal chunk or page-sized block of small chunks.
+/** Unused normal chunk or page-sized block of small chunks.
+ *
+ * - big chunk (>=page):
+ *    - struct only exists when the chunk is unused, written where chunk's data normally are
+ *    - count == 1, *chunk is a single unused chunk
+ * - small chunks (<page):
+ *    - struct always exists at the end of the page holding that block of chunks
+ */
 struct mp_unused {
 	uint32_t timestamp;
-	uint32_t count;
-	struct mempool_chunk *chunk;  /// single normal chunk or list of small unused chunks within their page
-	struct mp_unused *next;
-	struct mp_unused *prev;
+	uint32_t count; // the number of unused chunks here
+	struct mempool_chunk *chunk; // single normal chunk or list of small unused chunks within their page
+	struct mp_unused *next; // chunk(s) inserted later
+	struct mp_unused *prev; // chunk(s) inserted earlier
 };
 #define MP_UNUSED_TAIL ALIGN_TO(sizeof(struct mp_unused), CPU_STRUCT_ALIGN)
 
@@ -49,9 +56,9 @@ struct mp_unused {
  * A _mempool_ consists of mmapped chunks of different sizes.
  * We use _chunk_ to refer the mempool_chunk struct located after the data area of size chunk->size,
  * which contains data already allocated to the application followed by chunk->free bytes of available space.
- * Normal chunks with sizes of at least one page are mmaped on their own,
+ * Normal chunks with sizes of at least one page are mmaped on their own;
  * small chunks are allocated by single whole pages consecutively containing several of them.
- * See mp_reusable_ext_sizes[] in the configuration section below for the specific sizes of reusable chunks,
+ * See mp_reusable_ext_sizes[] in the configuration section below for the specific sizes of reusable chunks;
  * each chunk has its size rounded up to those values, or if it is greater, it is munmapped immediatelly when unneed.
  *
  * When allocating memory to the application,
@@ -81,7 +88,7 @@ struct mp_unused {
  *   * UNDEFINED (unlocked but uninitialized), or
  *   * DEFINED (unlocked and initialized).
  * ASan then disallows access to poisoned (NOACCESS) memory,
- * Valgrind in addittion to that detects decisions based on uninitialized memory.
+ * Valgrind addittionally detects decisions based on uninitialized memory.
  *
  * Desired state outside of our code:
  *   * mempool structure is accessible,
@@ -90,7 +97,7 @@ struct mp_unused {
  *      * free part of the data area is locked,
  *      * chunk (metadata) is locked,
  *   * within unused chunks
- *      * data area is locked except for the possibly contained unused structure,
+ *      * data area is locked except for the possibly contained mp_unused structure,
  *      * chunk (metadata) is accessible,
  *      * unused structure is accessible,
  *   * other internal metadata are accessible.
@@ -270,6 +277,7 @@ static void mp_free_small_chunks(struct mp_unused *unused)
 
 // --- handling unused chunks ---
 
+/// link chunk from the appropriate mp_unused and return pointer to that
 static inline struct mp_unused *chunk_to_unused(struct mempool_chunk *chunk, uint32_t now)
 {
 	// MEMCHECK: chunk defined, unused defined iff small
@@ -317,17 +325,42 @@ static inline void mp_remove_unused(struct mp_unused *item)
 #define GLOBAL_STORAGE_CLASS static
 #endif
 
+/** Structures holding unused chunks before they get reused or munmapped.  Illustrations below:
+
+Normal chunks in mp_reusable:
+
+                ---prev-->  (earlier inserted items)
+                <--next---  (later inserted items)
+
+  ...HEAD -- newest_unused -- another_unused -- oldest_unused -- HEAD...
+
+          ^ pushing/popping chunks          munmapping chunks ^
+
+
+Small chunks in mp_reusable:
+
+                ---prev-->  (earlier inserted items)
+                <--next---  (later inserted items)
+
+  ...HEAD -- newest_partially_unused -- ... -- oldest_partially_unused -- SEP -- newest_fully_unused -- ... -- oldest_fully_unused -- HEAD...
+
+                                                                              ^ pushing fully unused                    munmapping ^
+          ^ pushing partially unused, getting individual chunks from unused, popping single-chunk unused
+ */
 struct mp_reusable {
-	size_t unused_cnt, total_cnt;
-	struct mp_unused head, sep;
+	size_t unused_cnt; // the number of unused chunks held by this mp_reusable
+	size_t total_cnt; // the number of unused+used chunks belonging to this mp_reusable
+	struct mp_unused head; // empty head of the list
 	/** If chunks_per_block > 1, sep is an empty splitter inside the list,
-	 * with chunks from *partially* unused blocks on sep->prev side
-	 * and from fully unused blocks on sep->next side. */
-	uint32_t chunk_size;  /// mempool_chunk::size
-	uint32_t chunks_per_block;  /// block is what comes from mmap()
+	 * with chunks from *partially* unused blocks on sep->next side
+	 * and from fully unused blocks on sep->prev side. */
+	struct mp_unused sep;
+	uint32_t chunk_size; // mempool_chunk::size
+	uint32_t chunks_per_block; // block is what comes from mmap()
 };
 /// Here we cache unused chunks before they get reused or munmapped.
 GLOBAL_STORAGE_CLASS struct mp_reusable mp_reusable[MP_REUSABLE_CNT] = {0};
+/// true disables automatic mp_balance_internal() calls
 GLOBAL_STORAGE_CLASS bool mp_balance_on_demand = false;
 
 __attribute__((constructor))
@@ -409,7 +442,8 @@ static struct mempool_chunk *mp_new_reusable_chunk(uint32_t requested_size,
 		if (unused == &reusable->sep) {
 			unused = unused->prev;
 		}
-		if (unused->count > 0) {
+		// Note: if `reusable` is empty, we get the head with ->count == 0.
+		if (unused->count > 0) { // we reuse
 			reusable->unused_cnt--;
 			mp_remove_unused(unused);
 			chunk = unused->chunk;
@@ -420,7 +454,7 @@ static struct mempool_chunk *mp_new_reusable_chunk(uint32_t requested_size,
 			MEMCHECK_NOACCESS((uint8_t *)chunk - chunk->size, chunk->size);
 			MP_CHUNK_CHECK(chunk);
 			return chunk;
-		} else if (reusable->chunks_per_block > 1) {
+		} else if (reusable->chunks_per_block > 1) { // refill a block of small chunks
 			unused = mp_new_small_chunks(size);
 			chunk = unused->chunk;
 			unused->chunk = chunk->prev;
@@ -432,7 +466,7 @@ static struct mempool_chunk *mp_new_reusable_chunk(uint32_t requested_size,
 			return chunk;
 		} else {
 			reusable->total_cnt++;
-			// fall through
+			// fall through to get a new big chunk
 		}
 	} else {
 		size = ALIGN_TO(size + MP_CHUNK_TAIL, CPU_PAGE_SIZE) - MP_CHUNK_TAIL;
@@ -451,12 +485,13 @@ static void mp_free_reusable_chunk(struct mempool_chunk *chunk, uint32_t now)
 		MEMCHECK_NOACCESS((uint8_t *)chunk - chunk->size, chunk->size);
 		reusable->unused_cnt++;
 		struct mp_unused *unused = chunk_to_unused(chunk, now);
-		if (unused->count == 1) {
+		if (unused->count == 1) { // new unused
 			mp_insert_unused(unused, &reusable->head);
 		} else if (unused->count == reusable->chunks_per_block) {
+			// completed the block, so move towards unmapping
 			mp_remove_unused(unused);
 			mp_insert_unused(unused, &reusable->sep);
-		}
+		} // else all done be chunk_to_unused()
 		// MEMCHECK: data locked, chunk defined, unused defined
 	} else {
 #ifdef MP_LOG_GLOBAL_STATS_PERIOD
@@ -478,6 +513,7 @@ static void log_global_stats(void)
 }
 #endif
 
+/// see (docs for) mp_balance_reusable()
 static uint64_t mp_balance_internal(uint32_t now)
 {
 	// MEMCHECK: all data locked, chunks defined, unused defined
@@ -710,6 +746,7 @@ static void chunk_move_to(struct mempool_chunk **pchunk, struct mempool_chunk **
 	*where = chunk;
 }
 
+/// Implements the less typical flows, e.g. no searching pool->last again (if exists).
 static void *mp_alloc_internal(struct mempool *pool, size_t size)
 {
 	// MEMCHECK: pool defined, pool chunks locked

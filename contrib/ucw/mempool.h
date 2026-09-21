@@ -27,10 +27,11 @@
  * -----------
  ***/
 
+/// A chunk of memory, internal to this .c file.
 struct mempool_chunk {
-	struct mempool_chunk *prev;
-	uint32_t size;
-	uint32_t free;
+	struct mempool_chunk *prev; // the older chunk(s) in this pool
+	uint32_t size; // size of the chunk, excluding MP_CHUNK_TAIL which contains this struct
+	uint32_t free; // free space in the chunk
 #ifdef CONFIG_DEBUG
 	struct mempool *pool;         // Can be useful when analysing coredump for memory leaks
 #endif
@@ -42,20 +43,21 @@ struct mempool_chunk {
  * You should use this one as an opaque handle only, the insides are internal.
  **/
 struct mempool {
-	struct mempool_chunk *last;
+	struct mempool_chunk *last; /// linked list, continuing via mempool_chunk::prev
 	size_t ext_chunk_size; /// see mp_init() docs
-	size_t total_size;
+	size_t total_size; /// real allocated size in bytes.
 };
 
-struct mempool_stats {          /** Mempool statistics. See mp_stats(). **/
-	size_t total_size;          /** Real allocated size in bytes. */
-	size_t used_size;           /** Size allocated from mempool to application. */
-	unsigned chunks_count;      /** Number of allocated chunks. */
+/// Mempool statistics. See mp_stats().
+struct mempool_stats {
+	size_t total_size;          /// Real allocated size in bytes.
+	size_t used_size;           /// Size allocated from mempool to application.
+	unsigned chunks_count;      /// Number of allocated chunks.
 };
 
 // --- configuration ---  (see also many other options in C file)
 
-/* A printf-like function for debug logging;
+/** A printf-like function for debug logging;
  * called only if global or pool stats in C file or consistency checks below are enabled. */
 #define MP_LOG_LINE(fmt, ...) printf(fmt "\n", ##__VA_ARGS__)
 
