@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import logging.handlers
-import os
 import sys
 from enum import Enum
 from typing import TYPE_CHECKING, Any, cast
@@ -57,24 +56,20 @@ def get_logger(name: str | None = None) -> KresLogger:
     return cast("KresLogger", logger)
 
 
-SERVICE_NAME_LEN = 13
-NO_PREFIX_FORMAT_ENV_VAR = "KRES_LOGGING_NO_PREFIX_FORMAT"
+SERVICE_NAME_LEN = 10
 
 BASIC_FORMAT = "%(name)s: %(message)s"
 NO_PREFIX_FORMAT = f"[%(levelname)s] {BASIC_FORMAT}"
 
 
 def get_pretty_format(service: str, stream: str) -> str:
-    service = service.rjust(SERVICE_NAME_LEN)
     return f"%(asctime)s {service}[%(process)d]{stream}: {NO_PREFIX_FORMAT}"
 
 
-def get_formatter(service: str, target: LogTarget) -> logging.Formatter:
-    no_prefix = bool(os.environ.get(NO_PREFIX_FORMAT_ENV_VAR) == "true")
-
+def get_formatter(target: LogTarget, service: str | None = None) -> logging.Formatter:
     if target == LogTarget.SYSLOG:
         return logging.Formatter(BASIC_FORMAT)
-    if no_prefix:
+    if service is None:
         return logging.Formatter(NO_PREFIX_FORMAT)
 
     stream = ""
@@ -91,32 +86,31 @@ def get_logging_handler(target: LogTarget) -> logging.Handler:
     return logging.StreamHandler(sys.stdout)
 
 
-def start_logging(args: KresArgs, service: str = "knot-resolver") -> None:
+def start_logging(args: KresArgs, service: str | None = None) -> None:
     root = get_logger()
 
     level = _config_to_level[args.loglevel]
     root.setLevel(level)
 
     target = LogTarget(args.logtarget)
-    formatter = get_formatter(service, target)
+    formatter = get_formatter(target, service)
     handler = get_logging_handler(target)
     handler.setFormatter(formatter)
 
     root.addHandler(handler)
 
 
-def reconfigure_logging(config: KresConfig, service: str = "knot-resolver") -> None:
+def reconfigure_logging(config: KresConfig, service: str | None = None, debug: bool = False) -> None:
     root = get_logger()
 
-    groups = config.logging.groups
-    if groups and service in groups:
+    if debug:
         root.setLevel(logging.DEBUG)
     elif config.logging.level is not None:
         root.setLevel(_config_to_level[str(config.logging.level)])
 
     if config.logging.target is not None:
         target = LogTarget(str(config.logging.target))
-        formatter = get_formatter(service, target)
+        formatter = get_formatter(target, service)
         new_handler = get_logging_handler(target)
         new_handler.setFormatter(formatter)
 
