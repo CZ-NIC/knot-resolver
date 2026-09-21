@@ -266,6 +266,13 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
             for worker, res in cmd_results.items():
                 if res != 0:
                     logger.error("Failed to reset policy rules in %s: %s", worker, res)
+
+            if _config.tunnel_filter.enable:
+                logger.debug("Refreshing dns_tunnel_filter tags in all running 'kresd' workers")
+                cmd_results = await command_registered_workers("dns_tunnel_filter_refresh_tags()")
+                for worker, res in cmd_results.items():
+                    if res != 0:
+                        logger.error("Failed to refresh dns_tunnel_filter tags in %s: %s", worker, res)
         else:
             logger.debug(
                 "Skipped resetting policy rules for all running 'kresd' workers:"

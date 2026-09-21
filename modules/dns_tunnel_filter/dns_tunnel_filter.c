@@ -199,6 +199,18 @@ fail:
 	return ret;
 }
 
+KR_EXPORT
+int dns_tunnel_filter_refresh_tags(kr_rule_tags_t tags, kr_rule_tags_t add_tags, kr_rule_tags_t rpz_tags)
+{
+	config.tags = tags;
+	config.add_tags = add_tags;
+	config.rpz_tags = rpz_tags;
+	kr_log_debug(TUNNEL, "Tags updated: filter=0x%lx, rpz_add=0x%lx, rpz_rpz=0x%lx\n",
+			(unsigned long)tags, (unsigned long)add_tags, (unsigned long)rpz_tags);
+
+	return kr_ok();
+}
+
 /// Ensure that the filter is loaded; return false if failed.
 static bool ensure_loaded(void)
 {
@@ -458,7 +470,7 @@ static void do_filter(kr_layer_t *ctx, knot_pkt_t *pkt)
 		if (config.rpz_builder_enabled && registrable_ret == 0) {
 			const uint32_t hits = domain_hit_increment(registrable, kr_now());
 
-			if (hits >= config.hit_threshold) {
+			if (hits == config.hit_threshold) {
 				// RPZ modification
 				// _apply tags take precendence, and we store the last one
 				kr_rule_tags_t const add_tags_apply = config.add_tags & req->rule_tags_apply;
