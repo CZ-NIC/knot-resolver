@@ -78,7 +78,7 @@ usually, it is not needed and not recommended to change them.
 
    :default: 1s
 
-   Time interval how often GC is spawned.
+   Time interval how often cache utilization is checked.
 
    Usually, GC just checks percentual cache utilization and sleeps again,
    so it is recommended to keep the value small.
@@ -248,7 +248,7 @@ there are prefetch entries serving as time-ordered pointers to RRs planned for u
 and RTT entries allowing comparisons of round-trip times to alternative authoritative servers.
 
 Ideally, we would like to remove only expired RRs,
-which are not much useful anymore (unless serving stale answers).
+which are not much useful anymore, unless serving stale answers.
 Removing valid RRs may be suboptimal if they are needed in the future,
 but we still first remove the less useful ones,
 so removing some fraction of them may be also healthy.
