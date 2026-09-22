@@ -78,7 +78,7 @@ usually, it is not needed and not recommended to change them.
 
    :default: 1s
 
-   Time interval how often GC is spawned.
+   Time interval how often cache utilization is checked.
 
    Usually, GC just checks percentual cache utilization and sleeps again,
    so it is recommended to keep the value small.
@@ -172,9 +172,12 @@ both of which have to be met to consider that record eligible for prefetching.
    Require at least this number of accesses to the record per automatic update.
    It serves as a guarantee that prefetching will not significantly increase the traffic to authoritative servers.
 
+Details for the settings above
+~~~~~~~
+
 If the accesses are regular, their exponentially decreasing counter will converge to the equilibrium,
 where the increase in time is the same as the decay.
-Each of the last two configuration options gives us the lower bound on this value,
+Each of the last two configuration options gives us a lower bound on this value,
 which is checked both at the time of scheduling the update while inserting the record into cache
 and just before the update.
 
@@ -222,8 +225,8 @@ Recognizing small cache or too extensive prefetch
 -------------------------------------------------
 
 If the cache is not large enough, it may lead to evictions of useful valid RRs,
-followed by repetitive queries to upstream even before expiration of original answers
-and so to increasing the traffic, cpu consumption and latencies of answers to clients.
+followed by repetitive queries to upstream even before expiration of original answers.
+That increases traffic upstream, cpu consumption and latencies of answers to clients.
 Moreover garbage collector may possibly clash with too extensively configured prefetch;
 in an extreme case causing alternating updates and evictions of the same RRs.
 
@@ -248,7 +251,7 @@ there are prefetch entries serving as time-ordered pointers to RRs planned for u
 and RTT entries allowing comparisons of round-trip times to alternative authoritative servers.
 
 Ideally, we would like to remove only expired RRs,
-which are not much useful anymore (unless serving stale answers).
+which are not much useful anymore, unless serving stale answers.
 Removing valid RRs may be suboptimal if they are needed in the future,
 but we still first remove the less useful ones,
 so removing some fraction of them may be also healthy.
