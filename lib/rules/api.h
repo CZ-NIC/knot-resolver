@@ -19,6 +19,8 @@ typedef uint64_t kr_rule_tags_t;
 /// Tags "capacity", i.e. numbered from 0 to _CAP - 1.
 #define KR_RULE_TAGS_CAP (sizeof(kr_rule_tags_t) * 8)
 
+#define KR_UUID_BYTES 16
+
 /// Combine two sets of tags, i.e. union of the two tag-sets.
 static inline kr_rule_tags_t kr_rule_tags_combine(kr_rule_tags_t t1, kr_rule_tags_t t2)
 {
@@ -276,6 +278,22 @@ int kr_rule_local_unblock(const knot_dname_t *apex, kr_rule_tags_t tags);
 KR_EXPORT
 int kr_view_insert_action(const char *subnet, const char *dst_subnet,
 			kr_proto_set protos, const char *action);
+
+
+/* uuid parser, includes length check and proper hyphenation */
+KR_EXPORT
+int kr_uuid_parse(const char *s, uint8_t out[KR_UUID_BYTES]);
+
+/* Load worker-wide uuids file
+ *
+ * The uuids in this file are used to whitelist DoH clients
+ */
+KR_EXPORT
+int kr_view_load_uuids(const char *path);
+
+/* Search the uuid whitelist, returns true if the uuid was found */
+KR_EXPORT
+bool kr_view_uuid_allowed(const uint8_t uuid[KR_UUID_BYTES]);
 
 /** Add a tag by name into a tag-set variable.
  *

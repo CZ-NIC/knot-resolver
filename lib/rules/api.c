@@ -8,6 +8,7 @@
 #include "lib/cache/cdb_lmdb.h"
 
 #include <stdlib.h>
+#include <ctype.h>
 #include <lmdb.h>
 
 
@@ -1426,6 +1427,137 @@ int kr_view_insert_action(const char *subnet, const char *dst_subnet,
 	kr_require(data <= buf + dlen);
 	knot_db_val_t val = { .data = buf, .len = dlen };
 	return ruledb_op(write, &key, &val, 1);
+}
+
+static const uint8_t KEY_VIEW_UUID[1] = "u";
+
+#define KR_UUID_STRLEN 36
+
+static knot_db_val_t uuid_key_build(uint8_t key_data[KEY_MAXLEN],
+				    const uint8_t uuid[KR_UUID_BYTES])
+{
+	knot_db_val_t key;
+	key.data = &key_data[KEY_RULESET_MAXLEN];
+	key.len = 0;
+	if (uuid) {
+		memcpy(key.data, uuid, KR_UUID_BYTES);
+		key.len = KR_UUID_BYTES;
+	}
+	KEY_PREPEND(key, KEY_VIEW_UUID);
+
+	const size_t rsp_len = strlen(RULESET_DEFAULT);
+	key.data -= rsp_len;
+	key.len  += rsp_len;
+	memcpy(key.data, RULESET_DEFAULT, rsp_len);
+	return key;
+}
+
+static int hexval(char c)
+{
+	if (c >= '0' && c <= '9')
+		return c - '0';
+	c = tolower((unsigned char)c);
+	if (c >= 'a' && c <= 'f')
+		return c - 'a' + 10;
+	return -1;
+}
+
+int kr_uuid_parse(const char *s, uint8_t out[KR_UUID_BYTES])
+{
+	if (!s || strlen(s) != KR_UUID_STRLEN)
+		return kr_error(EINVAL);
+
+	int j = 0;
+	for (int i = 0; i < KR_UUID_STRLEN; ) {
+		if (i == 8 || i == 13 || i == 18 || i == 23) {
+			if (s[i++] != '-')
+				return -1;
+			continue;
+		}
+		int hi = hexval(s[i]), lo = hexval(s[i + 1]);
+		if (hi < 0 || lo < 0)
+			return -1;
+
+		out[j++] = (uint8_t)((hi << 4) | lo);
+		i += 2;
+	}
+	return 0;
+}
+
+int kr_view_load_uuids(const char *path)
+{
+	if (!path)
+		return kr_error(EINVAL);
+
+	ENSURE_the_rules;
+
+	FILE *f = fopen(path, "r");
+	if (!f) {
+		int err = errno;
+		kr_log_error(RULES, "failed to open UUID file %s: %s\n",
+				path, strerror(err));
+		return kr_error(err);
+	}
+
+	uint8_t key_data[KEY_MAXLEN];
+	const uint8_t placeholder = 1;
+	knot_db_val_t val = { .data = (void *)&placeholder,
+		.len = sizeof(placeholder) };
+	knot_db_val_t key;
+
+	char *line = NULL;
+	size_t line_cap = 0, lineno = 0;
+	ssize_t n;
+	int ret = 0;
+
+	while ((n = getline(&line, &line_cap, f)) != -1) {
+		lineno++;
+		while (n > 0 && isspace((unsigned char)line[n - 1]))
+			line[--n] = '\0';
+		if (n == 0 || line[0] == '#')
+			continue;
+
+		uint8_t uuid[KR_UUID_BYTES];
+		if (n != KR_UUID_STRLEN || kr_uuid_parse(line, uuid) != 0) {
+			kr_log_error(RULES, "%s:%zu: invalid UUID, see RFC 9562 section 4. UUID Format\n",
+					path, lineno);
+			ret = kr_error(EINVAL);
+			break;
+		}
+		key = uuid_key_build(key_data, uuid);
+		ret = ruledb_op(write, &key, &val, 1);
+		if (ret)
+			break;
+	}
+	if (ret == 0 && ferror(f))
+		ret = kr_error(EIO);
+	free(line);
+	(void)fclose(f);
+	if (ret) {
+		return ret;
+	}
+
+	key = uuid_key_build(key_data, NULL);
+	return ruledb_op(write, &key, &val, 1);
+}
+
+bool kr_view_uuid_allowed(const uint8_t uuid[KR_UUID_BYTES])
+{
+	if (!the_rules)
+		return true;
+
+	uint8_t key_data[KEY_MAXLEN];
+	knot_db_val_t val;
+	knot_db_val_t key = uuid_key_build(key_data, NULL);
+
+	int ret = ruledb_op(read, &key, &val, 1);
+	if (ret == kr_error(ENOENT))
+		return true;
+	if (ret || !uuid)
+		return false;
+
+	key = uuid_key_build(key_data, uuid);
+	return ruledb_op(read, &key, &val, 1) == 0;
 }
 
 static enum kr_proto req_proto(const struct kr_request *req)

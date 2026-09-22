@@ -319,6 +319,7 @@ ${CDEFS} ${LIBKRES} functions <<-EOF
 	kr_rules_deinit
 	kr_rules_reset
 	kr_view_insert_action
+	kr_view_load_uuids
 	kr_view_select_action
 	kr_rule_tag_add
 	kr_rule_local_subtree

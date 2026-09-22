@@ -1,6 +1,6 @@
 from typing import List, Literal, Optional
 
-from knot_resolver.datamodel.types import Float0_65535, IDPattern, IPNetwork
+from knot_resolver.datamodel.types import Float0_65535, IDPattern, IPNetwork, ReadableFile
 from knot_resolver.utils.modeling import ConfigSchema
 
 
@@ -33,16 +33,20 @@ class ViewSchema(ConfigSchema):
     tags_audit: Internal/tentative.  Additional tags for auditing of policy rules in dnstap output.
     answer: Direct approach how to handle request from clients identified by the view.
     options: Configuration options for clients identified by the view.
+    uuid_file: File containing uuids used to whitelist users querying over DoH. Applied to all subnets.
     """
 
-    subnets: List[IPNetwork]
+    subnets: Optional[List[IPNetwork]]
     dst_subnet: Optional[IPNetwork] = None  # could be a list as well, iterated in template
     protocols: Optional[List[Literal["udp53", "tcp53", "dot", "doh", "doq"]]] = None
     tags: Optional[List[IDPattern]] = None
     tags_audit: Optional[List[IDPattern]] = None
     answer: Optional[Literal["allow", "refused", "noanswer"]] = None
     options: ViewOptionsSchema = ViewOptionsSchema()
+    uuid_file: Optional[ReadableFile] = None
 
     def _validate(self) -> None:
-        if bool(self.tags) == bool(self.answer):
+        if bool(self.tags) == bool(self.answer) and self.uuid_file is None:
             raise ValueError("exactly one of 'tags' and 'answer' must be configured")
+        elif bool(self.tags) != bool(self.answer) and self.uuid_file is not None:
+            raise ValueError("'tags' and 'answer' cannot be configured alongside uuid-file")

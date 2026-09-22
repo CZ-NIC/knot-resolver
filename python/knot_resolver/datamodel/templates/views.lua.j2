@@ -4,8 +4,10 @@
 
 {% if cfg.views %}
 {% for view in cfg.views %}
+{% if view.uuid_file %}
+assert(C.kr_view_load_uuids('{{ view.uuid_file }}') == 0)
+{% else %}
 {% for subnet in view.subnets %}
-
 assert(C.kr_view_insert_action('{{ subnet }}', '{{ view.dst_subnet or '' }}',
   {{ get_proto_set(view.protocols) }}, policy.COMBINE({
 {%- set flags = view_flags(view.options) -%}
@@ -21,7 +23,7 @@ assert(C.kr_view_insert_action('{{ subnet }}', '{{ view.dst_subnet or '' }}',
 	{{ view_answer(view.answer) }},
 {%- endif %}
   })) == 0)
-
 {% endfor %}
+{% endif %}
 {% endfor %}
 {% endif %}

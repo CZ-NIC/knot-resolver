@@ -587,6 +587,14 @@
                         "description": "Transport protocol, as an additional condition.",
                         "default": null
                     },
+                    "keys": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "File containing whitelist of keys used to verify clients' access rights",
+                        "default": null
+                    },
                     "tags": {
                         "type": [
                             "array",
