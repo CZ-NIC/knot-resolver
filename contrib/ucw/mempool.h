@@ -131,6 +131,7 @@ uint64_t mp_balance_reusable(void);
  *
  * TODO: document that it's OK to pass NULL?
  */
+KR_EXPORT
 void mp_set_time(uint32_t (*get_stamp_cb)(void));
 
 /**
@@ -235,6 +236,7 @@ void *mp_alloc(struct mempool *pool, size_t size);
 
 /* For internal use only, do not call directly */
 void *mp_grow_internal(struct mempool *pool, size_t size);
+KR_EXPORT
 void *mp_spread_internal(struct mempool *pool, void *p, size_t size);
 
 /**
@@ -250,6 +252,7 @@ void *mp_spread_internal(struct mempool *pool, void *p, size_t size);
  * Keep in mind that you can't make any other pool allocations
  * before you "close" the growing buffer with \ref mp_end().
  */
+KR_EXPORT
 void *mp_start(struct mempool *pool, size_t size);
 
 /**
@@ -435,6 +438,7 @@ char *mp_printf_append(struct mempool *mp, char *ptr, const char *fmt, ...) FORM
  * not called on an opened growing buffer. The old name will be preserved for backward
  * compatibility for the time being.
  **/
+KR_EXPORT
 char *mp_vprintf_append(struct mempool *mp, char *ptr, const char *fmt, va_list args);
 #define mp_append_vprintf mp_vprintf_append
 

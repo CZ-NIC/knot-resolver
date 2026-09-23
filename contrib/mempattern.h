@@ -34,6 +34,7 @@ KR_EXPORT
 void *mm_alloc(knot_mm_t *mm, size_t size);
 
 /*! \brief Callocs using 'mm' if any, uses system calloc() otherwise. */
+KR_EXPORT
 void *mm_calloc(knot_mm_t *mm, size_t nmemb, size_t size);
 
 /*! \brief Reallocs using 'mm' if any, uses system realloc() otherwise. */
@@ -48,9 +49,11 @@ KR_EXPORT
 void mm_free(knot_mm_t *mm, void *what);
 
 /*! \brief Initialize default memory allocation context. */
+KR_EXPORT
 void mm_ctx_init(knot_mm_t *mm);
 
 /*! \brief Memory pool context. */
+KR_EXPORT
 void mm_ctx_mempool(knot_mm_t *mm, size_t chunk_size);
 
 
@@ -74,6 +77,7 @@ static inline void free_const(const void *what)
 }
 
 /*! \brief posix_memalign() wrapper. */
+KR_EXPORT
 void *mm_malloc_aligned(void *ctx, size_t n);
 
 /*! \brief Initialize mm with malloc+free with specified alignment (a power of two). */

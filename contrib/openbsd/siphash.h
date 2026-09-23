@@ -49,6 +49,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include "lib/defines.h"
 
 #define SIPHASH_BLOCK_LENGTH	 8
 #define SIPHASH_KEY_LENGTH	16
@@ -65,9 +66,13 @@ typedef struct {
 	uint64_t	k1;
 } SIPHASH_KEY;
 
+KR_EXPORT
 void		SipHash_Init(SIPHASH_CTX *, const SIPHASH_KEY *);
+KR_EXPORT
 void		SipHash_Update(SIPHASH_CTX *, int, int, const void *, size_t);
+KR_EXPORT
 uint64_t	SipHash_End(SIPHASH_CTX *, int, int);
+KR_EXPORT
 uint64_t	SipHash(const SIPHASH_KEY *, int, int, const void *, size_t);
 
 #define SipHash24_Init(_c, _k)		SipHash_Init((_c), (_k))

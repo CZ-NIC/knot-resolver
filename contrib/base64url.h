@@ -21,6 +21,7 @@
 #pragma once
 
 #include <stdint.h>
+#include "lib/defines.h"
 
 /*!
  * \brief Encodes binary data using Base64.
@@ -75,6 +76,7 @@ int32_t kr_base64url_encode_alloc(const uint8_t  *in,
  * \retval >=0		length of output data.
  * \retval KNOT_E*	if error.
  */
+KR_EXPORT
 int32_t kr_base64url_decode(const uint8_t  *in,
                       uint32_t       in_len,
                       uint8_t        *out,

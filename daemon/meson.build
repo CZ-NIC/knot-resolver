@@ -24,6 +24,10 @@ kresd_src = files([
   'udp_queue.c',
   'worker.c',
   'zimport.c',
+  # We include these directly here instead of contrib_src, until needed from elsewhere.
+  # The names defined inside aren't very suitable for KR_EXPORT.
+  '../contrib/ucw/lists.c',
+  '../contrib/ucw/heap.c',
 ])
 
 if enable_quic

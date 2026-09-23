@@ -16,6 +16,7 @@
 #pragma once
 
 #include <stdint.h>
+#include "lib/defines.h"
 
 /*!
  * \brief Decodes text data using Base32hex.
@@ -32,6 +33,7 @@
  * \retval >=0		length of output data.
  * \retval KNOT_E*	if error.
  */
+KR_EXPORT
 int32_t base32hex_decode(const uint8_t  *in,
                          const uint32_t in_len,
                          uint8_t        *out,
@@ -52,6 +54,7 @@ int32_t base32hex_decode(const uint8_t  *in,
  * \retval >=0		length of output string.
  * \retval <0		if error.
  */
+KR_EXPORT
 int32_t base32hex_encode(const uint8_t  *in,
                          const uint32_t in_len,
                          uint8_t        *out,

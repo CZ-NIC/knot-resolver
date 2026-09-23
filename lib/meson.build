@@ -105,9 +105,8 @@ libkres_inc = include_directories('..')
 libkres_lib = library('kres',
   libkres_src,
   soversion: libkres_soversion,
-  include_directories: libkres_inc,
+  include_directories: [libkres_inc, contrib_inc],
   dependencies: [
-    contrib_dep,
     kresconfig_dep,
     libuv,
     lmdb,
@@ -119,12 +118,18 @@ libkres_lib = library('kres',
     libsystemd,
     libm
   ],
+  link_whole: contrib_lib, # link_with wouldn't suffice; some KR_EXPORT symbols would be missing
   install: true,
 )
 
 libkres_dep = declare_dependency(
   include_directories: libkres_inc,
   link_with: libkres_lib
+)
+
+contrib_dep = declare_dependency(
+  include_directories: contrib_inc,
+  link_with: libkres_lib,
 )
 
 install_headers(

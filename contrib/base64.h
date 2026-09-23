@@ -13,6 +13,7 @@
 #pragma once
 
 #include <stdint.h>
+#include "lib/defines.h"
 
 /*!
  * \brief Encodes binary data using Base64.
@@ -28,6 +29,7 @@
  * \retval >=0		length of output string.
  * \retval KNOT_E*	if error.
  */
+KR_EXPORT
 int32_t kr_base64_encode(const uint8_t  *in,
                       const uint32_t in_len,
                       uint8_t        *out,
@@ -67,6 +69,7 @@ int32_t kr_base64_encode_alloc(const uint8_t  *in,
  * \retval >=0		length of output data.
  * \retval KNOT_E*	if error.
  */
+KR_EXPORT
 int32_t kr_base64_decode(const uint8_t  *in,
                       const uint32_t in_len,
                       uint8_t        *out,

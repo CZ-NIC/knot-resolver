@@ -16,8 +16,9 @@ contrib_src = files([
   'base64.c',
   'base64url.c',
   'openbsd/siphash.c',
-  'ucw/lists.c',
-  'ucw/heap.c',
+  # BEWARE: these are directly included in ../daemon/meson.build for now.
+  #'ucw/lists.c',
+  #'ucw/heap.c',
 ])
 
 contrib_inc = include_directories('.', '..')
@@ -27,9 +28,6 @@ contrib_lib = static_library(
   contrib_src,
   include_directories: contrib_inc,
   dependencies: libknot,
+  pic: true, # included in libkres which is dynamic by default
 )
 
-contrib_dep = declare_dependency(
-  include_directories: contrib_inc,
-  link_with: contrib_lib,
-)
