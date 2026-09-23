@@ -1533,14 +1533,24 @@
                     "default": "notice"
                 },
                 "target": {
-                    "type": "string",
-                    "enum": [
-                        "syslog",
-                        "stderr",
-                        "stdout"
+                    "anyOf": [
+                        {
+                            "type": "string",
+                            "enum": [
+                                "syslog",
+                                "stderr",
+                                "stdout"
+                            ]
+                        },
+                        {
+                            "type": "string",
+                            "enum": [
+                                "from-arg"
+                            ]
+                        }
                     ],
-                    "description": "Global logging stream target.",
-                    "default": "stdout"
+                    "description": "Global logging stream target. If 'from-arg', uses '--logtarget' argument ('stdout' by default).",
+                    "default": "from-arg"
                 },
                 "groups": {
                     "type": [

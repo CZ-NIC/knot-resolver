@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import logging.handlers
+import os
 import sys
 from enum import Enum
 from typing import TYPE_CHECKING, Any, cast
@@ -86,7 +87,12 @@ def get_logging_handler(target: LogTarget) -> logging.Handler:
     return logging.StreamHandler(sys.stdout)
 
 
+KRES_LOGTARGET_ENV_VAR = "KRES_LOGTARGET"
+
+
 def start_logging(args: KresArgs, service: str | None = None) -> None:
+    os.environ[KRES_LOGTARGET_ENV_VAR] = args.logtarget
+
     root = get_logger()
 
     level = _config_to_level[args.loglevel]
@@ -108,15 +114,14 @@ def reconfigure_logging(config: KresConfig, service: str | None = None, debug: b
     elif config.logging.level is not None:
         root.setLevel(_config_to_level[str(config.logging.level)])
 
-    if config.logging.target is not None:
-        target = LogTarget(str(config.logging.target))
-        formatter = get_formatter(target, service)
-        new_handler = get_logging_handler(target)
-        new_handler.setFormatter(formatter)
+    target = LogTarget(str(config.logging.target))
+    formatter = get_formatter(target, service)
+    new_handler = get_logging_handler(target)
+    new_handler.setFormatter(formatter)
 
-        for old_handler in root.handlers:
-            old_handler.flush()
-            old_handler.close()
-            root.removeHandler(old_handler)
+    for old_handler in root.handlers:
+        old_handler.flush()
+        old_handler.close()
+        root.removeHandler(old_handler)
 
-        root.addHandler(new_handler)
+    root.addHandler(new_handler)
