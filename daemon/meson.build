@@ -46,10 +46,10 @@ endif
 c_src_lint += kresd_src
 
 unit_tests += [
-  ['ratelimiting', files('ratelimiting.test/tests.c') + libkres_src ],
+  ['ratelimiting', files('ratelimiting.test/tests.c')],
 
   # parallel tests timeouts under valgrind; they checks mainly for race conditions, which is not needed there
-  ['ratelimiting-parallel', files('ratelimiting.test/tests-parallel.c') + libkres_src, ['skip_valgrind']]
+  ['ratelimiting-parallel', files('ratelimiting.test/tests-parallel.c'), ['skip_valgrind']]
 ]
 
 config_tests += [
