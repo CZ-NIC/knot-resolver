@@ -93,7 +93,7 @@ typedef uint32_t nsec_p_hash_t;
 static inline nsec_p_hash_t nsec_p_mkHash(const uint8_t *nsec_p)
 {
 	kr_require(nsec_p && !(KNOT_NSEC3_FLAG_OPT_OUT & nsec_p[1]));
-	return hash((const char *)nsec_p, nsec_p_rdlen(nsec_p));
+	return murmurhash((const char *)nsec_p, nsec_p_rdlen(nsec_p));
 }
 
 /** NSEC* parameters for the chain. */

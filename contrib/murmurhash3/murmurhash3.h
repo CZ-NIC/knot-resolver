@@ -5,5 +5,6 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include "lib/defines.h"
 
-uint32_t hash(const char* data, size_t len);
+KR_EXPORT uint32_t murmurhash(const char* data, size_t len);

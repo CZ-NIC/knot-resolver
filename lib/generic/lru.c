@@ -166,7 +166,7 @@ KR_EXPORT void * lru_get_impl(struct lru *lru, const char *key, uint key_len,
 		return NULL; // reasonable fallback when not debugging
 	bool is_new_entry = false;
 	// find the right group
-	uint32_t khash = hash(key, key_len);
+	uint32_t khash = murmurhash(key, key_len);
 	uint16_t khash_top = khash >> 16;
 	lru_group_t *g = &lru->groups[khash & ((1 << lru->log_groups) - 1)];
 	struct lru_item *it = NULL;

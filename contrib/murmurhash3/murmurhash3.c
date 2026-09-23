@@ -23,7 +23,7 @@ static inline uint32_t rotl32(uint32_t x, int8_t r)
     return (x << r) | (x >> (32 - r));
 }
 
-uint32_t hash(const char* data, size_t len_)
+uint32_t murmurhash(const char* data, size_t len_)
 {
     const int len = (int) len_;
     const int nblocks = len / 4;
