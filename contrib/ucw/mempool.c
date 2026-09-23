@@ -630,12 +630,6 @@ void mp_stats(struct mempool *pool, struct mempool_stats *stats)
 	assert(stats->used_size <= stats->total_size);
 }
 
-size_t mp_total_size(struct mempool *pool)
-{
-	// MEMCHECK: pool defined
-	return pool->total_size;
-}
-
 
 // --- allocating space from pools ---
 
