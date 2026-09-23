@@ -29,11 +29,11 @@ struct heap {
 #define HHEAD(h) 		HELEMENT((h), 1)
 #define EMPTY_HEAP(h) 		((h)->num == 0)
 
-int heap_init(struct heap *, int (*cmp)(void *, void *), int);
-void heap_deinit(struct heap *);
+int heap_init(struct heap *h, int (*cmp)(void *, void *), int init_size);
+void heap_deinit(struct heap *h);
 
-void heap_delmin(struct heap *);
-int heap_insert(struct heap *, heap_val_t *);
-int heap_find(struct heap *, heap_val_t *);
-void heap_delete(struct heap *, int);
-void heap_replace(struct heap *, int, heap_val_t *);
+void heap_delmin(struct heap *h);
+int heap_insert(struct heap *h, heap_val_t *e);
+int heap_find(struct heap *h, heap_val_t *elm);
+void heap_delete(struct heap *h, int e);
+void heap_replace(struct heap *h, int pos, heap_val_t *e);
