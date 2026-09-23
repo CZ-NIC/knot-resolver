@@ -141,7 +141,11 @@ void mp_stats(struct mempool *pool, struct mempool_stats *stats);
  * Return how many bytes were allocated by the pool, including unused parts
  * of chunks. This function is constant-time.
  **/
-size_t mp_total_size(struct mempool *pool);
+static inline size_t mp_total_size(struct mempool *pool)
+{
+	// MEMCHECK: pool defined
+	return pool->total_size;
+}
 
 
 /***
