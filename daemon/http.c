@@ -153,6 +153,13 @@ static bool check_uri(struct pl_http_sess_data *ctx, const char *path)
 	return true;
 }
 
+static bool user_key_allowed(const char *user_key)
+{
+	uint8_t uuid[KR_UUID_BYTES];
+	bool parsed = user_key && kr_uuid_parse(user_key, uuid) == 0;
+	return kr_view_uuid_allowed(parsed ? uuid : NULL);
+}
+
 /** Return whether the query/URI is allowed.  For now, any query is allowed. */
 static bool check_user_key(const char *path, char **user_key)
 {
@@ -659,6 +666,18 @@ static int header_callback(nghttp2_session *h2, const nghttp2_frame *frame,
 			return kr_error(ENOMEM);
 		memcpy(ctx->uri_path, value, valuelen);
 		ctx->uri_path[valuelen] = '\0';
+
+		char *user_key = NULL;
+		check_user_key(ctx->uri_path, &user_key);
+		int ret = user_key_allowed(user_key);
+		if (user_key)
+			free(user_key);
+		if (!ret) {
+			kr_log_debug(DOH, "[%p] stream %d: user key rejected\n",
+					(void *)h2, stream_id);
+			set_status(ctx, HTTP_STATUS_FORBIDDEN);
+			return 0;
+		}
 	}
 
 	if (!strcasecmp(":method", (const char *)name)) {
@@ -708,6 +727,8 @@ static int data_chunk_recv_callback(nghttp2_session *h2, uint8_t flags, int32_t 
 		ctx->incomplete_stream = -1;
 		return 0;
 	}
+	if (!http_status_has_category(ctx->status, 2))
+		return 0;
 
 	struct wire_buf *wb = &ctx->wire_buf;
 
