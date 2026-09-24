@@ -3,7 +3,6 @@ from __future__ import annotations
 import fcntl
 import os
 import signal
-from pathlib import Path
 from pwd import getpwuid
 from typing import TYPE_CHECKING, Any
 
@@ -18,6 +17,8 @@ from .manager.server import load_raw_config
 from .utils.modeling.parsing import data_combine
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from .args import KresArgs
 
 logger = get_logger(__name__)
@@ -78,7 +79,8 @@ async def start_resolver(args: KresArgs) -> int:
         config = KresConfig(config_data)
 
         # Reconfigure logging based on config
-        reconfigure_logging(config)
+        groups = config.logging.groups
+        reconfigure_logging(config, "launcher", bool(groups and "launcher" in groups))
 
         # We don't want more than one Knot Resolver in a single working directory.
         lock_path: Path = rundir / ".lock"

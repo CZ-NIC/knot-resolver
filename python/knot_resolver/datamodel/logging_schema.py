@@ -2,6 +2,7 @@ import os
 from typing import Any, List, Literal, Optional, Set, Type, Union, cast
 
 from knot_resolver.datamodel.types import WritableFilePath
+from knot_resolver.logging import KRES_LOGTARGET_ENV_VAR
 from knot_resolver.utils.modeling import ConfigSchema
 from knot_resolver.utils.modeling.base_schema import is_obj_type_valid
 
@@ -103,20 +104,36 @@ class DnstapSchema(ConfigSchema):
 
 
 class LoggingSchema(ConfigSchema):
-    """
-    Logging and debugging configuration.
+    class Raw(ConfigSchema):
+        """
+        Logging and debugging configuration.
 
-    ---
-    level: Global logging level.
-    target: Global logging stream target.
-    groups: List of groups for which 'debug' logging level is set.
-    dnstap: Logging DNS requests and responses to a unix socket.
-    """
+        ---
+        level: Global logging level.
+        target: Global logging stream target. If 'from-arg', uses '--logtarget' argument ('stdout' by default).
+        groups: List of groups for which 'debug' logging level is set.
+        dnstap: Logging DNS requests and responses to a unix socket.
+        """
 
-    level: LogLevelEnum = "notice"
-    target: LogTargetEnum = "stdout"
-    groups: Optional[List[LogGroupsEnum]] = None
-    dnstap: DnstapSchema = DnstapSchema()
+        level: LogLevelEnum = "notice"
+        target: Union[LogTargetEnum, Literal["from-arg"]] = "from-arg"
+        groups: Optional[List[LogGroupsEnum]] = None
+        dnstap: DnstapSchema = DnstapSchema()
+
+    _LAYER = Raw
+
+    level: LogLevelEnum
+    target: LogTargetEnum
+    groups: Optional[List[LogGroupsEnum]]
+    dnstap: DnstapSchema
+
+    def _target(self, raw: Raw) -> LogTargetEnum:
+        if raw.target == "from-arg":
+            target = os.environ.get(KRES_LOGTARGET_ENV_VAR) or "stdout"
+            if not is_obj_type_valid(target, cast(Type[Any], LogTargetEnum)):
+                raise ValueError(f"logging target '{target}' from '--logtarget' argument is invalid")
+            return cast(LogTargetEnum, target)
+        return raw.target
 
     def _validate(self) -> None:
         if self.groups is None:

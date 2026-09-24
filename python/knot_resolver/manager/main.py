@@ -16,6 +16,6 @@ MANAGER_DESCRIPTION = (
 
 def main() -> None:
     args = parse_args(description=MANAGER_DESCRIPTION)
-    start_logging(args, "manager")
+    start_logging(args)
     exit_code = asyncio.run(start_server(args))
     sys.exit(exit_code)

@@ -37,8 +37,8 @@ Improvements
 Incompatible changes
 --------------------
 - remove legacy systemd unit files (kresd@.service, kres-cache-gc.service) (!1853)
-- remove $KRES_LOGGING_TARGET environment variable (!1893)
-  /logging/target: removed `from-env` choice
+- remove $KRES_LOGGING_TARGET environment variable (!1893)  
+  You can override the default by passing `--logtarget` to `knot-resolver` command. (!1912)
 - docker: remove cross-platform build for linux/arm/v7 (!1904)
 
 
