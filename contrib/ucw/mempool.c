@@ -568,17 +568,6 @@ struct mempool *mp_new(size_t ext_chunk_size)
 	// MEMCHECK: pool defined, other data locked, chunk locked
 }
 
-static void mp_free_chain(struct mempool_chunk *chunk, uint32_t now)
-{
-	// MEMCHECK: pool chunks locked, data unknown
-	while (chunk) {
-		MEMCHECK_DEFINED(chunk, MP_CHUNK_TAIL);
-		struct mempool_chunk *prev = chunk->prev;
-		mp_free_reusable_chunk(chunk, now);
-		chunk = prev;
-	}
-}
-
 void mp_delete(struct mempool *pool)
 {
 	// MEMCHECK: pool defined, pool chunks locked, data unknown
@@ -590,7 +579,14 @@ void mp_delete(struct mempool *pool)
 #ifdef MP_LOG_POOL_STATS
 	log_pool_stats(pool);
 #endif
-	mp_free_chain(pool->last, now); // can contain the mempool structure
+	// Note: the chunks may contain *pool
+	struct mempool_chunk *chunk = pool->last;
+	while (chunk) {
+		MEMCHECK_DEFINED(chunk, MP_CHUNK_TAIL);
+		struct mempool_chunk *prev = chunk->prev;
+		mp_free_reusable_chunk(chunk, now);
+		chunk = prev;
+	}
 	if (!mp_balance_on_demand) mp_balance_internal(now);
 }
 
