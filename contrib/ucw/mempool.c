@@ -13,11 +13,14 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
+#include <unistd.h>
 #include <ucw/config.h>
 #include <ucw/lib.h>
 #include <ucw/mempool.h>
 #include <lib/log.h>
 #include <time.h>
+
+size_t CPU_PAGE_SIZE = 0;  // set in mp_reusable_init below
 
 #pragma GCC diagnostic ignored "-Wpointer-arith"
 #define MP_SIZE_MAX (UINT32_MAX - MP_CHUNK_TAIL - CPU_PAGE_SIZE)
@@ -91,12 +94,12 @@ struct mp_unused {
 
 // --- configuration ---
 
-/* The external sizes of reusable chunks, to which sizes of all chunks will be rounded up.
+/* The requested external sizes of reusable chunks, to which sizes of all chunks will be rounded up.
  * The chunks of larger sizes will be rounded to pages and immediately munmapped when unneeded.
  *
- * All sizes comprised of at least one page have to be page-aligned.
+ * All sizes comprised of at least one page will be rounded up to pages.
  * Smaller chunks are groupped in single pages accompanied with the metadata of MP_UNUSED_TAIL size,
- * so set their size to fill the (CPU_PAGE_SIZE - MP_UNUSED_TAIL) space fully.
+ * their size may be adjusted a little to fully fill the space if possible -- see mp_reusable_init for details.
  *
  * These chunks may be used also to satisfy needs for larger allocations than the natural pool chunk size.
  * The usable internal chunk size is lower than the external size by MP_CHUNK_TAIL,
@@ -105,7 +108,7 @@ struct mp_unused {
  * In case of changing these, see also the beginning of mp_new_reusable_chunk(),
  * where it is defined how default chunk size is increased with growing pool size. */
 const uint32_t mp_reusable_ext_sizes[] = {
-	(CPU_PAGE_SIZE - MP_UNUSED_TAIL) / 4,  // ~1K
+	 1 * 1024,
 	 4 * 1024,
 	16 * 1024,
 	68 * 1024,  // support 64K allocations
@@ -137,7 +140,8 @@ const uint32_t mp_reusable_ext_sizes[] = {
 /* If defined, print counts of currently used and all existing chunks of reusable sizes
  * periodically at most once per the given time period during balancing.
  * It also turns on logging of immediate munmapping of too large chunks;
- * you may want to add larger reusable chunk size if this happens often. */
+ * you may want to add larger reusable chunk size if this happens often.
+ * Finally, reusable chunk sizes are logged on startup. */
 //#define MP_LOG_GLOBAL_STATS_PERIOD       60000  // ms
 
 /* If defined, pool statistics are conditionally printed on mp_delete and mp_flush.
@@ -190,6 +194,8 @@ static void *page_alloc(size_t len)
 	if (p == (uint8_t*) MAP_FAILED) {
 		return NULL;
 	}
+	// we require CPU_PAGE_SIZE-alignment to find end of the page from an internal address in chunk_to_unused
+	assert(!((uintptr_t) p & (CPU_PAGE_SIZE-1)));
 	return p;
 }
 
@@ -260,7 +266,8 @@ static inline struct mp_unused *chunk_to_unused(struct mempool_chunk *chunk, uin
 {
 	// MEMCHECK: chunk defined, unused defined iff small
 	struct mp_unused *unused;
-	if (chunk->size < CPU_PAGE_SIZE >> 1) {
+	if (chunk->size + MP_CHUNK_TAIL < CPU_PAGE_SIZE) {
+		// mp_unused is located at the end of the page; we require CPU_PAGE_SIZE-alignment of mmapped blocks
 		unused = (void *)((uintptr_t)(chunk) & (UINTPTR_MAX - CPU_PAGE_SIZE + 1)) + CPU_PAGE_SIZE - MP_UNUSED_TAIL;
 	} else {
 		unused = (void *)(chunk) - MP_UNUSED_TAIL;
@@ -311,17 +318,32 @@ GLOBAL_STORAGE_CLASS bool mp_balance_on_demand = false;
 __attribute__((constructor))
 void mp_reusable_init(void)
 {
+	CPU_PAGE_SIZE = sysconf(_SC_PAGESIZE);
 	for (int i = 0; i < MP_REUSABLE_CNT; i++) {
 		struct mp_reusable *r = &mp_reusable[i];
 		r->head.next = r->head.prev = &r->head;
-		r->chunk_size = mp_reusable_ext_sizes[i] - MP_CHUNK_TAIL;
 		if (mp_reusable_ext_sizes[i] < CPU_PAGE_SIZE) {
 			mp_insert_unused(&r->sep, &r->head);
-			r->chunks_per_block = (CPU_PAGE_SIZE - MP_UNUSED_TAIL) / mp_reusable_ext_sizes[i];
+			r->chunks_per_block = CPU_PAGE_SIZE / mp_reusable_ext_sizes[i];
+			r->chunk_size = (CPU_PAGE_SIZE - MP_UNUSED_TAIL) / r->chunks_per_block - MP_CHUNK_TAIL;
 		} else {
 			r->chunks_per_block = 1;
+			r->chunk_size = ALIGN_TO(mp_reusable_ext_sizes[i], CPU_PAGE_SIZE) - MP_CHUNK_TAIL;
 		}
 	}
+#ifdef MP_LOG_GLOBAL_STATS_PERIOD
+	MP_LOG_LINE("CPU_PAGE_SIZE: %zu", CPU_PAGE_SIZE);
+	for (int i = 0; i < MP_REUSABLE_CNT; i++) {
+		if (mp_reusable_ext_sizes[i] < CPU_PAGE_SIZE) {
+			MP_LOG_LINE("reusable chunk%2d:  requested %6d B external size, real %6d B internal size, %2d chunks in page, %3zd B overhead",
+					i, mp_reusable_ext_sizes[i], mp_reusable[i].chunk_size, mp_reusable[i].chunks_per_block,
+					CPU_PAGE_SIZE - (mp_reusable[i].chunk_size + MP_CHUNK_TAIL) * mp_reusable[i].chunks_per_block - MP_UNUSED_TAIL);
+		} else {
+			MP_LOG_LINE("reusable chunk%2d:  requested %6d B external size, real %6d B internal size",
+					i, mp_reusable_ext_sizes[i], mp_reusable[i].chunk_size);
+		}
+	}
+#endif
 }
 
 struct mp_reusable *mp_get_reusable(uint32_t *size)
@@ -341,9 +363,10 @@ static void *mp_new_reusable_chunk(uint32_t requested_size, size_t pool_ext_chun
 	uint32_t size;  // size excl. chunk tail
 	{
 		uint32_t ext_size;  // external size, incl. chunk tail
-		ext_size = MIN((pool_size >> 3) + 1, mp_reusable_ext_sizes[MP_REUSABLE_CNT - 1]);  // minimum growing with pool_size
-		ext_size = MAX(ext_size, pool_ext_chunk_size);                                     // requested pool_size bound
-		ext_size = MAX(ext_size, requested_size + MP_CHUNK_TAIL);                          // requested space in chunk
+		ext_size = MIN((pool_size >> 3) + 1, mp_reusable[MP_REUSABLE_CNT - 1].chunk_size + MP_CHUNK_TAIL);
+			// minimum growing with pool_size
+		ext_size = MAX(ext_size, pool_ext_chunk_size);                // requested pool_size bound
+		ext_size = MAX(ext_size, requested_size + MP_CHUNK_TAIL);     // requested space in chunk
 		size = ext_size - MP_CHUNK_TAIL;
 	}
 	struct mp_reusable *reusable = mp_get_reusable(&size);
