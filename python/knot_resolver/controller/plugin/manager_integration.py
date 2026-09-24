@@ -1,9 +1,12 @@
-# type: ignore
-# pylint: disable=protected-access
+# ruff: noqa: G010
+# mypy: disable-error-code=import-untyped
+
+from __future__ import annotations
+
 import atexit
 import os
 import signal
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any
 
 from supervisor.compat import as_string
 from supervisor.events import (
@@ -14,93 +17,83 @@ from supervisor.events import (
     subscribe,
 )
 from supervisor.options import ServerOptions
-from supervisor.process import Subprocess
 from supervisor.states import SupervisorStates
-from supervisor.supervisord import Supervisor
 
-from .notify_socket import send_notify_socket_message, NOTIFY_SOCKET
+from knot_resolver.controller.notify.notify_socket import NOTIFY_SOCKET, send_notify_socket_message
 
-superd: Optional[Supervisor] = None
+if TYPE_CHECKING:
+    from supervisor.loggers import Logger
+    from supervisor.process import Subprocess
+    from supervisor.supervisord import Supervisor
 
-
-SYSTEMD_NOTIFY_SOCKET: Optional[str] = os.environ.get(NOTIFY_SOCKET)
-
-
-def check_for_fatal_manager(event: ProcessStateFatalEvent) -> None:
-    assert superd is not None
-
-    proc: Subprocess = event.process
-    processname = as_string(proc.config.name)
-    if processname == "manager":
-        # stop the whole supervisord gracefully
-        superd.options.logger.critical("manager process entered FATAL state! Shutting down")
-        superd.options.mood = SupervisorStates.SHUTDOWN
-
-        # force the interpreter to exit with exit code 1
-        atexit.register(lambda: os._exit(1))
+MANAGER_NAME = "manager"
 
 
-def check_for_starting_manager(event: ProcessStateStartingEvent) -> None:
-    assert superd is not None
-
-    proc: Subprocess = event.process
-    processname = as_string(proc.config.name)
-    if processname == "manager" and SYSTEMD_NOTIFY_SOCKET is not None:
-        # manager has sucessfully started, report it upstream
-        send_notify_socket_message(SYSTEMD_NOTIFY_SOCKET, STATUS="Starting services...")
+def _exit_failure() -> None:
+    os._exit(1)
 
 
-def check_for_runnning_manager(event: ProcessStateRunningEvent) -> None:
-    assert superd is not None
+def inject(supervisord: Supervisor, **_config: Any) -> None:
+    logger: Logger = supervisord.options.logger
 
-    proc: Subprocess = event.process
-    processname = as_string(proc.config.name)
-    if processname == "manager" and SYSTEMD_NOTIFY_SOCKET is not None:
-        # manager has sucessfully started, report it upstream
-        send_notify_socket_message(SYSTEMD_NOTIFY_SOCKET, READY="1", STATUS="Ready")
+    # Preserve the systemd NOTIFY_SOCKET before Supervisord modifies the environment.
+    systemd_notify_socket = os.environ.get(NOTIFY_SOCKET)
 
+    def notify(**status: str) -> None:
+        if systemd_notify_socket is not None:
+            send_notify_socket_message(systemd_notify_socket, **status)
 
-def check_for_stopping_manager(event: ProcessStateStoppingEvent) -> None:
-    assert superd is not None
+    def is_manager(event: Any) -> bool:
+        process: Subprocess = event.process
+        return as_string(process.config.name) == MANAGER_NAME
 
-    proc: Subprocess = event.process
-    processname = as_string(proc.config.name)
-    if processname == "manager" and SYSTEMD_NOTIFY_SOCKET is not None:
-        # manager is stopping, report it upstream
-        send_notify_socket_message(SYSTEMD_NOTIFY_SOCKET, STOPPING="1", STATUS="Stopping services...")
+    # Notify systemd that initialization has started.
+    notify(STATUS="Initializing supervisord...")
 
 
-def get_server_options_signal(self):
-    sig = self.signal_receiver.get_signal()
-    if sig == signal.SIGHUP and superd is not None:
-        superd.options.logger.info("received SIGHUP, forwarding to the process 'manager'")
-        manager_pid = superd.process_groups["manager"].processes["manager"].pid
-        os.kill(manager_pid, signal.SIGHUP)
+    def on_starting(event: ProcessStateStartingEvent) -> None:
+        if is_manager(event):
+            notify(STATUS="Starting services...")
+    subscribe(ProcessStateStartingEvent, on_starting)
+
+    def on_running(event: ProcessStateRunningEvent) -> None:
+        if is_manager(event):
+            notify(READY="1", STATUS="Ready")
+    subscribe(ProcessStateRunningEvent, on_running)
+
+    def on_stopping(event: ProcessStateStoppingEvent) -> None:
+        if is_manager(event):
+            notify(STOPPING="1", STATUS="Stopping services...",)
+    subscribe(ProcessStateStoppingEvent, on_stopping)
+
+    def on_fatal(event: ProcessStateFatalEvent) -> None:
+        if not is_manager(event):
+            return
+
+        logger.critical("The manager process entered FATAL state! Shutting down...")
+        supervisord.options.mood = SupervisorStates.SHUTDOWN
+
+        # Ensure supervisord exits with status 1 after shutdown.
+        atexit.register(_exit_failure)
+    subscribe(ProcessStateFatalEvent, on_fatal)
+
+    def get_signal(self: ServerOptions) -> int | None:
+        sig = self.signal_receiver.get_signal()
+
+        if sig != signal.SIGHUP:
+            return sig
+
+        logger.info("received SIGHUP, forwarding to the process 'manager'")
+        try:
+            manager = supervisord.process_groups[MANAGER_NAME].processes[
+                MANAGER_NAME
+            ]
+        except KeyError:
+            logger.warn("the manager process is not available; cannot forward SIGHUP")
+            return None
+
+        os.kill(manager.pid, signal.SIGHUP)
         return None
 
-    return sig
-
-
-def inject(supervisord: Supervisor, **_config: Any) -> Any:  # pylint: disable=useless-return
-    global superd
-    superd = supervisord
-
-    # This status notification here unsets the env variable $NOTIFY_SOCKET provided by systemd
-    # and stores it locally. Therefore, it shouldn't clash with $NOTIFY_SOCKET we are providing
-    # downstream
-    if SYSTEMD_NOTIFY_SOCKET is not None:
-        send_notify_socket_message(SYSTEMD_NOTIFY_SOCKET, STATUS="Initializing supervisord...")
-
-    # register events
-    subscribe(ProcessStateFatalEvent, check_for_fatal_manager)
-    subscribe(ProcessStateStartingEvent, check_for_starting_manager)
-    subscribe(ProcessStateRunningEvent, check_for_runnning_manager)
-    subscribe(ProcessStateStoppingEvent, check_for_stopping_manager)
-
-    # forward SIGHUP to manager
-    ServerOptions.get_signal = get_server_options_signal
-
-    # this method is called by supervisord when loading the plugin,
-    # it should return XML-RPC object, which we don't care about
-    # That's why why are returning just None
-    return None
+    # Forward SIGHUP to the manager process
+    ServerOptions.get_signal = get_signal
