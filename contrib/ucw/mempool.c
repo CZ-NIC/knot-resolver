@@ -20,7 +20,7 @@
 #include <lib/log.h>
 #include <time.h>
 
-size_t CPU_PAGE_SIZE = 0;  // set in mp_reusable_init below
+static size_t CPU_PAGE_SIZE = 0;  // set in mp_reusable_init below
 
 #pragma GCC diagnostic ignored "-Wpointer-arith"
 #define MP_SIZE_MAX (UINT32_MAX - MP_CHUNK_TAIL - CPU_PAGE_SIZE)
@@ -107,7 +107,7 @@ struct mp_unused {
  *
  * In case of changing these, see also the beginning of mp_new_reusable_chunk(),
  * where it is defined how default chunk size is increased with growing pool size. */
-const uint32_t mp_reusable_ext_sizes[] = {
+static const uint32_t mp_reusable_ext_sizes[] = {
 	 1 * 1024,
 	 4 * 1024,
 	16 * 1024,
@@ -304,7 +304,7 @@ static inline void mp_remove_unused(struct mp_unused *item)
 }
 
 #ifdef MP_IS_THREAD_SAFE
-#define GLOBAL_STORAGE_CLASS _Thread_local
+#define GLOBAL_STORAGE_CLASS static _Thread_local
 #else
 #define GLOBAL_STORAGE_CLASS static
 #endif
