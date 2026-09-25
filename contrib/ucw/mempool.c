@@ -309,11 +309,17 @@ static inline void mp_remove_unused(struct mp_unused *item)
 #define GLOBAL_STORAGE_CLASS static
 #endif
 
-GLOBAL_STORAGE_CLASS struct mp_reusable {
+struct mp_reusable {
 	size_t unused_cnt, total_cnt;
 	struct mp_unused head, sep;
-	uint32_t chunk_size, chunks_per_block;
-} mp_reusable[MP_REUSABLE_CNT] = {0};
+	/** If chunks_per_block > 1, sep is an empty splitter inside the list,
+	 * with chunks from *partially* unused blocks on sep->prev side
+	 * and from fully unused blocks on sep->next side. */
+	uint32_t chunk_size;  /// mempool_chunk::size
+	uint32_t chunks_per_block;  /// block is what comes from mmap()
+};
+/// Here we cache unused chunks before they get reused or munmapped.
+GLOBAL_STORAGE_CLASS struct mp_reusable mp_reusable[MP_REUSABLE_CNT] = {0};
 GLOBAL_STORAGE_CLASS bool mp_balance_on_demand = false;
 
 __attribute__((constructor))
@@ -367,7 +373,8 @@ struct mp_reusable *mp_get_reusable_exact(uint32_t size)
 	return NULL;
 }
 
-static void *mp_new_reusable_chunk(uint32_t requested_size, size_t pool_ext_chunk_size, size_t pool_size)
+static struct mempool_chunk *mp_new_reusable_chunk(uint32_t requested_size,
+					size_t pool_ext_chunk_size, size_t pool_size)
 {
 	struct mempool_chunk *chunk = NULL;
 	uint32_t size;  // size excl. chunk tail
@@ -375,9 +382,8 @@ static void *mp_new_reusable_chunk(uint32_t requested_size, size_t pool_ext_chun
 		uint32_t ext_size;  // external size, incl. chunk tail
 		ext_size = MIN((pool_size >> 3) + 1, mp_reusable[MP_REUSABLE_CNT - 1].chunk_size + MP_CHUNK_TAIL);
 			// minimum growing with pool_size
-		ext_size = MAX(ext_size, pool_ext_chunk_size);                // requested pool_size bound
-		ext_size = MAX(ext_size, requested_size + MP_CHUNK_TAIL);     // requested space in chunk
-		size = ext_size - MP_CHUNK_TAIL;
+		ext_size = MAX(ext_size, pool_ext_chunk_size);        // requested pool_size bound
+		size = MAX(ext_size - MP_CHUNK_TAIL, requested_size); // requested space in chunk
 	}
 	struct mp_reusable *reusable = mp_get_reusable(&size);
 	if (reusable) {
@@ -460,18 +466,20 @@ static uint64_t mp_balance_internal(uint32_t now)
 	// MEMCHECK: all data locked, chunks defined, unused defined
 	uint32_t longest_unused = 0;
 	int max_frees = MP_REUSABLE_MAX_CONSECUTIVE_FREES;
-	for (int i = 0; i < MP_REUSABLE_CNT; i++) {
+	for (int i = MP_REUSABLE_CNT - 1; i >= 0; i--) { // biggest chunks first
+		struct mp_reusable *reus = &mp_reusable[i];
 		struct mp_unused *unused;
-		while ((unused = mp_reusable[i].head.next)->count > 0) {
+		while ((unused = reus->head.next)->count > 0) {
+			// Note: if there's a `sep` in the list, iteration stops on it.
 			if (get_stamp && (now - unused->timestamp < MP_REUSABLE_HOLD_TIME)) {
 				longest_unused = MAX(longest_unused, now - unused->timestamp);
 				break;
 			}
-			if (max_frees-- <= 0) return 0;
+			if (--max_frees < 0) return 0;
 			mp_remove_unused(unused);
-			mp_reusable[i].total_cnt  -= mp_reusable[i].chunks_per_block;
-			mp_reusable[i].unused_cnt -= mp_reusable[i].chunks_per_block;
-			if (mp_reusable[i].chunks_per_block > 1) {
+			reus->total_cnt  -= reus->chunks_per_block;
+			reus->unused_cnt -= reus->chunks_per_block;
+			if (reus->chunks_per_block > 1) {
 				mp_free_small_chunks(unused);
 			} else {
 				mp_free_chunk(unused->chunk);
