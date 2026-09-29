@@ -46,7 +46,13 @@ class ViewSchema(ConfigSchema):
     uuid_file: Optional[ReadableFile] = None
 
     def _validate(self) -> None:
-        if bool(self.tags) == bool(self.answer) and self.uuid_file is None:
-            raise ValueError("exactly one of 'tags' and 'answer' must be configured")
-        elif bool(self.tags) != bool(self.answer) and self.uuid_file is not None:
-            raise ValueError("'tags' and 'answer' cannot be configured alongside uuid-file")
+        if self.uuid_file is not None:
+            if self.tags or self.answer:
+                raise ValueError("'tags' and 'answer' cannot be configured alongside uuid-file")
+            if self.subnets:
+                raise ValueError("'subnets' cannot be configured alongside uuid-file")
+        else:
+            if not self.subnets:
+                raise ValueError("'subnets' is required unless 'uuid-file' is configured")
+            if bool(self.tags) == bool(self.answer):
+                raise ValueError("exactly one of 'tags' and 'answer' must be configured")
