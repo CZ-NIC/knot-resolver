@@ -45,6 +45,7 @@ unit_tests += [
 
   # parallel tests timeouts under valgrind; they checks mainly for race conditions, which is not needed there
   ['ratelimiting-parallel', files('ratelimiting.test/tests-parallel.c') + libkres_src, ['skip_valgrind']],
+  ['doh-whitelist', files('doh_whitelist.test/tests.c') + libkres_src ],
 ]
 
 config_tests += [
