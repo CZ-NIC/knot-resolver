@@ -555,11 +555,15 @@
                 "type": "object",
                 "properties": {
                     "subnets": {
-                        "type": "array",
+                        "type": [
+                            "array",
+                            "null"
+                        ],
                         "items": {
                             "type": "string"
                         },
-                        "description": "Identifies the client based on his subnet.  Rule with more precise subnet takes priority."
+                        "description": "Identifies the client based on his subnet.  Rule with more precise subnet takes priority.",
+                        "default": null
                     },
                     "dst-subnet": {
                         "type": [
@@ -585,14 +589,6 @@
                             ]
                         },
                         "description": "Transport protocol, as an additional condition.",
-                        "default": null
-                    },
-                    "keys": {
-                        "type": [
-                            "string",
-                            "null"
-                        ],
-                        "description": "File containing whitelist of keys used to verify clients' access rights",
                         "default": null
                     },
                     "tags": {
@@ -665,6 +661,14 @@
                             "price_factor": 1.0,
                             "fallback": true
                         }
+                    },
+                    "uuid-file": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "File containing uuids used to whitelist users querying over DoH. Applied to all subnets.",
+                        "default": null
                     }
                 }
             },

@@ -3,8 +3,8 @@ from typing import Any
 import pytest
 
 from knot_resolver.datamodel.templates import template_from_str
-from knot_resolver.utils.modeling.exceptions import DataValidationError
 from knot_resolver.datamodel.view_schema import ViewOptionsSchema, ViewSchema
+from knot_resolver.utils.modeling.exceptions import DataValidationError
 
 
 def test_view_flags():
@@ -43,8 +43,10 @@ def test_view_answer(val: Any, res: Any):
     view = ViewSchema({"subnets": ["10.0.0.0/8"], "answer": val})
     assert tmpl.render(view=view) == res
 
+
 # DoH whitelist tests
 VIEWS_TMPL = "{% include 'views.lua.j2' %}"
+
 
 @pytest.fixture
 def uuid_file(tmp_path):
@@ -69,19 +71,25 @@ def test_subnets_emit_insert_action():
     assert "kr_view_load_uuids" not in out
 
 
-@pytest.mark.parametrize("cfg", [
-    {"subnets": ["10.0.0.0/8"]},
-    {"subnets": ["10.0.0.0/8"], "tags": ["t"], "answer": "allow"},
-])
+@pytest.mark.parametrize(
+    "cfg",
+    [
+        {"subnets": ["10.0.0.0/8"]},
+        {"subnets": ["10.0.0.0/8"], "tags": ["t"], "answer": "allow"},
+    ],
+)
 def test_tags_answer_exclusive(cfg):
     with pytest.raises((DataValidationError, ValueError)):
         ViewSchema(cfg)
 
 
-@pytest.mark.parametrize("extra", [
-    {"answer": "allow"},
-    {"subnets": ["10.0.0.0/8"]},
-])
+@pytest.mark.parametrize(
+    "extra",
+    [
+        {"answer": "allow"},
+        {"subnets": ["10.0.0.0/8"]},
+    ],
+)
 def test_uuid_file_conflicts(tmp_path, extra):
     f = tmp_path / "uuids.txt"
     f.write_text("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\n")
@@ -97,17 +105,21 @@ def test_uuid_file_without_tags_defaults_to_allow(uuid_file):
     assert "policy.TAGS_ASSIGN({})" in out
 
 
-@pytest.mark.parametrize("cfg", [
-    {"subnets": ["10.0.0.0/8"], "answer": "allow"},
-    {"subnets": ["10.0.0.0/8"], "tags": ["t"]},
-    {"subnets": ["::1"], "answer": "noanswer", "protocols": ["doq"]},
-])
+@pytest.mark.parametrize(
+    "cfg",
+    [
+        {"subnets": ["10.0.0.0/8"], "answer": "allow"},
+        {"subnets": ["10.0.0.0/8"], "tags": ["t"]},
+        {"subnets": ["::1"], "answer": "noanswer", "protocols": ["doq"]},
+    ],
+)
 def test_valid_views(cfg):
     ViewSchema(cfg)
 
 
 def test_mixed_views(tmp_path):
-    f = tmp_path / "u.txt"; f.write_text("x\n")
+    f = tmp_path / "u.txt"
+    f.write_text("x\n")
     views = [
         ViewSchema({"uuid-file": str(f)}),
         ViewSchema({"subnets": ["10.0.0.0/8"], "answer": "refused"}),
@@ -124,7 +136,6 @@ def test_no_views_renders_nothing(views):
 
 
 def test_protocols_rendered():
-    view = ViewSchema({"subnets": ["10.0.0.0/8"], "answer": "allow",
-                       "protocols": ["doq", "dot"]})
+    view = ViewSchema({"subnets": ["10.0.0.0/8"], "answer": "allow", "protocols": ["doq", "dot"]})
     out = template_from_str(VIEWS_TMPL).render(cfg={"views": [view]})
     assert "C.KR_PROTO_DOQ" in out and "C.KR_PROTO_DOT" in out

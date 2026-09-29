@@ -45,7 +45,6 @@ class ViewSchema(ConfigSchema):
     options: ViewOptionsSchema = ViewOptionsSchema()
     uuid_file: Optional[ReadableFile] = None
 
-
     def _validate(self) -> None:
         if self.uuid_file is not None:
             if self.subnets:
