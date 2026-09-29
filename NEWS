@@ -5,6 +5,8 @@ Security
 --------
 - fix crash when forwarding - DoS via NULL deref
   Reporters: Yuqi Qiu and Xiang Li, Nankai University (AOSP Lab).
+- fix crash or loop - DoS
+  Reporters: Joshua from AISLE
 
 Bugfixes
 --------

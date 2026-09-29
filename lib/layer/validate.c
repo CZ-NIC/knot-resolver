@@ -405,7 +405,7 @@ static int validate_keyset(struct kr_request *req, knot_pkt_t *answer, bool has_
 			int dnskey_keytag = -1;
 			bool have_zone_key_bit = true, dnskey_algo_supported = true;
 			knot_rdata_t *rdata_sep = NULL, *rdata_i = qry->zone_cut.key->rrs.rdata;
-			for (uint8_t i = 0; i < qry->zone_cut.key->rrs.count;
+			for (int i = 0; i < qry->zone_cut.key->rrs.count;
 			    ++i, rdata_i = knot_rdataset_next(rdata_i)) {
 				if (dnskey_keytag != sep_keytag) {
 					dnskey_keytag = kr_dnssec_key_tag(KNOT_RRTYPE_DNSKEY, rdata_i->data, rdata_i->len);
