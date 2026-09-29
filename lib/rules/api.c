@@ -1484,9 +1484,9 @@ int kr_uuid_parse(const char *s, uint8_t out[KR_UUID_BYTES])
 	return 0;
 }
 
-int kr_view_load_uuids(const char *path)
+int kr_view_load_uuids(const char *path, const char *action)
 {
-	if (!path)
+	if (!path || !action)
 		return kr_error(EINVAL);
 
 	ENSURE_the_rules;
@@ -1498,11 +1498,10 @@ int kr_view_load_uuids(const char *path)
 				path, strerror(err));
 		return kr_error(err);
 	}
-
+	const int action_len = strlen(action);
 	uint8_t key_data[KEY_MAXLEN];
-	const uint8_t placeholder = 1;
-	knot_db_val_t val = { .data = (void *)&placeholder,
-		.len = sizeof(placeholder) };
+	knot_db_val_t val = { .data = (void *)action,
+		.len = action_len };
 	knot_db_val_t key;
 
 	char *line = NULL;
@@ -1529,6 +1528,12 @@ int kr_view_load_uuids(const char *path)
 		if (ret)
 			break;
 	}
+	/* There might be another uuid file that is not empty, but
+	 * this is a configuration error either way */
+	if (lineno == 0) {
+		kr_log_warning(RULES, "Empty uuid file found, all DoH queries would be REFUSED!\n");
+		ret = kr_error(EINVAL);
+	}
 	if (ret == 0 && ferror(f))
 		ret = kr_error(EIO);
 	free(line);
@@ -1538,26 +1543,11 @@ int kr_view_load_uuids(const char *path)
 	}
 
 	key = uuid_key_build(key_data, NULL);
-	return ruledb_op(write, &key, &val, 1);
-}
-
-bool kr_view_uuid_allowed(const uint8_t uuid[KR_UUID_BYTES])
-{
-	if (!the_rules)
-		return true;
-
-	uint8_t key_data[KEY_MAXLEN];
-	knot_db_val_t val;
-	knot_db_val_t key = uuid_key_build(key_data, NULL);
-
-	int ret = ruledb_op(read, &key, &val, 1);
+	knot_db_val_t val_tmp;
+	ret = ruledb_op(read, &key, &val_tmp, 1);
 	if (ret == kr_error(ENOENT))
-		return true;
-	if (ret || !uuid)
-		return false;
-
-	key = uuid_key_build(key_data, uuid);
-	return ruledb_op(read, &key, &val, 1) == 0;
+		return ruledb_op(write, &key, &val, 1);
+	return ret;
 }
 
 static enum kr_proto req_proto(const struct kr_request *req)
@@ -1592,11 +1582,43 @@ static void log_action(const struct kr_request *req, knot_db_val_t act)
 	VERBOSE_MSG(req->rplan.initial, "=> view selected action: %s\n", act_0t);
 }
 
+int kr_view_uuid_select_action(const uint8_t uuid[KR_UUID_BYTES],
+		knot_db_val_t *selected)
+{
+	uint8_t key_data[KEY_MAXLEN];
+	knot_db_val_t val;
+	knot_db_val_t key = uuid_key_build(key_data, NULL);
+
+	if (ruledb_op(read, &key, &val, 1) == kr_error(ENOENT))
+		return kr_error(ENOENT);
+
+	if (uuid) {
+		key = uuid_key_build(key_data, uuid);
+		if (ruledb_op(read, &key, &val, 1) == 0) {
+			*selected = val;
+			return kr_ok();
+		}
+	}
+	static const char DENY[] = "policy.REFUSE";
+	*selected = (knot_db_val_t){
+		.data = (void *)DENY, .len = sizeof(DENY) - 1
+	};
+	return kr_ok();
+}
+
 int kr_view_select_action(const struct kr_request *req, knot_db_val_t *selected)
 {
 	kr_require(the_rules);
 	const struct sockaddr * const addr = req->qsource.addr;
 	if (!addr) return kr_error(ENOENT); // internal request; LATER: act somehow?
+
+	uint8_t uuid[KR_UUID_BYTES];
+	const bool has_uuid = req_proto(req) == KR_PROTO_DOH
+		&& req->qsource.user_key
+		&& kr_uuid_parse(req->qsource.user_key, uuid) == 0;
+	int ret = kr_view_uuid_select_action(has_uuid ? uuid : NULL, selected);
+	if (ret != kr_error(ENOENT))
+		return ret;
 
 	// Init the addr-based part of key; it's pretty static.
 	uint8_t key_data[KEY_MAXLEN];
@@ -1608,8 +1630,6 @@ int kr_view_select_action(const struct kr_request *req, knot_db_val_t *selected)
 		case AF_INET6: KEY_PREPEND(key, KEY_VIEW_SRC6);  break;
 		default:       kr_assert(false);  return kr_error(EINVAL);
 	}
-
-	int ret;
 
 	// Init code for managing the ruleset part of the key.
 	// LATER(optim.): we might cache the ruleset list a bit

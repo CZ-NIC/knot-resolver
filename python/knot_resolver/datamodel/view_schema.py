@@ -45,12 +45,16 @@ class ViewSchema(ConfigSchema):
     options: ViewOptionsSchema = ViewOptionsSchema()
     uuid_file: Optional[ReadableFile] = None
 
+
     def _validate(self) -> None:
         if self.uuid_file is not None:
-            if self.tags or self.answer:
-                raise ValueError("'tags' and 'answer' cannot be configured alongside uuid-file")
             if self.subnets:
                 raise ValueError("'subnets' cannot be configured alongside uuid-file")
+            # TODO: Replace if the answer option is ever required
+            # if bool(self.tags) == bool(self.answer):
+            #     raise ValueError("exactly one of 'tags' and 'answer' must be configured")
+            if self.answer:
+                raise ValueError("'answer' is currently not configurable for 'uuid-file'")
         else:
             if not self.subnets:
                 raise ValueError("'subnets' is required unless 'uuid-file' is configured")

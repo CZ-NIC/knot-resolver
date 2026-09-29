@@ -5,7 +5,15 @@
 {% if cfg.views %}
 {% for view in cfg.views %}
 {% if view.uuid_file %}
-assert(C.kr_view_load_uuids('{{ view.uuid_file }}') == 0)
+assert(C.kr_view_load_uuids('{{ view.uuid_file }}', policy.COMBINE({
+{%- if view.tags or view.tags_audit %}
+	{{ policy_tags_assign(view.tags, view.tags_audit) }},
+{%- elif view.answer %}
+	{{ view_answer(view.answer) }},
+{%- else %}
+	{{ view_answer('allow') }},
+{%- endif %}
+})) == 0)
 {% else %}
 {% for subnet in view.subnets %}
 assert(C.kr_view_insert_action('{{ subnet }}', '{{ view.dst_subnet or '' }}',

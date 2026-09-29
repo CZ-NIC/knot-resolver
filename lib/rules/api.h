@@ -289,11 +289,14 @@ int kr_uuid_parse(const char *s, uint8_t out[KR_UUID_BYTES]);
  * The uuids in this file are used to whitelist DoH clients
  */
 KR_EXPORT
-int kr_view_load_uuids(const char *path);
+int kr_view_load_uuids(const char *path, const char *action);
 
-/* Search the uuid whitelist, returns true if the uuid was found */
+/** Select the action for a DoH user key (UUID), if a whitelist is loaded.
+ * \return kr_ok() with *selected set to the action string;
+ *         kr_error(ENOENT) if no UUID whitelist is configured at all. */
 KR_EXPORT
-bool kr_view_uuid_allowed(const uint8_t uuid[KR_UUID_BYTES]);
+int kr_view_uuid_select_action(const uint8_t uuid[KR_UUID_BYTES],
+		knot_db_val_t *selected);
 
 /** Add a tag by name into a tag-set variable.
  *
