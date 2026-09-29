@@ -36,7 +36,7 @@ class ViewSchema(ConfigSchema):
     uuid_file: File containing uuids used to whitelist users querying over DoH. Applied to all subnets.
     """
 
-    subnets: Optional[List[IPNetwork]]
+    subnets: Optional[List[IPNetwork]] = None
     dst_subnet: Optional[IPNetwork] = None  # could be a list as well, iterated in template
     protocols: Optional[List[Literal["udp53", "tcp53", "dot", "doh", "doq"]]] = None
     tags: Optional[List[IDPattern]] = None
