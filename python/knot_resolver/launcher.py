@@ -31,18 +31,23 @@ async def start_resolver(args: KresArgs) -> int:
     blocked_signals = {signal.SIGHUP, signal.SIGINT, signal.SIGTERM}
     signal.pthread_sigmask(signal.SIG_BLOCK, blocked_signals)
 
-    # Check that we are running under the intended user
+    warning_msg = (
+        "Is this intentional?"
+        " This may affect configuration validation and the proper functioning of the resolver."
+    )
     try:
+        # Check that we are running under the intended user
         current_user = getpwuid(os.getuid()).pw_name
         if current_user != USER:
             logger.warning(
-                "Knot Resolver does not run as the default '%s' user, but as '%s' instead."
-                " This may or may not affect the configuration validation and the proper functioning of the resolver.",
+                "Knot Resolver does not run as the default '%s' user, but as '%s' instead. %s",
                 USER,
                 current_user,
+                warning_msg,
             )
     except KeyError:
-        logger.warning("Knot Resolver running with unknown user")
+        logger.warning("Knot Resolver is running under an unknown user. %s", warning_msg)
+
     # Check that we are not running as root
     if os.geteuid() == 0:
         logger.warning("It is not recommended to run under root privileges unless there is no other option.")
