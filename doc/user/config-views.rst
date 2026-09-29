@@ -45,7 +45,7 @@ Conditions
    .. option:: subnets: <list of subnets>
 
       Identifies the client based on their source address.
-      This is the only mandatory part of each rule.
+      This is the only mandatory part of each rule (except for uuid-file rules).
       You may use ``[ 0.0.0.0/0, "::/0" ]`` to match all external requests.
 
    .. option:: dst-subnet: <string>
@@ -62,6 +62,14 @@ Conditions
 
       List of protocols for the query; subset of:
       ``udp53``, ``tcp53``, ``dot``, ``doh``, ``doq``.
+
+   .. option:: uuid-file: <path>
+
+      Identifies the client based on the uuid passed as part of a request sent
+      over DoH. The file only supports line separated UUIDs (:rfc:`9562`).
+      Only action usable with the uuid-file condition is :ref:`tags`. Otherwise
+      all users that fails to provide UUID or provide UUID that is not in one
+      of the uuid files will receive answer with status REFUSED.
 
 Actions
 -------
