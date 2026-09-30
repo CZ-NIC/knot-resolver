@@ -284,13 +284,14 @@ static inline struct mp_unused *chunk_to_unused(struct mempool_chunk *chunk, uin
 	return unused;
 }
 
-static inline void mp_insert_unused(struct mp_unused *item, struct mp_unused *after)
+static inline void mp_insert_unused(struct mp_unused *item, struct mp_unused *before)
 {
 	// MEMCHECK: all unused defined
-	item->prev = after;
-	item->next = after->next;
+	struct mp_unused *after = before->prev;
 	after->next = item;
-	item->next->prev = item;
+	item->next = before;
+	before->prev = item;
+	item->prev = after;
 }
 
 static inline void mp_remove_unused(struct mp_unused *item)
@@ -391,7 +392,7 @@ static void *mp_new_reusable_chunk(uint32_t requested_size, size_t pool_ext_chun
 			chunk = unused->chunk;
 			unused->chunk = chunk->prev;
 			if (--unused->count) {
-				mp_insert_unused(unused, reusable->head.prev);
+				mp_insert_unused(unused, &reusable->head);
 			}
 			MEMCHECK_NOACCESS((uint8_t *)chunk - chunk->size, chunk->size);
 			MP_CHUNK_CHECK(chunk);
@@ -403,7 +404,7 @@ static void *mp_new_reusable_chunk(uint32_t requested_size, size_t pool_ext_chun
 			reusable->total_cnt += unused->count;
 			unused->count--;
 			reusable->unused_cnt += unused->count;
-			mp_insert_unused(unused, reusable->head.prev);
+			mp_insert_unused(unused, &reusable->head);
 			MP_CHUNK_CHECK(chunk);
 			return chunk;
 		} else {
@@ -428,10 +429,10 @@ static void mp_free_reusable_chunk(struct mempool_chunk *chunk, uint32_t now)
 		reusable->unused_cnt++;
 		struct mp_unused *unused = chunk_to_unused(chunk, now);
 		if (unused->count == 1) {
-			mp_insert_unused(unused, reusable->head.prev);
+			mp_insert_unused(unused, &reusable->head);
 		} else if (unused->count == reusable->chunks_per_block) {
 			mp_remove_unused(unused);
-			mp_insert_unused(unused, reusable->sep.prev);
+			mp_insert_unused(unused, &reusable->sep);
 		}
 		// MEMCHECK: data locked, chunk defined, unused defined
 	} else {
