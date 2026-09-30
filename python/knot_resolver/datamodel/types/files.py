@@ -169,7 +169,6 @@ def _check_permission(dest_path: Path, perm_mode: _PermissionMode) -> bool:
     if get_permissions_default():
         user_uid = getpwnam(USER).pw_uid
         user_gid = getgrnam(GROUP).gr_gid
-        username = USER
     # running under root privileges
     elif os.geteuid() == 0:
         return True
@@ -177,7 +176,6 @@ def _check_permission(dest_path: Path, perm_mode: _PermissionMode) -> bool:
     else:
         user_uid = os.getuid()
         user_gid = os.getgid()
-        username = getpwuid(user_uid).pw_name
 
     dest_stat = os.stat(dest_path)
     dest_uid = dest_stat.st_uid
@@ -187,7 +185,11 @@ def _check_permission(dest_path: Path, perm_mode: _PermissionMode) -> bool:
     def accessible(perm: _PermissionMode) -> bool:
         if user_uid == dest_uid:
             return bool(dest_mode & chflags[perm][0])
-        b_groups = os.getgrouplist(username, user_gid)
+        try:
+            username = getpwuid(user_uid).pw_name
+            b_groups = os.getgrouplist(username, user_gid)
+        except KeyError:
+            b_groups = [user_gid]
         if user_gid == dest_gid or dest_gid in b_groups:
             return bool(dest_mode & chflags[perm][1])
         return bool(dest_mode & chflags[perm][2])
