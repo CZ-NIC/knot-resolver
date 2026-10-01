@@ -624,9 +624,11 @@ void mp_flush(struct mempool *pool)
 	// MEMCHECK: pool defined, pool chunks locked, data except pool locked
 }
 
-static void mp_stats_chain(struct mempool *pool, struct mempool_chunk *chunk, struct mempool_stats *stats)
+void mp_stats(struct mempool *pool, struct mempool_stats *stats)
 {
 	// MEMCHECK: pool defined, pool chunks locked
+	memset(stats, 0, sizeof(*stats));
+	struct mempool_chunk *chunk = pool->last;
 	while (chunk) {
 		MEMCHECK_DEFINED(chunk, MP_CHUNK_TAIL);
 		stats->total_size += chunk->size + MP_CHUNK_TAIL;
@@ -639,13 +641,6 @@ static void mp_stats_chain(struct mempool *pool, struct mempool_chunk *chunk, st
 		MEMCHECK_NOACCESS(chunk, MP_CHUNK_TAIL);
 		chunk = prev;
 	}
-}
-
-void mp_stats(struct mempool *pool, struct mempool_stats *stats)
-{
-	// MEMCHECK: pool defined, pool chunks locked
-	bzero(stats, sizeof(*stats));
-	mp_stats_chain(pool, pool->last, stats);
 	assert(stats->used_size <= stats->total_size);
 }
 
