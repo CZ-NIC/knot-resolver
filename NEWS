@@ -9,6 +9,7 @@ Bugfixes
 - DoH fixes for sharing connections among different users (!1844)
 - TCP-based connections used Nagle's algorithm since 6.2.0 (!1903)
   This mistake significantly increased latencies of such transports.
+- local-data: process upper-case names correctly (!1915)
 
 Packaging
 ---------

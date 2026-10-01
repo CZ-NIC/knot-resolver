@@ -9,11 +9,18 @@
 #include "lib/rules/api.h"
 #include "lib/rules/impl.h"
 
+#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)
+    #include <stdlib.h>
+#else
+    #include <alloca.h>
+#endif
+
+#include <libzscanner/scanner.h>
+#include <libknot/rrset.h>
+
 #include "lib/log.h"
 #include "lib/utils.h"
 #include "lib/generic/trie.h"
-
-#include <libzscanner/scanner.h>
 
 /// State used in zs_scanner_t::process.data
 typedef struct {
@@ -66,7 +73,33 @@ static void rr_scan2trie(zs_scanner_t *s, const struct kr_rule_zonefile_config *
 			owner = knot_dname_copy(s->r_owner, s_data->pool);
 		knot_rrset_init(rr, owner, s->r_type, KNOT_CLASS_IN, s->r_ttl);
 	}
-	int ret = knot_rrset_add_rdata(rr, s->r_data, s->r_data_length, s_data->pool);
+	// Let's canonize the rdata first.
+	knot_rdata_t *r_data_buf = alloca(offsetof(knot_rdata_t, data) + s->r_data_length);
+	r_data_buf->len = s->r_data_length;
+	memcpy(r_data_buf->data, s->r_data, s->r_data_length);
+#if KNOT_VERSION_HEX >= 0x030500
+	int ret = knot_rdata_to_canonical(r_data_buf, s->r_type);
+#else // somewhat annoying compat; a bit less performant, for simplicity
+	knot_rrset_t rrs;
+	knot_rrset_init(&rrs, s->r_owner, s->r_type, s->r_class, s->r_ttl);
+	rrs.rrs.count = 1;
+	rrs.rrs.size = knot_rdata_size(s->r_data_length);
+	rrs.rrs.rdata = r_data_buf;
+	int ret = knot_rrset_rr_to_canonical(&rrs);
+#endif
+	static bool warned_canon = false;
+	if (unlikely(ret) && !warned_canon) {
+		KR_DNAME_GET_STR(owner_str, s->r_owner);
+		KR_RRTYPE_GET_STR(type_str, s->r_type);
+		kr_log_error(RULES,
+			"skipping a record which failed to process ('%s' %s): %s\n"
+		 	"reporting this type of issue only once per reload\n",
+		 	owner_str, type_str, knot_strerror(ret));
+		warned_canon = true;
+		return;
+	}
+	// and insert finally:
+	ret = knot_rrset_add_rdata(rr, s->r_data, s->r_data_length, s_data->pool);
 	kr_assert(!ret);
 }
 /// Process an RRset of other types into a rule
@@ -90,6 +123,8 @@ static void cname_scan2rule(zs_scanner_t *s)
 {
 	s_data_t *s_data = s->process.data;
 	const struct kr_rule_zonefile_config *c = s_data->c;
+
+	knot_dname_to_lower(s->r_data); // the target name may not have been lowercase
 
 	const char *last_label = NULL; // last label of the CNAME
 	for (knot_dname_t *dn = s->r_data; *dn != '\0'; dn += 1 + *dn)
@@ -138,9 +173,10 @@ static void cname_scan2rule(zs_scanner_t *s)
 		kr_log_warning(RULES, "failure code %d\n", ret);
 }
 
-/// Relativize s->r_owner if suitable.  (Also react to SOA.)  Return false to skip RR.
+/// Relativize s->r_owner if suitable.  (Also lowercase and react to SOA.)  Return false to skip RR.
 static bool owner_relativize(zs_scanner_t *s)
 {
+	knot_dname_to_lower(s->r_owner);
 	s_data_t *d = s->process.data;
 	if (!d->c->is_rpz)
 		return true;
@@ -224,8 +260,7 @@ static void process_record(zs_scanner_t *s)
 	case KNOT_RRTYPE_NSEC3:
 	case KNOT_RRTYPE_DNSKEY:
 	case KNOT_RRTYPE_DS:
-	unsupported_type:
-		(void)0; // C can't have a variable definition following a label
+	unsupported_type:;
 		KR_RRTYPE_GET_STR(type_str, s->r_type);
 		kr_log_warning(RULES, "skipping unsupported RR type %s\n", type_str);
 		return;
