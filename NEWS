@@ -1,4 +1,4 @@
-Knot Resolver 6.5.0 (2026-09-17)
+Knot Resolver 6.5.0 (2026-10-01)
 ================================
 
 Bugfixes
@@ -13,13 +13,9 @@ Bugfixes
 
 Packaging
 ---------
-- arch: updates and cleanup (!1858)
 - deb: migrate to sysusers and update packaging (!1857)
 - rpm: fix source build against libknot >= 3.6 (!1907)
-- python: raised minimum supported version to 3.9 (!1886)
-- Add a `PROJECT_VERSION` file as the single source of truth for the project version (!1889)
-- pyproject.toml: migrate from Poetry to `setuptools` (!1889)
-- python: removed typing-extensions dependency (!1910)
+- python: 3.9+ (!1886), migrated to setuptools (!1889), removed typing-extensions (!1910)
 - Debian 11 is no longer supported
 - Debian,Ubuntu: i386 and armhf architectures no longer supported
 
@@ -28,15 +24,10 @@ Improvements
 - decrease RAM usage by a lot (!1901)
 - local-data: increase capacity to 63 GiB (logged MDB_MAP_FULL, !1885)
 - systemd: use unit's {Runtime,State,Cache}Directory directives instead of tmpfiles.d (!1853)
-- controller: reimplemented the notify socket in Python (!1875)  
-  The `knot_resolver` Python package no longer contains native extensions and is now implemented entirely in Python.
-- python: improve Knot Resolver startup procedure (!1893)  
-  Some startup actions previously handled by the manager have been moved to a separate startup program.  
-  This simplifies the manager's startup logic and isolates Knot Resolver's initialization steps.
-  - `knot-resolver` executable: added `--loglevel` and `--logtarget` startup arguments.
-  - New `kres-manager` executable with same arguments as `knot-resolver` that starts only the manager.
-- python: utils: refactoring and cleanup (!1894)
-- python: client: refactoring and cleanup (!1908)
+- controller: reimplement the notify socket in Python (!1875)
+- python: improve Knot Resolver startup procedure (!1893)
+  Some startup actions previously handled by the manager have been moved to a separate startup program.
+- python: refactoring: utils (!1894), client (!1908)
 - allow running under an unknown user, e.g. in containers (!1914)
 
 Incompatible changes
