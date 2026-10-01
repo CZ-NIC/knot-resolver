@@ -12,6 +12,7 @@
 #include <pwd.h>
 #include <sys/param.h>
 #include <libzscanner/scanner.h>
+#include <libknot/rrset.h>
 #include <sys/un.h>
 
 #include <lua.h>
@@ -314,6 +315,7 @@ static void roothints_add(zs_scanner_t *zs)
 		return;
 	}
 	if (zs->r_type == KNOT_RRTYPE_A || zs->r_type == KNOT_RRTYPE_AAAA) {
+		knot_dname_to_lower(zs->r_owner);
 		kr_zonecut_add(hints, zs->r_owner, zs->r_data, zs->r_data_length);
 	}
 }
