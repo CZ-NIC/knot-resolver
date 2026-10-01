@@ -23,6 +23,7 @@ Packaging
 
 Improvements
 ------------
+- decrease RAM usage by a lot (!1901)
 - local-data: increase capacity to 63 GiB (logged MDB_MAP_FULL, !1885)
 - systemd: use unit's {Runtime,State,Cache}Directory directives instead of tmpfiles.d (!1853)
 - controller: reimplemented the notify socket in Python (!1875)

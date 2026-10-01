@@ -11,10 +11,7 @@
 #ifndef _UCW_CONFIG_H
 #define _UCW_CONFIG_H
 
-/* Default page size and pointer alignment */
-#ifndef CPU_PAGE_SIZE
-#define CPU_PAGE_SIZE 4096
-#endif
+/* Default pointer alignment */
 #define CPU_STRUCT_ALIGN sizeof(void *)
 
 /* Tell libc we're going to use all extensions available */

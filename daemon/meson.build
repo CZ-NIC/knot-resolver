@@ -11,6 +11,7 @@ kresd_src = files([
   'defer.c',
   'engine.c',
   'ffimodule.c',
+  'idletimer.c',
   'io.c',
   'main.c',
   'network.c',

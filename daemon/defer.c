@@ -7,6 +7,7 @@
 #include "daemon/defer.h"
 #include "daemon/session2.h"
 #include "daemon/udp_queue.h"
+#include "daemon/idletimer.h"
 #include "lib/kru.h"
 #include "lib/mmapped.h"
 #include "lib/resolve.h"
@@ -553,6 +554,7 @@ static enum protolayer_iter_cb_result pl_defer_unwrap(
 
 	VERBOSE_LOG_PRICY("  %s UNWRAP\n", kr_straddr(ctx->comm->src_addr));
 
+	idletimer_defer_busy(true);
 	uv_idle_start(&idle_handle, defer_queues_idle);
 
 	if (queue_len(sdata->queue) > 0) {  // stream with preceding packet already deferred
@@ -642,6 +644,7 @@ static void defer_queues_idle(uv_idle_t *handle)
 		phase_reset(PHASE_NONE);
 		VERBOSE_LOG("  deactivate idle\n");
 		uv_idle_stop(&idle_handle);
+		idletimer_defer_busy(false);
 	}
 	VERBOSE_LOG("POLL\n");
 }
