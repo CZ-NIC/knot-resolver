@@ -9,6 +9,7 @@ Bugfixes
 - DoH fixes for sharing connections among different users (!1844)
 - TCP-based connections used Nagle's algorithm since 6.2.0 (!1903)
   This mistake significantly increased latencies of such transports.
+- local-data: process upper-case names correctly (!1915)
 
 Packaging
 ---------
@@ -18,6 +19,7 @@ Packaging
 - python: raised minimum supported version to 3.9 (!1886)
 - Add a `PROJECT_VERSION` file as the single source of truth for the project version (!1889)
 - pyproject.toml: migrate from Poetry to `setuptools` (!1889)
+- python: removed typing-extensions dependency (!1910)
 
 Improvements
 ------------
@@ -31,12 +33,14 @@ Improvements
   - `knot-resolver` executable: added `--loglevel` and `--logtarget` startup arguments.
   - New `kres-manager` executable with same arguments as `knot-resolver` that starts only the manager.
 - python: utils: refactoring and cleanup (!1894)
+- python: client: refactoring and cleanup (!1908)
+- allow running under an unknown user, e.g. in containers (!1914)
 
 Incompatible changes
 --------------------
 - remove legacy systemd unit files (kresd@.service, kres-cache-gc.service) (!1853)
-- remove $KRES_LOGGING_TARGET environment variable (!1893)
-  /logging/target: removed `from-env` choice
+- remove $KRES_LOGGING_TARGET environment variable (!1893)  
+  You can override the default by passing `--logtarget` to `knot-resolver` command. (!1912)
 - docker: remove cross-platform build for linux/arm/v7 (!1904)
 
 

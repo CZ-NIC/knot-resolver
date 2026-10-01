@@ -297,7 +297,6 @@ Please note that starting with version 6, Knot Resolver is only officially suppo
    "Jinja2_", "Template engine for Python"
    "PyYAML_", "YAML framework for Python"
    "aiohttp_", "HTTP Client/Server for Python."
-   "typing-extensions_", "Compatibility module for Python"
    "prometheus-client_", "Prometheus client for Python (optional)"
    "watchdog_", "Python API for watching file system events (optional)"
    "supervisor_", "A process control system"
@@ -361,6 +360,5 @@ For development, it's possible to build the container directly from your git tre
 .. _PyYAML: https://pyyaml.org/
 .. _aiohttp: https://docs.aiohttp.org/
 .. _prometheus-client: https://github.com/prometheus/client_python
-.. _typing-extensions: https://pypi.org/project/typing-extensions/
 .. _watchdog: https://github.com/gorakhargosh/watchdog
 .. _supervisor: http://supervisord.org/

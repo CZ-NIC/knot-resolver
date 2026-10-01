@@ -1,132 +1,161 @@
-# noqa: INP001
+from __future__ import annotations
+
 import argparse
 import sys
+from dataclasses import dataclass
 from enum import Enum
-from typing import List, Literal, Optional, Tuple, Type
+from pathlib import Path
+from typing import TYPE_CHECKING, Literal
 
-from knot_resolver.client.command import COMP_NOSPACE, Command, CommandArgs, CompWords, comp_get_words, register_command
+from knot_resolver.client.args import KresClientArgs
+from knot_resolver.client.command import KresClientCommand, get_socket
+from knot_resolver.client.completion import COMP_NOSPACE, CompletionWords, comp_get_words
 from knot_resolver.datamodel import KresConfig
 from knot_resolver.utils.modeling.parsing import DataFormat, parse_json, try_to_parse
 from knot_resolver.utils.requests import request
 
+if TYPE_CHECKING:
+    import argparse
 
-class Operations(Enum):
+
+@dataclass(frozen=True)
+class ConfigCommandArgs(KresClientArgs):
+    operation: ConfigOperation
+    path: str
+    input: str | None = None
+    output_file: Path | None = None
+    format: DataFormat = DataFormat.YAML
+    value: str | None = None
+
+
+def register_subparser(subparser: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    path_help = "Optional, path (JSON pointer, RFC6901) to the configuration resources. "
+    " By default, the entire configuration is selected."
+
+    config_parser = subparser.add_parser("config", help="Performs operations on the running resolver's configuration.")
+    config_subparsers = config_parser.add_subparsers(dest="operation", help="operation type", required=True)
+
+    # GET operation
+    get_op = config_subparsers.add_parser("get", help="Get current configuration from the resolver.")
+    get_op.set_defaults(operation=ConfigOperation.GET)
+    get_op.add_argument(
+        "-p",
+        "--path",
+        action="store",
+        default="",
+        help=path_help,
+    )
+    get_op.add_argument(
+        "output_file",
+        type=Path,
+        nargs="?",
+        help="Optional, path to the file where to save exported configuration data."
+        " If not specified, data will be printed.",
+    )
+
+    get_formats = get_op.add_mutually_exclusive_group()
+    get_formats.add_argument(
+        "--json",
+        const=DataFormat.JSON,
+        action="store_const",
+        dest="format",
+        help="Get configuration data in JSON format.",
+    )
+    get_formats.add_argument(
+        "--yaml",
+        const=DataFormat.YAML,
+        action="store_const",
+        dest="format",
+        help="Get configuration data in YAML format, default.",
+    )
+
+    # SET operation
+    set_op = config_subparsers.add_parser("set", help="Set new configuration for the resolver.")
+    set_op.set_defaults(operation=ConfigOperation.SET)
+
+    set_op.add_argument(
+        "-p",
+        "--path",
+        action="store",
+        default="",
+        help=path_help,
+    )
+
+    set_op.add_argument(
+        "input",
+        type=str,
+        nargs="?",
+        metavar="input_file|value",
+        help="Path to configuration file or configuration value.",
+    )
+
+    # DELETE operation
+    delete_op = config_subparsers.add_parser(
+        "delete", help="Delete given configuration property or list item at the given index."
+    )
+    delete_op.set_defaults(operation=ConfigOperation.DELETE)
+    delete_op.add_argument(
+        "-p",
+        "--path",
+        action="store",
+        default="",
+        help=path_help,
+    )
+    config_parser.set_defaults(command=ConfigCommand, command_args=ConfigCommandArgs)
+
+
+class ConfigOperation(int, Enum):
     SET = 0
     DELETE = 1
     GET = 2
 
 
-def operation_to_method(operation: Operations) -> Literal["PUT", "GET", "DELETE"]:
-    if operation == Operations.SET:
-        return "PUT"
-    if operation == Operations.DELETE:
-        return "DELETE"
-    return "GET"
+class ConfigCommand(KresClientCommand):
+    def __init__(self, args: ConfigCommandArgs) -> None:
+        self._socket = get_socket(args)
+        self._args = args
 
+    def run(self) -> None:
+        new_config = None
+        path = f"v1/config{self._args.path}"
 
-@register_command
-class ConfigCommand(Command):
-    def __init__(self, namespace: argparse.Namespace) -> None:
-        super().__init__(namespace)
-        self.path: str = str(namespace.path) if hasattr(namespace, "path") else ""
-        self.format: DataFormat = namespace.format if hasattr(namespace, "format") else DataFormat.JSON
-        self.operation: Optional[Operations] = namespace.operation if hasattr(namespace, "operation") else None
-        self.file: Optional[str] = namespace.file if hasattr(namespace, "file") else None
+        method: Literal["PUT", "GET", "DELETE"] = "PUT"
+        if self._args.operation == ConfigOperation.GET:
+            method = "GET"
+        if self._args.operation == ConfigOperation.DELETE:
+            method = "DELETE"
 
-    @staticmethod
-    def register_args_subparser(
-        subparser: "argparse._SubParsersAction[argparse.ArgumentParser]",
-    ) -> Tuple[argparse.ArgumentParser, "Type[Command]"]:
-        config = subparser.add_parser("config", help="Performs operations on the running resolver's configuration.")
-        path_help = "Optional, path (JSON pointer, RFC6901) to the configuration resources. "
-        " By default, the entire configuration is selected."
+        if self._args.operation == ConfigOperation.SET:
+            if self._args.input:
+                try:
+                    with Path(self._args.input).open() as f:
+                        new_config = f.read()
+                except FileNotFoundError:
+                    new_config = self._args.input
+            else:
+                # use STDIN also when file is not specified
+                new_config = input("Type new configuration value: ")
 
-        config_subparsers = config.add_subparsers(help="operation type")
+        body = DataFormat.JSON.dict_dump(try_to_parse(new_config)) if new_config else None
+        response = request(self._socket, method, path, body)
 
-        # GET operation
-        get_op = config_subparsers.add_parser("get", help="Get current configuration from the resolver.")
-        get_op.set_defaults(operation=Operations.GET, format=DataFormat.YAML)
+        if response.status != 200:
+            print(response, file=sys.stderr)
+            sys.exit(1)
 
-        get_op.add_argument(
-            "-p",
-            "--path",
-            help=path_help,
-            action="store",
-            type=str,
-            default="",
-        )
-        get_op.add_argument(
-            "file",
-            help="Optional, path to the file where to save exported configuration data."
-            " If not specified, data will be printed.",
-            type=str,
-            nargs="?",
-        )
-
-        get_formats = get_op.add_mutually_exclusive_group()
-        get_formats.add_argument(
-            "--json",
-            help="Get configuration data in JSON format.",
-            const=DataFormat.JSON,
-            action="store_const",
-            dest="format",
-        )
-        get_formats.add_argument(
-            "--yaml",
-            help="Get configuration data in YAML format, default.",
-            const=DataFormat.YAML,
-            action="store_const",
-            dest="format",
-        )
-
-        # SET operation
-        set_op = config_subparsers.add_parser("set", help="Set new configuration for the resolver.")
-        set_op.set_defaults(operation=Operations.SET)
-
-        set_op.add_argument(
-            "-p",
-            "--path",
-            help=path_help,
-            action="store",
-            type=str,
-            default="",
-        )
-
-        value_or_file = set_op.add_mutually_exclusive_group()
-        value_or_file.add_argument(
-            "file",
-            help="Optional, path to file with new configuration.",
-            type=str,
-            nargs="?",
-        )
-        value_or_file.add_argument(
-            "value",
-            help="Optional, new configuration value.",
-            type=str,
-            nargs="?",
-        )
-
-        # DELETE operation
-        delete_op = config_subparsers.add_parser(
-            "delete", help="Delete given configuration property or list item at the given index."
-        )
-        delete_op.set_defaults(operation=Operations.DELETE)
-        delete_op.add_argument(
-            "-p",
-            "--path",
-            help=path_help,
-            action="store",
-            type=str,
-            default="",
-        )
-        return config, ConfigCommand
+        if self._args.operation == ConfigOperation.GET and self._args.output_file:
+            with self._args.output_file.open("w") as f:
+                f.write(self._args.format.dict_dump(parse_json(response.body), indent=4))
+            print(f"saved to: {self._args.output_file}")
+        elif response.body:
+            print(self._args.format.dict_dump(parse_json(response.body), indent=4))
 
     @staticmethod
-    def completion(args: List[str], parser: argparse.ArgumentParser) -> CompWords:
+    def completion(args: list[str], parser: argparse.ArgumentParser) -> CompletionWords:
         nargs = len(args)
 
         if nargs > 1 and args[-2] in ["-p", "--path"]:
-            words: CompWords = {}
+            words: CompletionWords = {}
             words[COMP_NOSPACE] = None
 
             path = args[-1]
@@ -157,43 +186,9 @@ class ConfigCommand(Command):
                     prefix += f"/{node}"
                     continue
 
-            for key in properties.keys():
+            for key in properties:
                 words[f"{prefix}/{key}"] = properties[key]["description"]
 
             return words
 
         return comp_get_words(args, parser)
-
-    def run(self, args: CommandArgs) -> None:
-        if not self.operation:
-            args.subparser.print_help()
-            sys.exit()
-
-        new_config = None
-        path = f"v1/config{self.path}"
-        method = operation_to_method(self.operation)
-
-        if self.operation == Operations.SET:
-            if self.file:
-                try:
-                    with open(self.file, "r") as f:
-                        new_config = f.read()
-                except FileNotFoundError:
-                    new_config = self.file
-            else:
-                # use STDIN also when file is not specified
-                new_config = input("Type new configuration: ")
-
-        body = DataFormat.JSON.dict_dump(try_to_parse(new_config)) if new_config else None
-        response = request(args.socket, method, path, body)
-
-        if response.status != 200:
-            print(response, file=sys.stderr)
-            sys.exit(1)
-
-        if self.operation == Operations.GET and self.file:
-            with open(self.file, "w") as f:
-                f.write(self.format.dict_dump(parse_json(response.body), indent=4))
-            print(f"saved to: {self.file}")
-        elif response.body:
-            print(self.format.dict_dump(parse_json(response.body), indent=4))

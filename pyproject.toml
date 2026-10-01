@@ -16,7 +16,6 @@ dependencies = [
     "jinja2",
     "pyyaml",
     "supervisor",
-    "typing-extensions",
 ]
 
 [project.optional-dependencies]

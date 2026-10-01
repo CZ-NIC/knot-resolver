@@ -507,7 +507,8 @@ async def _sigterm_while_shutting_down() -> None:
 
 @only_on_real_changes_update(lambda config: config.logging)
 async def _configure_logger(config: KresConfig, force: bool = False) -> None:
-    reconfigure_logging(config, "manager")
+    groups = config.logging.groups
+    reconfigure_logging(config, debug=bool(groups and "manager" in groups))
 
 
 async def logger_init(config_store: ConfigStore) -> None:

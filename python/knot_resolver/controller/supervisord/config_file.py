@@ -19,7 +19,6 @@ from knot_resolver.constants import (
 from knot_resolver.controller.interface import KresID, SubprocessType
 from knot_resolver.datamodel.config_schema import KresConfig, workers_max_count
 from knot_resolver.datamodel.logging_schema import LogTargetEnum
-from knot_resolver.logging import NO_PREFIX_FORMAT_ENV_VAR
 from knot_resolver.manager.constants import (
     kres_cache_dir,
     kresd_config_file_supervisord_pattern,
@@ -160,9 +159,9 @@ class ProcessTypeConfig:
                 *map(str, args.config),
             ]
 
-        environment = f"{NO_PREFIX_FORMAT_ENV_VAR}=true"
+        environment = ""
         if NOTIFY_SUPPORT:
-            environment += ",X-SUPERVISORD-TYPE=notify"
+            environment += "X-SUPERVISORD-TYPE=notify"
 
         cwd = str(os.getcwd())
         return ProcessTypeConfig(  # type: ignore[call-arg]
