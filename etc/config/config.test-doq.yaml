@@ -1,0 +1,7 @@
+workers: 1
+network:
+  listen:
+    - interface: 127.0.0.1@853
+      kind: doq
+logging:
+  level: info

@@ -317,6 +317,60 @@ docker:dockerhub:
     - if: '$CI_COMMIT_TAG'
       when: manual
     - when: never
+
+.kqtest: &kqtest
+  variables:
+    KQTEST_REPO: https://gitlab.nic.cz/knot/kdig-doq-test.git
+    KQTEST_BRANCH: main
+    KQTEST_PREFIX: $CI_PROJECT_DIR/.kqtest
+
+build:kqtest:
+  <<: *nodep
+  <<: *kqtest
+  stage: build
+  cache:
+    key: kqtest-$KQTEST_BRANCH
+    paths:
+      - .kqtest/
+  script:
+    - HEAD_SHA=$(git ls-remote --exit-code "$KQTEST_REPO" "refs/heads/$KQTEST_BRANCH" | cut -f1)
+    - echo "kqtest $KQTEST_BRANCH HEAD = $HEAD_SHA"
+    - |
+      if [ -x "$KQTEST_PREFIX/bin/kdig" ] && [ "$(cat "$KQTEST_PREFIX/sha" 2>/dev/null)" = "$HEAD_SHA" ]; then
+        echo "cached kdig is up to date, skipping build"
+        exit 0
+      fi
+    - git init kqtest-src
+    - git -C kqtest-src fetch --depth 1 "$KQTEST_REPO" "$HEAD_SHA"
+    - git -C kqtest-src checkout FETCH_HEAD
+    - cd kqtest-src
+    - autoreconf -fi
+    - >
+      ./configure --prefix="$KQTEST_PREFIX"
+      --disable-daemon
+      --disable-modules
+      --disable-documentation
+      --disable-fastparser
+      --enable-xdp=no
+      --enable-redis=no
+      --enable-dnstap=no
+      --enable-maxminddb=no
+      --enable-quic=yes
+      --without-libidn
+      --without-libnghttp2
+      --disable-shared
+      --enable-static
+    - make -C src -j"$(nproc)" kdig
+    - mkdir -p "$KQTEST_PREFIX/bin"
+    - cp src/kdig "$KQTEST_PREFIX/bin/kdig"
+    - echo "$HEAD_SHA" > "$KQTEST_PREFIX/sha"
+    - $KQTEST_PREFIX/bin/kdig --help
+  artifacts:
+    paths:
+      - .kqtest/bin/kdig
+      - .kqtest/sha
+    expire_in: 1 day
+
 # }}}
 
 # sanity {{{
@@ -954,5 +1008,26 @@ python:test:unit:
       - coverage.xml
       - unit.junit.xml
 
+python:test:kqtest:
+  <<: *python
+  <<: *kqtest
+  stage: test
+  needs:
+    - build:kqtest
+  script:
+    - export PATH="$KQTEST_PREFIX/bin:$PATH"
+    - pip install -e ".[prometheus,watchdog]" --group dev
+    - poe configure
+    # override the default config.yaml to avoid "duplicit network" errors
+    - KRES_DEV_CONFIG_FILE=etc/config/config.test-doq.yaml poe run > knot-resolver.log 2>&1 &
+    - sleep 60
+    - kdig -V 127.0.0.1 853 2>&1 | tee kqtest.log; test "${PIPESTATUS[0]}" -eq 0
+  after_script:
+    - pkill -f knot-resolver || true
+  artifacts:
+    when: always
+    paths:
+      - knot-resolver.log
+      - kqtest.log
 
 # }}}
