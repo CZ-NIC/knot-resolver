@@ -20,7 +20,15 @@
 #include <lib/log.h>
 #include <time.h>
 
-static size_t CPU_PAGE_SIZE = 0;  // set in mp_reusable_init below
+// When CPU_PAGE_SIZE is a true constant, the some computations can get done in compile-time.
+#if !defined(MP_ASSUME_4K_PAGES) && (defined(__x86_64__) || defined(__i386__))
+	#define MP_ASSUME_4K_PAGES 1
+#endif
+#if MP_ASSUME_4K_PAGES
+	#define CPU_PAGE_SIZE (size_t)4096
+#else
+	static size_t CPU_PAGE_SIZE = 0;  // set in mp_reusable_init below
+#endif
 
 #pragma GCC diagnostic ignored "-Wpointer-arith"
 #define MP_SIZE_MAX (UINT32_MAX - MP_CHUNK_TAIL - CPU_PAGE_SIZE)
@@ -325,7 +333,16 @@ GLOBAL_STORAGE_CLASS bool mp_balance_on_demand = false;
 __attribute__((constructor))
 void mp_reusable_init(void)
 {
-	CPU_PAGE_SIZE = sysconf(_SC_PAGESIZE);
+	const long ps = sysconf(_SC_PAGESIZE);
+#if MP_ASSUME_4K_PAGES
+	if (ps != CPU_PAGE_SIZE) {
+		fprintf(stderr, "ERROR: assumed page size %zu but got %ld\n", CPU_PAGE_SIZE, ps);
+		abort();
+	}
+#else
+	CPU_PAGE_SIZE = ps;
+#endif
+
 	for (int i = 0; i < MP_REUSABLE_CNT; i++) {
 		struct mp_reusable *r = &mp_reusable[i];
 		r->head.next = r->head.prev = &r->head;
