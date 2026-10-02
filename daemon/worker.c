@@ -1729,7 +1729,7 @@ int worker_submit(struct session *session, struct io_comm_data *comm,
 
 	// Parse the packet, unless it's useless anyway.
 	if (ret == 0) {
-		ret = knot_pkt_parse(pkt, 0);
+		ret = knot_pkt_parse(pkt, 1<<9); // TODO: use KNOT_PF_ONLYIN after dropping knot-dns < 3.5.7
 		if (ret == KNOT_ETRAIL && is_outgoing
 				&& !kr_fails_assert(pkt->parsed < pkt->size)) {
 			// We deal with this later, so that RCODE takes priority.
