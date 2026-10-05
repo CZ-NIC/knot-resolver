@@ -10,7 +10,6 @@
 #include "contrib/ucw/mempool.h"
 #include "lib/log.h"
 #include "lib/resolve.h"
-#include <execinfo.h>
 #include <string.h>
 
 #if ENABLE_LIBSYSTEMD
@@ -333,7 +332,10 @@ void kr_log_q1(const struct kr_query * const qry,
 	va_end(args);
 }
 
-#ifdef __linux__
+#ifdef __GLIBC__
+// in particular, musl libc does not have this header
+#include <execinfo.h>
+
 char *kr_log_get_trace(char *buf, size_t buf_size, int first_level, int last_level, const char *sep)
 {
 	const size_t sep_size = strlen(sep);
