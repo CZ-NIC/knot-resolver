@@ -36,11 +36,17 @@ integr_tests += [
 
 mod_inc_dir = include_directories('..', '../contrib')
 
+if host_machine.system() == 'sunos'
+  luajit_mod_dep = luajit.partial_dependency(compile_args: true, includes: true)
+else
+  luajit_mod_dep = luajit
+endif
+
 mod_deps = [
   contrib_dep,
   libknot,
   libuv,
-  luajit,
+  luajit_mod_dep,
 ]
 
 # handle more complex C/LUA modules separately
