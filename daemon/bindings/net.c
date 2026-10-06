@@ -919,6 +919,7 @@ static int net_tls_client(lua_State *L)
 	}
 	lua_pop(L, 1);
 
+	#define PIN_MARGIN 8
 	/* .pin_sha256 */
 	lua_getfield(L, 1, "pin_sha256");
 	if (!lua_isnil(L, -1)) {
@@ -933,14 +934,14 @@ static int net_tls_client(lua_State *L)
 			const char *pin = lua_tostring(L, -1);
 			if (!pin)
 				ERROR("pin_sha256 is not a string");
-			uint8_t *pin_raw = malloc(TLS_SHA256_RAW_LEN);
+			uint8_t *pin_raw = malloc(TLS_SHA256_RAW_LEN + PIN_MARGIN);
 			/* Push the string early to simplify error processing. */
 			if (kr_fails_assert(pin_raw && array_push(newcfg->pins, pin_raw) >= 0)) {
 				free(pin_raw);
 				ERROR("%s", kr_strerror(ENOMEM));
 			}
 			int ret = kr_base64_decode((const uint8_t *)pin, strlen(pin),
-						pin_raw, TLS_SHA256_RAW_LEN + 8);
+						pin_raw, TLS_SHA256_RAW_LEN + PIN_MARGIN);
 			if (ret < 0) {
 				ERROR("not a valid pin_sha256: '%s' (length %d), %s\n",
 					pin, (int)strlen(pin), knot_strerror(ret));
@@ -958,6 +959,7 @@ static int net_tls_client(lua_State *L)
 		}
 	}
 	lua_pop(L, 1);
+	#undef PIN_MARGIN
 
 	/* .insecure */
 	lua_getfield(L, 1, "insecure");
