@@ -24,7 +24,7 @@ struct session;
 typedef struct {
 	int sock_type;    /**< SOCK_DGRAM or SOCK_STREAM */
 	bool tls;         /**< only used together with .kind == NULL and SOCK_STREAM */
-	bool http;        /**< DoH2, implies .tls (in current implementation) */
+	bool http;        /**< DoH2 over SOCK_STREAM with .kind == NULL; .tls optional */
 	bool xdp;         /**< XDP is special (not a normal socket, in particular) */
 	bool quic;         /**< DoQ, implies .tls (in current implementation) */
 	bool freebind;    /**< used for binding to non-local address */

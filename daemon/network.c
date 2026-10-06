@@ -444,7 +444,7 @@ static int open_endpoint(const char *addr_str,
 	} /* else */
 
 	if (ep->flags.sock_type == SOCK_DGRAM) {
-		if (kr_fails_assert(!ep->flags.tls || ep->flags.quic))
+		if (kr_fails_assert((!ep->flags.tls || ep->flags.quic) && !ep->flags.http))
 			return kr_error(EINVAL);
 		uv_udp_t *ep_handle = malloc(sizeof(uv_udp_t));
 		ep->handle = (uv_handle_t *)ep_handle;
