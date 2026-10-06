@@ -856,7 +856,7 @@ static int net_tls_client(lua_State *L)
 		lua_error_p(L, "out of memory or something like that :-/");
 	/* Shortcut for cleanup actions needed from now on. */
 	#define ERROR(...) do { \
-		free(newcfg); \
+		tls_client_param_unref(newcfg); \
 		lua_error_p(L, __VA_ARGS__); \
 	} while (false)
 
