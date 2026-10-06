@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, cast
 if TYPE_CHECKING:
     from .args import KresArgs
     from .datamodel import KresConfig
+    from .datamodel.logging_schema import LogLevelEnum
 
 
 class LogTarget(str, Enum):
@@ -20,9 +21,9 @@ class LogTarget(str, Enum):
 
 NOTICE = (logging.WARNING + logging.INFO) // 2
 
-_config_to_level = {
-    "critical": logging.CRITICAL,
-    "error": logging.ERROR,
+_config_to_level: dict[LogLevelEnum, int] = {
+    "crit": logging.CRITICAL,
+    "err": logging.ERROR,
     "warning": logging.WARNING,
     "notice": NOTICE,
     "info": logging.INFO,
@@ -95,7 +96,7 @@ def start_logging(args: KresArgs, service: str | None = None) -> None:
 
     root = get_logger()
 
-    level = _config_to_level[args.loglevel]
+    level = _config_to_level[cast("LogLevelEnum", args.loglevel)]
     root.setLevel(level)
 
     target = LogTarget(args.logtarget)
@@ -112,9 +113,9 @@ def reconfigure_logging(config: KresConfig, service: str | None = None, debug: b
     if debug:
         root.setLevel(logging.DEBUG)
     elif config.logging.level is not None:
-        root.setLevel(_config_to_level[str(config.logging.level)])
+        root.setLevel(_config_to_level[config.logging.level])
 
-    target = LogTarget(str(config.logging.target))
+    target = LogTarget(config.logging.target)
     formatter = get_formatter(target, service)
     new_handler = get_logging_handler(target)
     new_handler.setFormatter(formatter)

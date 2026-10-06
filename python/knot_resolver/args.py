@@ -32,7 +32,7 @@ def create_parser(description: str) -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--loglevel",
-        choices=("debug", "info", "notice", "warning", "error", "critical"),
+        choices=("debug", "info", "notice", "warning", "err", "crit"),
         default="notice",
         help="Startup logging level before the configuration is loaded.",
     )
