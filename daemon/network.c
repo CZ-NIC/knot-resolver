@@ -393,10 +393,10 @@ static int open_endpoint(const char *addr_str,
 
 	if (sa && ep->fd == -1) {
 		if (sa->sa_family == AF_UNIX) {
-			struct sockaddr_un *sun = (struct sockaddr_un*)sa;
-			char *dirc = strdup(sun->sun_path);
+			struct sockaddr_un *unix_sock = (struct sockaddr_un*)sa;
+			char *dirc = strdup(unix_sock->sun_path);
 			char *dname = dirname(dirc);
-			(void)unlink(sun->sun_path);  /** Attempt to unlink if socket path exists. */
+			(void)unlink(unix_sock->sun_path);  /** Attempt to unlink if socket path exists. */
 			(void)mkdir(dname, S_IRWXU|S_IRWXG);  /** Attempt to create dir. */
 			free(dirc);
 		}
