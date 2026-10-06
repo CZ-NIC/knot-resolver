@@ -13,10 +13,10 @@
 #include "daemon/worker.h"
 #include "daemon/ratelimiting.h"
 #include "daemon/defer.h"
-#include "daemon/idletimer.h"
 
 #include "lib/defines.h"
 #include "lib/dnssec.h"
+#include "lib/idletimer.h"
 #include "lib/log.h"
 #include "lib/resolve.h"
 #include "lib/rules/api.h"
@@ -616,7 +616,7 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	kr_cache_prefetch_callback_init(loop, worker_prefetch);
+	kr_cache_prefetch_callback_init(worker_prefetch);
 
 	/* Start the scripting engine */
 	if (engine_load_sandbox() != 0) {
