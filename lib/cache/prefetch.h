@@ -5,7 +5,6 @@
 #pragma once
 
 #include "lib/cache/api.h"
-#include <uv.h>
 
 struct entry_h;
 
@@ -32,7 +31,7 @@ typedef int (*kr_cache_prefetch_callback_t)(knot_dname_t *qname, uint16_t qtype)
 // Initialize update callback and timer handle.
 // To be called before initialization from Lua.
 KR_EXPORT
-void kr_cache_prefetch_callback_init(uv_loop_t *loop, kr_cache_prefetch_callback_t callback);
+void kr_cache_prefetch_callback_init(kr_cache_prefetch_callback_t callback);
 
 // Initialize the rest and activate prefetch, to be called from Lua.
 KR_EXPORT

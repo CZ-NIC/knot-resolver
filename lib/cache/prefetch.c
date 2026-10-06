@@ -6,7 +6,7 @@
 #include "lib/cache/top.h"
 #include "lib/cache/impl.h"
 #include "lib/resolve.h"
-#include "daemon/worker.h"
+#include "lib/idletimer.h"
 
 #include <math.h>
 
@@ -20,15 +20,15 @@
 #define STRICTER_BEFORE_EXP_MS     2000  // ms, start increasing the bounds this time before expiration
 #define MIN_ACCESSES_AT_EXP        5243  // acc., 5s access period
 
-uv_timer_t timer_handle;
-uv_loop_t *loop_handle = NULL;  // prefetch initialized iff non-NULL
+idletimer_t timer;
+
 kr_cache_prefetch_callback_t update_callback = NULL;
 float conf_min_accesses_per_update;
 float conf_min_accesses_by_period;
 int conf_update_before_exp_perc;
 bool conf_enabled = false;
 
-void timer_callback(uv_timer_t *handle);
+uint64_t timer_callback(void);
 
 void kr_cache_prefetch_encode_entry(struct kr_cache_prefetch_sched *sched, knot_db_val_t *pkey, knot_db_val_t *val)
 {
@@ -89,17 +89,15 @@ int kr_cache_prefetch_decode_entry(knot_db_val_t pkey, knot_db_val_t val, struct
 	return kr_ok();
 }
 
-void kr_cache_prefetch_callback_init(uv_loop_t *loop, kr_cache_prefetch_callback_t callback)
+void kr_cache_prefetch_callback_init(kr_cache_prefetch_callback_t callback)
 {
-	uv_timer_init(loop, &timer_handle);
-	loop_handle = loop;
 	update_callback = callback;
 }
 
 void kr_cache_prefetch_init(uint32_t max_access_period_sec, float min_accesses_per_update, int update_before_exp_perc)
 {
-	if (!loop_handle) return;
-	uv_timer_start(&timer_handle, timer_callback, FIRST_TIMEOUT_MS, 0);
+	if (!update_callback) return;
+	idletimer_init(&timer, timer_callback, FIRST_TIMEOUT_MS);
 	conf_min_accesses_per_update = min_accesses_per_update;
 	conf_min_accesses_by_period = 1 / (1 - kr_cache_top_decay_mult(&the_resolver->cache.top, max_access_period_sec));
 	conf_update_before_exp_perc = update_before_exp_perc;
@@ -221,19 +219,11 @@ bool resolve_ekey(knot_db_val_t *ekey, uint16_t rrtype)
 	return !ret;
 }
 
-bool defer_busy = false;
-bool timer_skipped = false;
 bool timer_first_in_sec = false;
 
-void timer_callback(uv_timer_t *handle)
+uint64_t timer_callback(void)
 {
 	static int race_delay = 0;  // timer delay arising from detected race conditions on P entry removals
-
-	if (defer_busy) {
-		timer_skipped = true;
-		VERBOSE_LOG("skipped, defer busy");
-		return;
-	}
 
 	struct timespec ts;
 	int ret;
@@ -362,26 +352,12 @@ void timer_callback(uv_timer_t *handle)
 
 	// other P-entries for update in this sec might exist, continue in next libuv cycle
 	cache_op(&the_resolver->cache, commit, true, true);
-	uv_timer_start(&timer_handle, timer_callback, 0, 0);
 	timer_first_in_sec = false;
-	return;
+	return 0;  // next call as soon as possible
 
 done:
 	// no other P-entries for update in this sec exist, continue sometime in the first 100 ms of the next sec
 	cache_op(&the_resolver->cache, commit, true, true);
-	uint64_t timeout = 1000 - (time_now_msec % 1000) + (race_delay + time_now * 13) % 100;
-	uv_timer_start(&timer_handle, timer_callback, timeout, 0);
 	timer_first_in_sec = true;
-}
-
-void kr_cache_prefetch_defer_busy(bool busy)
-{
-	defer_busy = busy;
-
-	if (!defer_busy && timer_skipped) {
-		// continue with updates in next libuv cycle
-		uv_timer_start(&timer_handle, timer_callback, 0, 0);
-		timer_first_in_sec = false;
-		timer_skipped = false;
-	}
+	return 1000 - (time_now_msec % 1000) + (race_delay + time_now * 13) % 100;  // msec to next call
 }

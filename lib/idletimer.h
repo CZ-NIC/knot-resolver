@@ -13,6 +13,7 @@
 #pragma once
 #include <uv.h>
 #include <stdbool.h>
+#include "lib/defines.h"
 
 /** Callback function doing the periodic work.
  *
@@ -30,7 +31,9 @@ typedef struct idletimer {
 
 
 /// Initialize idle timer.
+KR_EXPORT
 void idletimer_init(idletimer_t *handle, idletimer_callback_t cb, uint64_t initial_timeout);
 
 /// Announce idle state from defer.
+KR_EXPORT
 void idletimer_defer_busy(bool busy);

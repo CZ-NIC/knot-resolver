@@ -2,7 +2,7 @@
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include "daemon/idletimer.h"
+#include "lib/idletimer.h"
 
 bool defer_busy = false;
 struct idletimer *skipped = NULL;
