@@ -23,6 +23,9 @@
  * lock based on a filename.  At the moment it's POSIX-only, but it
  * should be abstract enough of an interface to make an implementation
  * for non-posix systems if anyone cares. */
+#if defined(__sun)
+#define lock_t kr_lock_t
+#endif
 typedef int lock_t;
 static bool lock_is_invalid(lock_t lock)
 {

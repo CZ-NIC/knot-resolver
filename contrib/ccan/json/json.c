@@ -107,6 +107,9 @@ static void sb_free(SB *sb)
  * Type for Unicode codepoints.
  * We need our own because wchar_t might be 16 bits.
  */
+#if defined(__sun)
+#define uchar_t json_uchar_t
+#endif
 typedef uint32_t uchar_t;
 
 /*

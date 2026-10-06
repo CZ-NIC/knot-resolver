@@ -65,6 +65,9 @@
 #include <stdalign.h>
 #include <stdint.h>
 #include <stdlib.h>
+#if defined(__sun)
+#include <limits.h>
+#endif
 #include <uv.h>
 
 #include "contrib/mempattern.h"
