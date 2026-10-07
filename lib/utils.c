@@ -28,6 +28,9 @@
 #include <sys/stat.h>
 #include <sys/statvfs.h>
 #include <sys/un.h>
+#if defined(__sun) || !defined(PATH_MAX)
+#define PATH_MAX 4096 // use the linux/limits.h value
+#endif
 
 struct __attribute__((packed)) kr_sockaddr_key {
 	int family;
