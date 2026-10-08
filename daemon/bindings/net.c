@@ -143,7 +143,7 @@ static bool net_listen_addrs(lua_State *L, int port, endpoint_flags_t flags, int
 	if (str != NULL) {
 		const bool is_unix = str[0] == '/';
 		int ret = 0;
-		if (!flags.kind && !flags.tls) { /* normal UDP or XDP */
+		if (!flags.kind && !flags.tls && !flags.http) { /* normal UDP or XDP */
 			flags.sock_type = SOCK_DGRAM;
 			ret = network_listen(str, port, nic_queue, flags);
 		}
@@ -274,6 +274,7 @@ static int net_listen(lua_State *L)
 			flags.http = true;
 		} else if (k && strcasecmp(k, "doq") == 0) {
 			flags.tls = flags.quic = true;
+			flags.http = false;
 		} else if (k) {
 			flags.kind = k;
 			if (strcasecmp(k, "doh") == 0) {
