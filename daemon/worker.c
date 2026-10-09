@@ -867,6 +867,8 @@ static int transmit(struct qr_task *task)
 		if (ret < 0) {
 			kr_log_info(IO, "Failed to establish udp connection to %s: %s\n",
 					kr_straddr(out_comm.comm_addr), uv_strerror(ret));
+		} else {
+			io_udp_set_recverr(udp, out_comm.comm_addr->sa_family);
 		}
 	}
 	ret = qr_task_send(task, session, &out_comm, task->pktbuf);
