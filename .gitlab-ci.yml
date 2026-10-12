@@ -516,6 +516,7 @@ pytests:
     - branches@knot/security/knot-resolver
   # The set of respdiff+resperf jobs takes over two hours to execute.
   when: manual
+  allow_failure: true
 
 .respdiff:  &respdiff
   <<: *condor
