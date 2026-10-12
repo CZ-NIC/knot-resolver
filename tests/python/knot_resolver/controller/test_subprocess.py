@@ -1,6 +1,9 @@
+from unittest.mock import MagicMock
+
 import pytest
 
 from knot_resolver.controller.subprocess import (
+    Subprocess,
     SubprocessID,
     SubprocessStatus,
     SubprocessType,
@@ -210,3 +213,46 @@ class TestSubprocessID:
         second = SubprocessID(SubprocessType.WORKER, 1)
 
         assert {first, second} == {first}
+
+
+@pytest.fixture
+def controller():
+    controller = MagicMock()
+    controller.get_proxy.return_value = MagicMock()
+    return controller
+
+
+class TestSubprocess:
+    @pytest.mark.parametrize(
+            "subprocess_type",
+            [
+                SubprocessType.MANAGER,
+                SubprocessType.WORKER,
+                SubprocessType.LOADER,
+                SubprocessType.CACHE_GC,
+            ],
+        )
+    def test_subprocess_properties(
+        self,
+        subprocess_type,
+        controller,
+    ):
+        subprocess = Subprocess(subprocess_type, controller)
+        name = f"{subprocess_type}0" if subprocess_type is SubprocessType.WORKER else f"{subprocess_type}"
+
+        assert subprocess.id == SubprocessID(subprocess_type, 0)
+        assert subprocess.name == name
+        assert subprocess.type == subprocess_type
+        assert subprocess.full_name == f"{subprocess_type}:{name}"
+
+    def test_alloc_starts_at_zero(self, controller):
+        worker0 = Subprocess(SubprocessType.WORKER, controller)
+        worker1 = Subprocess(SubprocessType.WORKER, controller)
+        worker2 = Subprocess(SubprocessType.WORKER, controller)
+
+        assert worker0.id != worker1.id
+        assert worker1.id != worker2.id
+        assert worker0.id != worker2.id
+        assert worker0.name == f"{SubprocessType.WORKER}0"
+        assert worker1.name == f"{SubprocessType.WORKER}1"
+        assert worker2.name == f"{SubprocessType.WORKER}2"
