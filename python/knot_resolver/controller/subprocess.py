@@ -2,12 +2,20 @@ from __future__ import annotations
 
 from collections import defaultdict
 from enum import Enum, IntEnum
+from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar, cast
 
 from knot_resolver.logging import get_logger
 
+from .config import LOADER_CONFIGFILE_NAME, WORKER_CONFIGFILE_NAME
+from .exceptions import ControllerError
+
 if TYPE_CHECKING:
     from typing import TypeVar
+
+    from knot_resolver.datamodel import KresConfig
+
+    from .supervisord import SupervisordController, SupervisorRPC
 
     TSubprocessID = TypeVar("TSubprocessID", bound="SubprocessID")
 
@@ -104,3 +112,101 @@ class SubprocessID:
         if isinstance(other, SubprocessID):
             return self._type == other._type and self._num == other._num
         return NotImplemented
+
+
+class Subprocess:
+    def __init__(self, base_id: SubprocessType | SubprocessID, controller: SupervisordController) -> None:
+        self._id = base_id if isinstance(base_id, SubprocessID) else SubprocessID.alloc(base_id)
+        self._controller = controller
+
+        self._pid: int | None = None
+        self._config_file: Path | None = None
+
+    @property
+    def id(self) -> SubprocessID:
+        return self._id
+
+    @property
+    def name(self) -> str:
+        return self._id.subprocess_name
+
+    @property
+    def type(self) -> SubprocessType:
+        return self._id.subprocess_type
+
+    @property
+    def full_name(self) -> str:
+        return f"{self.type.value}:{self.name}"
+
+    async def start(self, config: KresConfig) -> None:
+        self._write_config_file(config)
+        try:
+            logger.debug("Starting %s subprocess...", self.name)
+            await self._start()
+        except ControllerError:
+            await self.cleanup()
+            raise
+
+    async def stop(self) -> None:
+        logger.debug("Stopping %s subprocess...", self.name)
+        await self._stop()
+        await self.cleanup()
+
+    async def reconfig(self, new_config: KresConfig) -> None:
+        self._write_config_file(new_config)
+        logger.debug("Restarting %s subprocess...", self.name)
+        await self._restart()
+
+    async def cleanup(self) -> None:
+        self._unlink_config_file()
+
+    def get_pid(self) -> int:
+        if self._pid is None:
+            subprocess_info = self._get_info()
+            self._pid = cast("int", subprocess_info["pid"])
+        return self._pid
+
+    def get_status(self) -> SubprocessStatus:
+        subprocess_info = self._get_info()
+        try:
+            return SubprocessStatus(cast("int", subprocess_info["state"]))
+        except ValueError:
+            return SubprocessStatus.UNKNOWN
+
+    async def _start(self) -> None:
+        supervisord = self._get_controller_proxy()
+        supervisord.startProcess(self.full_name)
+
+    async def _stop(self) -> None:
+        supervisord = self._get_controller_proxy()
+        supervisord.stopProcess(self.full_name)
+
+    async def _restart(self) -> None:
+        supervisord = self._get_controller_proxy()
+        supervisord.stopProcess(self.full_name)
+        supervisord.startProcess(self.full_name)
+
+    def _write_config_file(self, config: KresConfig) -> None:
+        if self.type is SubprocessType.WORKER:
+            config_lua = config.render_worker_lua()
+            config_file_name = WORKER_CONFIGFILE_NAME % {"process_num": self._id.subprocess_num}
+        elif self.type is SubprocessType.LOADER:
+            config_lua = config.render_loader_lua()
+            config_file_name = LOADER_CONFIGFILE_NAME
+        else:
+            return
+
+        config_file = Path(config_file_name).absolute()
+        logger.debug("Writing config for %s subprocess to %s file", self.name, config_file)
+        config_file.write_text(config_lua, encoding="utf-8")
+        self._config_file = config_file
+
+    def _unlink_config_file(self) -> None:
+        if self._config_file:
+            self._config_file.unlink(missing_ok=True)
+
+    def _get_controller_proxy(self) -> SupervisorRPC:
+        return self._controller.get_proxy()
+
+    def _get_info(self) -> dict[str, object]:
+        return self._get_controller_proxy().getProcessInfo(self.name)
