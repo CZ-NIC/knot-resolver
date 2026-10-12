@@ -1,297 +1,137 @@
+# ruff: noqa: N802
+# mypy: disable-error-code=import-untyped
+
+from __future__ import annotations
+
 import asyncio
 import logging
+import os
 import shutil
-from collections.abc import Coroutine, Iterable
-from os import getppid, kill  # pylint: disable=[no-name-in-module]
 from pathlib import Path
-from typing import Any, Callable, Dict, NoReturn, Optional, TypeVar, Union, cast
+from typing import TYPE_CHECKING, Protocol, cast
 from xmlrpc.client import Fault, ServerProxy
 
-import supervisor.xmlrpc  # type: ignore[import]
+from jinja2 import Environment, FileSystemLoader, StrictUndefined
+from supervisor.xmlrpc import SupervisorTransport
 
-from knot_resolver.args import KresArgs
-from knot_resolver.controller.exceptions import KresSubprocessControllerError, KresSubprocessControllerExec
-from knot_resolver.controller.interface import (
-    KresID,
-    Subprocess,
-    SubprocessController,
-    SubprocessStatus,
-    SubprocessType,
+from knot_resolver.logging import get_logger
+
+from .config import (
+    SUPERVISORD_CONFIGFILE_NAME,
+    SUPERVISORD_CONFIGFILE_NAME_TMP,
+    SUPERVISORD_SOCKET_NAME,
+    SubprocessConfig,
+    SupervisordConfig,
 )
-from knot_resolver.controller.supervisord.config_file import SupervisordKresID, write_config_file
-from knot_resolver.datamodel.config_schema import KresConfig, workers_max_count
-from knot_resolver.manager.constants import supervisord_config_file, supervisord_pid_file, supervisord_sock_file
-from knot_resolver.utils.async_utils import readfile
+from .exceptions import ControllerError
+from .subprocess import Subprocess, SubprocessID, SubprocessStatus, SubprocessType
 
-T = TypeVar("T")
+if TYPE_CHECKING:
+    from typing import Any
 
-logger = logging.getLogger(__name__)
+    from knot_resolver.args import KresArgs
+    from knot_resolver.datamodel import KresConfig
+
+    class SupervisorRPC(Protocol):
+        def getState(self) -> dict[str, Any]: ...
+        def getAllProcessInfo(self) -> list[dict[str, Any]]: ...
+        def getProcessInfo(self, name: str) -> dict[str, Any]: ...
+        def startProcess(self, name: str, wait: bool = True) -> bool: ...
+        def stopProcess(self, name: str, wait: bool = True) -> bool: ...
+        def shutdown(self) -> bool: ...
 
 
-def async_in_a_thread(func: Callable[..., T]) -> Callable[..., Coroutine[None, None, T]]:
-    async def wrapper(*args: Any, **kwargs: Any) -> T:
-        return await asyncio.to_thread(func, *args, **kwargs)
-
-    return wrapper
+logger = get_logger(__name__)
 
 
-async def _exec_supervisord(args: KresArgs, config: KresConfig) -> NoReturn:
-    logger.debug("Writing supervisord config")
-    await write_config_file(args, config)
-    logger.debug("Execing supervisord")
+def _create_server_proxy() -> ServerProxy:
+    serverurl = "unix://" + str(Path(SUPERVISORD_SOCKET_NAME).absolute())
+    transport = SupervisorTransport(
+        username=None,
+        password=None,
+        serverurl=serverurl,
+    )
+    return ServerProxy("http://localhost", transport=transport)
 
-    supervisord = shutil.which("supervisord")
-    if supervisord is None:
-        msg = "The executable 'supervisord' was not found in $PATH"
-        raise RuntimeError(msg)
 
-    raise KresSubprocessControllerExec(
-        [
-            supervisord,
-            "supervisord",
+def _create_supervisord_proxy() -> SupervisorRPC:
+    server_proxy = _create_server_proxy()
+    return cast("SupervisorRPC", server_proxy.supervisor)
+
+
+class SupervisordController:
+    def __init__(self, args: KresArgs, config: KresConfig) -> None:
+        self._args = args
+        self._config = config
+
+    def get_proxy(self) -> SupervisorRPC:
+        return _create_supervisord_proxy()
+
+    def write_config(self) -> None:
+        logger.info("Creating supervisord controller configuration...")
+
+        ldr = FileSystemLoader(Path(__file__).resolve().parent)
+        env = Environment(trim_blocks=True, lstrip_blocks=True, loader=ldr, undefined=StrictUndefined)
+        template = env.get_template("supervisord.conf.j2")
+
+        config: str = template.render(
+            supervisord=SupervisordConfig.create(self._args, self._config),
+            manager=SubprocessConfig.create_manager(self._args, self._config),
+            worker=SubprocessConfig.create_worker(self._args, self._config),
+            loader=SubprocessConfig.create_loader(self._args, self._config),
+            cache_gc=SubprocessConfig.create_cache_gc(self._args, self._config),
+        )
+
+        config_path_tmp = Path(SUPERVISORD_CONFIGFILE_NAME_TMP).absolute()
+        config_path_tmp.write_text(config, encoding="utf-8")
+        config_path_tmp.rename(SUPERVISORD_CONFIGFILE_NAME)
+
+    def exec(self) -> None:
+        supervisord = shutil.which("supervisord")
+        if not supervisord:
+            msg = "failed to find 'supervisord' executable"
+            raise ControllerError(msg)
+
+        config_path = Path(SUPERVISORD_CONFIGFILE_NAME).absolute()
+        if not config_path.exists():
+            msg = f"failed to find supervisord configuration file '{config_path}'"
+            raise ControllerError(msg)
+
+        args = (
+            str(supervisord),
             "--configuration",
-            str(supervisord_config_file(config).absolute()),
-        ]
-    )
+            str(config_path),
+        )
 
+        logger.notice("Execing supervisord controller...")
+        logging.shutdown()
 
-async def _reload_supervisord(args: KresArgs, config: KresConfig) -> None:
-    await write_config_file(args, config)
-    try:
-        supervisord = _create_supervisord_proxy(config)
-        supervisord.reloadConfig()
-    except Fault as e:
-        raise KresSubprocessControllerError(f"supervisord reload failed: {e}") from e
-
-
-@async_in_a_thread
-def _stop_supervisord(config: KresConfig) -> None:
-    supervisord = _create_supervisord_proxy(config)
-    # pid = supervisord.getPID()
-    try:
-        # we might be trying to shut down supervisord at a moment, when it's waiting
-        # for us to stop. Therefore, this shutdown request for supervisord might
-        # die and it's not a problem.
-        supervisord.shutdown()
-    except Fault as e:
-        if e.faultCode == 6 and e.faultString == "SHUTDOWN_STATE":
-            # supervisord is already stopping, so it's fine
-            pass
-        else:
-            # something wrong happened, let's be loud about it
-            raise
-
-    # It is always better to clean up.
-    # This way, we can be sure that we are starting with a newly generated configuration.
-    supervisord_config_file(config).unlink()
-
-
-async def _is_supervisord_available() -> bool:
-    # yes, it is! The code in this file wouldn't be running without it due to imports :)
-
-    # so let's just check that we can find supervisord and supervisorctl binaries
-    supervisord = shutil.which("supervisord")
-    supervisorctl = shutil.which("supervisorctl")
-    if supervisord is None or supervisorctl is None:
-        logger.error("Failed to find supervisord or supervisorctl executables in $PATH")
-        return False
-
-    return True
-
-
-async def _get_supervisord_pid(config: KresConfig) -> Optional[int]:
-    if not Path(supervisord_pid_file(config)).exists():
-        return None
-
-    return int(await readfile(supervisord_pid_file(config)))
-
-
-def _is_process_runinng(pid: int) -> bool:
-    try:
-        # kill with signal 0 is a safe way to test that a process exists
-        kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    else:
-        return True
-
-
-async def _is_supervisord_running(config: KresConfig) -> bool:
-    pid = await _get_supervisord_pid(config)
-    if pid is None:
-        return False
-    if not _is_process_runinng(pid) or getppid() != pid:
-        supervisord_pid_file(config).unlink()
-        return False
-    return True
-
-
-def _create_proxy(config: KresConfig) -> ServerProxy:
-    return ServerProxy(
-        "http://127.0.0.1",
-        transport=supervisor.xmlrpc.SupervisorTransport(
-            None, None, serverurl="unix://" + str(supervisord_sock_file(config))
-        ),
-    )
-
-
-def _create_supervisord_proxy(config: KresConfig) -> Any:
-    proxy = _create_proxy(config)
-    return getattr(proxy, "supervisor")
-
-
-def _create_fast_proxy(config: KresConfig) -> Any:
-    proxy = _create_proxy(config)
-    return getattr(proxy, "fast")
-
-
-def _convert_subprocess_status(proc: Any) -> SubprocessStatus:
-    conversion_tbl = {
-        # "STOPPED": None,  # filtered out elsewhere
-        "STARTING": SubprocessStatus.RUNNING,
-        "RUNNING": SubprocessStatus.RUNNING,
-        "BACKOFF": SubprocessStatus.RUNNING,
-        "STOPPING": SubprocessStatus.RUNNING,
-        "EXITED": SubprocessStatus.EXITED,
-        "FATAL": SubprocessStatus.FATAL,
-        "UNKNOWN": SubprocessStatus.UNKNOWN,
-    }
-
-    if proc["statename"] in conversion_tbl:
-        status = conversion_tbl[proc["statename"]]
-        exitstatus = proc["exitstatus"]
-        if exitstatus != 0:
-            status = SubprocessStatus.UNEXPECTED
-    else:
-        logger.warning(f"Unknown supervisord process state {proc['statename']}")
-        status = SubprocessStatus.UNKNOWN
-    return status
-
-
-def _list_running_subprocesses(config: KresConfig) -> Dict[SupervisordKresID, SubprocessStatus]:
-    try:
-        supervisord = _create_supervisord_proxy(config)
-        processes: Any = supervisord.getAllProcessInfo()
-    except Fault as e:
-        raise KresSubprocessControllerError(f"failed to get info from all running processes: {e}") from e
-
-    # there will be a manager process as well, but we don't want to report anything on ourselves
-    processes = [pr for pr in processes if pr["name"] != "manager"]
-
-    # convert all the names
-    return {
-        SupervisordKresID.from_string(f"{pr['group']}:{pr['name']}"): _convert_subprocess_status(pr)
-        for pr in processes
-        if pr["statename"] != "STOPPED"
-    }
-
-
-class SupervisordSubprocess(Subprocess):
-    def __init__(
-        self,
-        config: KresConfig,
-        controller: "SupervisordSubprocessController",
-        base_id: Union[SubprocessType, SupervisordKresID],
-    ) -> None:
-        if isinstance(base_id, SubprocessType):
-            super().__init__(config, SupervisordKresID.alloc(base_id))
-        else:
-            super().__init__(config, base_id)
-        self._controller: "SupervisordSubprocessController" = controller
-
-    @property
-    def name(self) -> str:
-        return str(self.id)
-
-    def status(self) -> SubprocessStatus:
         try:
-            supervisord = _create_supervisord_proxy(self._config)
-            status = supervisord.getProcessInfo(self.name)
-        except Fault as e:
-            raise KresSubprocessControllerError(f"failed to get status from '{self.id}' process: {e}") from e
-        return _convert_subprocess_status(status)
+            os.execv(supervisord, args)
+        except OSError as e:
+            msg = f"supervisord controller exec failed: {e}"
+            raise ControllerError(msg) from e
 
-    @async_in_a_thread
-    def _start(self) -> None:
-        # +1 for canary process (same as in config_file.py)
-        assert int(self.id) <= int(workers_max_count()) + 1, "trying to spawn more than allowed limit of workers"
+    async def create_subprocess(self, subprocess_type: SubprocessType) -> Subprocess:
+        return Subprocess(subprocess_type, self)
+
+    async def get_all_subprocess_status(self) -> dict[SubprocessID, SubprocessStatus]:
+        supervisord = self.get_proxy()
+        subprocesses_info = supervisord.getAllProcessInfo()
+        print(subprocesses_info)
+        return {
+            SubprocessID.from_name(cast("str", info["name"])): SubprocessStatus(cast("int", info["state"]))
+            for info in subprocesses_info
+        }
+
+    async def shutdown(self) -> None:
+        supervisord = self.get_proxy()
+
         try:
-            supervisord = _create_fast_proxy(self._config)
-            supervisord.startProcess(self.name)
-        except Fault as e:
-            raise KresSubprocessControllerError(f"failed to start '{self.id}'") from e
+            supervisord.shutdown()
+        except Fault as exc:
+            if (exc.faultCode, exc.faultString) != (6, "SHUTDOWN_STATE"):
+                raise
 
-    @async_in_a_thread
-    def _stop(self) -> None:
-        supervisord = _create_supervisord_proxy(self._config)
-        supervisord.stopProcess(self.name)
-
-    @async_in_a_thread
-    def _restart(self) -> None:
-        supervisord = _create_supervisord_proxy(self._config)
-        supervisord.stopProcess(self.name)
-        fast = _create_fast_proxy(self._config)
-        fast.startProcess(self.name)
-
-    @async_in_a_thread
-    def get_pid(self) -> int:
-        if self._pid is None:
-            supervisord = _create_supervisord_proxy(self._config)
-            info = supervisord.getProcessInfo(self.name)
-            self._pid = info["pid"]
-        return self._pid
-
-    def get_used_config(self) -> KresConfig:
-        return self._config
-
-
-class SupervisordSubprocessController(SubprocessController):
-    def __init__(self) -> None:  # pylint: disable=super-init-not-called
-        self._controller_config: Optional[KresConfig] = None
-
-    def __str__(self) -> str:
-        return "supervisord"
-
-    async def is_controller_available(self, config: KresConfig) -> bool:
-        res = await _is_supervisord_available()
-        if not res:
-            logger.info("Failed to find usable supervisord.")
-
-        logger.debug("Detection - supervisord controller is available for use")
-        return res
-
-    async def get_all_running_instances(self) -> Iterable[Subprocess]:
-        assert self._controller_config is not None
-
-        if await _is_supervisord_running(self._controller_config):
-            states = _list_running_subprocesses(self._controller_config)
-            return [
-                SupervisordSubprocess(self._controller_config, self, id_)
-                for id_ in states
-                if states[id_] == SubprocessStatus.RUNNING
-            ]
-        return []
-
-    async def initialize_controller(self, args: KresArgs, config: KresConfig) -> None:
-        self._controller_config = config
-
-        if not await _is_supervisord_running(config):
-            logger.info(
-                "We want supervisord to restart us when needed, we will therefore exec() it and let it start us again."
-            )
-            await _exec_supervisord(args, config)
-        else:
-            logger.info("Supervisord is already running, we will just update its config...")
-            await _reload_supervisord(args, config)
-
-    async def shutdown_controller(self) -> None:
-        assert self._controller_config is not None
-        await _stop_supervisord(self._controller_config)
-
-    async def create_subprocess(self, subprocess_config: KresConfig, subprocess_type: SubprocessType) -> Subprocess:
-        return SupervisordSubprocess(subprocess_config, self, subprocess_type)
-
-    @async_in_a_thread
-    def get_subprocess_status(self) -> Dict[KresID, SubprocessStatus]:
-        assert self._controller_config is not None
-        return cast(Dict[KresID, SubprocessStatus], _list_running_subprocesses(self._controller_config))
+        config_path = Path(SUPERVISORD_CONFIGFILE_NAME)
+        await asyncio.to_thread(config_path.unlink, missing_ok=True)
