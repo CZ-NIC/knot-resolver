@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 @dataclass(frozen=True)
 class ConvertCommandArgs(KresClientArgs):
     strict: bool
-    type: Literal["worker", "policy-loader"]
+    type: Literal["worker", "loader"]
     output_file: Path | None
     input_file: tuple[Path, ...]
 
@@ -38,7 +38,7 @@ def register_subparser(subparser: argparse._SubParsersAction[argparse.ArgumentPa
     )
     convert_parser.add_argument(
         "--type",
-        choices=["worker", "policy-loader"],
+        choices=["worker", "loader"],
         default="worker",
         help="The type of Lua script to generate",
     )
@@ -75,9 +75,9 @@ class ConvertCommand(KresClientCommand):
                 data = data_combine(data, parsed)
 
             set_global_validation_context(Context(Path(Path(self._args.input_file[0]).parent), self._args.strict))
-            lua = KresConfig(data).render_kresd_lua()
-            if self._args.type == "policy-loader":
-                lua = KresConfig(data).render_policy_loader_lua()
+            lua = KresConfig(data).render_worker_lua()
+            if self._args.type == "loader":
+                lua = KresConfig(data).render_loader_lua()
             reset_global_validation_context()
         except (DataParsingError, DataValidationError) as e:
             print(e, file=sys.stderr)
