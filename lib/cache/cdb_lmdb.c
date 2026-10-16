@@ -369,8 +369,14 @@ static int cdb_open_env(struct lmdb_env *env, const char *path, const size_t map
 	}
 
 	const bool size_requested = mapsize;
+	const size_t mapsize_rounded = (mapsize / pagesize) * pagesize;
+	size_t size_orig = 0;
 	if (size_requested) {
-		env->mapsize = (mapsize / pagesize) * pagesize;
+		struct stat st;
+		if (stat(env->mdb_data_path, &st) == 0)
+			size_orig = st.st_size; // no need to diagnose errors, size_orig = 0
+
+		env->mapsize = mapsize_rounded;
 		ret = mdb_env_set_mapsize(env->env, env->mapsize);
 		if (ret != MDB_SUCCESS) goto error_mdb;
 	}
@@ -419,11 +425,12 @@ static int cdb_open_env(struct lmdb_env *env, const char *path, const size_t map
 	}
 
 #if !defined(__MACOSX__) && !(defined(__APPLE__) && defined(__MACH__))
-	if (size_requested && env->is_cache) { // prealloc makes no sense for rules
-		ret = posix_fallocate(fd, 0, MAX(env->mapsize, env->st_size));
-	} else {
-		ret = 0;
-	}
+	// We minimize fallocate(), as it can be quite CPU-consuming per gigabyte on a tmpfs.
+	const bool want_fallocate =
+	  env->is_cache // prealloc makes no sense for rules, or at least not in this way
+	  && size_requested && size_orig != env->mapsize // otherwise it already had fallocate before
+	  && env->mapsize >= mapsize_rounded; // otherwise the file gets removed via kr_cache_open()
+	ret = want_fallocate ? posix_fallocate(fd, size_orig, MAX(env->mapsize, env->st_size)) : 0;
 	if (ret == EINVAL || ret == EOPNOTSUPP) {
 		/* POSIX says this can happen when the feature isn't supported by the FS.
 		 * We haven't seen this happen on Linux+glibc but it was reported on

@@ -6,6 +6,10 @@ Bugfixes
 - python: fix logging level mapping bug, regressed in 6.5.0 (!1918)
 - fix build with musl libc, regressed in 6.5.0 (!1917)
 
+Improvements
+------------
+- performance of reloads with large cache on tmpfs (!1924)
+
 
 Knot Resolver 6.5.0 (2026-10-01)
 ================================
