@@ -4,6 +4,7 @@ Knot Resolver 5.7.9 (2026-1m-dd)
 Improvements
 ------------
 - rpm: fix source build against libknot >= 3.6 (!1916)
+- performance of reloads with large cache on tmpfs (!1932)
 
 Incompatible changes
 --------------------
