@@ -8,7 +8,7 @@ jobs:
     runs-on: macOS-latest
     strategy:
       matrix:
-        knot-version: ['3.3']
+        knot-version: ['3.4']
 
     steps:
       - name: Checkout resolver code
@@ -18,7 +18,7 @@ jobs:
 
       - name: Install dependecies from brew
         run:
-          brew install cmocka luajit libuv lmdb meson nghttp2 autoconf automake m4 libtool pkg-config
+          brew install cmocka gnutls luajit libuv lmdb meson nghttp2 libngtcp2 autoconf automake m4 libtool pkg-config
 
       - name: Install libknot from sources
         env:
