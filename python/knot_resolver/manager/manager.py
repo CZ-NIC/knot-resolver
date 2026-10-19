@@ -8,9 +8,9 @@ from subprocess import SubprocessError
 from typing import Any, Callable, List, Optional
 
 from knot_resolver.args import KresArgs
-from knot_resolver.controller.exceptions import KresSubprocessControllerError
-from knot_resolver.controller.interface import Subprocess, SubprocessController, SubprocessStatus, SubprocessType
-from knot_resolver.controller.registered_workers import command_registered_workers, get_registered_workers_kresids
+from knot_resolver.controller import SupervisordController
+from knot_resolver.controller.exceptions import ControllerError
+from knot_resolver.controller.subprocess import Subprocess, SubprocessStatus, SubprocessType
 from knot_resolver.datamodel import KresConfig
 from knot_resolver.manager.config_store import (
     ConfigStore,
@@ -22,6 +22,7 @@ from knot_resolver.manager.files import files_reload
 from knot_resolver.utils.functional import Result
 from knot_resolver.utils.modeling.types import NoneType
 
+from .command_workers import command_workers, get_workers_subprocesses_ids, register_worker, unregister_worker
 from .constants import FIX_COUNTER_ATTEMPTS_MAX, FIX_COUNTER_DECREASE_INTERVAL_SEC, PROCESSES_WATCHDOG_INTERVAL_SEC
 
 logger = logging.getLogger(__name__)
@@ -80,7 +81,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
         self._policy_loader: Optional[Subprocess] = None
         self._manager_lock = asyncio.Lock()
         self._workers_reset_needed: bool = False
-        self._controller: SubprocessController
+        self._controller: SupervisordController
         self._processes_watchdog_task: Optional["asyncio.Task[None]"] = None
         self._fix_counter: _FixCounter = _FixCounter()
         self._config_store: ConfigStore
@@ -89,7 +90,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
     @staticmethod
     async def create(
         args: KresArgs,
-        subprocess_controller: SubprocessController,
+        subprocess_controller: SupervisordController,
         config_store: ConfigStore,
     ) -> "KresManager":
         """Create new instance of KresManager."""
@@ -97,12 +98,9 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
         await inst._async_init(args, subprocess_controller, config_store)  # noqa: SLF001
         return inst
 
-    async def _async_init(self, args: KresArgs, subprocess_controller: SubprocessController, config_store: ConfigStore) -> None:
+    async def _async_init(self, args: KresArgs, subprocess_controller: SupervisordController, config_store: ConfigStore) -> None:
         self._controller = subprocess_controller
         self._config_store = config_store
-
-        # initialize subprocess controller
-        await self._controller.initialize_controller(args, config_store.get())
 
         self._processes_watchdog_task = asyncio.create_task(self._processes_watchdog())
         logger.debug("Looking for already running workers")
@@ -153,33 +151,37 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
         await config_store.register_on_change_callback(only_on_no_changes_update(config_nodes)(files_reload))
 
     async def _spawn_new_worker(self, config: KresConfig) -> None:
-        subprocess = await self._controller.create_subprocess(config, SubprocessType.KRESD)
-        await subprocess.start()
+        subprocess = await self._controller.create_subprocess(SubprocessType.WORKER)
+        await subprocess.start(config)
         self._workers.append(subprocess)
+        register_worker(subprocess)
 
     async def _stop_a_worker(self) -> None:
         if len(self._workers) == 0:
             raise IndexError("Can't stop a kresd when there are no running")
 
         subprocess = self._workers.pop()
+        unregister_worker(subprocess)
         await subprocess.stop()
 
     async def _collect_already_running_workers(self) -> None:
-        for subp in await self._controller.get_all_running_instances():
-            if subp.type == SubprocessType.KRESD:
-                self._workers.append(subp)
-            elif subp.type == SubprocessType.GC:
+        for subprocess_id in await self._controller.get_all_subprocess_status():
+            if subprocess_id.subprocess_type == SubprocessType.WORKER:
+                self._workers.append(Subprocess(subprocess_id, self._controller))
+            elif subprocess_id.subprocess_type == SubprocessType.CACHE_GC:
                 assert self._gc is None
-                self._gc = subp
-            elif subp.type == SubprocessType.POLICY_LOADER:
+                self._gc = Subprocess(subprocess_id, self._controller)
+            elif subprocess_id.subprocess_type == SubprocessType.LOADER:
                 assert self._policy_loader is None
-                self._policy_loader = subp
+                self._policy_loader = Subprocess(subprocess_id, self._controller)
+            elif subprocess_id.subprocess_type == SubprocessType.MANAGER:
+                continue
             else:
                 raise RuntimeError("unexpected subprocess type")
 
     async def _rolling_restart(self, new_config: KresConfig) -> None:
         for kresd in self._workers:
-            await kresd.apply_new_config(new_config)
+            await kresd.reconfig(new_config)
 
     async def _ensure_number_of_children(self, config: KresConfig, n: int) -> None:
         # kill children that are not needed
@@ -194,21 +196,21 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
         if self._policy_loader:
             await self._policy_loader.start(config)
         else:
-            subprocess = await self._controller.create_subprocess(config, SubprocessType.POLICY_LOADER)
-            await subprocess.start()
+            subprocess = await self._controller.create_subprocess(SubprocessType.LOADER)
+            await subprocess.start(config)
             self._policy_loader = subprocess
 
     def _is_policy_loader_exited(self) -> bool:
         if self._policy_loader:
-            return self._policy_loader.status() in (SubprocessStatus.EXITED, SubprocessStatus.UNEXPECTED)
+            return self._policy_loader.get_status() in (SubprocessStatus.EXITED, SubprocessStatus.UNKNOWN)
         return False
 
     def _is_gc_running(self) -> bool:
         return self._gc is not None
 
     async def _start_gc(self, config: KresConfig) -> None:
-        subprocess = await self._controller.create_subprocess(config, SubprocessType.GC)
-        await subprocess.start()
+        subprocess = await self._controller.create_subprocess(SubprocessType.CACHE_GC)
+        await subprocess.start(config)
         self._gc = subprocess
 
     async def _stop_gc(self) -> None:
@@ -240,7 +242,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                 #   if it keeps running, the config is valid and others will soon join as well
                 #   if it crashes and the startup fails, then well, it's not running anymore... :)
                 await self._spawn_new_worker(new)
-            except (SubprocessError, KresSubprocessControllerError):
+            except (SubprocessError, ControllerError):
                 logger.error("Kresd with the new config failed to start, rejecting config")
                 return Result.err("canary kresd process failed to start. Config might be invalid.")
 
@@ -261,9 +263,9 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
     async def reset_workers_policy_rules(self, _config: KresConfig, force: bool = False) -> None:
         # command all running 'kresd' workers to reset their old policy rules,
         # unless the workers have already been started with a new config so reset is not needed
-        if self._workers_reset_needed and get_registered_workers_kresids():
+        if self._workers_reset_needed and get_workers_subprocesses_ids():
             logger.debug("Resetting policy rules for all running 'kresd' workers")
-            cmd_results = await command_registered_workers("require('ffi').C.kr_rules_reset()")
+            cmd_results = await command_workers("require('ffi').C.kr_rules_reset()")
             for worker, res in cmd_results.items():
                 if res != 0:
                     logger.error("Failed to reset policy rules in %s: %s", worker, res)
@@ -288,7 +290,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
         logger.debug("Creating TLS session ticket secret")
         secret = token_hex(32)
         logger.debug("Setting TLS session ticket secret for all running 'kresd' workers")
-        cmd_results = await command_registered_workers(f"net.tls_sticket_secret('{secret}')")
+        cmd_results = await command_workers(f"net.tls_sticket_secret('{secret}')")
         for worker, res in cmd_results.items():
             if res not in (0, True):
                 logger.error("Failed to set TLS session ticket secret in %s: %s", worker, res)
@@ -307,7 +309,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                     else:
                         logger.debug("Stopping cache GC")
                         await self._stop_gc()
-        except KresSubprocessControllerError as e:
+        except ControllerError as e:
             if _noretry:
                 raise
             if self._fix_counter.is_too_high():
@@ -348,16 +350,16 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                 # If we don't do this, we may start with
                 # an old configuration and fail to detect a bug.
                 if self._policy_loader:
-                    status = self._policy_loader.status()
+                    status = self._policy_loader.get_status()
                     await self._policy_loader.cleanup()
 
-                    if status is SubprocessStatus.UNEXPECTED:
+                    if status is SubprocessStatus.UNKNOWN:
                         return Result.err(
                             "kresd 'policy-loader' process exited unexpectedly."
                             " The configuration may be invalid. Please check the log."
                         )
 
-        except (SubprocessError, KresSubprocessControllerError) as e:
+        except (SubprocessError, ControllerError) as e:
             logger.error(f"Failed to load policy rules: {e}")
             return Result.err("kresd 'policy-loader' process failed to start. Config might be invalid.")
 
@@ -376,7 +378,7 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
         async with self._manager_lock:
             # we could stop all the children one by one right now
             # we won't do that and we leave that up to the subprocess controller to do that while it is shutting down
-            await self._controller.shutdown_controller()
+            await self._controller.shutdown()
             # now, when everything is stopped, let's clean up all the remains
             await asyncio.gather(*[w.cleanup() for w in self._workers])
 
@@ -415,8 +417,8 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
             try:
                 # gather current state
                 async with self._manager_lock:
-                    detected_subprocesses = await self._controller.get_subprocess_status()
-                expected_ids = [x.id for x in self._workers]
+                    detected_subprocesses = await self._controller.get_all_subprocess_status()
+                expected_ids = [worker.id for worker in self._workers]
                 if self._gc:
                     expected_ids.append(self._gc.id)
 
@@ -425,36 +427,36 @@ class KresManager:  # pylint: disable=too-many-instance-attributes
                 if self._policy_loader:
                     expected_ids.append(self._policy_loader.id)
 
-                for eid in expected_ids:
-                    if eid not in detected_subprocesses:
-                        logger.error("Subprocess with id '%s' was not found in the system!", eid)
+                for exp in expected_ids:
+                    if exp not in detected_subprocesses:
+                        logger.error("Subprocess with id '%s' was not found in the system!", exp)
                         invoke_callback = True
                         continue
 
-                    if detected_subprocesses[eid] is SubprocessStatus.FATAL:
-                        if self._policy_loader and self._policy_loader.id == eid:
+                    if detected_subprocesses[exp] is SubprocessStatus.FATAL:
+                        if self._policy_loader and self._policy_loader.id == exp:
                             logger.info(
                                 "Subprocess '%s' is skipped by WatchDog"
                                 " because its status is monitored in a different way.",
-                                eid,
+                                exp,
                             )
                             continue
-                        logger.error("Subprocess '%s' is in FATAL state!", eid)
+                        logger.error("Subprocess '%s' is in FATAL state!", exp)
                         invoke_callback = True
                         continue
 
-                    if detected_subprocesses[eid] is SubprocessStatus.UNKNOWN:
-                        logger.warning("Subprocess '%s' is in UNKNOWN state!", eid)
+                    if detected_subprocesses[exp] is SubprocessStatus.UNKNOWN:
+                        logger.warning("Subprocess '%s' is in UNKNOWN state!", exp)
 
                 non_registered_ids = detected_subprocesses.keys() - set(expected_ids)
-                if len(non_registered_ids) != 0:
+                if len(non_registered_ids) > 1:
                     logger.error(
                         "Found additional process in the system, which shouldn't be there - %s",
                         non_registered_ids,
                     )
                     invoke_callback = True
 
-            except KresSubprocessControllerError as e:
+            except ControllerError as e:
                 # wait few seconds and see if 'processes_watchdog' task is cancelled (during shutdown)
                 # otherwise it is an error
                 await asyncio.sleep(3)

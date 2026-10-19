@@ -1,7 +1,7 @@
 import logging
 
-from knot_resolver.controller.registered_workers import command_registered_workers
 from knot_resolver.datamodel import KresConfig
+from knot_resolver.manager.command_workers import command_workers
 
 logger = logging.getLogger(__name__)
 
@@ -18,4 +18,4 @@ async def files_reload(config: KresConfig, force: bool = False) -> None:
         else:
             logger.info("TLS cert files reload triggered")
             cmd = f"net.tls('{cert_file}', '{key_file}')"
-            await command_registered_workers(cmd)
+            await command_workers(cmd)

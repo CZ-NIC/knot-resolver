@@ -3,9 +3,9 @@ import logging
 from typing import Any, Dict, Generator, List, Optional, Tuple
 
 from knot_resolver.constants import PROMETHEUS_LIB
-from knot_resolver.controller.interface import KresID
-from knot_resolver.controller.registered_workers import get_registered_workers_kresids
+from knot_resolver.controller.subprocess import SubprocessID
 from knot_resolver.datamodel.config_schema import KresConfig
+from knot_resolver.manager.command_workers import get_workers_subprocesses_ids
 from knot_resolver.manager.config_store import ConfigStore, only_on_real_changes_update
 from knot_resolver.utils.functional import Result
 
@@ -45,7 +45,7 @@ if PROMETHEUS_LIB:
         c.add_metric((label[1],), buckets, sum_value=sum_value)
         return c
 
-    def _parse_resolver_metrics(instance_id: "KresID", metrics: Any) -> Generator[Metric, None, None]:
+    def _parse_resolver_metrics(instance_id: "SubprocessID", metrics: Any) -> Generator[Metric, None, None]:
         sid = str(instance_id)
 
         # response latency histogram
@@ -330,7 +330,7 @@ if PROMETHEUS_LIB:
                 value=metrics["predict"]["learned"],
             )
 
-    def _create_resolver_metrics_loaded_gauge(kresid: "KresID", loaded: bool) -> GaugeMetricFamily:
+    def _create_resolver_metrics_loaded_gauge(kresid: "SubprocessID", loaded: bool) -> GaugeMetricFamily:
         return _gauge(
             "resolver_metrics_loaded",
             "0 if metrics from resolver instance were not loaded, otherwise 1",
@@ -340,7 +340,7 @@ if PROMETHEUS_LIB:
 
     class KresPrometheusMetricsCollector:
         def __init__(self, config_store: ConfigStore) -> None:
-            self._stats_raw: "Optional[Dict[KresID, object]]" = None
+            self._stats_raw: "Optional[Dict[SubprocessID, object]]" = None
             self._config_store: ConfigStore = config_store
             self._collection_task: "Optional[asyncio.Task[None]]" = None
             self._skip_immediate_collection: bool = False
@@ -351,26 +351,26 @@ if PROMETHEUS_LIB:
 
             # if we have no data, return metrics with information about it and exit
             if self._stats_raw is None:
-                for kresid in get_registered_workers_kresids():
-                    yield _create_resolver_metrics_loaded_gauge(kresid, False)
+                for worker_id in get_workers_subprocesses_ids():
+                    yield _create_resolver_metrics_loaded_gauge(worker_id, False)
                 return
 
             # if we have data, parse them
-            for kresid in get_registered_workers_kresids():
+            for worker_id in get_workers_subprocesses_ids():
                 success = False
                 try:
-                    if kresid in self._stats_raw:
-                        metrics = self._stats_raw[kresid]
-                        yield from _parse_resolver_metrics(kresid, metrics)
+                    if worker_id in self._stats_raw:
+                        metrics = self._stats_raw[worker_id]
+                        yield from _parse_resolver_metrics(worker_id, metrics)
                         success = True
                 except KeyError as e:
                     logger.warning(
                         "Failed to load metrics from resolver instance %s: attempted to read missing statistic %s",
-                        str(kresid),
+                        str(worker_id),
                         str(e),
                     )
 
-                yield _create_resolver_metrics_loaded_gauge(kresid, success)
+                yield _create_resolver_metrics_loaded_gauge(worker_id, success)
 
         def describe(self) -> List[Metric]:
             # this function prevents the collector registry from invoking the collect function on startup

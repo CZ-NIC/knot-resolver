@@ -10,7 +10,7 @@ from functools import partial
 from http import HTTPStatus
 from pathlib import Path
 from time import time
-from typing import Any, Callable, Dict, List, Literal, Optional, Set, Union, cast
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Literal, Optional, Set, Union, cast
 
 from aiohttp import web
 from aiohttp.web import middleware
@@ -19,15 +19,13 @@ from aiohttp.web_response import json_response
 from aiohttp.web_runner import AppRunner, TCPSite, UnixSite
 
 from knot_resolver.args import KresArgs
-from knot_resolver.controller import get_best_controller_implementation
-from knot_resolver.controller.interface import SubprocessType
-from knot_resolver.controller.registered_workers import command_single_registered_worker
-from knot_resolver.controller.supervisord.plugin.notify_socket import send_notify_socket_message
+from knot_resolver.controller import SupervisordController
+from knot_resolver.controller.notify.notify_socket import send_notify_socket_message
+from knot_resolver.controller.subprocess import SubprocessType
 from knot_resolver.datamodel import kres_config_json_schema
 from knot_resolver.datamodel.cache_schema import CacheClearRPCSchema
 from knot_resolver.datamodel.config_schema import KresConfig
 from knot_resolver.datamodel.globals import Context, set_global_validation_context
-from knot_resolver.datamodel.management_schema import ManagementSchema
 from knot_resolver.exceptions import KresError
 from knot_resolver.logging import reconfigure_logging
 from knot_resolver.manager import files, metrics
@@ -38,11 +36,15 @@ from knot_resolver.utils.functional import Result
 from knot_resolver.utils.modeling.exceptions import AggregateDataValidationError, DataParsingError, DataValidationError
 from knot_resolver.utils.modeling.parsing import DataFormat, data_combine, try_to_parse
 from knot_resolver.utils.modeling.query import query
-from knot_resolver.utils.modeling.types import NoneType
 
+from .command_workers import command_worker
 from .config_store import ConfigStore
 from .exceptions import KresManagerBaseError
 from .manager import KresManager
+
+if TYPE_CHECKING:
+    from knot_resolver.datamodel.management_schema import ManagementSchema
+    from knot_resolver.utils.modeling.types import NoneType
 
 logger = logging.getLogger(__name__)
 
@@ -298,14 +300,10 @@ class Server:
 
     async def _handler_cache_clear(self, request: web.Request) -> web.Response:
         data = parse_from_mime_type(await request.text(), request.content_type)
-        config = CacheClearRPCSchema(data)
+        cache_clear_data = CacheClearRPCSchema(data)
 
-        _, result = await command_single_registered_worker(config.render_lua())
-        return web.Response(
-            body=json.dumps(result),
-            content_type="application/json",
-            charset="utf8",
-        )
+        _, result = await command_worker(cache_clear_data.render_lua())
+        return web.json_response(result)
 
     async def _handler_schema(self, _request: web.Request) -> web.Response:
         return web.json_response(
@@ -365,10 +363,10 @@ class Server:
 
         if "path" in request.match_info and len(request.match_info["path"]) > 0:
             ptstr = request.match_info["path"]
-            if ptstr == "/kresd":
-                proc_type = SubprocessType.KRESD
-            elif ptstr == "/gc":
-                proc_type = SubprocessType.GC
+            if ptstr == "/worker":
+                proc_type = SubprocessType.WORKER
+            elif ptstr == "/cache-gc":
+                proc_type = SubprocessType.CACHE_GC
             elif ptstr == "/all":
                 proc_type = None
             else:
@@ -473,8 +471,8 @@ async def _init_config_store(config: Dict[str, Any]) -> ConfigStore:
 
 async def _init_manager(args: KresArgs, config_store: ConfigStore) -> KresManager:
     """Call asynchronously when the application initializes."""
-    # Instantiate subprocess controller (if we wanted to, we could switch it at this point)
-    controller = await get_best_controller_implementation(config_store.get())
+    # Create subprocess controller
+    controller = SupervisordController(args, config_store.get())
 
     # Create KresManager. This will perform autodetection of available service managers and
     # select the most appropriate to use (or use the one configured directly)
