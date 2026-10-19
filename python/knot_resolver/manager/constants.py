@@ -14,42 +14,6 @@ FIX_COUNTER_DECREASE_INTERVAL_SEC = 30 * 60
 PROCESSES_WATCHDOG_INTERVAL_SEC: float = 5
 
 
-def kres_cache_dir(config: "KresConfig") -> Path:
-    return config.cache.storage.to_path()
-
-
-def policy_loader_config_file(_config: "KresConfig") -> Path:
-    return Path("policy-loader.conf")
-
-
-def kresd_config_file(_config: "KresConfig", kres_id: "KresID") -> Path:
-    return Path(f"kresd{int(kres_id)}.conf")
-
-
-def kresd_config_file_supervisord_pattern(_config: "KresConfig") -> Path:
-    return Path("kresd%(process_num)d.conf")
-
-
-def supervisord_config_file(_config: "KresConfig") -> Path:
-    return Path("supervisord.conf")
-
-
-def supervisord_config_file_tmp(_config: "KresConfig") -> Path:
-    return Path("supervisord.conf.tmp")
-
-
-def supervisord_pid_file(_config: "KresConfig") -> Path:
-    return Path("supervisord.pid")
-
-
-def supervisord_sock_file(_config: "KresConfig") -> Path:
-    return Path("supervisord.sock")
-
-
-def supervisord_subprocess_log_dir(_config: "KresConfig") -> Path:
-    return Path("logs")
-
-
 class _UserConstants:
     """Class for accessing constants, which are technically not constants as they are user configurable."""
 
