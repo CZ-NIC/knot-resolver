@@ -25,7 +25,7 @@ packages = [
 
 package_data = {
     "knot_resolver": [
-        "controller/supervisord/*.j2",
+        "controller/*.j2",
         "datamodel/templates/*.j2",
         "datamodel/templates/macros/*.j2"
     ]
