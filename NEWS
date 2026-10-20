@@ -5,6 +5,10 @@ Improvements
 ------------
 - rpm: fix source build against libknot >= 3.6 (!1916)
 
+Incompatible changes
+--------------------
+- docker: remove cross-platform build for linux/arm/v7 (!1928)
+
 
 Knot Resolver 5.7.8 (2026-08-05)
 ================================
