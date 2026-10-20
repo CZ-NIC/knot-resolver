@@ -40,6 +40,11 @@ stages:
   - deploy
   - pkg
 
+.only_tags_master_public: &only_tags_master_public
+  only:
+    - tags@knot/knot-resolver
+    - master@knot/knot-resolver
+
  # https://docs.gitlab.com/ce/ci/jobs/job_control.html#select-different-runner-tags-for-each-parallel-matrix-job
 .multi_platform: &multi_platform
   parallel:
@@ -216,10 +221,8 @@ docker:build:
 
 docker:build:cross-platform:
   <<: *docker
+  <<: *only_tags_master_public
   stage: build
-  only:
-    - master@knot/knot-resolver
-    - tags
   before_script:
     - >
       docker buildx create
@@ -244,10 +247,8 @@ docker:build:cross-platform:
 docker:test:cross-platform:
   <<: *docker
   <<: *multi_platform
+  <<: *only_tags_master_public
   stage: test
-  only:
-    - tags
-    - master@knot/knot-resolver
   needs:
     - docker:build:cross-platform
   image:
@@ -279,18 +280,18 @@ docker:test:cross-platform:
     - docker
     - ${PLATFORM}
 
+
 docker:dockerhub:
   <<: *docker
   stage: deploy
-  needs:
-    - docker:test:cross-platform
   before_script:
     - git fetch --tags --force
     - >
-      LATEST_TAG=$(git for-each-ref \
-        --sort=-version:refname \
-        --count=1 \
-        --format='%(refname:short)' refs/tags)
+      LATEST_TAG=$(git ls-remote --tags --refs \
+        https://gitlab.nic.cz/knot/knot-resolver.git |
+        sed 's|.*/||' |
+        sort -V |
+        tail -n1)
 
       echo "Latest tag: $LATEST_TAG"
       echo "Current: $CI_COMMIT_REF_NAME"
@@ -309,11 +310,11 @@ docker:dockerhub:
       -t ${DOCKER_HUB_REGISTRY}:latest
       ${GITLAB_REGISTRY}:${CI_COMMIT_REF_NAME}
   rules:
-    # Deploy automatically from schedule when DOCKERHUB_AUTO_DEPLOY is set
-    - if: '$CI_PIPELINE_SOURCE == "schedule" && $DOCKERHUB_AUTO_DEPLOY == "true"'
+    # Deploy automatically from schedule when DOCKER_HUB_AUTO_DEPLOY is set
+    - if: '$CI_PROJECT_PATH == "knot/security/knot-resolver" && $CI_PIPELINE_SOURCE == "schedule" && $DOCKER_HUB_AUTO_DEPLOY == "true"'
       when: on_success
     # Otherwise make it manual
-    - if: '$CI_COMMIT_TAG'
+    - if: '$CI_PROJECT_PATH == "knot/security/knot-resolver" && $CI_COMMIT_TAG'
       when: manual
     - when: never
 # }}}
