@@ -44,6 +44,10 @@ stages:
   only:
     - tags@knot/knot-resolver
     - master@knot/knot-resolver
+    
+.only_tags_security: &only_tags_security
+  only:
+    - tags@knot/security/knot-resolver
 
  # https://docs.gitlab.com/ce/ci/jobs/job_control.html#select-different-runner-tags-for-each-parallel-matrix-job
 .multi_platform: &multi_platform
@@ -849,13 +853,11 @@ docs:master:
 # Pushes the documetation as a new branch to the website repository.
 # https://gitlab.nic.cz/websites/knot-resolver.cz
 docs:website:
+  <<: *only_tags_security
   stage: deploy
   needs:
     - docs:build
   when: manual
-  only:
-    refs:
-      - tags
   script:
     - git clone https://gitlab-ci-token:${WEBSITE_DOCS_CI_TOKEN}@${CI_SERVER_HOST}:${CI_SERVER_PORT}/websites/knot-resolver.cz.git website
     - cp --recursive --verbose doc/html website/content/documentation/${CI_COMMIT_REF_NAME}
