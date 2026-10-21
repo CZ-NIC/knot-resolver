@@ -45,6 +45,10 @@ stages:
     - tags@knot/knot-resolver
     - master-5@knot/knot-resolver
 
+.only_tags_security: &only_tags_security
+  only:
+    - tags@knot/security/knot-resolver
+
  # https://docs.gitlab.com/ce/ci/jobs/job_control.html#select-different-runner-tags-for-each-parallel-matrix-job
 .multi_platform: &multi_platform
   parallel:
@@ -1009,6 +1013,7 @@ docs:release:
 # This job pushes the Knot Resolver documentation into a new branch of the
 # `websites/knot-resolver.cz` repository.
 docs:website:
+  <<: *only_tags_security
   stage: deploy
   needs:
     - docs:build
