@@ -1,5 +1,18 @@
-Knot Resolver 5.7.9 (2026-1m-dd)
+Knot Resolver 5.7.9 (2026-10-22)
 ================================
+
+Security
+--------
+- fix crash when forwarding - DoS via NULL deref
+  Reporters: Yuqi Qiu and Xiang Li, Nankai University (AOSP Lab).
+- exhaustion of ports for outgoing TCP - DoS
+  The attack only worked if /network/out-interface-* was configured.
+  Reporters: Jonathan Horovitz, Yehuda Afek, and Anat Bremler-Barr from Tel Aviv University.
+
+Packaging
+---------
+- Debian 11 is no longer supported
+- Debian,Ubuntu: i386 and armhf architectures no longer supported
 
 Improvements
 ------------
