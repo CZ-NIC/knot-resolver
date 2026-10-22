@@ -265,8 +265,8 @@ docker:dockerhub:
   stage: deploy
   before_script:
     - git fetch --tags --force
-    - >      
-      LATEST_TAG=$(git ls-remote --tags --refs \
+    - |
+      LATEST5_TAG=$(git ls-remote --tags --refs \
         https://gitlab.nic.cz/knot/knot-resolver.git |
         sed 's|.*/||' |
         grep '^v5' |
