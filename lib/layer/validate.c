@@ -405,7 +405,7 @@ static int validate_keyset(struct kr_request *req, knot_pkt_t *answer, bool has_
 			int dnskey_keytag = -1;
 			bool have_zone_key_bit = true, dnskey_algo_supported = true;
 			knot_rdata_t *rdata_sep = NULL, *rdata_i = qry->zone_cut.key->rrs.rdata;
-			for (uint8_t i = 0; i < qry->zone_cut.key->rrs.count;
+			for (int i = 0; i < qry->zone_cut.key->rrs.count;
 			    ++i, rdata_i = knot_rdataset_next(rdata_i)) {
 				if (dnskey_keytag != sep_keytag) {
 					dnskey_keytag = kr_dnssec_key_tag(KNOT_RRTYPE_DNSKEY, rdata_i->data, rdata_i->len);
@@ -843,14 +843,14 @@ static int unsigned_forward(kr_layer_t *ctx, knot_pkt_t *pkt)
 	if (nods && ns_exist && qtype == KNOT_RRTYPE_NS) {
 		qry->flags.DNSSEC_WANT = false;
 		qry->flags.DNSSEC_INSECURE = true;
+		const knot_pktsection_t *answer = knot_pkt_section(pkt, KNOT_ANSWER);
 		if (qry->forward_CNAME) {
 			if (kr_fails_assert(qry->cname_parent))
 				return KR_STATE_FAIL;
 			qry->cname_parent->flags.DNSSEC_WANT = false;
 			qry->cname_parent->flags.DNSSEC_INSECURE = true;
-		} else if (pkt_rcode == KNOT_RCODE_NOERROR && qry->parent != NULL) {
-			const knot_pktsection_t *sec = knot_pkt_section(pkt, KNOT_ANSWER);
-			const knot_rrset_t *rr = knot_pkt_rr(sec, 0);
+		} else if (pkt_rcode == KNOT_RCODE_NOERROR && qry->parent != NULL && answer->count) {
+			const knot_rrset_t *rr = knot_pkt_rr(answer, 0);
 			if (rr->type == KNOT_RRTYPE_NS) {
 				qry->parent->zone_cut.name = knot_dname_copy(rr->owner, &req->pool);
 				qry->parent->flags.DNSSEC_WANT = false;

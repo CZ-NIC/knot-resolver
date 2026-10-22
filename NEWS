@@ -1,5 +1,15 @@
-Knot Resolver 6.5.1 (2026-1m-dd)
+Knot Resolver 6.5.1 (2026-10-22)
 ================================
+
+Security
+--------
+- fix crash when forwarding - DoS via NULL deref
+  Reporters: Yuqi Qiu and Xiang Li, Nankai University (AOSP Lab).
+- fix crash or loop - DoS
+  Reporters: Joshua from AISLE
+- exhaustion of ports for outgoing TCP - DoS
+  The attack only worked if /network/out-interface-* was configured.
+  Reporters: Jonathan Horovitz, Yehuda Afek, and Anat Bremler-Barr from Tel Aviv University.
 
 Bugfixes
 --------
