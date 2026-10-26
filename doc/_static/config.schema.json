@@ -1252,11 +1252,6 @@
                             "pattern": "^(\\d+)(us|ms|s|m|h|d)$",
                             "description": "Wait time between two read-write transactions.",
                             "default": "0us"
-                        },
-                        "dry-run": {
-                            "type": "boolean",
-                            "description": "Run the garbage collector in dry-run mode.",
-                            "default": false
                         }
                     },
                     "default": {
@@ -1270,8 +1265,7 @@
                         "rw_deletes": 100,
                         "rw_reads": 200,
                         "rw_duration": "0us",
-                        "rw_delay": "0us",
-                        "dry_run": false
+                        "rw_delay": "0us"
                     }
                 },
                 "ttl-min": {
@@ -1413,8 +1407,7 @@
                     "rw_deletes": 100,
                     "rw_reads": 200,
                     "rw_duration": "0us",
-                    "rw_delay": "0us",
-                    "dry_run": false
+                    "rw_delay": "0us"
                 },
                 "ttl_min": "5s",
                 "ttl_max": "1d",
