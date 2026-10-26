@@ -779,8 +779,8 @@ pkg:opensuse-16.0:
     # openSUSE 16.0 Docker image excludes docs installation
     # with 'rpm.install.excludedocs = yes' zypp option, so comment it out
     - sed -i 's/^\(rpm\.install\.excludedocs[[:space:]]*=\)/# \1/' /etc/zypp/zypp.conf
-    # add the Python development repository to fetch Supervisor
-    - zypper addrepo https://download.opensuse.org/repositories/devel:languages:python/16.0/devel:languages:python.repo
+    # add the so_it_team community repository to fetch Supervisor
+    - zypper addrepo https://download.opensuse.org/repositories/home:so_it_team/16.0/home:so_it_team.repo
     # prometheus and watchdog are optional dependencies, but our `apkg test` needs them
     - zypper --non-interactive --gpg-auto-import-keys refresh
     - zypper install -y python313-prometheus_client python313-watchdog
