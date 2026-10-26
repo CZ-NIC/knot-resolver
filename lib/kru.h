@@ -115,6 +115,9 @@ struct kru_api {
 	/// Returns the final value of the counter normalized to the limit 2^16.
 	/// Set price to zero to skip updating; otherwise, KRU is always updated, using maximal allowed value on overflow.
 	uint16_t (*load_hash)(struct kru *kru, uint32_t time_now, kru_hash_t hash, kru_price_t price);
+
+	/// Compute decay multiplier for a given number of ticks.
+	double (*decay_mult)(struct kru *kru, uint32_t ticks);
 };
 
 // The functions are stored this way to make it easier to switch

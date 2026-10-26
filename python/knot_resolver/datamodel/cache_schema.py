@@ -7,6 +7,7 @@ from knot_resolver.datamodel.types import (
     DNSRecordTypeEnum,
     DomainName,
     EscapedStr,
+    FloatNonNegative,
     IntNonNegative,
     IntPositive,
     Percent,
@@ -67,29 +68,32 @@ class GarbageCollectorSchema(ConfigSchema):
     interval: Time interval how often the garbage collector will be run.
     threshold: Cache usage in percent that triggers the garbage collector.
     release: Percent of used cache to be freed by the garbage collector.
+    unschedule: Percent of used cache to get prefetch cancelled if scheduled.
+    dry_run: Run the garbage collector in dry-run mode.
     temp_keys_space: Maximum amount of temporary memory for copied keys (0 = unlimited).
     rw_deletes: Maximum number of deleted records per read-write transaction (0 = unlimited).
     rw_reads: Maximum number of read records per read-write transaction (0 = unlimited).
     rw_duration: Maximum duration of read-write transaction (0 = unlimited).
     rw_delay: Wait time between two read-write transactions.
-    dry_run: Run the garbage collector in dry-run mode.
     """
 
     enable: bool = True
     interval: TimeUnit = TimeUnit("1s")
     threshold: Percent = Percent(80)
     release: Percent = Percent(10)
+    unschedule: Percent = Percent(20)
+    dry_run: bool = False
+    # the rest are undocumented
     temp_keys_space: SizeUnit = SizeUnit("0M")
     rw_deletes: IntNonNegative = IntNonNegative(100)
     rw_reads: IntNonNegative = IntNonNegative(200)
     rw_duration: TimeUnit = TimeUnit("0us")
     rw_delay: TimeUnit = TimeUnit("0us")
-    dry_run: bool = False
 
 
 class PredictionSchema(ConfigSchema):
     """
-    Helps keep the cache hot by prefetching expiring records and learning usage patterns and repetitive queries.
+    Obsolete, does not affect anything now.
 
     ---
     enable: Enable/disable prediction.
@@ -104,15 +108,21 @@ class PredictionSchema(ConfigSchema):
 
 class PrefetchSchema(ConfigSchema):
     """
-    These options help keep the cache hot by prefetching expiring records or learning usage patterns and repetitive queries.
+    Refreshing frequently used records before their expiration.
 
     ---
-    expiring: Prefetch expiring records.
-    prediction: Prefetch record by predicting based on usage patterns and repetitive queries.
+    expiring: Use prefetching.
+    max_access_period: How often the record has to be accessed to be eligible for prefetch.
+    min_accesses_per_update: How many accesses to the record are required to occur before each prefetch.
+    update_before_expiration: How many percents of TTL before expiration to initiate update (always at least 5s).
+    prediction: Obsolete, does not affect anything now.
     """
 
     expiring: bool = False
-    prediction: PredictionSchema = PredictionSchema()
+    max_access_period: TimeUnit = TimeUnit("2h")
+    min_accesses_per_update: FloatNonNegative = FloatNonNegative(2)
+    update_before_expiration: Percent = Percent(1)
+    prediction: PredictionSchema = PredictionSchema()  # void, TODO add warning if used
 
 
 class CacheSchema(ConfigSchema):
@@ -127,7 +137,7 @@ class CacheSchema(ConfigSchema):
     ttl_max: Maximum time-to-live for the cache entries.
     ns_timeout: Time interval for which a nameserver address will be ignored after determining that it does not return (useful) answers.
     prefill: Prefill the cache periodically by importing zone data obtained over HTTP.
-    prefetch: These options help keep the cache hot by prefetching expiring records or learning usage patterns and repetitive queries.
+    prefetch: Refreshing frequently used records before their expiration.
     """
 
     storage: WritableDir = lazy_default(WritableDir, str(CACHE_DIR))

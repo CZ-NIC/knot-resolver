@@ -14,7 +14,7 @@
 
 #define FILE_FORMAT_VERSION 1  // fail if different
 
-#define KRU_CAPACITY(cache_size) (cache_size / 128)   // KRU size is approx. (8 * capacity) B
+#define KRU_CAPACITY(cache_size) ((cache_size) / 128)   // KRU size is approx. (8 * capacity) B
 	// average entry size seems to be 100-200 B,
 	// make KRU capacity between cache_size/128 and cache_size/64 (power of two)
 	// -> KRU size: between cache_size/16 and cache_size/8 (LMDB size is the rest)
@@ -47,7 +47,7 @@ static inline bool first_access_ro(struct kr_cache_top_context *ctx, kru_hash_t 
 {
 	// struct kr_cache_top_context { uint32_t bloom[32]; }
 	static_assert(sizeof(((struct kr_cache_top_context *)0)->bloom[0]) * 8 == 32, "");
-	static_assert(sizeof(((struct kr_cache_top_context *)0)->bloom)    * 8 == 32 * 32, "");
+	static_assert(sizeof(((struct kr_cache_top_context *)0)->bloom)    * 8 == 32 * 32l, "");
 		// expected around 40 unique cache accesses per request context, possibly up to ~200;
 		// prob. of collision of 50th unique access with the preceeding ones: ~0.1 %;
 		// 75th: ~0.4 %; 100th: ~1.1 %; 150th: ~3.9 %; 200th: ~8.7 %; 300th: ~23 %; 400th: ~39 %
@@ -93,6 +93,10 @@ static inline void get_size_capacity(size_t cache_size, size_t *top_size, size_t
 	for (size_t c = capacity - 1; c > 0; c >>= 1) (*capacity_log)++;
 
 	*top_size = offsetof(struct top_data, kru) + KRU.get_size(*capacity_log);
+}
+
+double kr_cache_top_decay_mult(struct kr_cache_top *top, uint32_t ticks) {
+	return KRU.decay_mult((struct kru *)&top->data->kru, ticks);
 }
 
 size_t kr_cache_top_get_size(size_t cache_size)
@@ -188,6 +192,7 @@ char *kr_cache_top_strkey(void *key, size_t len)
 	bool decimal_bytes = false;
 	int force_bytes = 0;
 	char *strp = str;
+	int zeroes = 1;  // consecutive zeroes or key beginning in text mode (not fully reliable but good enough)
 	for (size_t i = 0; i < len; i++) {
 		unsigned char c = k[i];
 		if ((force_bytes-- <= 0) &&
@@ -195,13 +200,18 @@ char *kr_cache_top_strkey(void *key, size_t len)
 			//if (c == ' ') c = '_';
 			if (c == 0)   c = '|';
 			if (bytes_mode) {
-				if (decimal_bytes) strp--;
+				if (decimal_bytes) {
+					strp--;
+				} else {
+					*strp++ = 'x';
+				}
 				*strp++ = '>';
 				bytes_mode = false;
 				decimal_bytes = false;
 			}
 			*strp++ = c;
-			if ((i > 0) && (k[i - 1] == '\0') && ((i == 1) || k[i - 2] == '\0')) {
+			if (zeroes >= 2) {
+				zeroes = 0;
 				switch (k[i]) {
 					case 'S':
 						if (len == 6) decimal_bytes = true;
@@ -210,9 +220,20 @@ char *kr_cache_top_strkey(void *key, size_t len)
 						force_bytes = INT_MAX;
 						break;
 					case 'E':
-						force_bytes = true;
+						force_bytes = 2;
 						decimal_bytes = true;
 						break;
+					case 'P':
+						force_bytes = 5;
+						zeroes = 1;  // E-key begins after forced bytes
+						break;
+					default: break;
+				}
+			} else {
+				if (k[i] == '\0') {
+					zeroes++;
+				} else {
+					zeroes = 0;
 				}
 			}
 		} else {

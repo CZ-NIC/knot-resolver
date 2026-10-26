@@ -13,13 +13,14 @@
 #include "daemon/worker.h"
 #include "daemon/ratelimiting.h"
 #include "daemon/defer.h"
-#include "daemon/idletimer.h"
 
 #include "lib/defines.h"
 #include "lib/dnssec.h"
+#include "lib/idletimer.h"
 #include "lib/log.h"
 #include "lib/resolve.h"
 #include "lib/rules/api.h"
+#include "lib/cache/prefetch.h"
 
 #include <arpa/inet.h>
 #include <getopt.h>
@@ -615,6 +616,8 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
+	kr_cache_prefetch_callback_init(worker_prefetch);
+
 	/* Start the scripting engine */
 	if (engine_load_sandbox() != 0) {
 		ret = EXIT_FAILURE;
@@ -648,7 +651,6 @@ int main(int argc, char **argv)
 		static idletimer_t mempool_timer;
 		idletimer_init(&mempool_timer, mp_balance_reusable, 1000);
 	}
-
 	ret = kr_rules_init_ensure();
 	if (ret) {
 		kr_log_error(RULES, "failed to initialize policy rule engine: %s\n",

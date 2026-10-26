@@ -42,13 +42,25 @@ struct entry_h {
 	uint8_t  rank : 6;	/**< See enum kr_rank */
 	bool is_packet : 1;	/**< Negative-answer packet for insecure/bogus name. */
 	bool has_optout : 1;	/**< Only for packets; persisted DNSSEC_OPTOUT. */
-	uint8_t _pad;		/**< We need even alignment for data now. */
+	uint8_t prefetch_priority;
+	/**< We need even alignment for data now. */
 	uint8_t data[];
 /* Well, we don't really need packing or alignment changes,
  * but due to LMDB the whole structure may not be stored at an aligned address,
  * and we need compilers (for non-x86) to know it to avoid SIGBUS (test: UBSAN). */
 } __attribute__ ((packed,aligned(1)));
 struct entry_apex;
+
+/** Return RR type corresponding to the key, KNOT_CACHE_RTT, KNOT_CACHE_PREFETCH or negative error code.
+ *
+ * Error is returned on unexpected values (those also trigger assertion).
+ */
+KR_EXPORT
+int key_consistent(knot_db_val_t key);
+enum {
+	KNOT_CACHE_RTT = 0x10000,
+	KNOT_CACHE_PREFETCH = 0x10001,
+};
 
 /** Check basic consistency of entry_h for 'E' entries, not looking into ->data.
  * (for is_packet the length of data is checked)
@@ -235,7 +247,7 @@ int entry_h_splice(
 	const knot_db_val_t key, const uint16_t ktype, const uint16_t type,
 	const knot_dname_t *owner/*log only*/,
 	const struct kr_query *qry, struct kr_cache *cache, uint32_t timestamp,
-	size_t *cache_record_size_out);
+	size_t *cache_record_size_out, bool force_overwrite);
 
 /** Parse an entry_apex into individual items.  @return error code. */
 KR_EXPORT int entry_list_parse(const knot_db_val_t val, entry_list_t list);

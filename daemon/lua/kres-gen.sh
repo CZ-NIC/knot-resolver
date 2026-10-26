@@ -310,6 +310,7 @@ ${CDEFS} ${LIBKRES} functions <<-EOF
 	kr_cache_remove
 	kr_cache_remove_subtree
 	kr_cache_commit
+	kr_cache_prefetch_init
 	# FIXME: perhaps rename this exported symbol
 	packet_ttl
 # New policy

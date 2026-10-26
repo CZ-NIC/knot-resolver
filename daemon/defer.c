@@ -7,7 +7,7 @@
 #include "daemon/defer.h"
 #include "daemon/session2.h"
 #include "daemon/udp_queue.h"
-#include "daemon/idletimer.h"
+#include "lib/idletimer.h"
 #include "lib/kru.h"
 #include "lib/mmapped.h"
 #include "lib/resolve.h"

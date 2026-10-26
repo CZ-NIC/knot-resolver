@@ -1633,6 +1633,16 @@ int worker_resolve_exec(struct qr_task *task, knot_pkt_t *query)
 	return qr_task_step(task, NULL, query);
 }
 
+int worker_prefetch(knot_dname_t *qname, uint16_t qtype) {
+	struct kr_qflags flags = {.NO_CACHE = true};
+	knot_pkt_t *pkt = worker_resolve_mk_pkt_dname(qname, qtype, KNOT_CLASS_IN, &flags);  // malloc'ed, (or _dname version)
+	struct qr_task *task = worker_resolve_start(pkt, flags);
+	kr_cache_top_context_reinit(&task->ctx->req.cache_top_context, true);
+	int ret = worker_resolve_exec(task, pkt);
+	knot_pkt_free(pkt);
+	return ret;
+}
+
 int worker_task_numrefs(const struct qr_task *task)
 {
 	return task->refs;

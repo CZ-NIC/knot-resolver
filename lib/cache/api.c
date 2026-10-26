@@ -31,6 +31,7 @@
 
 #include "lib/cache/impl.h"
 #include "lib/cache/top.h"
+#include "lib/cache/prefetch.h"
 
 /* TODO:
  *	- Reconsider when RRSIGs are put in and retrieved from the cache.
@@ -217,6 +218,44 @@ int kr_cache_clear(struct kr_cache *cache)
 		ret = assert_right_version(cache);
 	}
 	return ret;
+}
+
+int key_consistent(knot_db_val_t key)
+{
+	const uint8_t *kd = key.data;
+	ssize_t i;
+	/* CACHE_KEY_DEF */
+	if (key.len >= 2 && kd[0] == '\0') {
+		/* Beware: root zone is special and starts with
+		 *         a single \0 followed by type sign */
+		i = 1;
+	} else {
+		/* find the first double zero in the key */
+		for (i = 2; (i < key.len) && (kd[i - 1] || kd[i - 2]); ++i);
+		if (kr_fails_assert(i < key.len))
+			return kr_error(EINVAL);
+	}
+	// the next character can be used for classification
+	switch (kd[i]) {
+	case 'E':
+		(void)0; // C can't have a variable definition following a label
+		uint16_t type;
+		if (kr_fails_assert(i + 1 + sizeof(type) <= key.len))
+			return kr_error(EINVAL);
+		memcpy(&type, kd + i + 1, sizeof(type));
+		return type;
+	case '1':
+		return KNOT_RRTYPE_NSEC;
+	case '3':
+		return KNOT_RRTYPE_NSEC3;
+	case 'S':
+		return KNOT_CACHE_RTT;
+	case 'P':
+		return KNOT_CACHE_PREFETCH;
+	default:
+		kr_assert(!EINVAL);
+		return kr_error(EINVAL);
+	}
 }
 
 /* When going stricter, BEWARE of breaking entry_h_consistent_NSEC() */
@@ -660,7 +699,7 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 	/* Prepare raw memory for the new entry. */
 	size_t whole_val_len = 0;
 	ret = entry_h_splice(&val_new_entry, rank, key, k->type, rr->type,
-				rr->owner, qry, cache, timestamp, &whole_val_len);
+				rr->owner, qry, cache, timestamp, &whole_val_len, qry && qry->flags.NO_CACHE);
 	if (ret) return kr_ok(); /* some aren't really errors */
 	if (kr_fails_assert(val_new_entry.data))
 		return kr_error(EFAULT);
@@ -677,6 +716,8 @@ static ssize_t stash_rrset(struct kr_cache *cache, const struct kr_query *qry,
 		return kr_error(EINVAL);
 	if (qry) // it's possible to insert outside a request
 		kr_cache_top_access(qry->request, key.data, key.len, whole_val_len, "stash_rrset");
+	kr_cache_prefetch_schedule(key, eh, val_new_entry.len, whole_val_len, rr->type);
+		// needs writable eh, but contains another write to LMDB, so eh is invalidated afterwards
 
 	#if 0 /* Occasionally useful when debugging some kinds of changes. */
 	{

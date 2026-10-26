@@ -4,6 +4,8 @@
 
 #include "lib/cache/cdb_lmdb.h"
 #include "lib/cache/impl.h"
+#include "lib/cache/prefetch.h"
+#include "utils/cache_gc/categories.h"
 
 #include <ctype.h>
 #include <time.h>
@@ -70,42 +72,6 @@ void kr_gc_cache_close(struct kr_cache *kres_db, knot_db_t * knot_db)
 	kr_cache_close(kres_db);
 }
 
-int kr_gc_key_consistent(knot_db_val_t key)
-{
-	const uint8_t *kd = key.data;
-	ssize_t i;
-	/* CACHE_KEY_DEF */
-	if (key.len >= 2 && kd[0] == '\0') {
-		/* Beware: root zone is special and starts with
-		 *         a single \0 followed by type sign */
-		i = 1;
-	} else {
-		/* find the first double zero in the key */
-		for (i = 2; (i < key.len) && (kd[i - 1] || kd[i - 2]); ++i);
-		if (kr_fails_assert(i < key.len))
-			return kr_error(EINVAL);
-	}
-	// the next character can be used for classification
-	switch (kd[i]) {
-	case 'E':
-		(void)0; // C can't have a variable definition following a label
-		uint16_t type;
-		if (kr_fails_assert(i + 1 + sizeof(type) <= key.len))
-			return kr_error(EINVAL);
-		memcpy(&type, kd + i + 1, sizeof(type));
-		return type;
-	case '1':
-		return KNOT_RRTYPE_NSEC;
-	case '3':
-		return KNOT_RRTYPE_NSEC3;
-	case 'S':
-		return KNOT_CACHE_RTT;
-	default:
-		kr_assert(!EINVAL);
-		return kr_error(EINVAL);
-	}
-}
-
 /// expects that key is consistent! CACHE_KEY_DEF
 static uint8_t entry_labels(knot_db_val_t * key, uint16_t rrtype)
 {
@@ -141,25 +107,35 @@ void debug_printbin(const char *str, unsigned int len)
 }
 
 /** Return one entry_h reference from a cache DB value.  NULL if not consistent/suitable. */
-static const struct entry_h *val2entry(const knot_db_val_t val, uint16_t ktype)
+static const struct entry_h *val2entry(const knot_db_val_t val, uint16_t ktype, uint32_t *latest_exp_time_out)
 {
-	if (ktype != KNOT_RRTYPE_NS)
-		return entry_h_consistent(val, ktype);
+	*latest_exp_time_out = 0;
+	if (ktype != KNOT_RRTYPE_NS) {
+		struct entry_h *eh = entry_h_consistent(val, ktype);
+		if (eh) *latest_exp_time_out = eh->time + eh->ttl;
+		return eh;
+	}
 	/* Otherwise we have a multi-purpose entry.
 	 * Well, for now we simply choose the most suitable entry;
-	 * the only realistic collision is DNAME in apex where we'll prefer NS. */
+	 * the only realistic collision is DNAME in apex where we'll prefer NS.
+	 * As TTL we however use the latest expiration of the entries. */
 	entry_list_t el;
 	if (entry_list_parse(val, el))
 		return NULL;
+	struct entry_h *eh_ret = NULL;
 	for (int i = ENTRY_APEX_NSECS_CNT; i < EL_LENGTH; ++i) {
-		if (el[i].len)
-			return entry_h_consistent(el[i], EL2RRTYPE(i));
+		if (el[i].len) {
+			struct entry_h *eh = entry_h_consistent(el[i], EL2RRTYPE(i));
+			if (eh) {
+				*latest_exp_time_out = MAX(*latest_exp_time_out, eh->time + eh->ttl);
+				if (!eh_ret) eh_ret = eh;
+			}
+		}
 	}
-	/* Only NSEC* meta-data inside. */
-	return NULL;
+	return eh_ret;
 }
 
-int kr_gc_cache_iter(knot_db_t * knot_db, const  kr_cache_gc_cfg_t *cfg,
+int kr_gc_cache_iter(knot_db_t * knot_db, struct kr_cache_top *top, const kr_cache_gc_cfg_t *cfg,
 			kr_gc_iter_callback callback, void *ctx)
 {
 	unsigned int counter_iter = 0;
@@ -202,34 +178,46 @@ int kr_gc_cache_iter(knot_db_t * knot_db, const  kr_cache_gc_cfg_t *cfg,
 			goto error;
 		}
 
-		gc_record_info_t info = { 0 };
+		struct kr_gc_cat_record_info info = { .key = key, .expires_in = -1 };
 		info.entry_size = kr_cache_top_entry_size(key.len, val.len);
 		info.valid = false;
-		const int entry_type = kr_gc_key_consistent(key);
+		const int entry_type = key_consistent(key);
 		const struct entry_h *entry = NULL;
-		if (entry_type == KNOT_CACHE_RTT) {
+		if (entry_type >= 0) {
 			counter_gc_consistent++;
-			info.valid = true;
-			info.rrtype = entry_type;
-		} else if (entry_type >= 0) {
-			counter_gc_consistent++;
-			entry = val2entry(val, entry_type);
-		}
-		/* TODO: perhaps improve some details around here:
-		 *  - xNAME have .rrtype NS
-		 *  - DNAME hidden on NS name will not be considered here
-		 *  - if zone has NSEC* meta-data but no NS, it will be seen
-		 *    here as kr_inconsistent */
-		if (entry != NULL) {
-			info.valid = true;
-			info.rrtype = entry_type;
-			info.expires_in = entry->time + entry->ttl - now;
-			info.no_labels = entry_labels(&key, entry_type);
+			switch (entry_type) {
+				case KNOT_CACHE_PREFETCH: (void) 0;
+					struct kr_cache_prefetch_sched sched = { 0 };
+					if (!kr_cache_prefetch_decode_entry(key, val, &sched)) break;
+					info.prefetch_ekey = sched.ekey;
+					info.prefetch_ekeydata_len = sched.ep->ekeydata_len;
+					info.prefetch_min_load = sched.ep->min_load;
+					info.expires_in = sched.ep->exp_time - now;
+					// fall through
+				case KNOT_CACHE_RTT:
+					info.valid = true;
+					info.rrtype = entry_type;
+					break;
+				default: (void) 0;
+					/* TODO: perhaps improve some details around here:
+					 *  - xNAME have .rrtype NS
+					 *  - DNAME hidden on NS name will not be considered here (but as TTL the latest one is considered)
+					 *  - if zone has NSEC* meta-data but no NS, it will be seen
+					 *    here as kr_inconsistent */
+					uint32_t exp_time = 0;
+					entry = val2entry(val, entry_type, &exp_time);
+					if (!entry) break;
+					info.valid = true;
+					info.rrtype = entry_type;
+					info.expires_in = exp_time - now;
+					info.no_labels = entry_labels(&key, entry_type);  // TODO remove, not used
+					break;
+			}
 		}
 		counter_iter++;
 		counter_kr_consistent += info.valid;
 		if (VERBOSE_STATUS) {
-			if (!entry_type || ((entry_type != KNOT_CACHE_RTT) && !entry)) {  // don't log fully consistent entries
+			if (!entry_type || ((entry_type != KNOT_CACHE_RTT) && (entry_type != KNOT_CACHE_PREFETCH) && !entry)) {  // don't log fully consistent entries
 				printf
 				    ("GC %sconsistent, KR %sconsistent, size %zu, key len %zu: ",
 				     entry_type ? "" : "in", entry ? "" : "IN",
@@ -238,16 +226,7 @@ int kr_gc_cache_iter(knot_db_t * knot_db, const  kr_cache_gc_cfg_t *cfg,
 				printf("\n");
 			}
 		}
-		ret = callback(&key, &info, ctx);
-
-		if (ret != KNOT_EOK) {
-		error:
-			printf("Error iterating database (%s).\n",
-			       knot_strerror(ret));
-			api->iter_finish(it);
-			api->txn_abort(&txn);
-			return ret;
-		}
+		callback(top, &info, ctx);
 
 	skip:	// Advance to the next GC item.
 		if (++txn_steps < cfg->ro_txn_items || !cfg->ro_txn_items/*unlimited*/) {
@@ -284,4 +263,11 @@ int kr_gc_cache_iter(knot_db_t * knot_db, const  kr_cache_gc_cfg_t *cfg,
 	kr_log_debug(CACHE, "iterated %u items, gc consistent %u, kr consistent %u\n",
 		counter_iter, counter_gc_consistent, counter_kr_consistent);
 	return KNOT_EOK;
+
+error:
+	printf("Error iterating database (%s).\n",
+				 knot_strerror(ret));
+	api->iter_finish(it);
+	api->txn_abort(&txn);
+	return ret;
 }

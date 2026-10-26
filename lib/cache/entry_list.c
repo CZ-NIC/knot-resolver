@@ -7,6 +7,7 @@
  */
 
 #include "lib/cache/impl.h"
+#include "lib/cache/prefetch.h"
 #include "lib/utils.h"
 
 
@@ -216,7 +217,7 @@ int entry_h_splice(
 	const knot_db_val_t key, const uint16_t ktype, const uint16_t type,
 	const knot_dname_t *owner/*log only*/,
 	const struct kr_query *qry, struct kr_cache *cache, uint32_t timestamp,
-	size_t *cache_record_size_out)
+	size_t *cache_record_size_out, bool force_overwrite)
 {
 	//TODO: another review, perhaps including the API
 	if (kr_fails_assert(val_new_entry && val_new_entry->len > 0))
@@ -234,7 +235,7 @@ int entry_h_splice(
 	const struct entry_h *eh_orig = NULL;
 	entry_list_t el;
 	int ret = -1;
-	if (!kr_rank_test(rank, KR_RANK_SECURE) || ktype == KNOT_RRTYPE_NS) {
+	{
 		knot_db_val_t val;
 		ret = cache_op(cache, read, &key, &val, 1);
 		if (i_type) {
@@ -246,12 +247,9 @@ int entry_h_splice(
 		if (!ret) {
 			eh_orig = entry_h_consistent_E(val, type);
 		}
-	} else {
-		/* We want to fully overwrite the entry, so don't even read it. */
-		memset(el, 0, sizeof(el));
 	}
 
-	if (!kr_rank_test(rank, KR_RANK_SECURE) && eh_orig) {
+	if (!force_overwrite && !kr_rank_test(rank, KR_RANK_SECURE) && eh_orig) {
 		/* If equal rank was accepted, spoofing a *single* answer would be
 		 * enough to e.g. override NS record in AUTHORITY section.
 		 * This way they would have to hit the first answer
@@ -274,6 +272,8 @@ int entry_h_splice(
 	if (!i_type) {
 		/* The non-list types are trivial now. */
 		*cache_record_size_out = val_new_entry->len;
+		kr_cache_prefetch_unschedule(key, eh_orig, type);
+			// writes to cache, invalidates eh_orig and el-pointed memory
 		return cache_write_or_clear(cache, &key, val_new_entry, qry);
 	}
 	/* Now we're in trouble.  In some cases, parts of data to be written
@@ -294,6 +294,8 @@ int entry_h_splice(
 	uint8_t buf[val.len];
 	entry_list_memcpy((struct entry_apex *)buf, el);
 	*cache_record_size_out = val.len;
+	kr_cache_prefetch_unschedule(key, eh_orig, type);
+		// writes to cache, invalidates eh_orig and el-pointed memory
 	ret = cache_write_or_clear(cache, &key, &val, qry);
 	if (ret) return kr_error(ret);
 	memcpy(val.data, buf, val.len); /* we also copy the "empty" space, but well... */
