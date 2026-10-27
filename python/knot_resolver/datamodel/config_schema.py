@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 from knot_resolver.constants import API_SOCK_FILE, RUN_DIR, VERSION, WORKERS_SUPPORT
 from knot_resolver.datamodel.cache_schema import CacheSchema
 from knot_resolver.datamodel.defer_schema import DeferSchema
+from knot_resolver.datamodel.dga_filter_schema import DGAFilterSchema
 from knot_resolver.datamodel.dns64_schema import Dns64Schema
 from knot_resolver.datamodel.dnssec_schema import DnssecSchema
 from knot_resolver.datamodel.forward_schema import FallbackSchema, ForwardSchema
@@ -22,7 +23,6 @@ from knot_resolver.datamodel.options_schema import OptionsSchema
 from knot_resolver.datamodel.rate_limiting_schema import RateLimitingSchema
 from knot_resolver.datamodel.templates import KRESD_CONFIG_TEMPLATE, POLICY_LOADER_CONFIG_TEMPLATE
 from knot_resolver.datamodel.tunnel_filter_schema import RpzBuilderSchema, TunnelFilterSchema
-from knot_resolver.datamodel.dga_filter_schema import DGAFilterSchema
 from knot_resolver.datamodel.types import EscapedStr, IDPattern, IntPositive, WritableDir
 from knot_resolver.datamodel.view_schema import ViewSchema
 from knot_resolver.utils.modeling import ConfigSchema
@@ -65,7 +65,8 @@ def _get_views_tags(views: List[ViewSchema]) -> List[str]:
 
 
 def _check_local_data_tags(
-    views_tags: List[str], rules_or_rpz: Union[List[RuleSchema], List[RPZSchema], List[TunnelFilterSchema], List[DGAFilterSchema]]
+    views_tags: List[str],
+    rules_or_rpz: Union[List[RuleSchema], List[RPZSchema], List[TunnelFilterSchema], List[DGAFilterSchema]],
 ) -> Tuple[List[str], List[DataValidationError]]:
     tags = []
     errs = []

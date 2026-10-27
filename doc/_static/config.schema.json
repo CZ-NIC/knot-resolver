@@ -1325,7 +1325,7 @@
                     "minimum": 0,
                     "maximum": 100,
                     "description": "machine learning model inference threshold in percentage",
-                    "default": 31
+                    "default": 82
                 },
                 "tags": {
                     "type": [
@@ -1343,7 +1343,7 @@
             "default": {
                 "enable": false,
                 "file": null,
-                "threshold": 25,
+                "threshold": 82,
                 "tags": null
             }
         },

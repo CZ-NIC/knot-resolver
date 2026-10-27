@@ -14,6 +14,7 @@ libonnxruntime = declare_dependency(
 
 dga_filter_src = files([
   'dga_filter.c',
+  'model_features.c',
 ])
 c_src_lint += dga_filter_src
 

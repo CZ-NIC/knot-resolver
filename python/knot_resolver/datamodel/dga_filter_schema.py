@@ -17,7 +17,7 @@ class DGAFilterSchema(ConfigSchema):
 
     enable: bool = False
     file: Optional[ReadableFile] = None
-    threshold: Percent = Percent(31)
+    threshold: Percent = Percent(82)
     tags: Optional[List[IDPattern]] = None
 
     def _validate(self) -> None:

@@ -38,4 +38,5 @@ struct model_context{
 	char**             output_names;
 	size_t             num_inputs;
 	size_t             num_outputs;
+	OrtValue*          persistent_input_tensor;
 };

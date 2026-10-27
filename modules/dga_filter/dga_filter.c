@@ -9,6 +9,7 @@
  */
 
 #include <onnxruntime_c_api.h>
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,6 +17,7 @@
 #include "lib/layer.h"
 #include "lib/resolve.h"
 #include "dga_filter.h"
+#include "model_features.h"
 
 static const ModelDefinition DGA_MODEL_DEF = {
 	.expected_output_probs_dims = {-1, 2}, // -1 for dynamic dimension (i. e. batch size)
@@ -52,6 +54,11 @@ void model_context_deinit(void)
 	if (!config.model) return;
 
 	api = get_ort_api();
+
+	if (config.model->persistent_input_tensor) {
+		api->ReleaseValue(config.model->persistent_input_tensor);
+		config.model->persistent_input_tensor = NULL;
+	}
 
 	if (config.model->session_options) {
 		api->ReleaseSessionOptions(config.model->session_options);
@@ -90,16 +97,22 @@ void model_context_deinit(void)
 		api->ReleaseEnv(config.model->env);
 		config.model->env = NULL;
 	}
+
+	dga_features_unload();
 }
 
 static bool validate_model_definition(const char* model_path)
 {
 	bool valid = false;
 	OrtStatus* status = NULL;
-	OrtTypeInfo* type_info = NULL;
-	const OrtTensorTypeAndShapeInfo* tensor_info = NULL;
-	size_t dims_rank = 0;
-	int64_t dims[2];
+	OrtTypeInfo* out_type_info = NULL;
+	OrtTypeInfo* in_type_info = NULL;
+	const OrtTensorTypeAndShapeInfo* out_tensor_info = NULL;
+	const OrtTensorTypeAndShapeInfo* in_tensor_info = NULL;
+	size_t out_rank = 0;
+	size_t in_rank = 0;
+	int64_t out_dims[2];
+	int64_t in_dims[2];
 
 	const OrtApi* api = get_ort_api();
 
@@ -115,15 +128,35 @@ static bool validate_model_definition(const char* model_path)
 		goto fail;
 	}
 
+	// input: float tensor [batch, DGA_N_FEATURES]
+	ORT_CHECK(api->SessionGetInputTypeInfo(config.model->session, 0, &in_type_info),
+			fail);
+	ORT_CHECK(api->CastTypeInfoToTensorInfo(in_type_info, &in_tensor_info),
+			fail);
+	ORT_CHECK(api->GetDimensionsCount(in_tensor_info, &in_rank),
+			fail);
+	if (in_rank != ARRAY_SIZE(in_dims)) {
+		kr_log_crit(DGA, "failed to load ONNX model '%s': expected 2D input tensor, got %lldD",
+			model_path, (long long)in_rank);
+		goto fail;
+	}
+	ORT_CHECK(api->GetDimensions(in_tensor_info, in_dims, ARRAY_SIZE(in_dims)),
+			fail);
+	if (in_dims[1] != DGA_N_FEATURES) {
+		kr_log_crit(DGA, "failed to load ONNX model '%s': expected %d input features, got %lld",
+			model_path, DGA_N_FEATURES, (long long)in_dims[1]);
+		goto fail;
+	}
+
 	// we're only interested in the output tensor with probabilities and not the label tensor
 	ORT_CHECK(api->SessionGetOutputTypeInfo(config.model->session, DGA_MODEL_DEF.output_probs_index,
-			&type_info),
+			&out_type_info),
 			fail);
-	ORT_CHECK(api->CastTypeInfoToTensorInfo(type_info, &tensor_info),
+	ORT_CHECK(api->CastTypeInfoToTensorInfo(out_type_info, &out_tensor_info),
 			fail);
 
 	ONNXTensorElementDataType actual_type = ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
-	ORT_CHECK(api->GetTensorElementType(tensor_info, &actual_type),
+	ORT_CHECK(api->GetTensorElementType(out_tensor_info, &actual_type),
 			fail);
 	if (actual_type != ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT) {
 		kr_log_crit(DGA, "failed to load ONNX model '%s': expected float probability tensor at index %zu, got type %d",
@@ -131,27 +164,30 @@ static bool validate_model_definition(const char* model_path)
 		goto fail;
 	}
 
-	ORT_CHECK(api->GetDimensionsCount(tensor_info, &dims_rank), fail);
-	if (dims_rank != ARRAY_SIZE(DGA_MODEL_DEF.expected_output_probs_dims)) {
+	ORT_CHECK(api->GetDimensionsCount(out_tensor_info, &out_rank), fail);
+	if (out_rank != ARRAY_SIZE(DGA_MODEL_DEF.expected_output_probs_dims)) {
 		kr_log_crit(DGA, "failed to load ONNX model '%s': expected 2D probability tensor at index %zu, got %lldD",
-			model_path, DGA_MODEL_DEF.output_probs_index, (long long)dims_rank);
+			model_path, DGA_MODEL_DEF.output_probs_index, (long long)out_rank);
 		goto fail;
 	}
-	ORT_CHECK(api->GetDimensions(tensor_info, dims, ARRAY_SIZE(dims)),
+	ORT_CHECK(api->GetDimensions(out_tensor_info, out_dims, ARRAY_SIZE(out_dims)),
 			fail);
 
-	if (dims[0] != DGA_MODEL_DEF.expected_output_probs_dims[0] || dims[1] != DGA_MODEL_DEF.expected_output_probs_dims[1]) {
+	if (out_dims[0] != DGA_MODEL_DEF.expected_output_probs_dims[0] || out_dims[1] != DGA_MODEL_DEF.expected_output_probs_dims[1]) {
 		kr_log_crit(DGA, "failed to load ONNX model '%s': expected output probability tensor shape [%lld, %lld], got [%lld, %lld]",
 			model_path,
 			(long long)DGA_MODEL_DEF.expected_output_probs_dims[0], (long long)DGA_MODEL_DEF.expected_output_probs_dims[1], 
-			(long long)dims[0], (long long)dims[1]);
+			(long long)out_dims[0], (long long)out_dims[1]);
 		goto fail;
 	}
 
 	valid = true;
 fail:
-	if (type_info) {
-		api->ReleaseTypeInfo(type_info);
+	if (in_type_info) {
+		api->ReleaseTypeInfo(in_type_info);
+	}
+	if (out_type_info) {
+		api->ReleaseTypeInfo(out_type_info);
 	}
 	if (status) {
 		kr_log_crit(DGA, "model validation failed: %s\n", api->GetErrorMessage(status));
@@ -164,6 +200,15 @@ int model_context_init(const char* model_path)
 {
 	OrtStatus* status = NULL;
 
+	const unsigned char *onnx_data = NULL;
+	size_t onnx_data_len = 0;
+
+	if (dga_features_load(model_path, &onnx_data, &onnx_data_len) != 0) {
+		kr_log_crit(DGA, "failed to load DGA model container '%s'\n", model_path);
+		return kr_error(EINVAL);
+	}
+	kr_log_info(DGA, "loaded DGA model '%s'\n", model_path);
+	
 	const OrtApi* api = OrtGetApiBase()->GetApi(ORT_API_VERSION);
 
 	ORT_CHECK(api->CreateEnv(ORT_LOGGING_LEVEL_WARNING, "dga-classification", &config.model->env),
@@ -171,7 +216,11 @@ int model_context_init(const char* model_path)
 
 	ORT_CHECK(api->CreateSessionOptions(&config.model->session_options),
 			fail);
-	ORT_CHECK(api->CreateSession(config.model->env, model_path, config.model->session_options, &config.model->session),
+	ORT_CHECK(api->SetIntraOpNumThreads(config.model->session_options, 1), fail);
+	ORT_CHECK(api->SetInterOpNumThreads(config.model->session_options, 1), fail);
+	ORT_CHECK(api->SetSessionExecutionMode(config.model->session_options, ORT_SEQUENTIAL), fail);
+	ORT_CHECK(api->CreateSessionFromArray(config.model->env, onnx_data, onnx_data_len,
+			config.model->session_options, &config.model->session),
 			fail);
 
 	ORT_CHECK(api->GetAllocatorWithDefaultOptions(&(config.model->allocator)),
@@ -198,10 +247,17 @@ int model_context_init(const char* model_path)
 				fail);
 	}
 
+	int64_t dims[] = {1, DGA_N_FEATURES};
+
+	ORT_CHECK(api->CreateTensorAsOrtValue(config.model->allocator, dims, ARRAY_SIZE(dims),
+			ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT, &config.model->persistent_input_tensor),
+			fail);
+
 	return kr_ok();
 
 fail:
 	model_context_deinit();
+	dga_features_unload();
 	if (status) {
 		kr_log_crit(DGA, "create_context failed: %s\n", api->GetErrorMessage(status));
 		api->ReleaseStatus(status);
@@ -213,32 +269,28 @@ float get_model_inference(const char* name)
 {
 	const OrtApi* api;
 	OrtStatus* status = NULL;
-	int64_t dims[] = {1, 1}; // batch_size x 1 tensor -> [[input_string]]
-
-	const char* input_names[] = { config.model->input_name };
-	OrtValue* input_tensor = NULL;
-	OrtValue* input_tensors[config.model->num_inputs];
-	OrtValue* output_tensors[config.model->num_outputs];
-
+	float* tensor_data = NULL;
 	float prob_dga = DGA_FAIL_PROB;
 
-	if (!config.model) return DGA_FAIL_PROB;
+	if (!config.model || !config.model->persistent_input_tensor) return DGA_FAIL_PROB;
+
+	size_t num_outputs = config.model->num_outputs;
+	OrtValue* output_tensors[num_outputs];
+	memset(output_tensors, 0, sizeof(output_tensors));
 
 	api = get_ort_api();
 
-	ORT_CHECK(api->CreateTensorAsOrtValue(config.model->allocator, dims, ARRAY_SIZE(dims),
-			ONNX_TENSOR_ELEMENT_DATA_TYPE_STRING, &input_tensor),
+	ORT_CHECK(api->GetTensorMutableData(config.model->persistent_input_tensor, (void**)&tensor_data),
 			fail);
-	ORT_CHECK(api->FillStringTensor(input_tensor, &name, config.model->num_inputs),
-			input_release_fail);
 
-	input_tensors[0] = input_tensor;
-	memset(output_tensors, 0, sizeof(output_tensors));
+	if (build_features(name, tensor_data) != 0) return DGA_FAIL_PROB;
+
+	const char* input_names[] = { config.model->input_name };
 
 	ORT_CHECK(api->Run(config.model->session, NULL,
-			input_names, (const OrtValue* const*)input_tensors, config.model->num_inputs,
-			(const char* const*)config.model->output_names, config.model->num_outputs, output_tensors),
-			input_release_fail); // the actual model inference
+			input_names, (const OrtValue* const*)&config.model->persistent_input_tensor, 1,
+			(const char* const*)config.model->output_names, num_outputs, output_tensors),
+			output_release_fail);
 
 	// We only use the probability of the malicious class, which is
 	// at index [DGA_MODEL_DEF.output_probs_index][DGA_MODEL_DEF.output_probs_dga_index].
@@ -252,9 +304,9 @@ float get_model_inference(const char* name)
 	}
 
 output_release_fail:
-	for (size_t i = 0; i < config.model->num_outputs; i++) api->ReleaseValue(output_tensors[i]);
-input_release_fail:
-	api->ReleaseValue(input_tensor);
+	for (size_t i = 0; i < num_outputs; i++) {
+		if (output_tensors[i]) api->ReleaseValue(output_tensors[i]);
+	}
 fail:
 	if (status) api->ReleaseStatus(status);
 	return prob_dga * 100;
@@ -288,6 +340,9 @@ char *get_label_before_suffix(knot_dname_t *domain)
 
 	dot = strchr(copy, '.');
 	if (dot) *dot = '\0';
+
+	for (char *p = copy; *p; p++)
+		*p = (char)tolower((unsigned char)*p);
 
 	return copy;
 }
@@ -333,6 +388,16 @@ fail:
 	kr_log_crit(DGA, "Initialization of shared DGA filter data failed.\n");
 	load_attempted = true;
 	return ret;
+}
+
+KR_EXPORT
+int dga_filter_refresh_tags(kr_rule_tags_t tags)
+{
+	config.tags = tags;
+	kr_log_debug(DGA, "Tags updated: filter=0x%lx\n",
+			(unsigned long)tags);
+
+	return kr_ok();
 }
 
 /// Ensure that the filter is loaded; return false if failed.
