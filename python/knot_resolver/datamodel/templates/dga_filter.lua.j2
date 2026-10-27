@@ -1,9 +1,19 @@
 {% from 'macros/policy_macros.lua.j2' import policy_get_tagset %}
 {% if cfg.dga_filter.enable -%}
+{% from 'macros/common_macros.lua.j2' import string_table %}
 modules.load('dga_filter')
 ffi.cdef([[
 int dga_filter_setup(const char *model, kr_rule_tags_t tags, uint16_t threshold);
+int dga_filter_refresh_tags(kr_rule_tags_t tags);
 ]])
+
+local filter_tag_names = {{ string_table(cfg.dga_filter.tags) }}
+
+function dga_filter_refresh_tags()
+	return C.dga_filter_refresh_tags(
+		policy.get_tagset(filter_tag_names))
+end
+
 assert(C.dga_filter_setup(
 	'{{ cfg.dga_filter.file }}',
 	{{ policy_get_tagset(cfg.dga_filter.tags) }},
