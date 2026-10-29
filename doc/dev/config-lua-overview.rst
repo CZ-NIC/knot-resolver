@@ -33,14 +33,6 @@ Following **configuration file snippet** starts listening for unencrypted and al
    of this programming language. See article
    `Learn Lua in 15 minutes`_ for a syntax overview.
 
-When you modify configuration file on disk restart resolver process to get
-changes into effect. See chapter :ref:`systemd-zero-downtime-restarts` if even short
-outages are not acceptable for your deployment.
-
-.. [#] If you decide to run binary ``/usr/sbin/kresd`` manually (instead of
-   using systemd) do not forget to specify ``-c`` option with path to
-   configuration file, otherwise ``kresd`` will read file named ``config`` from
-   its current working directory.
 
 Documentation Conventions
 =========================

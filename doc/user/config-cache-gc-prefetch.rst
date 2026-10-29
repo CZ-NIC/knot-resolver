@@ -174,7 +174,7 @@ both of which have to be met to consider that record eligible for prefetching.
    It serves as a guarantee that prefetching will not significantly increase the traffic to authoritative servers.
 
 Details for the settings above
-~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 If the accesses are regular, their exponentially decreasing counter will converge to the equilibrium,
 where the increase in time is the same as the decay.

@@ -86,8 +86,7 @@ When invoked globally, you don't have to worry about virtual environments and su
 Or, you can create a symlink to the ``./poe`` script without installing PoeThePoet, e.g. ``ln -s path_to_the_repository/manager/poe /usr/bin/poe``.
 
 To list all the available commands, you can run ``poe help``.
-The commands are defined in the ``pyproject.toml`` file of the ``tool.poe.tasks
-`` section.
+The commands are defined in the ``pyproject.toml`` file of the ``tool.poe.tasks`` section.
 
 With this environment, **everything else should just work**.
 You can run the same checks that CI runs, all the commands listed below should pass.
