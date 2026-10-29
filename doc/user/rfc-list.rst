@@ -357,6 +357,5 @@ as some parts are optional to a degree or even not relevant to DNS resolvers.
     We also have a fallback that deals with typical cases of non-conforming servers.*
 :rfc:`9210`
     DNS Transport over TCP - Operational Requirements
-.. No DoQ yet, but it's planned.
- :rfc:`9250`
+:rfc:`9250`
     DNS over Dedicated QUIC Connections
