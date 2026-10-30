@@ -1,7 +1,7 @@
 {% from 'macros/common_macros.lua.j2' import boolean %}
 
 -- logging.level
-{% if cfg.logging.groups and "kresd" in cfg.logging.groups %}
+{% if cfg.logging.groups and "worker" in cfg.logging.groups %}
 log_level('debug')
 {% else %}
 log_level('{{ cfg.logging.level }}')
@@ -17,7 +17,7 @@ log_target('{{ cfg.logging.target }}')
 log_groups({
 {% for g in cfg.logging.groups %}
 {% if g not in [
-    "manager", "supervisord", "policy-loader", "kresd", "cache-gc",
+    "manager", "supervisord", "loader", "worker", "cache-gc",
     "files", "metrics", "server",
 ] %}
     '{{ g }}',

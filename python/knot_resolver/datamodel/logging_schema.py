@@ -2,7 +2,6 @@ import os
 from typing import Any, List, Literal, Optional, Set, Type, Union, cast
 
 from knot_resolver.datamodel.types import WritableFilePath
-from knot_resolver.logging import KRES_LOGTARGET_ENV_VAR
 from knot_resolver.utils.modeling import ConfigSchema
 from knot_resolver.utils.modeling.base_schema import is_obj_type_valid
 
@@ -10,10 +9,11 @@ LogLevelEnum = Literal["crit", "err", "warning", "notice", "info", "debug"]
 LogTargetEnum = Literal["syslog", "stderr", "stdout"]
 
 LogGroupsProcessesEnum = Literal[
-    "manager",
+    "launcher",
     "supervisord",
-    "policy-loader",
-    "kresd",
+    "manager",
+    "loader",
+    "worker",
     "cache-gc",
 ]
 
@@ -129,7 +129,7 @@ class LoggingSchema(ConfigSchema):
 
     def _target(self, raw: Raw) -> LogTargetEnum:
         if raw.target == "from-arg":
-            target = os.environ.get(KRES_LOGTARGET_ENV_VAR) or "stdout"
+            target = os.environ.get("KRES_LOGTARGET") or "stdout"
             if not is_obj_type_valid(target, cast(Type[Any], LogTargetEnum)):
                 raise ValueError(f"logging target '{target}' from '--logtarget' argument is invalid")
             return cast(LogTargetEnum, target)

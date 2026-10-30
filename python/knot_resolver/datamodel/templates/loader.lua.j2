@@ -5,7 +5,7 @@ ffi = require('ffi')
 local C = ffi.C
 
 -- logging.level
-{% if cfg.logging.groups and "policy-loader" in cfg.logging.groups %}
+{% if cfg.logging.groups and "loader" in cfg.logging.groups %}
 log_level('debug')
 {% else %}
 log_level('{{ cfg.logging.level }}')
@@ -21,7 +21,7 @@ log_target('{{ cfg.logging.target }}')
 log_groups({
 {% for g in cfg.logging.groups %}
 {% if g not in [
-    "manager", "supervisord", "policy-loader", "kresd", "cache-gc",
+    "manager", "supervisord", "loader", "worker", "cache-gc",
     "files", "metrics", "server",
 ] %}
     '{{ g }}',
