@@ -192,12 +192,12 @@ def test_domain_name_invalid(val: str):
         DomainName(val)
 
 
-@pytest.mark.parametrize("val", ["lo", "eth0", "wlo1", "web_ifgrp", "e8-2"])
+@pytest.mark.parametrize("val", ["lo", "eth0", "wlo1", "web_ifgrp", "e8-2", "enp1s0.15"])
 def test_interface_name_valid(val: str):
     assert str(InterfaceName(val)) == val
 
 
-@pytest.mark.parametrize("val", ["_lo", "-wlo1", "lo_", "wlo1-", "e8--2", "web__ifgrp"])
+@pytest.mark.parametrize("val", ["_lo", "-wlo1", "lo_", "wlo1-", "e8--2", "web__ifgrp", "enp1s0..15"])
 def test_interface_name_invalid(val: Any):
     with raises(ValueError):
         InterfaceName(val)
