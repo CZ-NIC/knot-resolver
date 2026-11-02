@@ -194,7 +194,7 @@ class DomainName(StrBase):
 class InterfaceName(PatternBase):
     """Network interface name."""
 
-    _re = re.compile(r"^[a-zA-Z0-9]+(?:[-_][a-zA-Z0-9]+)*$")
+    _re = re.compile(r"^[a-zA-Z0-9]+(?:[-_.][a-zA-Z0-9]+)*$")
 
 
 class IDPattern(PatternBase):
