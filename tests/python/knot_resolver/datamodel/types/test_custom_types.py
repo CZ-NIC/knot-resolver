@@ -197,7 +197,7 @@ def test_interface_name_valid(val: str):
     assert str(InterfaceName(val)) == val
 
 
-@pytest.mark.parametrize("val", ["_lo", "-wlo1", "lo_", "wlo1-", "e8--2", "web__ifgrp", "enp1s0..15"])
+@pytest.mark.parametrize("val", ["_lo", "-wlo1", ".enp1s0", "lo_", "wlo1-", "enp1s0.", "e8--2", "web__ifgrp", "enp1s0..15"])
 def test_interface_name_invalid(val: Any):
     with raises(ValueError):
         InterfaceName(val)
