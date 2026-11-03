@@ -81,6 +81,10 @@ if LINUX_SYS:
 async def start_resolver(args: KresArgs) -> int:
     logger.notice(f"Starting Knot Resolver {VERSION}...")
 
+    # TODO(amrazek): This should be just a temporary solution
+    # for passing the log level from the launcher arguments.
+    os.environ["KRES_LOGTARGET"] = args.logtarget
+
     # Block signals during initialization
     blocked_signals = {signal.SIGHUP, signal.SIGINT, signal.SIGTERM}
     signal.pthread_sigmask(signal.SIG_BLOCK, blocked_signals)
@@ -144,8 +148,7 @@ async def start_resolver(args: KresArgs) -> int:
         return 1
 
     # Reconfigure logging based on config
-    groups = config.logging.groups
-    reconfigure_logging(config, "launcher", bool(groups and "launcher" in groups))
+    reconfigure_logging("launcher", config, True)
 
     if LINUX_SYS:
         # Disable Transparent Huge Pages on Linux for this process and all children.
