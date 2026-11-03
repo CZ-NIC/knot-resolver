@@ -1,10 +1,19 @@
 import logging
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from knot_resolver.datamodel.config_schema import KresConfig
 
+
+MANAGER_PROCESS_DESCRIPTION = (
+    "Knot Resolver Manager - A Python program for "
+    "managing and orchestrating Knot Resolver components."
+)
+
+MANAGER_PROCESS_NAME_DEFAULT = "manager"
+MANAGER_PROCESS_NAME = os.environ.get("SUPERVISOR_PROCESS_NAME", MANAGER_PROCESS_NAME_DEFAULT)
 
 LOGGING_LEVEL_STARTUP = logging.DEBUG
 

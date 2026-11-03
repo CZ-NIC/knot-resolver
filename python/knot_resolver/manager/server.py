@@ -505,8 +505,7 @@ async def _sigterm_while_shutting_down() -> None:
 
 @only_on_real_changes_update(lambda config: config.logging)
 async def _configure_logger(config: KresConfig, force: bool = False) -> None:
-    groups = config.logging.groups
-    reconfigure_logging(config, debug=bool(groups and "manager" in groups))
+    reconfigure_logging("manager", config)
 
 
 async def logger_init(config_store: ConfigStore) -> None:
@@ -516,6 +515,10 @@ async def logger_init(config_store: ConfigStore) -> None:
 async def start_server(args: KresArgs) -> int:
     # This function is quite long, but it describes how manager runs. So let's silence pylint
     # pylint: disable=too-many-statements
+
+    # TODO(amrazek): This should be just a temporary solution
+    # for passing the log level from the manager arguments.
+    os.environ["KRES_LOGTARGET"] = args.logtarget
 
     start_time = time()
     manager: Optional[KresManager] = None

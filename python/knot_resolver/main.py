@@ -10,6 +10,6 @@ from .logging import start_logging
 
 def main() -> None:
     args = parse_args()
-    start_logging(args, "launcher")
+    start_logging("launcher", args, True)
     exit_code = asyncio.run(start_resolver(args))
     sys.exit(exit_code)
