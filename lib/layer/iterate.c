@@ -1252,10 +1252,9 @@ skip_checks:
 		break;
 	}
 
-rrarray_finalize:
+rrarray_finalize:;
 	/* Finish construction of libknot-format RRsets.
 	 * We do this even if dropping the answer, though it's probably useless. */
-	(void)0;
 	const struct kr_cache *cache = &req->ctx->cache;
 	ranked_rr_array_t *selected[] = kr_request_selected(req);
 	for (knot_section_t i = KNOT_ANSWER; i <= KNOT_ADDITIONAL; ++i) {

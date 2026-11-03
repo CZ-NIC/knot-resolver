@@ -686,7 +686,7 @@ int zi_zone_import(const zi_config_t config)
 	}
 
    //// Do all ZONEMD processing, if desired.
-zonemd: (void)0; // C can't have a variable definition following a label
+zonemd:;
 	double time_zonemd = NAN;
 	if (c->zonemd) {
 		kr_timer_start(&stopwatch);
