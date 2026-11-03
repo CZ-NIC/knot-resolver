@@ -2,7 +2,6 @@ import os
 from typing import Any, List, Literal, Optional, Set, Type, Union, cast
 
 from knot_resolver.datamodel.types import WritableFilePath
-from knot_resolver.logging import KRES_LOGTARGET_ENV_VAR
 from knot_resolver.utils.modeling import ConfigSchema
 from knot_resolver.utils.modeling.base_schema import is_obj_type_valid
 
@@ -10,10 +9,11 @@ LogLevelEnum = Literal["crit", "err", "warning", "notice", "info", "debug"]
 LogTargetEnum = Literal["syslog", "stderr", "stdout"]
 
 LogGroupsProcessesEnum = Literal[
-    "manager",
+    "launcher",
     "supervisord",
-    "policy-loader",
-    "kresd",
+    "manager",
+    "loader",
+    "worker",
     "cache-gc",
 ]
 
@@ -78,6 +78,8 @@ LogGroupsKresdEnum = Literal[
 ]
 
 LogGroupsEnum = Literal[LogGroupsProcessesEnum, LogGroupsManagerEnum, LogGroupsKresdEnum]
+
+KRES_LOGTARGET_ENV_VAR = "KRES_LOGTARGET"
 
 
 class DnstapSchema(ConfigSchema):

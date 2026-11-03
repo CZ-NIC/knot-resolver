@@ -1594,10 +1594,11 @@
                     "items": {
                         "type": "string",
                         "enum": [
-                            "manager",
+                            "launcher",
                             "supervisord",
-                            "policy-loader",
-                            "kresd",
+                            "manager",
+                            "loader",
+                            "worker",
                             "cache-gc",
                             "files",
                             "metrics",
@@ -1626,7 +1627,6 @@
                             "cookie",
                             "statis",
                             "rebind",
-                            "worker",
                             "policy",
                             "daf",
                             "timejm",
