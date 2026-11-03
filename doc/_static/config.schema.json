@@ -1650,7 +1650,8 @@
                             "prlayr",
                             "defer",
                             "doq",
-                            "ngtcp2"
+                            "ngtcp2",
+                            "prefet"
                         ]
                     },
                     "description": "List of groups for which 'debug' logging level is set.",

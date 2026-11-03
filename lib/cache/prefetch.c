@@ -10,7 +10,7 @@
 
 #include <math.h>
 
-#define VERBOSE_LOG(fmt, ...) kr_log_debug(CACHE, "PREFETCH  " fmt "\n", ## __VA_ARGS__)
+#define VERBOSE_LOG(fmt, ...) kr_log_debug(PREFETCH, fmt "\n", ## __VA_ARGS__)
 #define VERBOSE_LOG_pkey(fmt, ...) \
 	{ WITH_VERBOSE((struct kr_query *) NULL) \
 		VERBOSE_LOG(fmt " %6d %s", ## __VA_ARGS__, sched.ep ? sched.ep->exp_time - time_now : 0, kr_cache_top_strkey(pkey.data, pkey.len)); }
