@@ -237,8 +237,7 @@ int key_consistent(knot_db_val_t key)
 	}
 	// the next character can be used for classification
 	switch (kd[i]) {
-	case 'E':
-		(void)0; // C can't have a variable definition following a label
+	case 'E':;
 		uint16_t type;
 		if (kr_fails_assert(i + 1 + sizeof(type) <= key.len))
 			return kr_error(EINVAL);
