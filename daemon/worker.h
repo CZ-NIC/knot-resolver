@@ -138,6 +138,7 @@ typedef array_t(const char *) doh_headerlist_t;
 /** \details Worker state is meant to persist during the whole life of daemon. */
 struct worker_ctx {
 	uv_loop_t *loop;
+    char *name;	/** Custom worker name (e.g. Supervisord process name). */
 	int count;  /** unreliable, does not count systemd instance, do not use */
 	int vars_table_ref;
 	unsigned tcp_pipeline_max;
