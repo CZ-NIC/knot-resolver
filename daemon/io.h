@@ -42,6 +42,10 @@ void tcp_timeout_trigger(uv_timer_t *timer);
  * \param family = AF_*
  * \param has_tls has meanings only when type is SOCK_STREAM */
 int io_create(uv_loop_t *loop, uv_handle_t **handle, int type, unsigned family);
+/** Ask the kernel to report ICMP errors, such as host or network unreachable,
+ * on an outgoing connected UDP socket.  Without this, Linux reports only some
+ * of them, like port unreachable, and a read waits for its timeout instead. */
+void io_udp_set_recverr(uv_udp_t *handle, int family);
 void io_free(uv_handle_t *handle);
 
 int io_start_read(uv_handle_t *handle);

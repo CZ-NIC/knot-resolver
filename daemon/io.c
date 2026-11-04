@@ -61,11 +61,31 @@ static void udp_on_unwrapped(int status, struct session2 *session,
 	wire_buf_reset(&session->wire_buf);
 }
 
+/** Whether a read error means no answer can come from the peer. */
+static bool udp_peer_unreachable(ssize_t nread)
+{
+	return nread == UV_ECONNREFUSED || nread == UV_EHOSTUNREACH
+		|| nread == UV_ENETUNREACH;
+}
+
 void udp_recv(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 	const struct sockaddr *comm_addr, unsigned flags)
 {
 	struct session2 *s = handle->data;
-	if (s->closing || nread <= 0 || comm_addr->sa_family == AF_UNSPEC)
+	if (s->closing)
+		return;
+	if (nread < 0) {
+		/* An ICMP error for a connected outgoing socket fails the read,
+		 * and comm_addr is NULL then.  (Entries that libuv drains from
+		 * the error queue afterwards come with an address; skip them so
+		 * one error is handled once.)  No answer will come, so act on it
+		 * the way the timer would, without waiting for it. */
+		if (s->outgoing && !s->stream && !comm_addr
+				&& udp_peer_unreachable(nread))
+			session2_event(s, PROTOLAYER_EVENT_GENERAL_TIMEOUT, NULL);
+		return;
+	}
+	if (nread == 0 || comm_addr->sa_family == AF_UNSPEC)
 		return;
 
 	if (!the_network->enable_connect_udp && s->outgoing) {
@@ -926,6 +946,21 @@ int io_listen_xdp(uv_loop_t *loop, struct endpoint *ep, const char *ifname)
 	return ret;
 }
 #endif
+
+void io_udp_set_recverr(uv_udp_t *handle, int family)
+{
+#if defined(IP_RECVERR) && defined(IPV6_RECVERR)
+	uv_os_fd_t fd;
+	if (uv_fileno((uv_handle_t *)handle, &fd) != 0)
+		return;
+	const int yes = 1;
+	int ret = family == AF_INET6
+		? setsockopt(fd, IPPROTO_IPV6, IPV6_RECVERR, &yes, sizeof(yes))
+		: setsockopt(fd, IPPROTO_IP, IP_RECVERR, &yes, sizeof(yes));
+	if (ret)
+		kr_log_debug(IO, "failed to set IP_RECVERR: %s\n", strerror(errno));
+#endif
+}
 
 int io_create(uv_loop_t *loop, uv_handle_t **handle,
               int type, unsigned family)
