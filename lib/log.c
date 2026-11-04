@@ -97,6 +97,18 @@ bool kr_log_group_is_set(enum kr_log_group group)
 	return kr_log_groups & (1ULL << group);
 }
 
+static char *kr_log_ident = NULL;
+
+void kr_log_ident_set(const char *ident)
+{
+    char *new_ident = ident ? strdup(ident) : NULL;
+    if (ident && !new_ident)
+        return;
+
+    free(kr_log_ident);
+    kr_log_ident = new_ident;
+}
+
 void kr_log_fmt(enum kr_log_group group, kr_log_level_t level, const char *file,
 		const char *line, const char *func, const char *fmt, ...)
 {
@@ -112,7 +124,23 @@ void kr_log_fmt(enum kr_log_group group, kr_log_level_t level, const char *file,
 		va_start(args, fmt);
 		if (use_journal) {
 		#if ENABLE_LIBSYSTEMD
-			sd_journal_printv_with_location(level, file, line, func, fmt, args);
+			if (kr_log_ident) {
+				char *message = NULL;
+				if (vasprintf(&message, fmt, args) >= 0) {
+					sd_journal_send(
+						"MESSAGE=%s", message,
+						"PRIORITY=%d", level,
+						"SYSLOG_IDENTIFIER=%s", kr_log_ident,
+						"CODE_FILE=%s", file,
+						"CODE_LINE=%s", line,
+						"CODE_FUNC=%s", func,
+						NULL
+					);
+					free(message);
+				}
+			} else {
+				sd_journal_printv_with_location(level, file, line, func, fmt, args);
+			}
 		#endif
 		} else {
 			vsyslog(level, fmt, args);
@@ -265,7 +293,7 @@ void kr_log_target_set(kr_log_target_t target)
 	use_journal = ret > 0;
 #endif
 	if (!use_journal)
-		openlog(NULL, LOG_PID, LOG_DAEMON);
+		openlog(kr_log_ident, LOG_PID, LOG_DAEMON);
 	if (ret < 0)
 		kr_log_error(SYSTEM, "failed test for systemd presence: %s\n",
 				strerror(abs(ret)));
