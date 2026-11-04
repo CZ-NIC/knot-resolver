@@ -20,6 +20,9 @@
 #if defined(__GLIBC__) && defined(_GNU_SOURCE)
 #include <malloc.h>
 #endif
+#ifdef __linux__
+#include <sys/prctl.h>
+#endif
 #include <sys/types.h>
 #include <unistd.h>
 #include <gnutls/gnutls.h>
@@ -1757,6 +1760,9 @@ void worker_deinit(void)
 
 	mp_delete(the_worker->pkt_pool.ctx);
 	the_worker->pkt_pool.ctx = NULL;
+	
+	free(the_worker->name);
+	the_worker->name = NULL;
 
 	the_worker = NULL;
 }
@@ -2435,7 +2441,24 @@ int worker_init(void)
 	/* Set some worker.* fields in Lua */
 	lua_getglobal(L, "worker");
 	pid_t pid = getpid();
-
+	
+	const char *worker_name = getenv("SUPERVISOR_PROCESS_NAME");
+	if (worker_name && *worker_name) {
+		the_worker->name = strdup(worker_name);
+		if (!the_worker->name)
+			return kr_error(ENOMEM);
+	}
+	lua_pushstring(L, the_worker->name);
+	lua_setfield(L, -2, "name");
+	
+	if (the_worker->name) {
+		kr_log_ident_set(the_worker->name);
+		#ifdef __linux__
+		if (prctl(PR_SET_NAME, the_worker->name, 0, 0, 0) == -1)
+			return kr_error(errno);
+		#endif
+	}
+	
 	auto_free char *pid_str = NULL;
 	const char *inst_name = getenv("SYSTEMD_INSTANCE");
 	if (inst_name) {

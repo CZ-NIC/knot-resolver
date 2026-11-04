@@ -29,6 +29,8 @@ kr_log_target_t kr_log_target;
 KR_EXPORT
 void kr_log_target_set(kr_log_target_t target);
 
+KR_EXPORT
+void kr_log_ident_set(const char *ident);
 
 /* Groups */
 
