@@ -435,7 +435,9 @@ static int cdb_open_env(struct lmdb_env *env, const char *path, const size_t map
 	if (env->is_cache)
 		kr_log_debug(MDB, "%s\n", debug_msg);
 
-	ret = want_fallocate ? posix_fallocate(fd, size_orig, MAX(env->mapsize, env->st_size)) : 0;
+	ret = 0;
+	if (want_fallocate)
+		ret = posix_fallocate(fd, size_orig, MAX(env->mapsize, env->st_size) - size_orig);
 	if (ret == EINVAL || ret == EOPNOTSUPP) {
 		/* POSIX says this can happen when the feature isn't supported by the FS.
 		 * We haven't seen this happen on Linux+glibc but it was reported on
