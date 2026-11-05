@@ -87,20 +87,23 @@ static void rr_scan2trie(zs_scanner_t *s, const struct kr_rule_zonefile_config *
 	rrs.rrs.rdata = r_data_buf;
 	int ret = knot_rrset_rr_to_canonical(&rrs);
 #endif
-	static bool warned_canon = false;
-	if (unlikely(ret) && !warned_canon) {
-		KR_DNAME_GET_STR(owner_str, s->r_owner);
-		KR_RRTYPE_GET_STR(type_str, s->r_type);
-		kr_log_error(RULES,
-			"skipping a record which failed to process ('%s' %s): %s\n"
-		 	"reporting this type of issue only once per reload\n",
-		 	owner_str, type_str, knot_strerror(ret));
-		warned_canon = true;
+	// and insert finally:
+	if (likely(ret == KNOT_EOK)) {
+		ret = knot_rrset_add_rdata(rr, s->r_data, s->r_data_length, s_data->pool);
+		kr_assert(ret == KNOT_EOK);
 		return;
 	}
-	// and insert finally:
-	ret = knot_rrset_add_rdata(rr, s->r_data, s->r_data_length, s_data->pool);
-	kr_assert(!ret);
+	// or warn
+	static bool warned_canon = false;
+	if (warned_canon)
+		return;
+	KR_DNAME_GET_STR(owner_str, s->r_owner);
+	KR_RRTYPE_GET_STR(type_str, s->r_type);
+	kr_log_error(RULES,
+		"skipping a record which failed to process ('%s' %s): %s\n"
+		"reporting this type of issue only once per reload\n",
+		owner_str, type_str, knot_strerror(ret));
+	warned_canon = true;
 }
 /// Process an RRset of other types into a rule
 static int rr_trie2rule(const char *key_data, uint32_t key_len, trie_val_t *rr_p, void *config)
