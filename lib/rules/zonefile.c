@@ -89,7 +89,7 @@ static void rr_scan2trie(zs_scanner_t *s, const struct kr_rule_zonefile_config *
 #endif
 	// and insert finally:
 	if (likely(ret == KNOT_EOK)) {
-		ret = knot_rrset_add_rdata(rr, s->r_data, s->r_data_length, s_data->pool);
+		ret = knot_rrset_add_rdata(rr, r_data_buf->data, r_data_buf->len, s_data->pool);
 		kr_assert(ret == KNOT_EOK);
 		return;
 	}
