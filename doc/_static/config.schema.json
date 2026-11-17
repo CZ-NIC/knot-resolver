@@ -1053,11 +1053,17 @@
                                 "type": "boolean",
                                 "description": "Enable/disable DNSSEC.",
                                 "default": true
+                            },
+                            "tcp": {
+                                "type": "boolean",
+                                "description": "Use TCP to connect to the forwarding targets.",
+                                "default": false
                             }
                         },
                         "default": {
                             "authoritative": false,
-                            "dnssec": true
+                            "dnssec": true,
+                            "tcp": false
                         }
                     }
                 }

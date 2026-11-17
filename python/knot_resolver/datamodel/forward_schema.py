@@ -34,10 +34,12 @@ class ForwardOptionsSchema(ConfigSchema):
     ---
     authoritative: The forwarding target is an authoritative server.
     dnssec: Enable/disable DNSSEC.
+    tcp: Use TCP to connect to the forwarding targets.
     """
 
     authoritative: bool = False
     dnssec: bool = True
+    tcp: bool = False
 
 
 class ForwardSchema(ConfigSchema):

@@ -17,11 +17,22 @@ def test_policy_rule_forward_add():
             },
         }
     )
-    result = "policy.rule_forward_add('.',{dnssec=true,auth=false},{{'2001:148f:fffe::1',tls=false,hostname='odvr.nic.cz',},{'185.43.135.1',tls=false,hostname='odvr.nic.cz',},})"
+    result = "policy.rule_forward_add('.',{dnssec=true,auth=false,tcp=false},{{'2001:148f:fffe::1',tls=false,hostname='odvr.nic.cz',},{'185.43.135.1',tls=false,hostname='odvr.nic.cz',},})"
 
     tmpl = template_from_str(tmpl_str)
     assert tmpl.render(rule=rule) == result
 
     rule.servers = [IPAddressOptionalPort("2001:148f:fffe::1"), IPAddressOptionalPort("185.43.135.1")]
-    result = "policy.rule_forward_add('.',{dnssec=true,auth=false},{{'2001:148f:fffe::1'},{'185.43.135.1'},})"
+    result = "policy.rule_forward_add('.',{dnssec=true,auth=false,tcp=false},{{'2001:148f:fffe::1'},{'185.43.135.1'},})"
+    assert tmpl.render(rule=rule) == result
+
+
+def test_policy_rule_forward_add_tcp():
+    tmpl_str = """{% from 'macros/forward_macros.lua.j2' import policy_rule_forward_add %}
+{{ policy_rule_forward_add(rule.subtree[0],rule.options,rule.servers) }}"""
+
+    rule = ForwardSchema({"subtree": ".", "servers": ["9.9.9.9"], "options": {"tcp": True}})
+    result = "policy.rule_forward_add('.',{dnssec=true,auth=false,tcp=true},{{'9.9.9.9'},})"
+
+    tmpl = template_from_str(tmpl_str)
     assert tmpl.render(rule=rule) == result

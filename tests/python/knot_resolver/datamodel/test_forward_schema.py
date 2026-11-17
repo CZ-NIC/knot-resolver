@@ -31,6 +31,13 @@ def test_forward_valid(port: int, auth: bool):
     )
 
 
+@pytest.mark.parametrize("tcp", [False, True])
+def test_forward_tcp(tcp: bool):
+    fwd = ForwardSchema({"subtree": ".", "options": {"tcp": tcp}, "servers": ["127.0.0.1"]})
+    assert fwd.options.tcp == tcp
+    assert ForwardSchema({"subtree": ".", "servers": ["127.0.0.1"]}).options.tcp is False
+
+
 @pytest.mark.parametrize(
     "port,auth,tls",
     [(5335, True, False), (53, True, True)],

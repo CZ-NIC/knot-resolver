@@ -1,7 +1,7 @@
 {% from 'macros/common_macros.lua.j2' import boolean, string_table %}
 
 {% macro forward_options(options) -%}
-{dnssec={{ boolean(options.dnssec) }},auth={{ boolean(options.authoritative) }}}
+{dnssec={{ boolean(options.dnssec) }},auth={{ boolean(options.authoritative) }},tcp={{ boolean(options.tcp) }}}
 {%- endmacro %}
 
 {% macro forward_server(server) -%}

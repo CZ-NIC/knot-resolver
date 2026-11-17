@@ -93,3 +93,10 @@ The :option:`forward <forward: <list>>` list of rules overrides which servers ge
          :default: true
 
          Enable/disable DNSSEC for a subtree.
+
+      .. option:: tcp: true|false
+
+         :default: false
+
+         Use TCP to connect to the forwarding targets.
+         Targets with ``transport: tls`` use TLS, which always runs over TCP.
