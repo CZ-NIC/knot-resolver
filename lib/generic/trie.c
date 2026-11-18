@@ -123,6 +123,27 @@ static void assert_portability(void) {
 #endif
 }
 
+/*! \brief Initialize a new leaf, copying the key, and returning failure code. */
+static int mkleaf(node_t *leaf, const char *key, uint32_t len, knot_mm_t *mm)
+{
+	tkey_t *lkey = mm_alloc(mm, sizeof(tkey_t) + len);
+	#if FLAGS_HACK
+		assert(((uintptr_t)lkey) % 4 == 0); // we need an aligned pointer
+	#endif
+	if (unlikely(!lkey))
+		return KNOT_ENOMEM;
+	lkey->len = len;
+	memcpy(lkey->chars, key, len);
+	leaf->leaf = (leaf_t){
+		#if !FLAGS_HACK
+			.flags = 0,
+		#endif
+		.val = NULL,
+		.key = lkey
+	};
+	return KNOT_EOK;
+}
+
 /*! \brief Propagate error codes. */
 #define ERR_RETURN(x) \
 	do { \
@@ -764,34 +785,13 @@ success:
 	}
 }
 
-/*! \brief Initialize a new leaf, copying the key, and returning failure code. */
-static int mk_leaf(node_t *leaf, const char *key, uint32_t len, knot_mm_t *mm)
-{
-	tkey_t *k = mm_alloc(mm, sizeof(tkey_t) + len);
-	#if FLAGS_HACK
-		assert(((uintptr_t)k) % 4 == 0); // we need an aligned pointer
-	#endif
-	if (unlikely(!k))
-		return KNOT_ENOMEM;
-	k->len = len;
-	memcpy(k->chars, key, len);
-	leaf->leaf = (leaf_t){
-		#if !FLAGS_HACK
-			.flags = 0,
-		#endif
-		.val = NULL,
-		.key = k
-	};
-	return KNOT_EOK;
-}
-
 trie_val_t* trie_get_ins(trie_t *tbl, const char *key, uint32_t len)
 {
 	if (kr_fails_assert(tbl))
 		return NULL;
 	// First leaf in an empty tbl?
 	if (unlikely(!tbl->weight)) {
-		if (unlikely(mk_leaf(&tbl->root, key, len, &tbl->mm)))
+		if (unlikely(mkleaf(&tbl->root, key, len, &tbl->mm)))
 			return NULL;
 		++tbl->weight;
 		return tvalp(&tbl->root);
@@ -810,7 +810,7 @@ trie_val_t* trie_get_ins(trie_t *tbl, const char *key, uint32_t len)
 	if (bp.flags == 0) // the same key was already present
 		return tvalp(t);
 	node_t leaf;
-	if (unlikely(mk_leaf(&leaf, key, len, &tbl->mm)))
+	if (unlikely(mkleaf(&leaf, key, len, &tbl->mm)))
 		return NULL;
 
 	if (isbranch(t) && bp.index == t->branch.index && bp.flags == t->branch.flags) {
