@@ -656,26 +656,25 @@ static int ns_prev_leaf(nstack_t *ns)
 	assert(ns && ns->len > 0);
 
 	node_t *t = ns->stack[ns->len - 1];
+	// Beware: BMP_NOBYTE child is ordered *before* its parent.
 	if (hastwig(t, 1 << 0)) { // the prefix leaf
 		ERR_RETURN(ns_longer(ns));
 		ns->stack[ns->len++] = twig(t, 0);
 		return KNOT_EOK;
 	}
 
-	do {
-		if (ns->len < 2)
-			return KNOT_ENOENT; // root without empty key has no previous leaf
+	for (; ns->len >= 2; --ns->len) {
 		t = ns->stack[ns->len - 1];
 		node_t *p = ns->stack[ns->len - 2];
 		uint ci = twig_number(t, p);
 		assert(ci >= 0 && ci <= 16);
-		if (ci > 0) { // t isn't the first child -> go down the previous one
-			ns->stack[ns->len - 1] = twig(p, ci - 1);
-			return ns_last_leaf(ns);
-		}
-		// we've got to go up again
-		--ns->len;
-	} while (true);
+		if (ci == 0) // we've got to go up again
+			continue;
+		// t isn't the first child -> go down the previous one
+		ns->stack[ns->len - 1] = twig(p, ci - 1);
+		return ns_last_leaf(ns);
+	}
+	return KNOT_ENOENT; // root without empty key has no previous leaf
 }
 
 /*!
@@ -691,21 +690,22 @@ static int ns_next_leaf(nstack_t *ns)
 	node_t *t = ns->stack[ns->len - 1];
 	if (isbranch(t))
 		return ns_first_leaf(ns);
-	do {
-		if (ns->len < 2)
-			return KNOT_ENOENT; // not found, as no more parent is available
+	for (; ns->len >= 2; --ns->len) {
 		t = ns->stack[ns->len - 1];
 		node_t *p = ns->stack[ns->len - 2];
 		uint ci = twig_number(t, p);
 		assert(ci >= 0 && ci <= 16);
 		uint cc = bitmap_weight(p->branch.bitmap);
-		if (ci + 1 < cc) { // t isn't the last child -> go down the next one
-			ns->stack[ns->len - 1] = twig(p, ci + 1);
-			return ns_first_leaf(ns);
+		assert(ci + 1 <= cc);
+		if (ci + 1 == cc) {
+			// t is the last child of p, so we need to keep climbing
+			continue;
 		}
-		// we've got to go up again
-		--ns->len;
-	} while (true);
+		// go down the next child of p
+		ns->stack[ns->len - 1] = twig(p, ci + 1);
+		return ns_first_leaf(ns);
+	}
+	return KNOT_ENOENT; // not found, as no more parent is available
 }
 
 int trie_get_leq(trie_t *tbl, const char *key, uint32_t len, trie_val_t **val)
