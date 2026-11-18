@@ -198,6 +198,13 @@ static bool hastwig(const node_t *t, bitmap_t bit)
 	return t->branch.bitmap & bit;
 }
 
+/*! \brief Get pointer to packed array of child nodes. */
+static node_t* twigs(const node_t *t)
+{
+	assert(isbranch(t));
+	return t->branch.twigs;
+}
+
 /*! \brief Compute offset of an existing child in a branch node. */
 static uint twigoff(const node_t *t, bitmap_t b)
 {
@@ -209,7 +216,15 @@ static uint twigoff(const node_t *t, bitmap_t b)
 static node_t* twig(node_t *t, uint i)
 {
 	assert(isbranch(t));
-	return &t->branch.twigs[i];
+	return twigs(t) + i;
+}
+
+/*! \brief Get the position of a child node within its parent's twigs array. */
+static uint twig_number(node_t *child, node_t *parent)
+{
+	ptrdiff_t num = child - twigs(parent);
+	assert(num >= 0 && num < bitmap_weight(parent->branch.bitmap));
+	return (uint)num;
 }
 
 /*!
@@ -261,11 +276,10 @@ static void clear_trie(node_t *trie, knot_mm_t *mm)
 	if (!isbranch(trie)) {
 		mm_free(mm, tkey(trie));
 	} else {
-		branch_t *b = &trie->branch;
-		int len = bitmap_weight(b->bitmap);
-		for (int i = 0; i < len; ++i)
-			clear_trie(b->twigs + i, mm);
-		mm_free(mm, b->twigs);
+		uint len = bitmap_weight(trie->branch.bitmap);
+		for (uint i = 0; i < len; ++i)
+			clear_trie(twig(trie, i), mm);
+		mm_free(mm, twigs(trie));
 	}
 }
 
@@ -314,7 +328,7 @@ static struct found find_equal(trie_t *tbl, const char *key, uint32_t len)
 	branch_t *p = NULL;
 	bitmap_t b = 0;
 	while (isbranch(t)) {
-		__builtin_prefetch(t->branch.twigs);
+		__builtin_prefetch(twigs(t));
 		b = twigbit(t, key, len);
 		if (!hastwig(t, b))
 			return ret0;
@@ -345,7 +359,7 @@ static struct found find_first(trie_t *tbl)
 	branch_t *p = NULL;
 	while (isbranch(t)) {
 		p = &t->branch;
-		t = &p->twigs[0];
+		t = twig(p, 0);
 	}
 	return (struct found) {
 		.l = &t->leaf,
@@ -388,19 +402,19 @@ static int del_found(trie_t *tbl, struct found found, trie_val_t *val)
 		return KNOT_EOK;
 	}
 	// remove leaf t as child of p; get child index via pointer arithmetic
-	int ci = ((union node *)found.l) - p->twigs,
+	node_t *tp = twigs(p);
+	int ci = ((union node *)found.l) - tp,
 	    cc = bitmap_weight(p->bitmap); // child count
 	assert(ci >= 0 && ci < cc);
 
 	if (cc == 2) { // collapse binary node p: move the other child to this node
-		node_t *twigs = p->twigs;
-		(*(union node *)p) = twigs[1 - ci]; // it might be a leaf or branch
-		mm_free(&tbl->mm, twigs);
+		(*(union node *)p) = tp[1 - ci]; // it might be a leaf or branch
+		mm_free(&tbl->mm, tp);
 		return KNOT_EOK;
 	}
-	memmove(p->twigs + ci, p->twigs + ci + 1, sizeof(node_t) * (cc - ci - 1));
+	memmove(tp + ci, tp + ci + 1, sizeof(node_t) * (cc - ci - 1));
 	p->bitmap &= ~found.b;
-	node_t *twigs = mm_realloc(&tbl->mm, p->twigs, sizeof(node_t) * (cc - 1),
+	node_t *twigs = mm_realloc(&tbl->mm, tp, sizeof(node_t) * (cc - 1),
 	                           sizeof(node_t) * cc);
 	if (likely(twigs != NULL))
 		p->twigs = twigs;
@@ -533,7 +547,7 @@ static int ns_find_branch(nstack_t *ns, const char *key, uint32_t len,
 	while (isbranch(ns->stack[ns->len - 1])) {
 		ERR_RETURN(ns_longer(ns));
 		node_t *t = ns->stack[ns->len - 1];
-		__builtin_prefetch(t->branch.twigs);
+		__builtin_prefetch(twigs(t));
 		bitmap_t b = twigbit(t, key, len);
 		// Even if our key is missing from this branch we need to
 		// keep iterating down to a leaf. It doesn't matter which
@@ -608,7 +622,7 @@ static int ns_last_leaf(nstack_t *ns)
 		node_t *t = ns->stack[ns->len - 1];
 		if (!isbranch(t))
 			return KNOT_EOK;
-		int lasti = bitmap_weight(t->branch.bitmap) - 1;
+		uint lasti = bitmap_weight(t->branch.bitmap) - 1;
 		assert(lasti >= 0);
 		ns->stack[ns->len++] = twig(t, lasti);
 	} while (true);
@@ -643,9 +657,8 @@ static int ns_prev_leaf(nstack_t *ns)
 
 	node_t *t = ns->stack[ns->len - 1];
 	if (hastwig(t, 1 << 0)) { // the prefix leaf
-		t = twig(t, 0);
 		ERR_RETURN(ns_longer(ns));
-		ns->stack[ns->len++] = t;
+		ns->stack[ns->len++] = twig(t, 0);
 		return KNOT_EOK;
 	}
 
@@ -654,10 +667,10 @@ static int ns_prev_leaf(nstack_t *ns)
 			return KNOT_ENOENT; // root without empty key has no previous leaf
 		t = ns->stack[ns->len - 1];
 		node_t *p = ns->stack[ns->len - 2];
-		int pindex = t - p->branch.twigs; // index in parent via pointer arithmetic
-		assert(pindex >= 0 && pindex <= 16);
-		if (pindex > 0) { // t isn't the first child -> go down the previous one
-			ns->stack[ns->len - 1] = twig(p, pindex - 1);
+		uint ci = twig_number(t, p);
+		assert(ci >= 0 && ci <= 16);
+		if (ci > 0) { // t isn't the first child -> go down the previous one
+			ns->stack[ns->len - 1] = twig(p, ci - 1);
 			return ns_last_leaf(ns);
 		}
 		// we've got to go up again
@@ -683,11 +696,11 @@ static int ns_next_leaf(nstack_t *ns)
 			return KNOT_ENOENT; // not found, as no more parent is available
 		t = ns->stack[ns->len - 1];
 		node_t *p = ns->stack[ns->len - 2];
-		int pindex = t - p->branch.twigs; // index in parent via pointer arithmetic
-		assert(pindex >= 0 && pindex <= 16);
-		int pcount = bitmap_weight(p->branch.bitmap);
-		if (pindex + 1 < pcount) { // t isn't the last child -> go down the next one
-			ns->stack[ns->len - 1] = twig(p, pindex + 1);
+		uint ci = twig_number(t, p);
+		assert(ci >= 0 && ci <= 16);
+		uint cc = bitmap_weight(p->branch.bitmap);
+		if (ci + 1 < cc) { // t isn't the last child -> go down the next one
+			ns->stack[ns->len - 1] = twig(p, ci + 1);
 			return ns_first_leaf(ns);
 		}
 		// we've got to go up again
@@ -805,16 +818,16 @@ trie_val_t* trie_get_ins(trie_t *tbl, const char *key, uint32_t len)
 		bitmap_t b1 = twigbit(t, key, len);
 		assert(!hastwig(t, b1));
 		uint s, m; TWIGOFFMAX(s, m, t, b1); // new child position and original child count
-		node_t *twigs = mm_realloc(&tbl->mm, t->branch.twigs,
+		node_t *nt = mm_realloc(&tbl->mm, twigs(t),
 				sizeof(node_t) * (m + 1), sizeof(node_t) * m);
-		if (unlikely(!twigs))
+		if (unlikely(!nt))
 			goto err_leaf;
-		memmove(twigs + s + 1, twigs + s, sizeof(node_t) * (m - s));
-		twigs[s] = leaf;
-		t->branch.twigs = twigs;
+		memmove(nt + s + 1, nt + s, sizeof(node_t) * (m - s));
+		nt[s] = leaf;
+		t->branch.twigs = nt;
 		t->branch.bitmap |= b1;
 		++tbl->weight;
-		return tvalp(&twigs[s]);
+		return tvalp(&nt[s]);
 	} else {
 		// We need to insert a new binary branch with leaf at *t.
 		// Note: it works the same for the case where we insert above root t.
@@ -824,13 +837,13 @@ trie_val_t* trie_get_ins(trie_t *tbl, const char *key, uint32_t len)
 				assert(hastwig(pt, twigbit(pt, key, len)));
 			}
 		#endif
-		node_t *twigs = mm_alloc(&tbl->mm, sizeof(node_t) * 2);
-		if (unlikely(!twigs))
+		node_t *nt = mm_alloc(&tbl->mm, sizeof(node_t) * 2);
+		if (unlikely(!nt))
 			goto err_leaf;
 		node_t t2 = *t; // Save before overwriting t.
 		t->branch.flags = bp.flags;
 		t->branch.index = bp.index;
-		t->branch.twigs = twigs;
+		t->branch.twigs = nt;
 		bitmap_t b1 = twigbit(t, key, len);
 		bitmap_t b2 = unlikely(k2 == -256) ? (1 << 0) : nibbit(k2, bp.flags);
 		t->branch.bitmap = b1 | b2;
@@ -851,8 +864,8 @@ static int apply_trie(node_t *t, int (*f)(trie_val_t *, void *), void *d)
 	assert(t);
 	if (!isbranch(t))
 		return f(tvalp(t), d);
-	int child_count = bitmap_weight(t->branch.bitmap);
-	for (int i = 0; i < child_count; ++i)
+	uint child_count = bitmap_weight(t->branch.bitmap);
+	for (uint i = 0; i < child_count; ++i)
 		ERR_RETURN(apply_trie(twig(t, i), f, d));
 	return KNOT_EOK;
 }
@@ -871,8 +884,8 @@ static int apply_trie_with_key(node_t *t, int (*f)(const char *, uint32_t, trie_
 	assert(t);
 	if (!isbranch(t))
 		return f(tkey(t)->chars, tkey(t)->len, tvalp(t), d);
-	int child_count = bitmap_weight(t->branch.bitmap);
-	for (int i = 0; i < child_count; ++i)
+	uint child_count = bitmap_weight(t->branch.bitmap);
+	for (uint i = 0; i < child_count; ++i)
 		ERR_RETURN(apply_trie_with_key(twig(t, i), f, d));
 	return KNOT_EOK;
 }
