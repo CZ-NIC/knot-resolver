@@ -455,28 +455,32 @@ trie_val_t* trie_get_first(trie_t *tbl, trie_key_t **key, uint32_t *len)
 	return tvalp(found.l);
 }
 
-/** Delete the found element (if any) and return value (unless NULL is passed) */
+/*! \brief Delete leaf t with parent p; b is the bit for t under p.
+ * Optionally return the deleted value via val.  The function can't fail. */
 static int del_found(trie_t *tbl, struct found found, trie_val_t *val)
 {
-	if (!found.l)
+	node_t *t = found.l;
+	node_t * const p = found.p;
+
+	if (!t)
 		return KNOT_ENOENT;
-	mm_free(&tbl->mm, tkey(found.l));
+	mm_free(&tbl->mm, tkey(t));
 	if (val != NULL)
-		*val = *tvalp(found.l); // we return trie_val_t directly when deleting
+		*val = *tvalp(t); // we return trie_val_t directly when deleting
 	--tbl->weight;
-	node_t * const p = found.p; // short-hand
 	if (unlikely(!p)) { // whole trie was a single leaf
 		assert(tbl->weight == 0);
 		tbl->root = empty_root();
 		return KNOT_EOK;
 	}
-	// remove leaf t as child of p; get child index via pointer arithmetic
+	// remove leaf t as child of p
 	node_t *tp = twigs(p);
-	uint ci = twig_number(found.l, p);
+	uint ci = twig_number(t, p);
 	uint cc = branch_weight(p); // child count
 	assert(ci >= 0 && ci < cc);
 
-	if (cc == 2) { // collapse binary node p: move the other child to this node
+	if (cc == 2) {
+		// collapse binary node p: move the other child to the parent
 		*p = tp[1 - ci]; // it might be a leaf or branch
 		mm_free(&tbl->mm, tp);
 		return KNOT_EOK;
@@ -484,8 +488,9 @@ static int del_found(trie_t *tbl, struct found found, trie_val_t *val)
 	memmove(tp + ci, tp + ci + 1, sizeof(node_t) * (cc - ci - 1));
 	node_t *newt = mm_realloc(&tbl->mm, tp, sizeof(node_t) * (cc - 1),
 	                          sizeof(node_t) * cc);
-		/* We can ignore mm_realloc failure, only beware that next time
-		 * the prev_size passed to it wouldn't be correct; TODO? */
+	// We can ignore mm_realloc failure because an oversized twig
+	// array is OK - only beware that next time the prev_size
+	// passed to mm_realloc will not be correct; TODO?
 	*p = mkbranch(branch_index(p), branch_bmp(p) & ~found.b,
 	              likely(newt != NULL) ? newt : tp);
 	return KNOT_EOK;
@@ -526,7 +531,7 @@ typedef struct trie_it {
 	node_t* *stack; /*!< The stack; malloc is used directly instead of mm. */
 	uint32_t len;   /*!< Current length of the stack. */
 	uint32_t alen;  /*!< Allocated/available length of the stack. */
-	/*! \brief Initial storage for \a stack; it should fit in many use cases. */
+	/*! \brief Initial storage for \a stack; it should fit in most use cases. */
 	node_t* stack_init[60];
 } nstack_t;
 
@@ -721,7 +726,7 @@ static int ns_prev_leaf(nstack_t *ns)
 
 	node_t *t = ns->stack[ns->len - 1];
 	// Beware: BMP_NOBYTE child is ordered *before* its parent.
-	if (hastwig(t, BMP_NOBYTE)) { // the prefix leaf
+	if (isbranch(t) && hastwig(t, BMP_NOBYTE)) {
 		ERR_RETURN(ns_longer(ns));
 		ns->stack[ns->len++] = twig(t, 0);
 		return KNOT_EOK;
@@ -852,18 +857,18 @@ trie_val_t* trie_get_ins(trie_t *tbl, const trie_key_t *key, uint32_t len)
 		nstack_t ns_local;
 	ns_init(&ns_local, tbl);
 	nstack_t *ns = &ns_local;
-	trie_index_t ni; // branch-point nibble index signifying the longest common prefix
+	trie_index_t idiff;
 	int k2; // the first unmatched character in the leaf
-	if (unlikely(ns_find_branch(ns, key, len, &ni, &k2)))
+	if (unlikely(ns_find_branch(ns, key, len, &idiff, &k2)))
 		return NULL;
 	node_t *t = ns->stack[ns->len - 1];
-	if (ni == TMAX_INDEX) // the same key was already present
+	if (idiff == TMAX_INDEX) // the same key was already present
 		return tvalp(t);
 	node_t leaf;
 	if (unlikely(mkleaf(&leaf, key, len, &tbl->mm)))
 		return NULL;
 
-	if (isbranch(t) && branch_index(t) == ni) {
+	if (isbranch(t) && branch_index(t) == idiff) {
 		// The node t needs a new leaf child.
 		bitmap_t b1 = twigbit(t, key, len);
 		assert(!hastwig(t, b1));
@@ -874,7 +879,7 @@ trie_val_t* trie_get_ins(trie_t *tbl, const trie_key_t *key, uint32_t len)
 			goto err_leaf;
 		memmove(nt + s + 1, nt + s, sizeof(node_t) * (m - s));
 		nt[s] = leaf;
-		*t = mkbranch(ni, branch_bmp(t) | b1, nt);
+		*t = mkbranch(idiff, branch_bmp(t) | b1, nt);
 		++tbl->weight;
 		return tvalp(&nt[s]);
 	} else {
@@ -890,11 +895,11 @@ trie_val_t* trie_get_ins(trie_t *tbl, const trie_key_t *key, uint32_t len)
 		if (unlikely(!nt))
 			goto err_leaf;
 		node_t t2 = *t; // Save before overwriting t.
-		bitmap_t b1 = keybit(ni, key, len);
+		bitmap_t b1 = keybit(idiff, key, len);
 		bitmap_t b2 = unlikely(k2 == -256)
 			? BMP_NOBYTE
-			: keybit(ni & 1, (const char *)&(unsigned char){ (unsigned char)k2 }, 1);
-		*t = mkbranch(ni, b1 | b2, nt);
+			: keybit(idiff & 1, (const char *)&(unsigned char){ (unsigned char)k2 }, 1);
+		*t = mkbranch(idiff, b1 | b2, nt);
 		*twig(t, twigoff(t, b1)) = leaf;
 		*twig(t, twigoff(t, b2)) = t2;
 		++tbl->weight;
@@ -907,14 +912,14 @@ err_leaf:
 }
 
 /*! \brief Apply a function to every trie_val_t*, in order; a recursive solution. */
-static int apply_trie(node_t *t, int (*f)(trie_val_t *, void *), void *d)
+static int apply_nodes(node_t *t, int (*f)(trie_val_t *, void *), void *d)
 {
 	assert(t);
 	if (!isbranch(t))
 		return f(tvalp(t), d);
 	uint n = branch_weight(t);
 	for (uint i = 0; i < n; ++i)
-		ERR_RETURN(apply_trie(twig(t, i), f, d));
+		ERR_RETURN(apply_nodes(twig(t, i), f, d));
 	return KNOT_EOK;
 }
 
@@ -923,7 +928,7 @@ int trie_apply(trie_t *tbl, int (*f)(trie_val_t *, void *), void *d)
 	assert(tbl && f);
 	if (!tbl->weight)
 		return KNOT_EOK;
-	return apply_trie(&tbl->root, f, d);
+	return apply_nodes(&tbl->root, f, d);
 }
 
 /*! \brief Apply a function to every key + trie_val_t*, in order; a recursive solution. */
