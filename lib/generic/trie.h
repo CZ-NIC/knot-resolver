@@ -25,6 +25,8 @@
 
 /*! \brief Element value. */
 typedef void* trie_val_t;
+/*! \brief Key for indexing tries.  Sign could be flipped easily. */
+typedef char trie_key_t;
 
 /*! \brief Opaque structure holding a QP-trie. */
 typedef struct trie trie_t;
@@ -50,16 +52,16 @@ size_t trie_weight(const trie_t *tbl);
 
 /*! \brief Search the trie, returning NULL on failure. */
 KR_EXPORT
-trie_val_t* trie_get_try(trie_t *tbl, const char *key, uint32_t len);
+trie_val_t* trie_get_try(trie_t *tbl, const trie_key_t *key, uint32_t len);
 
 /*!
  * \brief Return pointer to the minimum.  Optionally with key and its length. */
 KR_EXPORT
-trie_val_t* trie_get_first(trie_t *tbl, char **key, uint32_t *len);
+trie_val_t* trie_get_first(trie_t *tbl, trie_key_t **key, uint32_t *len);
 
 /*! \brief Search the trie, inserting NULL trie_val_t on failure. */
 KR_EXPORT
-trie_val_t* trie_get_ins(trie_t *tbl, const char *key, uint32_t len);
+trie_val_t* trie_get_ins(trie_t *tbl, const trie_key_t *key, uint32_t len);
 
 /*!
  * \brief Search for less-or-equal element.
@@ -72,7 +74,7 @@ trie_val_t* trie_get_ins(trie_t *tbl, const char *key, uint32_t len);
  *         or KNOT_E*.
  */
 KR_EXPORT
-int trie_get_leq(trie_t *tbl, const char *key, uint32_t len, trie_val_t **val);
+int trie_get_leq(trie_t *tbl, const trie_key_t *key, uint32_t len, trie_val_t **val);
 
 /*!
  * \brief Apply a function to every trie_val_t, in order.
@@ -92,7 +94,7 @@ int trie_apply(trie_t *tbl, int (*f)(trie_val_t *, void *), void *d);
  * \return First nonzero from f() or zero (i.e. KNOT_EOK).
  */
 KR_EXPORT
-int trie_apply_with_key(trie_t *tbl, int (*f)(const char *, uint32_t, trie_val_t *, void *), void *d);
+int trie_apply_with_key(trie_t *tbl, int (*f)(const trie_key_t *, uint32_t, trie_val_t *, void *), void *d);
 
 /*!
  * \brief Remove an item, returning KNOT_EOK if succeeded or KNOT_ENOENT if not found.
@@ -100,7 +102,7 @@ int trie_apply_with_key(trie_t *tbl, int (*f)(const char *, uint32_t, trie_val_t
  * If val!=NULL and deletion succeeded, the deleted value is set.
  */
 KR_EXPORT
-int trie_del(trie_t *tbl, const char *key, uint32_t len, trie_val_t *val);
+int trie_del(trie_t *tbl, const trie_key_t *key, uint32_t len, trie_val_t *val);
 
 /*!
  * \brief Remove the first item, returning KNOT_EOK on success.
@@ -110,7 +112,7 @@ int trie_del(trie_t *tbl, const char *key, uint32_t len, trie_val_t *val);
  * otherwise kr_error(ENOSPC) is returned.
  */
 KR_EXPORT
-int trie_del_first(trie_t *tbl, char *key, uint32_t *len, trie_val_t *val);
+int trie_del_first(trie_t *tbl, trie_key_t *key, uint32_t *len, trie_val_t *val);
 
 /*! \brief Create a new iterator pointing to the first element (if any). */
 KR_EXPORT
@@ -143,7 +145,7 @@ void trie_it_free(trie_it_t *it);
  *       as it is without an additional type conversion.
  */
 KR_EXPORT
-const char* trie_it_key(trie_it_t *it, size_t *len);
+const trie_key_t* trie_it_key(trie_it_t *it, size_t *len);
 
 /*! \brief Return pointer to the value of the current element (writable). */
 KR_EXPORT

@@ -36,7 +36,7 @@ typedef char static_assert_pointer_fits_in_word
  */
 typedef struct {
 	uint32_t len; // 32 bits are enough for key lengths; probably even 16 bits would be.
-	char chars[];
+	trie_key_t chars[];
 } tkey_t;
 
 /*! \brief A trie node is a pair of words.
@@ -142,7 +142,7 @@ typedef char static_assert_bmp_fits
 #define BMP_NOBYTE (BIG1 << TSHIFT_BMP)
 
 /*! \brief Initialize a new leaf, copying the key, and returning failure code. */
-static int mkleaf(node_t *leaf, const char *key, uint32_t len, knot_mm_t *mm)
+static int mkleaf(node_t *leaf, const trie_key_t *key, uint32_t len, knot_mm_t *mm)
 {
 	tkey_t *lkey = mm_alloc(mm, sizeof(tkey_t) + len);
 	if (unlikely(!lkey))
@@ -243,7 +243,7 @@ static uint twigoff(const node_t *t, bitmap_t bit)
 }
 
 /*! \brief Extract a nibble from a key and turn it into a bitmask. */
-static bitmap_t keybit(trie_index_t ni, const char *key, uint32_t len)
+static bitmap_t keybit(trie_index_t ni, const trie_key_t *key, uint32_t len)
 {
 	trie_index_t bytei = ni >> 1;
 
@@ -258,7 +258,7 @@ static bitmap_t keybit(trie_index_t ni, const char *key, uint32_t len)
 }
 
 /*! \brief Extract a nibble from a key and turn it into a bitmask. */
-static bitmap_t twigbit(const node_t *t, const char *key, uint32_t len)
+static bitmap_t twigbit(const node_t *t, const trie_key_t *key, uint32_t len)
 {
 	assert(isbranch(t));
 	return keybit(branch_index(t), key, len);
@@ -274,7 +274,7 @@ static bool hastwig(const node_t *t, bitmap_t bit)
 }
 
 /*! \brief Get pointer to packed array of child nodes. */
-static node_t* twigs(const node_t *t)
+static node_t* twigs(node_t *t)
 {
 	assert(isbranch(t));
 	return t->p;
@@ -307,7 +307,8 @@ static uint twig_number(node_t *child, node_t *parent)
 	} while(0)
 
 /*! \brief Simple string comparator. */
-static int key_cmp(const char *k1, uint32_t k1_len, const char *k2, uint32_t k2_len)
+static int key_cmp(const trie_key_t *k1, uint32_t k1_len,
+		   const trie_key_t *k2, uint32_t k2_len)
 {
 	int ret = memcmp(k1, k2, MIN(k1_len, k2_len));
 	if (ret != 0) {
@@ -384,7 +385,7 @@ struct found {
 };
 
 /** Search trie for an item with the given key (equality only). */
-static struct found find_equal(trie_t *tbl, const char *key, uint32_t len)
+static struct found find_equal(trie_t *tbl, const trie_key_t *key, uint32_t len)
 {
 	assert(tbl);
 	struct found ret0;
@@ -413,7 +414,7 @@ static struct found find_equal(trie_t *tbl, const char *key, uint32_t len)
 	};
 }
 
-trie_val_t* trie_get_try(trie_t *tbl, const char *key, uint32_t len)
+trie_val_t* trie_get_try(trie_t *tbl, const trie_key_t *key, uint32_t len)
 {
 	struct found found = find_equal(tbl, key, len);
 	return found.l ? tvalp(found.l) : NULL;
@@ -442,7 +443,7 @@ static struct found find_first(trie_t *tbl)
 	};
 }
 
-trie_val_t* trie_get_first(trie_t *tbl, char **key, uint32_t *len)
+trie_val_t* trie_get_first(trie_t *tbl, trie_key_t **key, uint32_t *len)
 {
 	struct found found = find_first(tbl);
 	if (!found.l)
@@ -490,13 +491,13 @@ static int del_found(trie_t *tbl, struct found found, trie_val_t *val)
 	return KNOT_EOK;
 }
 
-int trie_del(trie_t *tbl, const char *key, uint32_t len, trie_val_t *val)
+int trie_del(trie_t *tbl, const trie_key_t *key, uint32_t len, trie_val_t *val)
 {
 	struct found found = find_equal(tbl, key, len);
 	return del_found(tbl, found, val);
 }
 
-int trie_del_first(trie_t *tbl, char *key, uint32_t *len, trie_val_t *val)
+int trie_del_first(trie_t *tbl, trie_key_t *key, uint32_t *len, trie_val_t *val)
 {
 	struct found found = find_first(tbl);
 	if (!found.l)
@@ -606,7 +607,7 @@ static inline int ns_longer(nstack_t *ns)
  *
  *  \return KNOT_EOK or KNOT_ENOMEM.
  */
-static int ns_find_branch(nstack_t *ns, const char *key, uint32_t len,
+static int ns_find_branch(nstack_t *ns, const trie_key_t *key, uint32_t len,
                           trie_index_t *idiff, int *first)
 {
 	assert(ns && ns->len && idiff);
@@ -777,7 +778,7 @@ static int ns_next_leaf(nstack_t *ns, const bool skip_prefixed)
 	return KNOT_ENOENT; // not found, as no more parent is available
 }
 
-int trie_get_leq(trie_t *tbl, const char *key, uint32_t len, trie_val_t **val)
+int trie_get_leq(trie_t *tbl, const trie_key_t *key, uint32_t len, trie_val_t **val)
 {
 	assert(tbl && val);
 	*val = NULL; // so on failure we can just return;
@@ -834,7 +835,7 @@ success:
 	}
 }
 
-trie_val_t* trie_get_ins(trie_t *tbl, const char *key, uint32_t len)
+trie_val_t* trie_get_ins(trie_t *tbl, const trie_key_t *key, uint32_t len)
 {
 	if (kr_fails_assert(tbl))
 		return NULL;
@@ -926,7 +927,7 @@ int trie_apply(trie_t *tbl, int (*f)(trie_val_t *, void *), void *d)
 }
 
 /*! \brief Apply a function to every key + trie_val_t*, in order; a recursive solution. */
-static int apply_trie_with_key(node_t *t, int (*f)(const char *, uint32_t, trie_val_t *, void *), void *d)
+static int apply_trie_with_key(node_t *t, int (*f)(const trie_key_t *, uint32_t, trie_val_t *, void *), void *d)
 {
 	assert(t);
 	if (!isbranch(t))
@@ -937,7 +938,7 @@ static int apply_trie_with_key(node_t *t, int (*f)(const char *, uint32_t, trie_
 	return KNOT_EOK;
 }
 
-int trie_apply_with_key(trie_t *tbl, int (*f)(const char *, uint32_t, trie_val_t *, void *), void *d)
+int trie_apply_with_key(trie_t *tbl, int (*f)(const trie_key_t *, uint32_t, trie_val_t *, void *), void *d)
 {
 	assert(tbl && f);
 	if (!tbl->weight)
@@ -978,7 +979,7 @@ void trie_it_free(trie_it_t *it)
 	free(it);
 }
 
-const char* trie_it_key(trie_it_t *it, size_t *len)
+const trie_key_t* trie_it_key(trie_it_t *it, size_t *len)
 {
 	assert(it && it->len);
 	node_t *t = it->stack[it->len - 1];
