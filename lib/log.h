@@ -11,6 +11,16 @@
 #define LOG_UNKNOWN_LEVEL	-1 /**< Negative error value. */
 #define LOG_GNUTLS_LEVEL	5 /**< GnuTLS level is 5. */
 
+/* Custom identifier */
+
+KR_EXPORT extern
+char *kr_log_ident;
+
+/** Set a custom log identifier to be used when logging to syslog. */
+KR_EXPORT
+void kr_log_ident_set(const char *ident);
+
+
 /* Targets */
 
 typedef enum {
