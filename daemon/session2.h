@@ -140,18 +140,23 @@ struct comm_addr_storage {
  *  - to zero, then reserved via `wire_buf_reserve`. */
 struct wire_buf {
 	char *buf; /**< Buffer memory. */
-	size_t size; /**< Current size of the buffer memory. */
+	size_t cur_size; /**< Current size of the buffer memory. */
+	size_t max_size; /**< Maximal size of the buffer memory. */
 	size_t start; /**< Index at which the valid data of the buffer starts (inclusive). */
 	size_t end; /**< Index at which the valid data of the buffer ends (exclusive). */
 };
 
-/** Initializes the wire buffer with the specified `initial_size` and allocates
- * the underlying memory. */
+/** Initializes the wire buffer with the specified `max_size`. */
 void wire_buf_init(struct wire_buf *wb, size_t initial_size);
 
 /** De-allocates the wire buffer's underlying memory (the struct itself is left
  * intact). */
 void wire_buf_deinit(struct wire_buf *wb);
+
+/** Moves wire_buf's underlaying memory (if any) into another wire_buf.
+ * The dst has to have buf == NULL, other fields may be uninitialized; all settings are taken from src.
+ * The src wire_buf can be then used as after reset, or reinitialized by wire_buf_init. */
+void wire_buf_move(struct wire_buf *dst, struct wire_buf *src);
 
 /** Ensures that the wire buffer's size is at least `size`. The memory at `wb`
  * must be initialized, either to zero or via `wire_buf_init`. */
@@ -200,9 +205,17 @@ static inline void *wire_buf_free_space(const struct wire_buf *wb)
 /** Gets the length of the free space after the valid data of the wire buffer. */
 static inline size_t wire_buf_free_space_length(const struct wire_buf *wb)
 {
-	if (kr_fails_assert(wb->end <= wb->size))
+	const size_t allowed_size = MIN(wb->cur_size, wb->max_size);
+	if (kr_fails_assert(wb->end <= allowed_size))
 		return 0;
-	return (wb->buf) ? wb->size - wb->end : 0;
+	return (wb->buf) ? allowed_size - wb->end : 0;
+}
+
+static inline int wire_buf_free_space_reserve(struct wire_buf *wb, size_t length) {
+	if (wire_buf_free_space_length(wb) >= length) {
+		return kr_ok();
+	}
+	return wire_buf_reserve(wb, wire_buf_data_length(wb) + length);
 }
 
 
@@ -447,6 +460,8 @@ struct protolayer_iter_ctx {
 	 * when the context is being destroyed. Initialized and destroyed
 	 * automatically - layers may use it to allocate memory. */
 	knot_mm_t pool;
+	/** Per-iter wire buffer used as payload storage during async processing. */
+	struct wire_buf wb;
 
 	/** Careful!  It's only present sometimes and read-only really.
 	 * TODO: maybe a better mechanism should be designed instead of this. */

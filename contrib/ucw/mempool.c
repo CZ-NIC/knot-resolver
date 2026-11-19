@@ -433,6 +433,7 @@ static struct mempool_chunk *mp_new_reusable_chunk(uint32_t requested_size,
 		ext_size = MIN((pool_size >> 3) + 1, mp_reusable[MP_REUSABLE_CNT - 1].chunk_size + MP_CHUNK_TAIL);
 			// minimum growing with pool_size
 		ext_size = MAX(ext_size, pool_ext_chunk_size);        // requested pool_size bound
+		ext_size = MAX(ext_size, MP_CHUNK_TAIL);
 		size = MAX(ext_size - MP_CHUNK_TAIL, requested_size); // requested space in chunk
 	}
 	struct mp_reusable *reusable = mp_get_reusable(&size);
@@ -499,6 +500,23 @@ static void mp_free_reusable_chunk(struct mempool_chunk *chunk, uint32_t now)
 #endif
 		mp_free_chunk(chunk);
 	}
+}
+
+void *mp_alloc_rawmem(size_t *size)
+{
+	struct mempool_chunk *chunk = mp_new_reusable_chunk(0, *size, 0);
+	*size = chunk->size + MP_CHUNK_TAIL;
+	void *mem = (void *)chunk - chunk->size;
+	MEMCHECK_UNDEFINED(mem, *size);
+	return mem;
+}
+
+void mp_free_rawmem(void *mem, size_t size)
+{
+	struct mempool_chunk *chunk = mem + size - MP_CHUNK_TAIL;
+	chunk->size = size - MP_CHUNK_TAIL;
+	const uint32_t now = get_stamp ? get_stamp() : 0;
+	mp_free_reusable_chunk(chunk, now);
 }
 
 #ifdef MP_LOG_GLOBAL_STATS_PERIOD

@@ -39,16 +39,11 @@ static int handle_packet(struct pl_quic_conn_sess_data *conn,
 	ngtcp2_pkt_info pi = { .ecn = NGTCP2_ECN_NOT_ECT, };
 	*doq_error = DOQ_NO_ERROR;
 
+	kr_assert(ctx->payload.type == PROTOLAYER_PAYLOAD_WIRE_BUF);
 	int ret = -1;
-	if (ctx->payload.type == PROTOLAYER_PAYLOAD_WIRE_BUF) {
-		ret = ngtcp2_conn_read_pkt(conn->conn, conn->path, &pi,
-				wire_buf_data(ctx->payload.wire_buf),
-				wire_buf_data_length(ctx->payload.wire_buf), now);
-	} else {
-		ret = ngtcp2_conn_read_pkt(conn->conn, conn->path, &pi,
-				ctx->payload.buffer.buf,
-				ctx->payload.buffer.len, now);
-	}
+	ret = ngtcp2_conn_read_pkt(conn->conn, conn->path, &pi,
+			wire_buf_data(ctx->payload.wire_buf),
+			wire_buf_data_length(ctx->payload.wire_buf), now);
 
 	if (ret == 0) {
 		wire_buf_reset(ctx->payload.wire_buf);
@@ -759,18 +754,10 @@ int send_special(ngtcp2_version_cid *dec_cids, kr_quic_table_t *table,
 	if (kr_fails_assert(ctx)) {
 		return kr_error(EINVAL);
 	}
-	char *err_buf = mm_alloc(&ctx->pool, NGTCP2_MAX_UDP_PAYLOAD_SIZE);
-	if (!err_buf)
-		return kr_error(ENOMEM);
 
-	struct wire_buf err_wb = {
-		.buf = err_buf,
-		.end = 0,
-		.size = NGTCP2_MAX_UDP_PAYLOAD_SIZE,
-		.start = 0,
-	};
-	struct wire_buf *save_wb = ctx->payload.wire_buf;
-	ctx->payload.wire_buf = &err_wb;
+	struct wire_buf save_wb;
+	wire_buf_move(&save_wb, ctx->payload.wire_buf);
+	wire_buf_init(ctx->payload.wire_buf, NGTCP2_MAX_UDP_PAYLOAD_SIZE);
 
 	uint64_t now = quic_timestamp();
 
@@ -856,8 +843,8 @@ int send_special(ngtcp2_version_cid *dec_cids, kr_quic_table_t *table,
 		ret = kr_ok();
 	}
 
-	mm_free(&ctx->pool, ctx->payload.wire_buf->buf);
-	ctx->payload.wire_buf = save_wb;
+	wire_buf_deinit(ctx->payload.wire_buf);
+	wire_buf_move(ctx->payload.wire_buf, &save_wb);
 
 	return ret;
 }
@@ -873,19 +860,7 @@ static enum protolayer_iter_cb_result pl_quic_conn_unwrap(void *sess_data,
 		return protolayer_break(ctx, kr_ok());
 	}
 
-	/* Deferred payload (async processing) switches the buffer type
-	 * (see protolayer_payload_ensure_long_lived) */
-	if (ctx->payload.type == PROTOLAYER_PAYLOAD_BUFFER) {
-		struct wire_buf *wb = mm_alloc(&ctx->pool, sizeof(struct wire_buf));
-		if (!wb) {
-			return protolayer_break(ctx, kr_error(ENOMEM));
-		}
-		wb->size = ctx->payload.buffer.len;
-		wb->buf = ctx->payload.buffer.buf;
-		wb->end = wb->size;
-		wb->start = 0;
-		ctx->payload = protolayer_payload_wire_buf(wb, false);
-	}
+	kr_assert(ctx->payload.type == PROTOLAYER_PAYLOAD_WIRE_BUF);
 
 	kr_quic_set_addrs(ctx, &conn->path);
 

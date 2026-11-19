@@ -875,7 +875,7 @@ static int pl_http_sess_init(struct session2 *session,
 	http->current_method = HTTP_METHOD_NONE;
 	http->uri_path = NULL;
 	http->status = HTTP_STATUS_OK;
-	wire_buf_init(&http->wire_buf, session->wire_buf.size);
+	wire_buf_init(&http->wire_buf, session->wire_buf.max_size);
 
 	ret = nghttp2_session_server_new(&http->h2, callbacks, http);
 	if (ret < 0)

@@ -2170,7 +2170,7 @@ static knot_pkt_t *stream_produce_packet(struct session2 *session,
 		session2_penalize(session);
 		return NULL;
 	}
-	if (msg_len >= wb->size) {
+	if (msg_len >= wb->max_size) {
 		*out_err = true;
 		session2_penalize(session);
 		return NULL;

@@ -149,6 +149,30 @@ static inline size_t mp_total_size(struct mempool *pool)
 	return pool->total_size;
 }
 
+/***
+ * [[rawmem]]
+ * Memory allocation outside of pools
+ ***/
+
+/**
+ * Allocate raw memory block from the reusable ones outside of mempool.
+ *
+ * The size of the allocated block will be at least the original value of *size,
+ * which will be updated to be the real allocated size.
+ * The real size then has to be passed to mp_free_rawmem to allow reusing the block.
+ *
+ * The memory of chunks is used here without the metadata,
+ * so the whole block of external chunk's sizes may be used.
+ **/
+KR_EXPORT
+void *mp_alloc_rawmem(size_t *size);
+
+/**
+ * Return the raw memory block to be reused elsewhere.
+ * Its real size from the mp_alloc_rawmem has to be passed here.
+ */
+KR_EXPORT
+void mp_free_rawmem(void *mem, size_t size);
 
 /***
  * [[basic]]

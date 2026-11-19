@@ -402,7 +402,7 @@ void *protolayer_iter_data_get_current(struct protolayer_iter_ctx *ctx)
 
 size_t protolayer_sess_size_est(struct session2 *s)
 {
-	return s->session_size + s->wire_buf.size;
+	return s->session_size + s->wire_buf.cur_size;
 }
 
 size_t protolayer_iter_size_est(struct protolayer_iter_ctx *ctx, bool incl_payload)
@@ -469,6 +469,7 @@ static int protolayer_iter_ctx_finish(struct protolayer_iter_ctx *ctx, int ret)
 	if (ctx->finished_cb)
 		ctx->finished_cb(ret, s, ctx->comm, ctx->finished_cb_baton);
 
+	wire_buf_deinit(&ctx->wb);
 	mm_ctx_delete(&ctx->pool);
 
 	return ret;
@@ -521,6 +522,13 @@ static void protolayer_payload_ensure_long_lived(struct protolayer_iter_ctx *ctx
 	size_t buf_len = protolayer_payload_size(&ctx->payload);
 	if (kr_fails_assert(buf_len))
 		return;
+
+	if (ctx->payload.type == PROTOLAYER_PAYLOAD_WIRE_BUF) {
+		wire_buf_move(&ctx->wb, ctx->payload.wire_buf);
+		wire_buf_reserve(ctx->payload.wire_buf, ctx->payload.wire_buf->max_size); // XXX to be removed
+		ctx->payload.wire_buf = &ctx->wb;
+		return;
+	}
 
 	void *buf = mm_alloc(&ctx->pool, buf_len);
 	kr_require(buf);
@@ -758,41 +766,57 @@ enum protolayer_iter_cb_result protolayer_break(struct protolayer_iter_ctx *ctx,
 }
 
 
-void wire_buf_init(struct wire_buf *wb, size_t initial_size)
+void wire_buf_init(struct wire_buf *wb, size_t max_size)
 {
-	char *buf = malloc(initial_size);
-	kr_require(buf);
-
 	*wb = (struct wire_buf){
-		.buf = buf,
-		.size = initial_size
+		.max_size = max_size
 	};
+
+	wire_buf_reserve(wb, max_size);
 }
 
 void wire_buf_deinit(struct wire_buf *wb)
 {
-	free(wb->buf);
+	if (wb->buf) {
+		mp_free_rawmem(wb->buf, wb->cur_size);
+		wb->buf = NULL;
+	}
+}
+
+void wire_buf_move(struct wire_buf *dst, struct wire_buf *src) {
+	kr_assert(dst->buf == NULL);
+	*dst = *src;
+	src->buf = NULL;
 }
 
 int wire_buf_reserve(struct wire_buf *wb, size_t size)
 {
-	if (wb->buf && wb->size >= size)
+	if (wb->buf && wb->cur_size >= size)
 		return kr_ok();
 
-	char *newbuf = realloc(wb->buf, size);
+	char *newbuf = mp_alloc_rawmem(&size);
 	kr_require(newbuf);
+	size_t len = 0;
+	if (wb->buf) {
+		len = wire_buf_data_length(wb);
+		if (len > 0) {
+			memcpy(newbuf, wire_buf_data(wb), len);
+		}
+		mp_free_rawmem(wb->buf, wb->cur_size);
+	}
 	wb->buf = newbuf;
-	wb->size = size;
+	wb->start = 0;
+	wb->end = len;
+	wb->cur_size = size;
 	return kr_ok();
 }
 
 int wire_buf_consume(struct wire_buf *wb, size_t length)
 {
-	size_t ne = wb->end + length;
-	if (kr_fails_assert(wb->buf && ne <= wb->size))
+	if (kr_fails_assert(wire_buf_free_space_length(wb) >= length))
 		return kr_error(EINVAL);
 
-	wb->end = ne;
+	wb->end += length;
 	return kr_ok();
 }
 
