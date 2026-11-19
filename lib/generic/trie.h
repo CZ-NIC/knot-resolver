@@ -59,6 +59,28 @@ trie_val_t* trie_get_try(trie_t *tbl, const trie_key_t *key, uint32_t len);
 KR_EXPORT
 trie_val_t* trie_get_first(trie_t *tbl, trie_key_t **key, uint32_t *len);
 
+/*! \brief Search the trie including DNS wildcard semantics, returning NULL on failure.
+ *
+ * \note We assume the key is in knot_dname_lf() format, i.e. labels are ordered
+ *   from root to leaf and separated by zero bytes (and no other zeros are allowed).
+ * \note Beware that DNS wildcard matching is not exactly what normal people would expect.
+ */
+KR_EXPORT
+trie_val_t* trie_get_try_wildcard(trie_t *tbl, const trie_key_t *key, uint32_t len);
+
+/*!
+ * \brief Find a stored key that is a prefix of (or equal to) the given key,
+ *        terminated by a '\0' boundary when shorter.
+ *
+ * \param tbl  Trie.
+ * \param key  Searched key.
+ * \param len  Key length.
+ *
+ * \return Pointer to the matching internal key structure, or NULL if none matches.
+ */
+KR_EXPORT
+const trie_key_t *trie_find_prefix_match(const trie_t *tbl, const char *key, uint32_t len);
+
 /*! \brief Search the trie, inserting NULL trie_val_t on failure. */
 KR_EXPORT
 trie_val_t* trie_get_ins(trie_t *tbl, const trie_key_t *key, uint32_t len);

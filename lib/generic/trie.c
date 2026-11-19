@@ -445,6 +445,85 @@ trie_val_t* trie_get_first(trie_t *tbl, trie_key_t **key, uint32_t *len)
 	return tvalp(found.l);
 }
 
+/* Optimization: the approach isn't ideal, as e.g. walking through the prefix
+ * is duplicated and we explicitly construct the wildcard key.  Still, it's close
+ * to optimum which would be significantly more complicated and error-prone to write. */
+trie_val_t* trie_get_try_wildcard(trie_t *tbl, const trie_key_t *key, uint32_t len)
+{
+	assert(tbl);
+	if (!tbl->weight)
+		return NULL;
+	// Find leaf sharing the longest common prefix; see ns_find_branch() for explanation.
+	node_t *t = &tbl->root;
+	while (isbranch(t)) {
+		__builtin_prefetch(twigs(t));
+		bitmap_t b = twigbit(t, key, len);
+		uint i = hastwig(t, b) ? twigoff(t, b) : 0;
+		t = twig(t, i);
+	}
+	const tkey_t * const lcp_key = tkey(t);
+
+	// Find the last matching zero byte or -1 (source of synthesis)
+	int64_t i_lmz = -1; // signed type so -1 value is a distinct sentinel value
+	for (uint32_t i = 0; i < len && i < lcp_key->len && key[i] == lcp_key->chars[i]; ++i) {
+		if (key[i] == '\0' && i < len - 1) // do not count the terminating zero
+			i_lmz = i;
+		// Shortcut: we may have found an exact match.
+		if (i == len - 1 && len == lcp_key->len)
+			return tvalp(t);
+	}
+	if (len == 0) // The empty name needs separate handling.
+		return lcp_key->len == 0 ? tvalp(t) : NULL;
+
+	// Construct the key of the wildcard we need and look it up.
+	const uint32_t wild_len = (uint32_t)(i_lmz + 3);
+	trie_key_t wild_key[wild_len];
+	memcpy(wild_key, key, wild_len - 2);
+	wild_key[wild_len - 2] = '*';
+	wild_key[wild_len - 1] = '\0'; // LF is always 0-terminated ATM
+	return trie_get_try(tbl, wild_key, wild_len);
+}
+
+/*!
+ * \brief Find longest-matching prefix leaf with '\0'-delimited boundary check.
+ *
+ * Uses a blind descent to locate a leaf sharing a common prefix with key,
+ * then verifies full prefix equality and a '\0' label/separator boundary when
+ * the stored key is shorter than the query.
+ */
+const trie_key_t *trie_find_prefix_match(const trie_t *tbl, const char *key, uint32_t len)
+{
+	assert(tbl);
+	if (!tbl->weight)
+		return NULL;
+
+	// Perform the blind descent to find the closest LCP leaf
+	const node_t *t = &tbl->root;
+	while (isbranch(t)) {
+		__builtin_prefetch(twigs(t));
+		bitmap_t b = twigbit(t, key, len);
+		uint i = hastwig(t, b) ? twigoff(t, b) : 0;
+		t = twig(t, i);
+	}
+	const tkey_t * const lcp_key = tkey(t);
+
+	// The stored key cannot be longer than the query if it's a prefix
+	if (lcp_key->len > len || len == 0)
+		return NULL;
+
+	// Verify byte-for-byte match up to the stored key's length
+	if (memcmp(lcp_key->chars, key, lcp_key->len) != 0)
+		return NULL;
+
+	// If the stored key is shorter than the query, the character immediately
+	// following it in the query MUST be a '\0' separator.
+	// This prevents "examples.com" from falsely matching a query for "example.com".
+	if (lcp_key->len < len && key[lcp_key->len] != '\0')
+		return NULL;
+
+	return lcp_key->chars; // Returns the pointer to the matched parent/exact key!
+}
+
 /*! \brief Delete leaf t with parent p; b is the bit for t under p.
  * Optionally return the deleted value via val.  The function can't fail. */
 static int del_found(trie_t *tbl, struct found found, trie_val_t *val)
