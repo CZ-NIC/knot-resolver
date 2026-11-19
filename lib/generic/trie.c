@@ -101,18 +101,6 @@ struct trie {
 	knot_mm_t mm;
 };
 
-/*! \brief Make the root node empty (debug-only). */
-static inline void empty_root(node_t *root) {
-#ifndef NDEBUG
-	*root = (node_t){ .branch = {
-		.flags = 3, // invalid value that fits
-		.bitmap = 0,
-		.index = -1,
-		.twigs = NULL
-	} };
-#endif
-}
-
 /*! \brief Check that unportable code works OK (debug-only). */
 static void assert_portability(void) {
 #if FLAGS_HACK
@@ -144,6 +132,18 @@ static int mkleaf(node_t *leaf, const char *key, uint32_t len, knot_mm_t *mm)
 	return KNOT_EOK;
 }
 
+/*! \brief Make the root node empty (debug-only). */
+static inline void empty_root(node_t *root) {
+#ifndef NDEBUG
+	*root = (node_t){ .branch = {
+		.flags = 3, // invalid value that fits
+		.bitmap = 0,
+		.index = -1,
+		.twigs = NULL
+	} };
+#endif
+}
+
 /*! \brief Propagate error codes. */
 #define ERR_RETURN(x) \
 	do { \
@@ -152,23 +152,6 @@ static int mkleaf(node_t *leaf, const char *key, uint32_t len, knot_mm_t *mm)
 			return err_code_; \
 	} while (false)
 
-/*!
- * \brief Count the number of set bits.
- *
- * \TODO This implementation may be relatively slow on some HW.
- */
-static uint bitmap_weight(bitmap_t w)
-{
-	assert((w & ~((1 << 17) - 1)) == 0); // using the least-important 17 bits
-	return __builtin_popcount(w);
-}
-
-/*! \brief Only keep the lowest bit in the bitmap (least significant -> twigs[0]). */
-static bitmap_t bitmap_lowest_bit(bitmap_t w)
-{
-	assert((w & ~((1 << 17) - 1)) == 0); // using the least-important 17 bits
-	return 1 << __builtin_ctz(w);
-}
 
 /*! \brief Test flags to determine type of this node. */
 static bool isbranch(const node_t *t)
@@ -192,6 +175,13 @@ static trie_val_t *tvalp(node_t *t)
 	return &t->leaf.val;
 }
 
+/*! \brief Only keep the lowest bit in the bitmap (least significant -> twigs[0]). */
+static bitmap_t bitmap_lowest_bit(bitmap_t w)
+{
+	assert((w & ~((1 << 17) - 1)) == 0); // using the least-important 17 bits
+	return 1 << __builtin_ctz(w);
+}
+
 /*! \brief Given a branch node, return the bitmap of present children. */
 static bitmap_t branch_bmp(const node_t *t)
 {
@@ -210,6 +200,14 @@ static uint branch_weight(const node_t *t)
 	uint n = __builtin_popcount(t->branch.bitmap);
 	assert(n > 1 && n <= 17);
 	return n;
+}
+
+/*! \brief Compute offset of an existing child in a branch node. */
+static uint twigoff(const node_t *t, bitmap_t bit)
+{
+	assert(isbranch(t));
+	assert(__builtin_popcount(bit) == 1);
+	return __builtin_popcount(branch_bmp(t) & (bit - 1));
 }
 
 /*! \brief Make a bitmask for testing a branch bitmap. */
@@ -244,14 +242,6 @@ static node_t* twigs(const node_t *t)
 {
 	assert(isbranch(t));
 	return t->branch.twigs;
-}
-
-/*! \brief Compute offset of an existing child in a branch node. */
-static uint twigoff(const node_t *t, bitmap_t bit)
-{
-	assert(isbranch(t));
-	assert(__builtin_popcount(bit) == 1);
-	return __builtin_popcount(branch_bmp(t) & (bit - 1));
 }
 
 /*! \brief Get pointer to a particular child of a branch node. */
@@ -388,6 +378,12 @@ static struct found find_equal(trie_t *tbl, const char *key, uint32_t len)
 	};
 }
 
+trie_val_t* trie_get_try(trie_t *tbl, const char *key, uint32_t len)
+{
+	struct found found = find_equal(tbl, key, len);
+	return found.l ? tvalp(found.l) : NULL;
+}
+
 /** Find item with the first key (lexicographical order). */
 static struct found find_first(trie_t *tbl)
 {
@@ -409,12 +405,6 @@ static struct found find_first(trie_t *tbl)
 		.p = p,
 		.b = p ? bitmap_lowest_bit(branch_bmp(p)) : 0,
 	};
-}
-
-trie_val_t* trie_get_try(trie_t *tbl, const char *key, uint32_t len)
-{
-	struct found found = find_equal(tbl, key, len);
-	return found.l ? tvalp(found.l) : NULL;
 }
 
 trie_val_t* trie_get_first(trie_t *tbl, char **key, uint32_t *len)
@@ -939,13 +929,6 @@ trie_it_t* trie_it_begin(trie_t *tbl)
 	return it;
 }
 
-void trie_it_next(trie_it_t *it)
-{
-	assert(it && it->len);
-	if (ns_next_leaf(it) != KNOT_EOK)
-		it->len = 0;
-}
-
 bool trie_it_finished(trie_it_t *it)
 {
 	assert(it);
@@ -977,4 +960,11 @@ trie_val_t* trie_it_val(trie_it_t *it)
 	node_t *t = it->stack[it->len - 1];
 	assert(!isbranch(t));
 	return tvalp(t);
+}
+
+void trie_it_next(trie_it_t *it)
+{
+	assert(it && it->len);
+	if (ns_next_leaf(it) != KNOT_EOK)
+		it->len = 0;
 }
