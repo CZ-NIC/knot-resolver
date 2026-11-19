@@ -516,6 +516,7 @@ int trie_del_first(trie_t *tbl, trie_key_t *key, uint32_t *len, trie_val_t *val)
  * The structure also serves directly as the public trie_it_t type,
  * in which case it always points to the current leaf, unless we've finished
  * (i.e. it->len == 0).
+ * stack[0] is always a valid pointer to the root -> ns_gettrie()
  */
 typedef struct trie_it {
 	node_t* *stack; /*!< The stack; malloc is used directly instead of mm. */
@@ -531,12 +532,15 @@ static void ns_init(nstack_t *ns, trie_t *tbl)
 	assert(tbl);
 	ns->stack = ns->stack_init;
 	ns->alen = sizeof(ns->stack_init) / sizeof(ns->stack_init[0]);
-	if (tbl->weight) {
-		ns->len = 1;
-		ns->stack[0] = &tbl->root;
-	} else {
-		ns->len = 0;
-	}
+	// Keep &tbl->root in stack[0] even when empty (len == 0).
+	ns->stack[0] = &tbl->root;
+	ns->len = (tbl->weight > 0);
+}
+
+static inline trie_t * ns_gettrie(nstack_t *ns)
+{
+	assert(ns && ns->stack && ns->stack[0]);
+	return (struct trie *)ns->stack[0];
 }
 
 /*! \brief Free inside of the stack, i.e. not the passed pointer itself. */
@@ -772,6 +776,28 @@ static int ns_next_leaf(nstack_t *ns, const bool skip_prefixed)
 	return KNOT_ENOENT; // not found, as no more parent is available
 }
 
+/*! \brief Advance the node stack to leaf with longest prefix of the current key. */
+static int ns_prefix(nstack_t *ns)
+{
+	assert(ns && ns->len > 0);
+	const node_t *start = ns->stack[ns->len - 1];
+	// Walk up the trie until we find a BMP_NOBYTE child.
+	while (--ns->len > 0) {
+		node_t *p = ns->stack[ns->len - 1];
+		if (!hastwig(p, BMP_NOBYTE))
+			continue;
+		node_t *end = twig(p, 0);
+		// In case we started in a BMP_NOBYTE leaf, the first step up
+		// did NOT shorten the key and we would get back into the same
+		// node again.
+		if (end == start)
+			continue;
+		ns->stack[ns->len++] = end;
+		return KNOT_EOK;
+	}
+	return KNOT_ENOENT; // not found, as no more parent is available
+}
+
 /*! \brief less-or-equal search.
  *
  * \return KNOT_EOK for exact match, 1 for previous, KNOT_ENOENT for not-found,
@@ -839,6 +865,24 @@ int trie_get_leq(trie_t *tbl, const trie_key_t *key, uint32_t len, trie_val_t **
 		if (val) *val = NULL;
 	}
 	ns_cleanup(ns);
+	return ret;
+}
+
+int trie_it_get_leq(trie_it_t *it, const trie_key_t *key, uint32_t len)
+{
+	assert(it && it->stack[0] && it->alen);
+	const trie_t *tbl = ns_gettrie(it);
+	if (tbl->weight == 0) {
+		it->len = 0;
+		return KNOT_ENOENT;
+	}
+	it->len = 1;
+	int ret = ns_get_leq(it, key, len);
+	if (ret == KNOT_EOK || ret == 1) {
+		assert(trie_it_key(it, NULL));
+	} else {
+		it->len = 0;
+	}
 	return ret;
 }
 
@@ -982,6 +1026,29 @@ void trie_it_free(trie_it_t *it)
 	free(it);
 }
 
+trie_it_t *trie_it_clone(const trie_it_t *it)
+{
+	if (!it) // TODO: or should that be an assertion?
+		return NULL;
+	trie_it_t *it2 = malloc(sizeof(nstack_t));
+	if (!it2)
+		return NULL;
+	it2->len = it->len;
+	it2->alen = it->alen; // we _might_ change it in the rare malloc case, but...
+	if (likely(it->stack == it->stack_init)) {
+		it2->stack = it2->stack_init;
+		assert(it->alen == sizeof(it->stack_init) / sizeof(it->stack_init[0]));
+	} else {
+		it2->stack = malloc(it2->alen * sizeof(it2->stack[0]));
+		if (!it2->stack) {
+			free(it2);
+			return NULL;
+		}
+	}
+	memcpy(it2->stack, it->stack, it->len * sizeof(it->stack[0]));
+	return it2;
+}
+
 const trie_key_t* trie_it_key(trie_it_t *it, size_t *len)
 {
 	assert(it && it->len);
@@ -1006,4 +1073,72 @@ void trie_it_next(trie_it_t *it)
 	assert(it && it->len);
 	if (ns_next_leaf(it, false) != KNOT_EOK)
 		it->len = 0;
+}
+
+void trie_it_next_loop(trie_it_t *it)
+{
+	assert(it && it->len);
+	int ret = ns_next_leaf(it, false);
+	if (ret == KNOT_ENOENT) {
+		it->len = 1;
+		ret = ns_first_leaf(it);
+	}
+	if (ret)
+		it->len = 0;
+}
+
+void trie_it_next_nosuffix(trie_it_t *it)
+{
+	assert(it && it->len);
+	if (ns_next_leaf(it, true) != KNOT_EOK)
+		it->len = 0;
+}
+
+void trie_it_prev(trie_it_t *it)
+{
+	assert(it && it->len);
+	if (ns_prev_leaf(it) != KNOT_EOK)
+		it->len = 0;
+}
+
+void trie_it_prev_loop(trie_it_t *it)
+{
+	assert(it && it->len);
+	int ret = ns_prev_leaf(it);
+	if (ret == KNOT_ENOENT) {
+		it->len = 1;
+		ret = ns_last_leaf(it);
+	}
+	if (ret)
+		it->len = 0;
+}
+
+void trie_it_parent(trie_it_t *it)
+{
+	assert(it && it->len);
+	if (ns_prefix(it))
+		it->len = 0;
+}
+
+void trie_it_del(trie_it_t *it)
+{
+	assert(it && it->len);
+	if (it->len == 0)
+		return;
+	struct found found = {
+		.l = it->stack[it->len - 1],
+		.p = NULL,
+		.b = 0, // del_found() needs to know which bit to zero in the bitmap
+	};
+	assert(!isbranch(found.l));
+	if (it->len > 1) { // deleting the root
+		found.p = it->stack[it->len - 2];
+		assert(isbranch(found.p));
+		size_t len;
+		const trie_key_t *key = trie_it_key(it, &len);
+		found.b = twigbit(found.p, key, len);
+	}
+	// We could trie_it_{next,prev,...}(it) now, in case we wanted that semantics.
+	it->len = 0;
+	del_found(ns_gettrie(it), found, NULL);
 }

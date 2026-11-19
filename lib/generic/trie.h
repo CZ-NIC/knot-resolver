@@ -118,18 +118,6 @@ int trie_del_first(trie_t *tbl, trie_key_t *key, uint32_t *len, trie_val_t *val)
 KR_EXPORT
 trie_it_t* trie_it_begin(trie_t *tbl);
 
-/*!
- * \brief Advance the iterator to the next element.
- *
- * Iteration is in ascending lexicographical order.
- * In particular, the empty string would be considered as the very first.
- *
- * \note You may not use this function if the trie's key-set has been modified
- * during the lifetime of the iterator (modifying values only is OK).
- */
-KR_EXPORT
-void trie_it_next(trie_it_t *it);
-
 /*! \brief Test if the iterator has gone past the last element. */
 KR_EXPORT
 bool trie_it_finished(trie_it_t *it);
@@ -137,6 +125,10 @@ bool trie_it_finished(trie_it_t *it);
 /*! \brief Free any resources of the iterator. It's OK to call it on NULL. */
 KR_EXPORT
 void trie_it_free(trie_it_t *it);
+
+/*! \brief Copy the iterator.  See the warning in trie_it_begin(). */
+KR_EXPORT
+trie_it_t *trie_it_clone(const trie_it_t *it);
 
 /*!
  * \brief Return pointer to the key of the current element.
@@ -150,3 +142,46 @@ const trie_key_t* trie_it_key(trie_it_t *it, size_t *len);
 /*! \brief Return pointer to the value of the current element (writable). */
 KR_EXPORT
 trie_val_t* trie_it_val(trie_it_t *it);
+
+/*!
+ * \brief Advance the iterator to the next element.
+ *
+ * Iteration is in ascending lexicographical order.
+ * In particular, the empty string would be considered as the very first.
+ *
+ * \note You may not use this function if the trie's key-set has been modified
+ * during the lifetime of the iterator (modifying values only is OK).
+ */
+KR_EXPORT
+void trie_it_next(trie_it_t *it);
+/*!
+ * \brief Advance the iterator to the next element, skipping keys that have
+ * the current key as a prefix.
+ */
+KR_EXPORT
+void trie_it_next_nosuffix(trie_it_t *it);
+/*! \brief Advance the iterator to the previous element.  See trie_it_next(). */
+KR_EXPORT
+void trie_it_prev(trie_it_t *it);
+
+/*! \brief Advance iterator to the next element, looping to first after last. */
+KR_EXPORT
+void trie_it_next_loop(trie_it_t *it);
+/*! \brief Advance iterator to the previous element, looping to last after first. */
+KR_EXPORT
+void trie_it_prev_loop(trie_it_t *it);
+
+/*! \brief Advance iterator to the longest prefix of the current key.
+ *
+ * \TODO: name, maybe _prefix?  Arguments similar to _nosub vs. _unprefixed.
+ */
+KR_EXPORT
+void trie_it_parent(trie_it_t *it);
+
+/*! \brief trie_get_leq() but with an iterator. */
+KR_EXPORT
+int trie_it_get_leq(trie_it_t *it, const trie_key_t *key, uint32_t len);
+
+/*! \brief Remove the current element.  The iterator will get trie_it_finished() */
+KR_EXPORT
+void trie_it_del(trie_it_t *it);
