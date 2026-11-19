@@ -296,16 +296,6 @@ static uint twig_number(node_t *child, node_t *parent)
 	return (uint)num;
 }
 
-/*!
- * \brief For a branch nod, compute offset of a child and child count.
- *
- * Having this separate might be meaningful for performance optimization.
- */
-#define TWIGOFFMAX(off, max, t, b) do {			\
-		(off) = twigoff((t), (b));		\
-		(max) = branch_weight(t);\
-	} while(0)
-
 /*! \brief Simple string comparator. */
 static int key_cmp(const trie_key_t *k1, uint32_t k1_len,
 		   const trie_key_t *k2, uint32_t k2_len)
@@ -601,19 +591,18 @@ static inline int ns_longer(nstack_t *ns)
  *  The whole path to the point is kept on the passed stack;
  *  always at least the root will remain on the top of it.
  *  Beware: the precise semantics of this function is rather tricky.
- *  The top of the stack will contain: the corresponding leaf if exact match is found;
- *  or the immediate node below a branching-point-on-edge or the branching-point itself.
+ *  The top of the stack will contain: the corresponding leaf if exact
+ *  match is found; or the immediate node below a
+ *  branching-point-on-edge or the branching-point itself.
  *
- *  \param idiff  Set position of the point of first mismatch (nibble index).
- *  \param first  Set the value of the first non-matching character (from trie),
- *                optionally; end-of-string character has value -256 (that's why it's int).
- *                Note: the character is converted to *unsigned* char (i.e. 0..255),
- *                as that's the ordering used in the trie.
+ *  \param idiff  Set the index of first differing nibble, or TMAX_INDEX for an exact match
+ *  \param tbit   Set the bit of the closest leaf's nibble at index idiff
+ *  \param kbit   Set the bit of the key's nibble at index idiff
  *
  *  \return KNOT_EOK or KNOT_ENOMEM.
  */
 static int ns_find_branch(nstack_t *ns, const trie_key_t *key, uint32_t len,
-                          trie_index_t *idiff, int *first)
+                          trie_index_t *idiff, bitmap_t *tbit, bitmap_t *kbit)
 {
 	assert(ns && ns->len && idiff);
 	// First find some leaf with longest matching prefix.
@@ -630,7 +619,7 @@ static int ns_find_branch(nstack_t *ns, const trie_key_t *key, uint32_t len,
 		uint i = hastwig(t, b) ? twigoff(t, b) : 0;
 		ns->stack[ns->len++] = twig(t, i);
 	}
-	tkey_t *lkey = tkey(ns->stack[ns->len-1]);
+	tkey_t *lkey = tkey(ns->stack[ns->len - 1]);
 	// Find index of the first char that differs.
 	size_t bytei = 0;
 	uint32_t klen = lkey->len;
@@ -638,8 +627,6 @@ static int ns_find_branch(nstack_t *ns, const trie_key_t *key, uint32_t len,
 		if (key[bytei] != lkey->chars[bytei])
 			break;
 	}
-	if (first)
-		*first = klen > bytei ? (uint8_t)lkey->chars[bytei] : -256;
 	// Find which half-byte has matched.
 	trie_index_t index = bytei << 1;
 	if (bytei == len && len == klen) { // found equivalent key
@@ -675,6 +662,8 @@ success:
 		}
 	#endif
 	*idiff = index;
+	*tbit = keybit(index, lkey->chars, lkey->len);
+	*kbit = keybit(index, key, len);
 	return KNOT_EOK;
 }
 
@@ -796,36 +785,36 @@ int trie_get_leq(trie_t *tbl, const trie_key_t *key, uint32_t len, trie_val_t **
 	ns_init(&ns_local, tbl);
 	nstack_t *ns = &ns_local;
 	trie_index_t idiff;
-	int un_leaf; // first unmatched character in the leaf
-	ERR_RETURN(ns_find_branch(ns, key, len, &idiff, &un_leaf));
-	uint32_t bytei = (uint32_t)(idiff >> 1);
-	int un_key = bytei < len ? (unsigned char)key[bytei] : -256;
+	bitmap_t tbit, kbit;
+	ERR_RETURN(ns_find_branch(ns, key, len, &idiff, &tbit, &kbit));
 	node_t *t = ns->stack[ns->len - 1];
 	if (idiff == TMAX_INDEX) { // found exact match
 		*val = tvalp(t);
 		return KNOT_EOK;
 	}
 	// Get t: the last node on matching path
+	bitmap_t b;
 	if (isbranch(t) && branch_index(t) == idiff) {
 		// t is OK
+		b = kbit;
 	} else {
 		// the top of the stack was the first unmatched node -> step up
 		if (ns->len == 1) {
 			// root was unmatched already
-			if (un_key < un_leaf)
+			if (kbit < tbit)
 				return KNOT_ENOENT;
 			ERR_RETURN(ns_last_leaf(ns));
 			goto success;
 		}
 		--ns->len;
 		t = ns->stack[ns->len - 1];
+		b = twigbit(t, key, len);
 	}
 	// Now we re-do the first "non-matching" step in the trie
 	// but try the previous child if key was less (it may not exist)
-	bitmap_t b = twigbit(t, key, len);
 	int i = hastwig(t, b)
-		? twigoff(t, b) - (un_key < un_leaf)
-		: twigoff(t, b) - 1 /*twigoff returns successor when !hastwig*/;
+		? (int)twigoff(t, b) - (kbit < tbit)
+		: (int)twigoff(t, b) - 1 /* twigoff returns successor when !hastwig */;
 	if (i >= 0) {
 		ERR_RETURN(ns_longer(ns));
 		ns->stack[ns->len++] = twig(t, i);
@@ -858,30 +847,29 @@ trie_val_t* trie_get_ins(trie_t *tbl, const trie_key_t *key, uint32_t len)
 	ns_init(&ns_local, tbl);
 	nstack_t *ns = &ns_local;
 	trie_index_t idiff;
-	int k2; // the first unmatched character in the leaf
-	if (unlikely(ns_find_branch(ns, key, len, &idiff, &k2)))
+	bitmap_t tbit, kbit;
+	if (unlikely(ns_find_branch(ns, key, len, &idiff, &tbit, &kbit)))
 		return NULL;
 	node_t *t = ns->stack[ns->len - 1];
 	if (idiff == TMAX_INDEX) // the same key was already present
 		return tvalp(t);
-	node_t leaf;
+	node_t leaf, *leafp;
 	if (unlikely(mkleaf(&leaf, key, len, &tbl->mm)))
 		return NULL;
 
 	if (isbranch(t) && branch_index(t) == idiff) {
 		// The node t needs a new leaf child.
-		bitmap_t b1 = twigbit(t, key, len);
-		assert(!hastwig(t, b1));
-		uint s, m; TWIGOFFMAX(s, m, t, b1); // new child position and original child count
+		assert(!hastwig(t, kbit));
+		// new child position and original child count
+		uint s = twigoff(t, kbit);
+		uint m = branch_weight(t);
 		node_t *nt = mm_realloc(&tbl->mm, twigs(t),
 				sizeof(node_t) * (m + 1), sizeof(node_t) * m);
 		if (unlikely(!nt))
 			goto err_leaf;
 		memmove(nt + s + 1, nt + s, sizeof(node_t) * (m - s));
-		nt[s] = leaf;
-		*t = mkbranch(idiff, branch_bmp(t) | b1, nt);
-		++tbl->weight;
-		return tvalp(&nt[s]);
+		leafp = nt + s;
+		*t = mkbranch(idiff, branch_bmp(t) | kbit, nt);
 	} else {
 		// We need to insert a new binary branch with leaf at *t.
 		// Note: it works the same for the case where we insert above root t.
@@ -895,16 +883,13 @@ trie_val_t* trie_get_ins(trie_t *tbl, const trie_key_t *key, uint32_t len)
 		if (unlikely(!nt))
 			goto err_leaf;
 		node_t t2 = *t; // Save before overwriting t.
-		bitmap_t b1 = keybit(idiff, key, len);
-		bitmap_t b2 = unlikely(k2 == -256)
-			? BMP_NOBYTE
-			: keybit(idiff & 1, (const char *)&(unsigned char){ (unsigned char)k2 }, 1);
-		*t = mkbranch(idiff, b1 | b2, nt);
-		*twig(t, twigoff(t, b1)) = leaf;
-		*twig(t, twigoff(t, b2)) = t2;
-		++tbl->weight;
-		return tvalp(twig(t, twigoff(t, b1)));
+		*t = mkbranch(idiff, tbit | kbit, nt);
+		*twig(t, twigoff(t, tbit)) = t2;
+		leafp = twig(t, twigoff(t, kbit));
 	};
+	*leafp = leaf;
+	++tbl->weight;
+	return tvalp(leafp);
 err_leaf:
 	mm_free(&tbl->mm, tkey(&leaf));
 	return NULL;
