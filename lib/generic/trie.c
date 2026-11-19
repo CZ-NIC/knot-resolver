@@ -589,11 +589,6 @@ static inline int ns_longer(nstack_t *ns)
 	return ns_longer_alloc(ns); // hand-split the part suitable for inlining
 }
 
-typedef struct {
-	uint32_t index;
-	uint flags;
-} branch_info_t;
-
 /*!
  * \brief Find the "branching point" as if searching for a key.
  *
@@ -603,7 +598,7 @@ typedef struct {
  *  The top of the stack will contain: the corresponding leaf if exact match is found;
  *  or the immediate node below a branching-point-on-edge or the branching-point itself.
  *
- *  \param info   Set position of the point of first mismatch (in index and flags).
+ *  \param idiff  Set position of the point of first mismatch (nibble index).
  *  \param first  Set the value of the first non-matching character (from trie),
  *                optionally; end-of-string character has value -256 (that's why it's int).
  *                Note: the character is converted to *unsigned* char (i.e. 0..255),
@@ -612,9 +607,9 @@ typedef struct {
  *  \return KNOT_EOK or KNOT_ENOMEM.
  */
 static int ns_find_branch(nstack_t *ns, const char *key, uint32_t len,
-                          branch_info_t *info, int *first)
+                          trie_index_t *idiff, int *first)
 {
-	assert(ns && ns->len && info);
+	assert(ns && ns->len && idiff);
 	// First find some leaf with longest matching prefix.
 	while (isbranch(ns->stack[ns->len - 1])) {
 		ERR_RETURN(ns_longer(ns));
@@ -631,38 +626,33 @@ static int ns_find_branch(nstack_t *ns, const char *key, uint32_t len,
 	}
 	tkey_t *lkey = tkey(ns->stack[ns->len-1]);
 	// Find index of the first char that differs.
-	uint32_t index = 0;
-	while (index < MIN(len, lkey->len)) {
-		if (key[index] != lkey->chars[index])
+	size_t bytei = 0;
+	uint32_t klen = lkey->len;
+	for (bytei = 0; bytei < MIN(len, klen); bytei++) {
+		if (key[bytei] != lkey->chars[bytei])
 			break;
-		else
-			++index;
 	}
-	info->index = index;
 	if (first)
-		*first = lkey->len > index ? (unsigned char)lkey->chars[index] : -256;
-	// Find flags: which half-byte has matched.
-	uint flags;
-	if (index == len && len == lkey->len) { // found equivalent key
-		info->flags = flags = 0;
+		*first = klen > bytei ? (uint8_t)lkey->chars[bytei] : -256;
+	// Find which half-byte has matched.
+	trie_index_t index = bytei << 1;
+	if (bytei == len && len == klen) { // found equivalent key
+		index = TMAX_INDEX;
 		goto success;
 	}
-	if (likely(index < MIN(len, lkey->len))) {
-		byte k2 = (byte)lkey->chars[index];
-		byte k1 = (byte)key[index];
-		flags = ((k1 ^ k2) & 0xf0) ? 1 : 2;
-	} else { // one is prefix of another
-		flags = 1;
+	if (likely(bytei < MIN(len, klen))) {
+		uint8_t k2 = (uint8_t)lkey->chars[bytei];
+		uint8_t k1 = (uint8_t)key[bytei];
+		if (((k1 ^ k2) & 0xf0) == 0)
+			index += 1;
 	}
-	info->flags = flags;
 	// now go up the trie from the current leaf
-	trie_index_t ni = ((trie_index_t)index << 1) | (flags - 1);
 	node_t *t;
 	do {
 		if (unlikely(ns->len == 1))
 			goto success; // only the root stays on the stack
 		t = ns->stack[ns->len - 2];
-		if (branch_index(t) < ni)
+		if (branch_index(t) < index)
 			goto success;
 		--ns->len;
 	} while (true);
@@ -671,13 +661,14 @@ success:
 		assert(ns->len);
 		if (isbranch(ns->stack[ns->len - 1])) {
 			t = ns->stack[ns->len - 1];
-			assert(branch_index(t) >= ni);
+			assert(branch_index(t) >= index);
 		}
 		if (ns->len > 1) {
 			t = ns->stack[ns->len - 2];
-			assert(branch_index(t) < ni || flags == 0);
+			assert(branch_index(t) < index || index == TMAX_INDEX);
 		}
 	#endif
+	*idiff = index;
 	return KNOT_EOK;
 }
 
@@ -798,18 +789,18 @@ int trie_get_leq(trie_t *tbl, const char *key, uint32_t len, trie_val_t **val)
 		nstack_t ns_local;
 	ns_init(&ns_local, tbl);
 	nstack_t *ns = &ns_local;
-	branch_info_t bp;
+	trie_index_t idiff;
 	int un_leaf; // first unmatched character in the leaf
-	ERR_RETURN(ns_find_branch(ns, key, len, &bp, &un_leaf));
-	int un_key = bp.index < len ? (unsigned char)key[bp.index] : -256;
+	ERR_RETURN(ns_find_branch(ns, key, len, &idiff, &un_leaf));
+	uint32_t bytei = (uint32_t)(idiff >> 1);
+	int un_key = bytei < len ? (unsigned char)key[bytei] : -256;
 	node_t *t = ns->stack[ns->len - 1];
-	if (bp.flags == 0) { // found exact match
+	if (idiff == TMAX_INDEX) { // found exact match
 		*val = tvalp(t);
 		return KNOT_EOK;
 	}
-	trie_index_t bp_ni = ((trie_index_t)bp.index << 1) | (bp.flags - 1);
 	// Get t: the last node on matching path
-	if (isbranch(t) && branch_index(t) == bp_ni) {
+	if (isbranch(t) && branch_index(t) == idiff) {
 		// t is OK
 	} else {
 		// the top of the stack was the first unmatched node -> step up
@@ -860,17 +851,16 @@ trie_val_t* trie_get_ins(trie_t *tbl, const char *key, uint32_t len)
 		nstack_t ns_local;
 	ns_init(&ns_local, tbl);
 	nstack_t *ns = &ns_local;
-	branch_info_t bp; // branch-point: index and flags signifying the longest common prefix
+	trie_index_t ni; // branch-point nibble index signifying the longest common prefix
 	int k2; // the first unmatched character in the leaf
-	if (unlikely(ns_find_branch(ns, key, len, &bp, &k2)))
+	if (unlikely(ns_find_branch(ns, key, len, &ni, &k2)))
 		return NULL;
 	node_t *t = ns->stack[ns->len - 1];
-	if (bp.flags == 0) // the same key was already present
+	if (ni == TMAX_INDEX) // the same key was already present
 		return tvalp(t);
 	node_t leaf;
 	if (unlikely(mkleaf(&leaf, key, len, &tbl->mm)))
 		return NULL;
-	trie_index_t ni = ((trie_index_t)bp.index << 1) | (bp.flags - 1);
 
 	if (isbranch(t) && branch_index(t) == ni) {
 		// The node t needs a new leaf child.
@@ -899,10 +889,10 @@ trie_val_t* trie_get_ins(trie_t *tbl, const char *key, uint32_t len)
 		if (unlikely(!nt))
 			goto err_leaf;
 		node_t t2 = *t; // Save before overwriting t.
-		bitmap_t b1 = twigbit(t, key, len);
+		bitmap_t b1 = keybit(ni, key, len);
 		bitmap_t b2 = unlikely(k2 == -256)
 			? BMP_NOBYTE
-			: keybit(bp.flags - 1, (const char *)&(byte){ (byte)k2 }, 1);
+			: keybit(ni & 1, (const char *)&(unsigned char){ (unsigned char)k2 }, 1);
 		*t = mkbranch(ni, b1 | b2, nt);
 		*twig(t, twigoff(t, b1)) = leaf;
 		*twig(t, twigoff(t, b2)) = t2;
