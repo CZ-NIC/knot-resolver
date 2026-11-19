@@ -555,13 +555,14 @@ static int del_found(trie_t *tbl, struct found found, trie_val_t *val)
 		return KNOT_EOK;
 	}
 	memmove(tp + ci, tp + ci + 1, sizeof(node_t) * (cc - ci - 1));
+	p->i &= ~found.b;
 	node_t *newt = mm_realloc(&tbl->mm, tp, sizeof(node_t) * (cc - 1),
 	                          sizeof(node_t) * cc);
+	if (likely(newt != NULL))
+		p->p = newt;
 	// We can ignore mm_realloc failure because an oversized twig
 	// array is OK - only beware that next time the prev_size
 	// passed to mm_realloc will not be correct; TODO?
-	*p = mkbranch(branch_index(p), branch_bmp(p) & ~found.b,
-	              likely(newt != NULL) ? newt : tp);
 	return KNOT_EOK;
 }
 
