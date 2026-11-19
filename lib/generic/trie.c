@@ -713,15 +713,16 @@ static int ns_prev_leaf(nstack_t *ns)
 /*!
  * \brief Advance the node stack to the leaf that is successor to the current node.
  *
- * \note Prefix leaf or anything else under the current node DOES count.
+ * \param skip_prefixed skip any nodes whose key is a prefix of the current one.
+ *     If false, prefix leaf or anything else under the current node DOES count.
  * \return KNOT_EOK on success, KNOT_ENOENT on not-found, or possibly KNOT_ENOMEM.
  */
-static int ns_next_leaf(nstack_t *ns)
+static int ns_next_leaf(nstack_t *ns, const bool skip_prefixed)
 {
 	assert(ns && ns->len > 0);
 
 	node_t *t = ns->stack[ns->len - 1];
-	if (isbranch(t))
+	if (!skip_prefixed && isbranch(t))
 		return ns_first_leaf(ns);
 	for (; ns->len >= 2; --ns->len) {
 		t = ns->stack[ns->len - 1];
@@ -965,6 +966,6 @@ trie_val_t* trie_it_val(trie_it_t *it)
 void trie_it_next(trie_it_t *it)
 {
 	assert(it && it->len);
-	if (ns_next_leaf(it) != KNOT_EOK)
+	if (ns_next_leaf(it, false) != KNOT_EOK)
 		it->len = 0;
 }
