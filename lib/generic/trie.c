@@ -192,6 +192,26 @@ static trie_val_t *tvalp(node_t *t)
 	return &t->leaf.val;
 }
 
+/*! \brief Given a branch node, return the bitmap of present children. */
+static bitmap_t branch_bmp(const node_t *t)
+{
+	assert(isbranch(t));
+	return (t->branch.bitmap);
+}
+
+/*!
+ * \brief Count the children of a branch node.
+ *
+ * \TODO This implementation may be relatively slow on some HW.
+ */
+static uint branch_weight(const node_t *t)
+{
+	assert(isbranch(t));
+	uint n = __builtin_popcount(t->branch.bitmap);
+	assert(n > 1 && n <= 17);
+	return n;
+}
+
 /*! \brief Make a bitmask for testing a branch bitmap. */
 static bitmap_t nibbit(byte k, uint flags)
 {
@@ -227,24 +247,26 @@ static node_t* twigs(const node_t *t)
 }
 
 /*! \brief Compute offset of an existing child in a branch node. */
-static uint twigoff(const node_t *t, bitmap_t b)
+static uint twigoff(const node_t *t, bitmap_t bit)
 {
 	assert(isbranch(t));
-	return bitmap_weight(t->branch.bitmap & (b - 1));
+	assert(__builtin_popcount(bit) == 1);
+	return __builtin_popcount(branch_bmp(t) & (bit - 1));
 }
 
 /*! \brief Get pointer to a particular child of a branch node. */
 static node_t* twig(node_t *t, uint i)
 {
-	assert(isbranch(t));
+	assert(i < branch_weight(t));
 	return twigs(t) + i;
 }
 
 /*! \brief Get the position of a child node within its parent's twigs array. */
 static uint twig_number(node_t *child, node_t *parent)
 {
+	// twig array index using pointer arithmetic
 	ptrdiff_t num = child - twigs(parent);
-	assert(num >= 0 && num < bitmap_weight(parent->branch.bitmap));
+	assert(num >= 0 && num < branch_weight(parent));
 	return (uint)num;
 }
 
@@ -255,7 +277,7 @@ static uint twig_number(node_t *child, node_t *parent)
  */
 #define TWIGOFFMAX(off, max, t, b) do {			\
 		(off) = twigoff((t), (b));		\
-		(max) = bitmap_weight((t)->branch.bitmap);\
+		(max) = branch_weight(t);\
 	} while(0)
 
 /*! \brief Simple string comparator. */
@@ -297,8 +319,8 @@ static void clear_trie(node_t *trie, knot_mm_t *mm)
 	if (!isbranch(trie)) {
 		mm_free(mm, tkey(trie));
 	} else {
-		uint len = bitmap_weight(trie->branch.bitmap);
-		for (uint i = 0; i < len; ++i)
+		uint n = branch_weight(trie);
+		for (uint i = 0; i < n; ++i)
 			clear_trie(twig(trie, i), mm);
 		mm_free(mm, twigs(trie));
 	}
@@ -385,7 +407,7 @@ static struct found find_first(trie_t *tbl)
 	return (struct found) {
 		.l = &t->leaf,
 		.p = p,
-		.b = p ? bitmap_lowest_bit(p->bitmap) : 0,
+		.b = p ? bitmap_lowest_bit(branch_bmp(p)) : 0,
 	};
 }
 
@@ -424,8 +446,8 @@ static int del_found(trie_t *tbl, struct found found, trie_val_t *val)
 	}
 	// remove leaf t as child of p; get child index via pointer arithmetic
 	node_t *tp = twigs(p);
-	int ci = ((union node *)found.l) - tp,
-	    cc = bitmap_weight(p->bitmap); // child count
+	uint ci = twig_number(found.l, p);
+	uint cc = branch_weight(p); // child count
 	assert(ci >= 0 && ci < cc);
 
 	if (cc == 2) { // collapse binary node p: move the other child to this node
@@ -643,7 +665,7 @@ static int ns_last_leaf(nstack_t *ns)
 		node_t *t = ns->stack[ns->len - 1];
 		if (!isbranch(t))
 			return KNOT_EOK;
-		uint lasti = bitmap_weight(t->branch.bitmap) - 1;
+		uint lasti = branch_weight(t) - 1;
 		assert(lasti >= 0);
 		ns->stack[ns->len++] = twig(t, lasti);
 	} while (true);
@@ -716,7 +738,7 @@ static int ns_next_leaf(nstack_t *ns)
 		node_t *p = ns->stack[ns->len - 2];
 		uint ci = twig_number(t, p);
 		assert(ci >= 0 && ci <= 16);
-		uint cc = bitmap_weight(p->branch.bitmap);
+		uint cc = branch_weight(p);
 		assert(ci + 1 <= cc);
 		if (ci + 1 == cc) {
 			// t is the last child of p, so we need to keep climbing
@@ -864,8 +886,8 @@ static int apply_trie(node_t *t, int (*f)(trie_val_t *, void *), void *d)
 	assert(t);
 	if (!isbranch(t))
 		return f(tvalp(t), d);
-	uint child_count = bitmap_weight(t->branch.bitmap);
-	for (uint i = 0; i < child_count; ++i)
+	uint n = branch_weight(t);
+	for (uint i = 0; i < n; ++i)
 		ERR_RETURN(apply_trie(twig(t, i), f, d));
 	return KNOT_EOK;
 }
@@ -884,8 +906,8 @@ static int apply_trie_with_key(node_t *t, int (*f)(const char *, uint32_t, trie_
 	assert(t);
 	if (!isbranch(t))
 		return f(tkey(t)->chars, tkey(t)->len, tvalp(t), d);
-	uint child_count = bitmap_weight(t->branch.bitmap);
-	for (uint i = 0; i < child_count; ++i)
+	uint n = branch_weight(t);
+	for (uint i = 0; i < n; ++i)
 		ERR_RETURN(apply_trie_with_key(twig(t, i), f, d));
 	return KNOT_EOK;
 }
