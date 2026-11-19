@@ -640,7 +640,7 @@ static void ns_cleanup(nstack_t *ns)
 static int ns_longer_alloc(nstack_t *ns)
 {
 	ns->alen *= 2;
-	size_t new_size = sizeof(nstack_t) + ns->alen * sizeof(node_t *);
+	size_t new_size = ns->alen * sizeof(node_t *);
 	node_t **st;
 	if (ns->stack == ns->stack_init) {
 		st = malloc(new_size);
