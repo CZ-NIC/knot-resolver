@@ -772,26 +772,20 @@ static int ns_next_leaf(nstack_t *ns, const bool skip_prefixed)
 	return KNOT_ENOENT; // not found, as no more parent is available
 }
 
-int trie_get_leq(trie_t *tbl, const trie_key_t *key, uint32_t len, trie_val_t **val)
+/*! \brief less-or-equal search.
+ *
+ * \return KNOT_EOK for exact match, 1 for previous, KNOT_ENOENT for not-found,
+ *         or KNOT_E*.
+ */
+static int ns_get_leq(nstack_t *ns, const trie_key_t *key, uint32_t len)
 {
-	assert(tbl && val);
-	*val = NULL; // so on failure we can just return;
-	if (tbl->weight == 0)
-		return KNOT_ENOENT;
-	{ // Intentionally un-indented; until end of function, to bound cleanup attr.
-	// First find a key with longest-matching prefix
-	__attribute__((cleanup(ns_cleanup)))
-		nstack_t ns_local;
-	ns_init(&ns_local, tbl);
-	nstack_t *ns = &ns_local;
+	// First find the key with longest-matching prefix
 	trie_index_t idiff;
 	bitmap_t tbit, kbit;
 	ERR_RETURN(ns_find_branch(ns, key, len, &idiff, &tbit, &kbit));
 	node_t *t = ns->stack[ns->len - 1];
-	if (idiff == TMAX_INDEX) { // found exact match
-		*val = tvalp(t);
+	if (idiff == TMAX_INDEX) // found exact match
 		return KNOT_EOK;
-	}
 	// Get t: the last node on matching path
 	bitmap_t b;
 	if (isbranch(t) && branch_index(t) == idiff) {
@@ -804,7 +798,7 @@ int trie_get_leq(trie_t *tbl, const trie_key_t *key, uint32_t len, trie_val_t **
 			if (kbit < tbit)
 				return KNOT_ENOENT;
 			ERR_RETURN(ns_last_leaf(ns));
-			goto success;
+			return 1;
 		}
 		--ns->len;
 		t = ns->stack[ns->len - 1];
@@ -822,11 +816,30 @@ int trie_get_leq(trie_t *tbl, const trie_key_t *key, uint32_t len, trie_val_t **
 	} else {
 		ERR_RETURN(ns_prev_leaf(ns));
 	}
-success:
-	assert(!isbranch(ns->stack[ns->len - 1]));
-	*val = tvalp(ns->stack[ns->len - 1]);
 	return 1;
+}
+
+int trie_get_leq(trie_t *tbl, const trie_key_t *key, uint32_t len, trie_val_t **val)
+{
+	assert(tbl && val);
+	if (tbl->weight == 0) {
+		if (val) *val = NULL;
+		return KNOT_ENOENT;
 	}
+	// We try to do without malloc.
+	nstack_t ns_local;
+	ns_init(&ns_local, tbl);
+	nstack_t *ns = &ns_local;
+
+	int ret = ns_get_leq(ns, key, len);
+	if (ret == KNOT_EOK || ret == 1) {
+		assert(!isbranch(ns->stack[ns->len - 1]));
+		if (val) *val = tvalp(ns->stack[ns->len - 1]);
+	} else {
+		if (val) *val = NULL;
+	}
+	ns_cleanup(ns);
+	return ret;
 }
 
 trie_val_t* trie_get_ins(trie_t *tbl, const trie_key_t *key, uint32_t len)
