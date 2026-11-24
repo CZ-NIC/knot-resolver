@@ -159,6 +159,7 @@ static int kr_recv_stream_data_cb(ngtcp2_conn *ngconn, uint32_t flags,
 	stream->sdata_offset = offset;
 
 	if (wire_buf_data_length(&stream->pers_inbuf) < sizeof(uint16_t)) {
+		wire_buf_free_space_reserve(&stream->pers_inbuf, NGTCP2_MAX_UDP_PAYLOAD_SIZE);
 		if (datalen == 0) {
 			goto malformed;
 		}
@@ -186,11 +187,9 @@ static int kr_recv_stream_data_cb(ngtcp2_conn *ngconn, uint32_t flags,
 
 		uint32_t qsize =
 			knot_wire_read_u16(wire_buf_data(&stream->pers_inbuf));
-		uint32_t qsize_prefixed = qsize + sizeof(uint16_t);
-		if (qsize > wire_buf_free_space_length(&stream->pers_inbuf)) {
-			uint32_t qsize_prefixed_safe = qsize_prefixed + 16;
-			wire_buf_reserve(&stream->pers_inbuf,
-					qsize_prefixed_safe);
+		if (wire_buf_free_space_reserve(&stream->pers_inbuf, qsize) != kr_ok()) {
+			kr_log_debug(DOQ, "too large stream->pers_inbuf needed");
+			goto malformed;
 		}
 		if (datalen == 0) {
 			goto finished;
@@ -758,6 +757,7 @@ int send_special(ngtcp2_version_cid *dec_cids, kr_quic_table_t *table,
 	struct wire_buf save_wb;
 	wire_buf_move(&save_wb, ctx->payload.wire_buf);
 	wire_buf_init(ctx->payload.wire_buf, NGTCP2_MAX_UDP_PAYLOAD_SIZE);
+	wire_buf_reserve(ctx->payload.wire_buf, NGTCP2_MAX_UDP_PAYLOAD_SIZE);
 
 	uint64_t now = quic_timestamp();
 
@@ -952,6 +952,7 @@ static enum protolayer_iter_cb_result pl_quic_conn_wrap(void *sess_data,
 			return protolayer_continue(ctx);
 		}
 
+		wire_buf_reserve_max(ctx->payload.wire_buf); // temporary, reserves too much
 		int nwrite = ngtcp2_conn_writev_stream(conn->conn,
 				conn->path, &pi,
 				wire_buf_free_space(ctx->payload.wire_buf),

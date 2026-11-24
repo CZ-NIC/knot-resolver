@@ -347,6 +347,7 @@ int write_retry_packet(struct wire_buf *dest, kr_quic_table_t *table,
 		return ret;
 	}
 
+	wire_buf_reserve_max(dest);
 	ret = ngtcp2_crypto_write_retry(
 		wire_buf_free_space(dest),
 		wire_buf_free_space_length(dest),

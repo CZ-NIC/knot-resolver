@@ -190,6 +190,7 @@ static int process_uri_path(struct pl_http_sess_data *ctx, const char* path, int
 		end = beg + strlen(beg);
 
 	struct wire_buf *wb = &ctx->wire_buf;
+	wire_buf_free_space_reserve(wb, ((end - beg + 3) / 4) * 3);
 	remaining = wire_buf_free_space_length(wb);
 	dest = wire_buf_free_space(wb);
 
@@ -671,8 +672,10 @@ static int data_chunk_recv_callback(nghttp2_session *h2, uint8_t flags, int32_t 
 
 	struct wire_buf *wb = &ctx->wire_buf;
 
-	ssize_t remaining = wire_buf_free_space_length(wb);
+
 	ssize_t required = len;
+	wire_buf_free_space_reserve(wb, required);
+	ssize_t remaining = wire_buf_free_space_length(wb);
 	/* First data chunk of the new stream */
 	if (is_first)
 		required += sizeof(uint16_t);

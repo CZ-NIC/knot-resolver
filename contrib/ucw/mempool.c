@@ -123,10 +123,11 @@ struct mp_unused {
  * In case of changing these, see also the beginning of mp_new_reusable_chunk(),
  * where it is defined how default chunk size is increased with growing pool size. */
 static const uint32_t mp_reusable_ext_sizes[] = {
-	 1 * 1024,
-	 4 * 1024,
-	16 * 1024,
-	68 * 1024,  // support 64K allocations
+	      1344,  // ~1/3 of page, UDP wire_buf size
+	  4 * 1024,
+	 16 * 1024,
+	 68 * 1024,  // support 64K allocations
+	128 * 1024,
 };
 #define MP_REUSABLE_CNT ARRAY_SIZE(mp_reusable_ext_sizes)
 
@@ -382,7 +383,8 @@ void mp_reusable_init(void)
 		if (mp_reusable_ext_sizes[i] < CPU_PAGE_SIZE) {
 			mp_insert_unused(&r->sep, &r->head);
 			r->chunks_per_block = CPU_PAGE_SIZE / mp_reusable_ext_sizes[i];
-			r->chunk_size = (CPU_PAGE_SIZE - MP_UNUSED_TAIL) / r->chunks_per_block - MP_CHUNK_TAIL;
+			r->chunk_size = ALIGN_TO((CPU_PAGE_SIZE - MP_UNUSED_TAIL) / r->chunks_per_block - (CPU_CACHE_LINE_ALIGN - 1), CPU_CACHE_LINE_ALIGN)
+				- MP_CHUNK_TAIL;
 		} else {
 			r->chunks_per_block = 1;
 			r->chunk_size = ALIGN_TO(mp_reusable_ext_sizes[i], CPU_PAGE_SIZE) - MP_CHUNK_TAIL;

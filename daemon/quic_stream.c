@@ -165,6 +165,7 @@ static int send_stream(struct pl_quic_stream_sess_data *stream,
 	ngtcp2_conn_info info = { 0 };
 	ngtcp2_conn_get_conn_info(stream->conn, &info);
 
+	wire_buf_reserve_max(ctx->payload.wire_buf);
 	int nwrite = ngtcp2_conn_writev_stream(stream->conn,
 			(ngtcp2_path *)path, &pi,
 			wire_buf_free_space(ctx->payload.wire_buf),
@@ -194,7 +195,7 @@ static int pl_quic_stream_sess_init(struct session2 *session,
 	struct pl_quic_stream_sess_data *stream = sess_data;
 	stream->h.session = session;
 
-	wire_buf_init(&stream->pers_inbuf, NGTCP2_MAX_UDP_PAYLOAD_SIZE);
+	wire_buf_init(&stream->pers_inbuf, sizeof(uint16_t) + KNOT_WIRE_MAX_PKTSIZE);
 	wire_buf_init(&stream->outbuf, NGTCP2_MAX_UDP_PAYLOAD_SIZE);
 
 	session->secure = true;

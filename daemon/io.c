@@ -51,6 +51,16 @@ static void handle_getbuf(uv_handle_t* handle, size_t suggested_size, uv_buf_t* 
 	struct session2 *s = handle->data;
 	struct wire_buf *wb = &s->wire_buf;
 
+	if (!wb->buf) {
+		// keep buffer size for at least a single UDP packet (even for streams)
+		knot_rrset_t *opt_rr = s->outgoing ? the_resolver->upstream_opt_rr : the_resolver->downstream_opt_rr;
+		size_t udp_size = opt_rr ? knot_edns_get_payload(opt_rr) : KNOT_WIRE_MAX_PKTSIZE;
+		wire_buf_free_space_reserve(wb, udp_size);
+	} else {
+		// resize to next wire_buf size if full
+		wire_buf_free_space_reserve(wb, 1);
+	}
+
 	buf->base = wire_buf_free_space(wb);
 	buf->len = wire_buf_free_space_length(wb);
 }

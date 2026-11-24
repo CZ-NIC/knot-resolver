@@ -13,6 +13,7 @@
 
 /* Default pointer alignment */
 #define CPU_STRUCT_ALIGN sizeof(void *)
+#define CPU_CACHE_LINE_ALIGN 64
 
 /* Tell libc we're going to use all extensions available */
 

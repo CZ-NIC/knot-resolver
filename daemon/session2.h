@@ -162,6 +162,12 @@ void wire_buf_move(struct wire_buf *dst, struct wire_buf *src);
  * must be initialized, either to zero or via `wire_buf_init`. */
 int wire_buf_reserve(struct wire_buf *wb, size_t size);
 
+/** Temporary way to ensure old semantics,
+ * call before getting free space length to have all the space from wire_buf_init preallocated. */
+static inline int wire_buf_reserve_max(struct wire_buf *wb) {
+	return wire_buf_reserve(wb, wb->max_size);
+}
+
 /** Adds `length` to the end index of the valid data, marking `length` more
  * bytes as valid.
  *
@@ -211,7 +217,8 @@ static inline size_t wire_buf_free_space_length(const struct wire_buf *wb)
 	return (wb->buf) ? allowed_size - wb->end : 0;
 }
 
-static inline int wire_buf_free_space_reserve(struct wire_buf *wb, size_t length) {
+static inline int wire_buf_free_space_reserve(struct wire_buf *wb, size_t length)
+{
 	if (wire_buf_free_space_length(wb) >= length) {
 		return kr_ok();
 	}

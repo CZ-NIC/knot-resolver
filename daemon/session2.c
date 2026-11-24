@@ -525,7 +525,6 @@ static void protolayer_payload_ensure_long_lived(struct protolayer_iter_ctx *ctx
 
 	if (ctx->payload.type == PROTOLAYER_PAYLOAD_WIRE_BUF) {
 		wire_buf_move(&ctx->wb, ctx->payload.wire_buf);
-		wire_buf_reserve(ctx->payload.wire_buf, ctx->payload.wire_buf->max_size); // XXX to be removed
 		ctx->payload.wire_buf = &ctx->wb;
 		return;
 	}
@@ -771,8 +770,6 @@ void wire_buf_init(struct wire_buf *wb, size_t max_size)
 	*wb = (struct wire_buf){
 		.max_size = max_size
 	};
-
-	wire_buf_reserve(wb, max_size);
 }
 
 void wire_buf_deinit(struct wire_buf *wb)
@@ -794,6 +791,11 @@ int wire_buf_reserve(struct wire_buf *wb, size_t size)
 	if (wb->buf && wb->cur_size >= size)
 		return kr_ok();
 
+	if (size > wb->max_size) {
+		return ENOMEM;
+	}
+
+	size = MAX(size, wb->cur_size * 3 / 2); // for the case we get out of reusable sizes
 	char *newbuf = mp_alloc_rawmem(&size);
 	kr_require(newbuf);
 	size_t len = 0;

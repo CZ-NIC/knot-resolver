@@ -1116,6 +1116,11 @@ static enum protolayer_iter_cb_result pl_tls_unwrap(void *sess_data, void *iter_
 
 	/* See https://gnutls.org/manual/html_node/Data-transfer-and-termination.html#Data-transfer-and-termination */
 	while (true) {
+		// resize to the next allowed wire_buf size if needed
+		if (wire_buf_free_space_reserve(&tls->unwrap_buf, 1) != kr_ok()) {
+			brstatus = kr_error(ENOSPC);
+			goto exit_break;
+		};
 		ssize_t count = gnutls_record_recv(tls->tls_session,
 				wire_buf_free_space(&tls->unwrap_buf),
 				wire_buf_free_space_length(&tls->unwrap_buf));
@@ -1161,8 +1166,7 @@ static enum protolayer_iter_cb_result pl_tls_unwrap(void *sess_data, void *iter_
 		wire_buf_consume(&tls->unwrap_buf, count);
 		if (wire_buf_free_space_length(&tls->unwrap_buf) == 0 && protolayer_queue_has_payload(&tls->unwrap_queue) > 0) {
 			/* wire buffer is full but not all data was consumed */
-			brstatus = kr_error(ENOSPC);
-			goto exit_break;
+			continue;
 		}
 
 		if (kr_fails_assert(queue_len(tls->unwrap_queue) == 1)) {
