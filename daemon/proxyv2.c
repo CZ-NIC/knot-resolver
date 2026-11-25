@@ -320,17 +320,25 @@ struct pl_proxyv2_state {
 static enum protolayer_iter_cb_result pl_proxyv2_dgram_unwrap(
 		void *sess_data, void *iter_data, struct protolayer_iter_ctx *ctx)
 {
-	ctx->payload = protolayer_payload_as_buffer(&ctx->payload);
-	if (kr_fails_assert(ctx->payload.type == PROTOLAYER_PAYLOAD_BUFFER)) {
-		/* unsupported payload */
-		return protolayer_break(ctx, kr_error(EINVAL));
-	}
-
 	struct session2 *s = ctx->session;
 	struct pl_proxyv2_state *proxy_state = iter_data;
 
-	char *data = ctx->payload.buffer.buf;
-	ssize_t data_len = ctx->payload.buffer.len;
+	char *data;
+	ssize_t data_len;
+	switch (ctx->payload.type) {
+		case PROTOLAYER_PAYLOAD_WIRE_BUF:
+			data = wire_buf_data(ctx->payload.wire_buf);
+			data_len = wire_buf_data_length(ctx->payload.wire_buf);
+			break;
+		case PROTOLAYER_PAYLOAD_BUFFER:
+			data = ctx->payload.buffer.buf;
+			data_len = ctx->payload.buffer.len;
+			break;
+		default:
+			/* unsupported payload */
+			return protolayer_break(ctx, kr_error(EINVAL));
+	}
+
 	struct comm_info *comm = ctx->comm;
 	if (!s->outgoing && proxy_header_present(data, data_len)) {
 		if (!proxy_allowed(comm->comm_addr)) {
@@ -369,8 +377,12 @@ static enum protolayer_iter_cb_result pl_proxyv2_dgram_unwrap(
 			}
 		}
 
-		ctx->payload = protolayer_payload_buffer(
-				data + trimmed, data_len - trimmed, false);
+		if (ctx->payload.type == PROTOLAYER_PAYLOAD_WIRE_BUF) {
+			wire_buf_trim(ctx->payload.wire_buf, trimmed);
+		} else {  // PROTOLAYER_PAYLOAD_BUFFER
+			ctx->payload = protolayer_payload_buffer(
+					data + trimmed, data_len - trimmed, ctx->payload.short_lived);
+		}
 	}
 
 	return protolayer_continue(ctx);
