@@ -11,8 +11,8 @@ packages = [
     "knot_resolver.client",
     "knot_resolver.client.commands",
     "knot_resolver.controller",
-    "knot_resolver.controller.supervisord",
-    "knot_resolver.controller.supervisord.plugin",
+    "knot_resolver.controller.notify",
+    "knot_resolver.controller.plugin",
     "knot_resolver.datamodel",
     "knot_resolver.datamodel.templates",
     "knot_resolver.datamodel.types",
@@ -25,7 +25,7 @@ packages = [
 
 package_data = {
     "knot_resolver": [
-        "controller/supervisord/*.j2",
+        "controller/*.j2",
         "datamodel/templates/*.j2",
         "datamodel/templates/macros/*.j2"
     ]

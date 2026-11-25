@@ -17,15 +17,15 @@ def _get_templates_dir() -> str:
 _TEMPLATES_DIR = _get_templates_dir()
 
 
-def _import_kresd_config_template() -> Template:
-    path = os.path.join(_TEMPLATES_DIR, "kresd.lua.j2")
+def _import_worker_config_template() -> Template:
+    path = os.path.join(_TEMPLATES_DIR, "worker.lua.j2")
     with open(path, "r", encoding="UTF-8") as file:
         template = file.read()
     return template_from_str(template)
 
 
-def _import_policy_loader_config_template() -> Template:
-    path = os.path.join(_TEMPLATES_DIR, "policy-loader.lua.j2")
+def _import_loader_config_template() -> Template:
+    path = os.path.join(_TEMPLATES_DIR, "loader.lua.j2")
     with open(path, "r", encoding="UTF-8") as file:
         template = file.read()
     return template_from_str(template)
@@ -37,7 +37,7 @@ def template_from_str(template: str) -> Template:
     return env.from_string(template)
 
 
-KRESD_CONFIG_TEMPLATE = _import_kresd_config_template()
+WORKER_CONFIG_TEMPLATE = _import_worker_config_template()
 
 
-POLICY_LOADER_CONFIG_TEMPLATE = _import_policy_loader_config_template()
+LOADER_CONFIG_TEMPLATE = _import_loader_config_template()

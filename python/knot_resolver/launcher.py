@@ -7,8 +7,8 @@ from pwd import getpwuid
 from typing import TYPE_CHECKING, Any
 
 from .constants import LINUX_SYS, USER, VERSION
-from .controller import get_best_controller_implementation
-from .controller.exceptions import KresSubprocessControllerError, KresSubprocessControllerExec
+from .controller import SupervisordController
+from .controller.exceptions import ControllerError
 from .datamodel.config_schema import KresConfig, get_rundir_without_validation
 from .datamodel.globals import Context, set_global_validation_context
 from .exceptions import KresError
@@ -86,8 +86,7 @@ async def start_resolver(args: KresArgs) -> int:
     signal.pthread_sigmask(signal.SIG_BLOCK, blocked_signals)
 
     warning_msg = (
-        "This may affect configuration validation and the proper functioning of the resolver."
-        " Is this intentional?"
+        "This may affect configuration validation and the proper functioning of the resolver. Is this intentional?"
     )
     try:
         # Check that we are running under the intended user
@@ -117,7 +116,7 @@ async def start_resolver(args: KresArgs) -> int:
                     " from '%s', which is used as the prefix for relative paths."
                     "This can cause issues with files that are configured with relative paths.",
                     config_file,
-                    args.config[0]
+                    args.config[0],
                 )
 
             # Preprocess config - load from file or in general take it to the last step before validation.
@@ -140,35 +139,31 @@ async def start_resolver(args: KresArgs) -> int:
         # Validate configuration data
         config = KresConfig(config_data)
 
-        # Reconfigure logging based on config
-        groups = config.logging.groups
-        reconfigure_logging(config, "launcher", bool(groups and "launcher" in groups))
+    except KresError as e:
+        logger.error(e)
+        return 1
 
-        # We don't want more than one Knot Resolver in a single working directory.
-        lock_path: Path = rundir / ".lock"
-        lock = lock_path.open("w")
-        try:
-            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
-            logger.error("Rundir already in use: %s", rundir.absolute())
-            return 1
+    # Reconfigure logging based on config
+    groups = config.logging.groups
+    reconfigure_logging(config, "launcher", bool(groups and "launcher" in groups))
 
-        if LINUX_SYS:
-            # Disable Transparent Huge Pages on Linux for this process and all children.
-            # THP causes large memory footprint in kresd processes (peaks and not returning memory).
-            linux_disable_transparent_huge_pages()
+    if LINUX_SYS:
+        # Disable Transparent Huge Pages on Linux for this process and all children.
+        # THP causes large memory footprint in kresd processes (peaks and not returning memory).
+        linux_disable_transparent_huge_pages()
 
-        # Start the controller
-        controller = await get_best_controller_implementation(config)
-        logger.info("Initializing controller...")
-        await controller.initialize_controller(args, config)
+    # We don't want more than one Knot Resolver in a single working directory.
+    lock_path: Path = rundir / ".lock"
+    lock = lock_path.open("w")
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        logger.error("Rundir already in use: %s", rundir.absolute())
+        return 1
 
-    except KresSubprocessControllerExec as e:
-        # if we caught this exception, some component wants to perform a reexec during startup. Most likely, it would
-        # be a subprocess manager like supervisord, which wants to make sure the manager runs under supervisord in
-        # the process tree. So now we stop everything, and exec what we are told to. We are assuming, that the thing
-        # we'll exec will invoke us again.
-        logger.info("Exec requested with arguments: %s", str(e.exec_args))
+    controller = SupervisordController(args, config)
+    try:
+        controller.write_config()
 
         # Unblock signals, this could actually terminate us straight away
         signal.pthread_sigmask(signal.SIG_UNBLOCK, blocked_signals)
@@ -176,21 +171,11 @@ async def start_resolver(args: KresArgs) -> int:
         # Critical: make the lock FD survive exec()
         os.set_inheritable(lock.fileno(), True)
 
-        # Finally exec what we were told to exec
-        os.execl(*e.exec_args)
-
-    except KresSubprocessControllerError as e:
-        logger.error("Controller initialization failed: %s", e)
+        controller.exec()
+    except ControllerError as e:
+        logger.critical(e)
         return 1
-
-    except KresError as e:
-        logger.error(e)
-        return 1
-
     except Exception:
-        logger.exception("Uncaught generic exception during Knot Resolver startup...")
+        logger.exception("Uncaught generic exception during supervisord controller startup...")
         return 1
-
-    # Should not get here: controller should raise KresSubprocessControllerExec.
-    logger.error("Controller did not raise KresSubprocessControllerExec")
-    return 1
+    return 0

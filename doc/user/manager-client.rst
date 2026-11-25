@@ -295,14 +295,12 @@ single ``kresctl`` command.
         This is because the validation runs under a different user/group than the resolver
         itself and attempts to access the configured paths directly.
 
-    .. option:: --type=<worker|policy-loader>
+    .. option:: --type=<worker|loader>
 
         Which type of Lua script to generate.
 
-        * ``worker`` generates a script for the daemon (default)
-        * ``policy-loader`` generates a script for the one-shot policy loader,
-          which generates a rule database based on ``views``, ``local-data``,
-          and ``forward`` configuration
+        * ``worker`` generates a script for the workers (default)
+        * ``loader`` generates a script for the one-shot loader process, which builds the rule database from the ``views``, ``local-data``, and ``forward`` configuration.
 
     .. option:: [-o, --output <output_file>]
 
