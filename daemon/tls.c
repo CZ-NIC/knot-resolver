@@ -1164,8 +1164,8 @@ static enum protolayer_iter_cb_result pl_tls_unwrap(void *sess_data, void *iter_
 		}
 		VERBOSE_MSG(tls->client_side, "received %zd data\n", count);
 		wire_buf_consume(&tls->unwrap_buf, count);
-		if (wire_buf_free_space_length(&tls->unwrap_buf) == 0 && protolayer_queue_has_payload(&tls->unwrap_queue) > 0) {
-			/* wire buffer is full but not all data was consumed */
+		if (protolayer_queue_has_payload(&tls->unwrap_queue) > 0) {
+			/* not all data was consumed */
 			continue;
 		}
 
