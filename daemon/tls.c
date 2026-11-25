@@ -1208,35 +1208,45 @@ exit_break:
 static ssize_t pl_tls_submit(gnutls_session_t tls_session,
                              struct protolayer_payload payload)
 {
-	if (payload.type == PROTOLAYER_PAYLOAD_WIRE_BUF)
-		payload = protolayer_payload_as_buffer(&payload);
-
 	// TODO: the handling of positive gnutls_record_send() is weird/confusing,
 	// but it seems caught later when checking gnutls_record_uncork()
 
-	if (payload.type == PROTOLAYER_PAYLOAD_BUFFER) {
-		ssize_t count = gnutls_record_send(tls_session,
-				payload.buffer.buf, payload.buffer.len);
-		if (count < 0)
-			return count;
+	ssize_t total_submitted = 0;
+	ssize_t ret;
 
-		return payload.buffer.len;
-	} else if (payload.type == PROTOLAYER_PAYLOAD_IOVEC) {
-		ssize_t total_submitted = 0;
-		for (int i = 0; i < payload.iovec.cnt; i++) {
-			struct iovec iov = payload.iovec.iov[i];
-			ssize_t count = gnutls_record_send(tls_session,
-					iov.iov_base, iov.iov_len);
-			if (count < 0)
-				return count;
+	switch (payload.type) {
 
-			total_submitted += iov.iov_len;
-		}
-		return total_submitted;
+		case PROTOLAYER_PAYLOAD_WIRE_BUF:
+			ret = gnutls_record_send(tls_session,
+					wire_buf_data(payload.wire_buf), wire_buf_data_length(payload.wire_buf));
+			wire_buf_reset(payload.wire_buf);
+			if (ret < 0) return ret;
+			total_submitted = wire_buf_data_length(payload.wire_buf);
+			break;
+
+		case PROTOLAYER_PAYLOAD_BUFFER:
+			ret = gnutls_record_send(tls_session,
+					payload.buffer.buf, payload.buffer.len);
+			if (ret < 0) return ret;
+			total_submitted = payload.buffer.len;
+			break;
+
+		case PROTOLAYER_PAYLOAD_IOVEC:
+			for (int i = 0; i < payload.iovec.cnt; i++) {
+				struct iovec iov = payload.iovec.iov[i];
+				ret = gnutls_record_send(tls_session,
+						iov.iov_base, iov.iov_len);
+				if (ret < 0) return ret;
+				total_submitted += iov.iov_len;
+			}
+			break;
+
+		default:
+			kr_assert(false && "Invalid payload");
+			return kr_error(EINVAL);
 	}
 
-	kr_assert(false && "Invalid payload");
-	return kr_error(EINVAL);
+	return total_submitted;
 }
 
 static enum protolayer_iter_cb_result pl_tls_wrap(

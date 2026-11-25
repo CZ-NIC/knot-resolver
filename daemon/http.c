@@ -946,32 +946,38 @@ static enum protolayer_iter_cb_result pl_http_unwrap(
 	if (!http->h2)
 		return protolayer_break(ctx, kr_error(ENOSYS));
 
-	struct protolayer_payload pld = ctx->payload;
-	if (pld.type == PROTOLAYER_PAYLOAD_WIRE_BUF) {
-		pld = protolayer_payload_as_buffer(&pld);
+	const struct protolayer_payload pld = ctx->payload;
+
+	switch (pld.type) {
+
+		case PROTOLAYER_PAYLOAD_WIRE_BUF:
+			ret = nghttp2_session_mem_recv(http->h2,
+					wire_buf_data(pld.wire_buf), wire_buf_data_length(pld.wire_buf));
+			wire_buf_reset(pld.wire_buf);
+			break;
+
+		case PROTOLAYER_PAYLOAD_BUFFER:
+			ret = nghttp2_session_mem_recv(http->h2,
+					pld.buffer.buf, pld.buffer.len);
+			break;
+
+		case PROTOLAYER_PAYLOAD_IOVEC:
+			for (int i = 0; i < pld.iovec.cnt; i++) {
+				ret = nghttp2_session_mem_recv(http->h2,
+						pld.iovec.iov[i].iov_base,
+						pld.iovec.iov[i].iov_len);
+				if (ret < 0) break;
+			}
+			break;
+
+		default:
+			kr_assert(false && "Invalid payload type");
+			return protolayer_break(ctx, kr_error(EIO));
 	}
 
-	if (pld.type == PROTOLAYER_PAYLOAD_BUFFER) {
-		ret = nghttp2_session_mem_recv(http->h2,
-				pld.buffer.buf, pld.buffer.len);
-		if (ret < 0) {
-			kr_log_debug(DOH, "[%p] nghttp2_session_mem_recv failed: %s (%zd)\n",
-					(void *)http->h2, nghttp2_strerror(ret), ret);
-			return protolayer_break(ctx, kr_error(EIO));
-		}
-	} else if (pld.type == PROTOLAYER_PAYLOAD_IOVEC) {
-		for (int i = 0; i < pld.iovec.cnt; i++) {
-			ret = nghttp2_session_mem_recv(http->h2,
-					pld.iovec.iov[i].iov_base,
-					pld.iovec.iov[i].iov_len);
-			if (ret < 0) {
-				kr_log_debug(DOH, "[%p] nghttp2_session_mem_recv failed: %s (%zd)\n",
-						(void *)http->h2, nghttp2_strerror(ret), ret);
-				return protolayer_break(ctx, kr_error(EIO));
-			}
-		}
-	} else {
-		kr_assert(false && "Invalid payload type");
+	if (ret < 0) {
+		kr_log_debug(DOH, "[%p] nghttp2_session_mem_recv failed: %s (%zd)\n",
+				(void *)http->h2, nghttp2_strerror(ret), ret);
 		return protolayer_break(ctx, kr_error(EIO));
 	}
 

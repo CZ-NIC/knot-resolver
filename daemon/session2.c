@@ -122,6 +122,7 @@ static const struct protolayer_grp protolayer_grps[KR_PROTO_COUNT] = {
 #undef XX
 };
 
+static void protolayer_payload_ensure_long_lived(struct protolayer_iter_ctx *ctx);
 
 const char *protolayer_layer_name(enum protolayer_type p)
 {
@@ -258,32 +259,6 @@ size_t protolayer_payload_copy(void *dest,
 		kr_assert(false && "Invalid payload type");
 		return 0;
 	}
-}
-
-struct protolayer_payload protolayer_payload_as_buffer(
-		const struct protolayer_payload *payload)
-{
-	if (payload->type == PROTOLAYER_PAYLOAD_BUFFER)
-		return *payload;
-
-	if (payload->type == PROTOLAYER_PAYLOAD_WIRE_BUF) {
-		struct protolayer_payload new_payload = {
-			.type = PROTOLAYER_PAYLOAD_BUFFER,
-			.short_lived = payload->short_lived,
-			.ttl = payload->ttl,
-			.buffer = {
-				.buf = wire_buf_data(payload->wire_buf),
-				.len = wire_buf_data_length(payload->wire_buf)
-			}
-		};
-		wire_buf_reset(payload->wire_buf);
-		return new_payload;
-	}
-
-	kr_assert(false && "Unsupported payload type.");
-	return (struct protolayer_payload){
-		.type = PROTOLAYER_PAYLOAD_NULL
-	};
 }
 
 size_t protolayer_queue_count_payload(const protolayer_iter_ctx_queue_t *queue)
@@ -487,28 +462,35 @@ static int protolayer_push(struct protolayer_iter_ctx *ctx)
 {
 	struct session2 *session = ctx->session;
 
-	if (ctx->payload.type == PROTOLAYER_PAYLOAD_WIRE_BUF) {
-		ctx->payload = protolayer_payload_as_buffer(&ctx->payload);
-	}
-
 	if (kr_log_is_debug(PROTOLAYER, NULL)) {
 		VERBOSE_LOG(session, "Pushing %s\n",
 				protolayer_payload_name(ctx->payload.type));
 	}
 
-	if (ctx->payload.type == PROTOLAYER_PAYLOAD_BUFFER) {
-		session2_transport_push(session,
-				ctx->payload.buffer.buf, ctx->payload.buffer.len,
-				ctx->payload.short_lived,
-				ctx->comm, protolayer_push_finished, ctx);
-	} else if (ctx->payload.type == PROTOLAYER_PAYLOAD_IOVEC) {
-		session2_transport_pushv(session,
-				ctx->payload.iovec.iov, ctx->payload.iovec.cnt,
-				ctx->payload.short_lived,
-				ctx->comm, protolayer_push_finished, ctx);
-	} else {
-		kr_assert(false && "Invalid payload type");
-		return kr_error(EINVAL);
+	switch (ctx->payload.type) {
+		case PROTOLAYER_PAYLOAD_WIRE_BUF:
+			// keep wire_buf data alive without copying until finishing iter_ctx
+			protolayer_payload_ensure_long_lived(ctx);
+			session2_transport_push(session,
+					wire_buf_data(ctx->payload.wire_buf), wire_buf_data_length(ctx->payload.wire_buf),
+					ctx->payload.short_lived,  // false now
+					ctx->comm, protolayer_push_finished, ctx);
+			break;
+		case PROTOLAYER_PAYLOAD_BUFFER:
+			session2_transport_push(session,
+					ctx->payload.buffer.buf, ctx->payload.buffer.len,
+					ctx->payload.short_lived,
+					ctx->comm, protolayer_push_finished, ctx);
+			break;
+		case PROTOLAYER_PAYLOAD_IOVEC:
+			session2_transport_pushv(session,
+					ctx->payload.iovec.iov, ctx->payload.iovec.cnt,
+					ctx->payload.short_lived,
+					ctx->comm, protolayer_push_finished, ctx);
+			break;
+		default:
+			kr_assert(false && "Invalid payload type");
+			return kr_error(EINVAL);
 	}
 
 	return PROTOLAYER_RET_ASYNC;

@@ -187,7 +187,7 @@ int wire_buf_trim(struct wire_buf *wb, size_t length);
 /** Moves the valid bytes of the buffer to the buffer's beginning. */
 int wire_buf_movestart(struct wire_buf *wb);
 
-/** Marks the wire buffer as empty. */
+/** Marks the wire buffer as empty, all the data are considered invalid afterwards. */
 int wire_buf_reset(struct wire_buf *wb);
 
 /** Gets a pointer to the data marked as valid in the wire buffer. */
@@ -547,16 +547,6 @@ static inline struct protolayer_payload protolayer_payload_wire_buf(
 		.wire_buf = wire_buf
 	};
 }
-
-/** Convenience function to represent the specified payload as a buffer-type.
- * Supports only `_BUFFER` and `_WIRE_BUF` on the input, otherwise returns
- * `_NULL` type or aborts on assertion if allowed.
- *
- * If the input payload is `_WIRE_BUF`, the pointed-to wire buffer is reset to
- * indicate that all of its contents have been used up, and the buffer is ready
- * to be reused. */
-struct protolayer_payload protolayer_payload_as_buffer(
-		const struct protolayer_payload *payload);
 
 /** A predefined queue type for iteration context. */
 typedef queue_t(struct protolayer_iter_ctx *) protolayer_iter_ctx_queue_t;
