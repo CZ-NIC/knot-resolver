@@ -147,7 +147,7 @@ struct wire_buf {
 };
 
 /** Initializes the wire buffer with the specified `max_size`. */
-void wire_buf_init(struct wire_buf *wb, size_t initial_size);
+void wire_buf_init(struct wire_buf *wb, size_t max_size);
 
 /** De-allocates the wire buffer's underlying memory (the struct itself is left
  * intact). */
