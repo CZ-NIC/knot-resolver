@@ -149,10 +149,6 @@ struct wire_buf {
 /** Initializes the wire buffer with the specified `max_size`. */
 void wire_buf_init(struct wire_buf *wb, size_t max_size);
 
-/** De-allocates the wire buffer's underlying memory (the struct itself is left
- * intact). */
-void wire_buf_deinit(struct wire_buf *wb);
-
 /** Moves wire_buf's underlaying memory (if any) into another wire_buf.
  * The dst has to have buf == NULL, other fields may be uninitialized; all settings are taken from src.
  * The src wire_buf can be then used as after reset, or reinitialized by wire_buf_init. */
@@ -187,8 +183,14 @@ int wire_buf_trim(struct wire_buf *wb, size_t length);
 /** Moves the valid bytes of the buffer to the buffer's beginning. */
 int wire_buf_movestart(struct wire_buf *wb);
 
-/** Marks the wire buffer as empty, all the data are considered invalid afterwards. */
+/** Marks the wire buffer as empty,
+ * all the data are considered invalid and the memory may be deallocated. */
 int wire_buf_reset(struct wire_buf *wb);
+
+/** De-allocates the wire buffer's underlying memory (the struct itself is left intact). */
+static inline void wire_buf_deinit(struct wire_buf *wb) {
+	wire_buf_reset(wb);
+}
 
 /** Gets a pointer to the data marked as valid in the wire buffer. */
 static inline void *wire_buf_data(const struct wire_buf *wb)

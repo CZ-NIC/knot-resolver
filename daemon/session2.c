@@ -754,18 +754,13 @@ void wire_buf_init(struct wire_buf *wb, size_t max_size)
 	};
 }
 
-void wire_buf_deinit(struct wire_buf *wb)
-{
-	if (wb->buf) {
-		mp_free_rawmem(wb->buf, wb->cur_size);
-		wb->buf = NULL;
-	}
-}
-
 void wire_buf_move(struct wire_buf *dst, struct wire_buf *src) {
 	kr_assert(dst->buf == NULL);
 	*dst = *src;
 	src->buf = NULL;
+	src->cur_size = 0;
+	src->start = 0;
+	src->end = 0;
 }
 
 int wire_buf_reserve(struct wire_buf *wb, size_t size)
@@ -816,10 +811,10 @@ int wire_buf_trim(struct wire_buf *wb, size_t length)
 
 int wire_buf_movestart(struct wire_buf *wb)
 {
-	if (kr_fails_assert(wb->buf))
-		return kr_error(EINVAL);
 	if (wb->start == 0)
 		return kr_ok();
+	if (kr_fails_assert(wb->buf))
+		return kr_error(EINVAL);
 
 	size_t len = wire_buf_data_length(wb);
 	if (len) {
@@ -835,6 +830,11 @@ int wire_buf_movestart(struct wire_buf *wb)
 
 int wire_buf_reset(struct wire_buf *wb)
 {
+	if (wb->buf) {
+		mp_free_rawmem(wb->buf, wb->cur_size);
+		wb->buf = NULL;
+		wb->cur_size = 0;
+	}
 	wb->start = 0;
 	wb->end = 0;
 	return kr_ok();
