@@ -43,8 +43,10 @@ Forwarding implementation in Knot Resolver has following properties:
           transport: tls
           hostname: odvr.nic.cz
 
-    # use a local authoritative server for an internal-only zone
-    - subtree: internal.example.com
+    # use a local authoritative server for internal-only zones
+    - subtree:
+        - internal1.example.com
+        - internal2.example.com
       servers: [ 10.0.0.53 ]
       options:
         authoritative: true
@@ -54,9 +56,9 @@ The :option:`forward <forward: <list>>` list of rules overrides which servers ge
 
 .. option:: forward: <list>
 
-   .. option:: subtree: <subtree name>
+   .. option:: subtree: <subtree name>|<list of subtree names>
 
-      Subtree to forward.
+      Subtree(s) to forward.
 
    .. option:: servers: <list of addresses>|<list of servers>
 
